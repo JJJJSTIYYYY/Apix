@@ -1,0 +1,791 @@
+分类和标签模块开发需求文档: '## 项目目标
+
+  为个人博客系统开发分类和标签管理模块，提供完整的CRUD操作和关联管理功能。
+
+
+  ## 功能需求
+
+  ### 分类管理
+
+  1. 创建分类（需要管理员权限）
+
+  2. 获取单个分类详情（包括关联的博客数量）
+
+  3. 获取分类列表（支持分页）
+
+  4. 更新分类（管理员权限）
+
+  5. 删除分类（管理员权限）
+
+  6. 获取分类下的博客列表
+
+
+  ### 标签管理
+
+  1. 创建标签（需要管理员权限）
+
+  2. 获取单个标签详情
+
+  3. 获取标签列表（支持分页、热门标签排序）
+
+  4. 更新标签（管理员权限）
+
+  5. 删除标签（管理员权限）
+
+  6. 获取标签下的博客列表
+
+  7. 获取热门标签（按使用频率排序）
+
+
+  ## 非功能需求
+
+  1. 使用TypeScript
+
+  2. 遵循现有项目结构规范
+
+  3. 使用Prisma进行数据库操作
+
+  4. 使用现有的中间件体系（asyncHandler、错误处理、验证等）
+
+  5. 确保API响应格式统一
+
+  6. 实现权限控制：分类和标签管理仅限管理员
+
+  7. 公共API（如获取分类/标签列表）不需要认证
+
+
+  ## 模块定义
+
+  ### 模块1：分类控制器 (category.controller.ts)
+
+  - createCategory: 创建分类
+
+  - getCategory: 获取单个分类详情
+
+  - getCategories: 获取分类列表
+
+  - updateCategory: 更新分类
+
+  - deleteCategory: 删除分类
+
+  - getCategoryBlogs: 获取分类下的博客列表
+
+
+  ### 模块2：标签控制器 (tag.controller.ts)
+
+  - createTag: 创建标签
+
+  - getTag: 获取单个标签详情
+
+  - getTags: 获取标签列表
+
+  - updateTag: 更新标签
+
+  - deleteTag: 删除标签
+
+  - getTagBlogs: 获取标签下的博客列表
+
+  - getPopularTags: 获取热门标签
+
+
+  ### 模块3：分类服务 (category.service.ts)
+
+  - 分类CRUD操作
+
+  - 分类关联博客查询
+
+  - 分类统计（博客数量）
+
+
+  ### 模块4：标签服务 (tag.service.ts)
+
+  - 标签CRUD操作
+
+  - 标签关联博客查询
+
+  - 标签统计（使用频率、热门标签）
+
+
+  ### 模块5：路由文件
+
+  - category.ts：分类相关路由
+
+  - tag.ts：标签相关路由
+
+
+  ### 模块6：数据验证
+
+  - category.validation.ts：分类数据验证
+
+  - tag.validation.ts：标签数据验证
+
+
+  ## 预期输出
+
+  1. 完整的分类和标签管理API
+
+  2. 所有代码文件放置在正确目录
+
+  3. 代码通过TypeScript编译检查
+
+  4. 与博客模块独立，但考虑未来集成
+
+
+  ## 技术约束
+
+  1. 数据库模型已定义（Category、Tag、BlogTag）
+
+  2. 分类删除时关联博客的categoryId设置为NULL（外键约束SetNull）
+
+  3. 标签删除时通过BlogTag级联删除（外键约束Cascade）
+
+  4. 分类和标签的slug字段必须是唯一的
+
+  5. 热门标签查询按关联博客数量排序
+
+
+  ## 路由设计
+
+  ### 分类路由
+
+  - POST /api/categories - 创建分类（管理员）
+
+  - GET /api/categories - 获取分类列表
+
+  - GET /api/categories/:id - 获取分类详情
+
+  - PUT /api/categories/:id - 更新分类（管理员）
+
+  - DELETE /api/categories/:id - 删除分类（管理员）
+
+  - GET /api/categories/:id/blogs - 获取分类下的博客
+
+
+  ### 标签路由
+
+  - POST /api/tags - 创建标签（管理员）
+
+  - GET /api/tags - 获取标签列表
+
+  - GET /api/tags/:id - 获取标签详情
+
+  - PUT /api/tags/:id - 更新标签（管理员）
+
+  - DELETE /api/tags/:id - 删除标签（管理员）
+
+  - GET /api/tags/:id/blogs - 获取标签下的博客
+
+  - GET /api/tags/popular - 获取热门标签（按使用频率排序）'
+前端开发任务决策: '1. 用户请求开发个人博客项目的前端应用，使用React + TypeScript + Tailwind CSS技术栈。
+
+  2. 需要基于现有需求文档（requirement_document.md），但专注于前端部分。
+
+  3. 工作目录：/workspace/blog-project/frontend。
+
+  4. 后端API基础URL为http://localhost:3001/api（假设后端运行在3001端口）。
+
+  5. 需要创建前端需求文档，分解模块，制定开发计划。
+
+  6. 由于这是一个复杂的任务，需要分解为多个子模块并协调开发。
+
+  7. 将使用shadcn/ui组件库，需要初始化。
+
+  8. 需要创建TODO列表来跟踪进度。'
+博客管理模块开发需求文档: '## 博客管理模块需求文档
+
+
+  ### 项目背景
+
+  作为个人博客系统的核心模块，博客管理模块负责处理博客文章的完整生命周期管理。
+
+
+  ### 模块目标
+
+  实现博客的完整CRUD操作，支持草稿、发布、删除等状态管理，并提供丰富的查询筛选功能。
+
+
+  ### 功能需求
+
+
+  #### 1. 博客创建
+
+  - 需要用户认证
+
+  - 支持标题、内容、摘要、封面图、分类、标签
+
+  - 状态默认为DRAFT
+
+  - 必须关联作者（当前登录用户）
+
+
+  #### 2. 博客查询
+
+  - 获取单个博客详情（包括关联数据）
+
+  - 获取博客列表（支持分页、状态筛选、作者筛选、分类筛选、标签筛选）
+
+  - 获取当前用户的博客列表
+
+  - 按分类获取博客列表
+
+  - 按标签获取博客列表
+
+
+  #### 3. 博客更新
+
+  - 需要作者或管理员权限
+
+  - 可更新标题、内容、摘要、封面图、分类、标签
+
+  - 状态更新需通过专门接口
+
+
+  #### 4. 博客删除
+
+  - 需要作者或管理员权限
+
+  - 软删除（将状态标记为DELETED）或硬删除（根据配置）
+
+
+  #### 5. 博客发布
+
+  - 需要作者或管理员权限
+
+  - 将状态从DRAFT改为PUBLISHED
+
+  - 设置publishedAt时间戳
+
+
+  ### 非功能需求
+
+  1. 性能：列表查询需支持分页，避免大数据量查询
+
+  2. 安全性：严格的权限验证，防止越权操作
+
+  3. 数据一致性：处理关联数据（标签、分类）的更新
+
+  4. 错误处理：统一的错误响应格式
+
+
+  ### 技术约束
+
+  1. 使用TypeScript开发
+
+  2. 遵循现有项目结构模式（控制器-服务-验证-路由）
+
+  3. 使用Prisma ORM进行数据库操作
+
+  4. 使用express-validator进行数据验证
+
+  5. 使用现有的中间件体系（asyncHandler、错误处理、验证、认证）
+
+  6. API响应格式统一：{ success: boolean, data: any, error?: string }
+
+
+  ### 数据库模型
+
+  基于现有Prisma Schema中的Blog模型：
+
+  - 字段：id, title, content, excerpt, coverImage, status, viewCount, publishedAt, createdAt,
+  updatedAt, authorId, categoryId
+
+  - 关联：author, category, blogTags, comments, likes, bookmarks
+
+
+  ### 模块分解
+
+  1. **验证模块**：定义博客创建、更新、查询参数的验证规则
+
+  2. **服务模块**：实现业务逻辑，处理数据库操作和权限验证
+
+  3. **控制器模块**：处理HTTP请求和响应
+
+  4. **路由模块**：定义RESTful API路由
+
+  5. **集成模块**：将博客路由注册到主应用
+
+
+  ### 预期输出
+
+  1. 完整的博客管理API（9个端点）
+
+  2. 类型安全的TypeScript代码
+
+  3. 通过TypeScript编译检查
+
+  4. 完善的错误处理和权限控制
+
+
+  ### 开发优先级
+
+  1. 基础CRUD（创建、读取、更新、删除）
+
+  2. 查询筛选功能
+
+  3. 状态管理功能
+
+  4. 关联数据处理'
+后端API开发任务决策: '1. 用户请求开发个人博客项目的后端API，基于Node.js + Express + TypeScript技术栈。
+
+  2. 使用SQLite数据库和Prisma ORM。
+
+  3. 工作目录：/workspace/blog-project/backend。
+
+  4. 需要实现完整的RESTful API，包括用户认证、博客管理、分类标签、评论、点赞收藏、搜索、文件上传等功能。
+
+  5. 数据库设计已经提供Prisma Schema草案。
+
+  6. 需要创建项目结构，安装依赖，配置TypeScript和Prisma。
+
+  7. 需要实现认证中间件（JWT）、授权中间件、错误处理、CORS等。
+
+  8. 需要实现所有API端点，并确保功能完整。
+
+  9. 需要创建环境变量配置和种子数据脚本。
+
+  10. 需要提供API文档和项目启动说明。
+
+  11. 将使用现有需求文档（requirement_document.md）作为参考，但专注于后端实现。'
+搜索模块开发完成总结: "## 搜索模块开发完成\n\n### 已完成功能\n1. **全文搜索控制器** (`/src/controllers/search.controller.ts`)\n\
+  \   - `searchBlogs`: 支持关键词搜索、分类/标签/作者筛选、日期范围、排序、分页\n   - `searchSuggestions`: 搜索建议（基于标签匹配）\n\
+  \   - `getSearchHistory`: 获取搜索历史（需要认证）\n   - `deleteSearchHistory`: 删除搜索历史\n   -\
+  \ `getPopularSearches`: 获取热门搜索（支持今日、本周、本月、全部统计）\n\n2. **搜索服务** (`/src/services/search.service.ts`)\n\
+  \   - `searchBlogs`: 使用FTS5虚拟表进行全文搜索，支持相关性排序\n   - `searchSuggestions`: 基于标签名称和搜索历史提供建议\n\
+  \   - `addSearchHistory`: 记录搜索历史（需要用户认证）\n   - `getSearchHistory`: 获取用户的搜索历史\n \
+  \  - `deleteSearchHistory`: 删除单条或全部搜索历史\n   - `getPopularSearches`: 使用Prisma groupBy统计热门搜索\n\
+  \n3. **搜索验证** (`/src/validations/search.validation.ts`)\n   - 使用Joi验证所有搜索相关参数，确保输入安全\n\
+  \n4. **搜索路由** (`/src/routes/search.ts`)\n   - 注册所有搜索相关路由，使用相应控制器\n\n5. **路由注册**\
+  \ (`/src/app.ts`)\n   - 在应用主路由中注册 `/api/search` 路径\n\n### 数据库集成\n- 已使用现有FTS5迁移 (`prisma/migrations/20260314192211_add_fts5/migration.sql`)\n\
+  - BlogFTS表已创建，包含title, content, excerpt, blogId字段\n- 搜索使用FTS5 MATCH查询，支持相关性排序\n\
+  - 搜索历史表（SearchHistory）与用户关联\n\n### 技术亮点\n- 使用SQLite FTS5实现全文搜索，支持相关性评分\n- 高级筛选支持分类、标签、作者、状态、日期范围\n\
+  - 搜索建议基于标签和搜索历史，提供智能推荐\n- 热门搜索支持按时间段统计，使用Prisma聚合查询\n- 完整的输入验证和错误处理\n- TypeScript类型安全，编译通过\n\
+  \n### 测试验证\n- 使用自定义测试脚本 (`test_search2.sh`) 验证所有搜索API\n- 搜索结果API返回成功（空数据集，因为测试数据库无博客数据）\n\
+  - 搜索建议API返回标签建议（基于现有标签数据）\n- 热门搜索API返回成功（空数组，因为无搜索历史数据）\n- 所有API响应格式符合项目标准\n\n###\
+  \ 待办事项完成\n✅ 所有7个待办事项已完成，包括代码检查、创建控制器、服务、验证、路由、注册和测试。\n\n### 后续建议\n1. 添加更多测试数据，验证搜索结果正确性\n\
+  2. 考虑实现搜索结果的缓存机制\n3. 可扩展为多语言搜索支持\n4. 前端集成搜索界面\n\n搜索模块现已就绪，可供前端调用。"
+搜索模块开发需求文档: '## 项目：个人博客系统 - 全文搜索模块
+
+
+  ### 项目目标
+
+  实现全文搜索功能，支持博客内容的快速检索，包括关键词搜索、高级筛选、搜索建议、搜索历史和热门搜索功能。
+
+
+  ### 功能需求
+
+
+  #### 1. 全文搜索功能
+
+  - 支持关键词搜索（标题、内容、摘要）
+
+  - 支持布尔搜索（AND, OR, NOT）
+
+  - 支持短语搜索（引号包裹）
+
+  - 支持通配符搜索（可选）
+
+  - 基于SQLite FTS5虚拟表实现
+
+
+  #### 2. 高级筛选
+
+  - 分类筛选（categoryId）
+
+  - 标签筛选（tagIds，多个标签）
+
+  - 作者筛选（authorId）
+
+  - 状态筛选（status，默认只搜索PUBLISHED状态）
+
+  - 日期范围筛选（createdAt范围）
+
+  - 排序选项（相关性、时间、浏览量等）
+
+
+  #### 3. 搜索建议
+
+  - 基于搜索历史和热门搜索生成建议
+
+  - 支持自动完成功能
+
+  - 返回热门标签和分类作为搜索建议
+
+
+  #### 4. 搜索历史
+
+  - 记录用户的搜索历史（需要认证）
+
+  - 支持查看和删除搜索历史
+
+  - 搜索历史可用于个性化推荐
+
+
+  #### 5. 热门搜索
+
+  - 统计热门搜索关键词
+
+  - 可按时间段统计（今日、本周、本月）
+
+  - 防止恶意刷搜索统计
+
+
+  ### 技术约束
+
+  1. 使用TypeScript
+
+  2. 遵循现有项目结构规范
+
+  3. 使用Prisma进行数据库操作，但FTS5可能需要原始SQL查询
+
+  4. 使用现有的中间件体系（asyncHandler、错误处理、验证等）
+
+  5. 确保API响应格式统一
+
+  6. 参考现有模块的代码风格和模式
+
+
+  ### 模块分解
+
+  1. 搜索控制器（/src/controllers/search.controller.ts）
+
+  2. 搜索服务（/src/services/search.service.ts）
+
+  3. 搜索路由（/src/routes/search.ts）
+
+  4. 搜索验证（/src/validations/search.validation.ts）
+
+
+  ### 数据库参考
+
+  - FTS5虚拟表：BlogFTS，包含title, content, excerpt, blogId字段
+
+  - 现有迁移：prisma/migrations/20260314192211_add_fts5/migration.sql
+
+  - 维护脚本：fix-fts.sql, reset-fts.sql
+
+
+  ### 路由参数设计
+
+  搜索博客接口（GET /api/search/blogs）支持以下查询参数：
+
+  - `q` - 搜索关键词（必填）
+
+  - `category` - 分类ID
+
+  - `tag` - 标签ID（可多个，逗号分隔）
+
+  - `author` - 作者ID
+
+  - `status` - 博客状态（默认''PUBLISHED''）
+
+  - `startDate` - 开始日期（ISO格式）
+
+  - `endDate` - 结束日期（ISO格式）
+
+  - `sort` - 排序字段（relevance, createdAt, updatedAt, viewCount）
+
+  - `order` - 排序方向（asc, desc）
+
+  - `page` - 页码（默认1）
+
+  - `limit` - 每页数量（默认10）
+
+
+  ### 预期输出
+
+  1. 完整的搜索功能API
+
+  2. 所有代码文件放置在正确目录
+
+  3. 代码通过TypeScript编译检查
+
+  4. 可以处理常见错误场景
+
+  5. 搜索结果包含相关性评分（如果使用FTS5）
+
+
+  ### 开发优先级
+
+  1. 核心搜索功能（searchBlogs）
+
+  2. 高级筛选和排序
+
+  3. 搜索建议（searchSuggestions）
+
+  4. 搜索历史（searchHistory）
+
+  5. 热门搜索（getPopularSearches）'
+数据库模块开发需求文档: '项目目标：设计并实现个人博客项目的数据库结构，使用SQLite和Prisma ORM。
+
+
+  功能需求：
+
+  1. 数据库设计：定义用户、博客、分类、标签、博客标签关联、评论、点赞、收藏、媒体文件等实体。
+
+  2. Prisma Schema：在schema.prisma中定义所有模型，包括字段、数据类型、约束、关系和索引。
+
+  3. 数据库迁移：创建初始迁移脚本，可应用到SQLite数据库。
+
+  4. 种子数据：创建种子脚本，包含2个用户（admin和user）、3-5个分类、10-15个标签、10-20篇博客（部分草稿，部分发布），每篇博客有评论、点赞、收藏数据。
+
+  5. 全文搜索：配置SQLite FTS5扩展，支持博客标题、内容、分类、标签的全文搜索。
+
+  6. 数据库工具函数：提供连接、事务、查询帮助等工具函数。
+
+
+  非功能性需求：
+
+  - 性能：适当索引优化查询性能。
+
+  - 数据完整性：正确的外键约束和唯一约束。
+
+  - 可维护性：清晰的代码结构和注释。
+
+
+  模块分解：
+
+  1. Prisma Schema设计模块
+
+  2. 数据库迁移模块
+
+  3. 种子数据模块
+
+  4. 全文搜索配置模块
+
+  5. 工具函数模块
+
+
+  预期输出：
+
+  - 完整的Prisma Schema文件（schema.prisma）
+
+  - 数据库迁移文件（prisma/migrations/）
+
+  - 种子数据脚本（seed.ts）
+
+  - 数据库工具函数（可选）
+
+  - 数据库初始化说明文档'
+文件上传模块开发需求文档: "## 项目目标\n为个人博客系统实现文件上传和管理功能，支持图片上传（博客封面）、文件管理、权限控制。\n\n## 功能需求\n1.\
+  \ 文件上传功能\n   - 支持单文件上传（必需）\n   - 支持多文件上传（可选）\n   - 支持图片文件（jpg, png, gif, webp）\n\
+  \   - 支持文件大小限制（最大10MB）\n   - 自动生成唯一文件名\n   - 记录文件元数据到数据库\n\n2. 文件管理功能\n   - 查看文件列表（分页、排序）\n\
+  \   - 查看文件详细信息\n   - 删除文件（同时删除物理文件）\n   - 更新文件信息（如重命名）\n\n3. 权限控制\n   - 上传文件：需要登录用户\n\
+  \   - 查看文件列表：公开或受限（根据配置）\n   - 删除文件：必须是文件上传者或管理员\n   - 更新文件信息：必须是文件上传者或管理员\n\n4.\
+  \ 文件服务功能\n   - 支持直接访问文件（静态文件服务）\n   - 支持图片缩略图生成（可选）\n   - 支持文件分类（如博客封面、用户头像等）\n\n\
+  ## 技术约束\n- 使用TypeScript\n- 使用Express + Prisma\n- 使用multer处理文件上传\n- 文件存储在/uploads/目录，按日期组织（如uploads/2025/03/15/）\n\
+  - 生成唯一文件名（UUID + 扩展名）\n- 遵循现有项目结构规范\n- 使用现有的中间件体系（asyncHandler、错误处理、验证等）\n- 确保API响应格式统一\n\
+  - 确保文件存储安全（防止目录遍历攻击）\n\n## 模块定义\n1. 媒体控制器（/src/controllers/media.controller.ts）\n\
+  \   - uploadFile: 上传文件（需要认证）\n   - getFile: 获取文件信息\n   - getFiles: 获取文件列表（支持分页、按用户筛选）\n\
+  \   - deleteFile: 删除文件（作者或管理员权限）\n   - getUserFiles: 获取用户上传的文件列表\n   - updateFileInfo:\
+  \ 更新文件信息\n\n2. 媒体服务（/src/services/media.service.ts）\n   - 文件存储处理（本地文件系统）\n   - 文件信息记录到数据库\n\
+  \   - 文件删除处理（同时删除物理文件）\n   - 文件类型验证（图片、文档等）\n   - 文件大小限制\n   - 文件名冲突处理\n\n3. 媒体路由（/src/routes/media.ts）\n\
+  \   - POST /api/media/upload - 上传文件\n   - GET /api/media/:id - 获取文件信息\n   - GET\
+  \ /api/media - 获取文件列表\n   - DELETE /api/media/:id - 删除文件\n   - PUT /api/media/:id\
+  \ - 更新文件信息\n   - GET /api/users/:userId/media - 获取用户上传的文件\n\n4. 数据验证（/src/validations/media.validation.ts）\n\
+  \   - 文件类型验证（MIME类型白名单）\n   - 文件大小限制（如最大10MB）\n   - 文件名验证\n\n5. 文件存储配置\n   - 配置multer中间件\n\
+  \   - 静态文件服务配置（Express.static）\n\n## 数据库模型\n使用现有的Media模型（来自schema.prisma）：\n- id:\
+  \ Int\n- filename: String (原始文件名)\n- filepath: String (服务器存储路径)\n- mimeType: String\n\
+  - size: Int (字节)\n- createdAt: DateTime\n- uploaderId: Int (外键)\n\n## 路由设计\n主要路由：\n\
+  - POST /api/media/upload - 上传文件（multipart/form-data）\n- GET /api/media/:id - 获取文件元数据\n\
+  - GET /api/media/:id/download - 下载文件（或直接通过静态文件服务访问）\n- DELETE /api/media/:id - 删除文件\n\
+  - PUT /api/media/:id - 更新文件信息\n- GET /api/media - 获取文件列表（支持分页、筛选）\n\n静态文件服务：\n-\
+  \ 配置Express静态文件中间件，使uploads/目录可通过URL访问\n- 例如：http://localhost:3000/uploads/2025/03/15/filename.jpg\n\
+  \n## 文件存储策略\n目录结构：\nuploads/\n├── 2025/\n│   ├── 03/\n│   │   ├── 15/\n│   │   │\
+  \   ├── abc123.jpg\n│   │   │   └── def456.png\n│   │   └── 16/\n│   │       └──\
+  \ ghi789.webp\n├── avatars/          # 用户头像\n└── blog-covers/      # 博客封面（可选分类）\n\
+  \n文件名生成：\n- 使用UUID生成唯一文件名：{uuid}.{ext}\n- 保留原始文件扩展名\n\n## 预期输出\n1. 完整的文件上传和管理API\n\
+  2. 所有代码文件放置在正确目录\n3. 代码通过TypeScript编译检查\n4. 可以处理常见错误场景（文件过大、类型不支持等）\n5. 静态文件服务配置正确"
+文件上传模块配置决策: '## Multer配置
+
+  - 使用磁盘存储，临时目录为`uploads/temp`
+
+  - 文件大小限制：10MB
+
+  - 允许的MIME类型：图片（jpeg, png, gif, webp, svg+xml）、PDF、文本、Office文档、压缩文件
+
+  - 文件过滤器拒绝不支持的类型
+
+
+  ## 文件存储策略
+
+  - 服务层按年/月/日组织目录结构
+
+  - 生成唯一文件名：原始文件名清理 + UUID + 扩展名
+
+  - 文件路径存储在数据库中，使用正斜杠统一格式
+
+
+  ## 静态文件服务
+
+  - Express静态文件中间件配置为`/uploads`路由
+
+  - 物理文件存储在`uploads/`目录下
+
+  - 通过URL可直接访问：http://localhost:3000/uploads/2025/03/15/filename.jpg
+
+
+  ## 安全措施
+
+  - 文件类型验证（白名单）
+
+  - 文件大小限制
+
+  - 文件名消毒，防止路径遍历攻击
+
+  - 权限控制：上传者或管理员可删除/更新文件'
+评论模块开发需求文档: '## 项目目标
+
+  为个人博客系统实现评论管理模块，支持评论的CRUD操作、嵌套评论、权限控制，并与博客模块和用户模块集成。
+
+
+  ## 功能需求
+
+
+  ### 1. 评论创建
+
+  - 需要用户认证
+
+  - 必须关联博客（blogId）
+
+  - 可选关联父评论（parentCommentId），实现嵌套评论
+
+  - 内容必填，长度限制（1-2000字符）
+
+
+  ### 2. 评论查询
+
+  - 获取单个评论详情（包含用户、博客、父评论信息）
+
+  - 获取博客下的评论列表（支持嵌套结构构建）
+
+  - 获取用户的评论列表
+
+  - 获取评论的回复列表
+
+  - 支持分页、排序、筛选（顶级评论或全部）
+
+
+  ### 3. 评论更新
+
+  - 需要作者或管理员权限
+
+  - 只能更新内容字段
+
+  - 验证博客和父评论是否存在
+
+
+  ### 4. 评论删除
+
+  - 需要作者或管理员权限
+
+  - 支持软删除（标记为删除状态）或物理删除
+
+  - 考虑级联关系（数据库已配置Cascade）
+
+
+  ### 5. 权限控制
+
+  - 创建评论：需要登录用户
+
+  - 更新/删除评论：必须是评论作者或管理员
+
+  - 获取评论列表：公开访问，但可过滤敏感内容
+
+
+  ### 6. 数据关联
+
+  返回评论时包含：
+
+  - 用户信息（id, name, avatar）
+
+  - 博客信息（id, title）
+
+  - 父评论信息（如果有）
+
+  - 回复数量统计
+
+  - 可操作权限标记（canEdit, canDelete）
+
+
+  ## 非功能需求
+
+  1. 使用TypeScript
+
+  2. 遵循现有项目结构规范
+
+  3. 使用Prisma进行数据库操作
+
+  4. 使用现有的中间件体系（asyncHandler、错误处理、验证、认证等）
+
+  5. API响应格式统一：{ success: boolean, data: any, error?: string }
+
+  6. 性能优化：嵌套评论查询避免N+1问题
+
+
+  ## 数据库模型
+
+  基于现有Prisma Schema中的Comment模型：
+
+  - 字段：id, content, createdAt, updatedAt, blogId, userId, parentCommentId
+
+  - 关联：blog, user, parent, replies
+
+  - 索引：blogId, userId, parentCommentId
+
+  - 外键约束：Cascade删除（博客和用户删除时级联删除评论），SetNull（父评论删除时设为null）
+
+
+  ## 模块分解
+
+  1. **验证模块**：定义评论创建、更新、查询参数的验证规则
+
+  2. **服务模块**：实现业务逻辑，处理数据库操作、权限验证、嵌套结构构建
+
+  3. **控制器模块**：处理HTTP请求和响应
+
+  4. **路由模块**：定义RESTful API路由
+
+  5. **集成模块**：将评论路由注册到主应用
+
+
+  ## 技术约束
+
+  1. 嵌套评论支持：评论可以回复其他评论，获取时构建树形结构
+
+  2. 分页和排序：支持page、limit、sort、order查询参数
+
+  3. 权限验证：复用现有的认证中间件和角色检查
+
+  4. 错误处理：统一的错误响应格式
+
+  5. 关联查询：使用Prisma的include进行关联数据查询
+
+
+  ## 路由设计
+
+  - POST /api/comments - 创建评论（需要认证）
+
+  - GET /api/comments/:id - 获取评论详情
+
+  - PUT /api/comments/:id - 更新评论（作者或管理员）
+
+  - DELETE /api/comments/:id - 删除评论（作者或管理员）
+
+  - GET /api/blogs/:blogId/comments - 获取博客的评论列表
+
+  - GET /api/users/:userId/comments - 获取用户的评论列表
+
+  - GET /api/comments/:id/replies - 获取评论的回复列表
+
+
+  ## 预期输出
+
+  1. 完整的评论管理API（7个端点）
+
+  2. 所有代码文件放置在正确目录
+
+  3. 代码通过TypeScript编译检查
+
+  4. 可以处理常见错误场景
+
+  5. 与现有模块（博客、用户）集成良好'

@@ -1,0 +1,201 @@
+<div class="knowledge-base-docs">
+
+  <h2>- · 常见问题 · -</h2>
+
+  <div class="faq-group">
+    <details class="faq-item">
+      <summary>什么是模型技能包？</summary>
+      <div class="faq-content">
+        技能包是一组预定义的功能模块或指令集合，旨在为 Agent 提供执行特定任务或操作的能力，以扩展其应用范围和提升任务完成效率。
+      </div>
+    </details>
+    <details class="faq-item">
+      <summary>我要上传什么格式的技能包？</summary>
+      <div class="faq-content">
+        需要上传一个ZIP格式的技能包。该包的根目录下必须包含一个名为 SKILL.md 的文件，且其内容需符合 Anthropic 兼容的技能包协议。上传后，服务器将自动解析并加载该技能包。请不要上传同名技能包，否则按上传时间加载 latest。
+      </div>
+    </details>
+    <details class="faq-item">
+      <summary>上传什么技能都可以吗？</summary>
+      <div class="faq-content">
+        技能包主要用于封装复杂的操作逻辑，而不会扩展模型本身的基础能力。通常，你可以将复杂的任务流程编写成代码，并将其封装在技能包中，供 Agent 在需要时直接调用。<strong>注：所有的代码将会在本地执行，请不要上传恶意代码。</strong>
+      </div>
+    </details>
+    <details class="faq-item">
+      <summary>一次可以开启几个技能包？</summary>
+      <div class="faq-content">
+        开启的技能包数量未设上限，但不建议开启多个，建议关闭与任务无关的技能包以优化 Agent 表现，同时启用过多技能包可能导致指令冲突、增加决策负担，从而降低任务执行的准确性和效率。
+      </div>
+    </details>
+  </div>
+
+  <h2>- · 常见问题 · -</h2>
+
+  <div class="faq-group">
+    <details class="faq-item">
+      <summary>为什么上传技能包失败？</summary>
+      <div class="faq-content">
+        可能原因包括：技能包中无 SKILL.md 文件、SKILL.md 中无开头的 YAML 格式元数据。
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>为什么技能包加载失败？</summary>
+      <div class="faq-content">
+        可能原因包括：压缩包解压后非技能包文件夹（技能名/SKILL.md），请确保解压后的文件夹名与 SKILL.md 中的技能名一致。
+      </div>
+    </details>
+
+</div>
+
+
+<style>
+/* ================= Base ================= */
+
+.knowledge-base-docs {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 12px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #2c3e50;
+}
+
+h2 {
+  font-size: 1.4em;
+  padding-bottom: 3px;
+}
+
+/* ================= Group ================= */
+
+.kb-group,
+.faq-group {
+  border-radius: 10px;
+  padding: 8px;
+}
+
+/* ================= KB Items ================= */
+
+.kb-item {
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.kb-item.warning {
+  background: #fffbfb;
+  box-shadow: inset 0 0 0 1px #ff190031;
+}
+
+.kb-item summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.kb-index {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e8f2fb;
+  color: #3498db;
+  text-align: center;
+  font-size: 13px;
+  line-height: 22px;
+  flex-shrink: 0;
+}
+
+.kb-item.warning .kb-index {
+  background: #fdecea;
+  color: #e74c3c;
+}
+
+.kb-title {
+  flex: 1;
+}
+
+.kb-content {
+  padding: 0 16px 14px;
+}
+
+.kb-content ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.kb-content li {
+  margin: 6px 0;
+}
+
+details[open] > .kb-content,
+details[open] > .faq-content {
+  animation: fadeSlide 0.25s ease;
+}
+
+.warning-box {
+  background: #fff1f0;
+  border: 1px solid #f3c2c2;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 0.95em;
+}
+
+/* ================= FAQ ================= */
+
+.faq-item {
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.faq-item summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.faq-content {
+  padding: 0 16px 14px;
+  color: #555;
+  animation: fadeSlide 0.25s ease;
+}
+
+/* ================= details reset ================= */
+
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ================= Animation ================= */
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.herf {
+  color: #2cbfc7;
+  text-decoration: none;
+}
+
+.herf:hover {
+  color: #2cbfc7;
+  text-decoration: underline;
+}
+
+</style>

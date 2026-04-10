@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIX - 多引擎Agent平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00d4ff;
+            --secondary: #7c3aed;
+            --accent: #f472b6;
+            --dark: #0f172a;
+            --glow: rgba(0, 212, 255, 0.5);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark);
+            overflow-x: hidden;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 动态背景网格 */
+        .grid-bg {
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 20s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        /* 浮动粒子 */
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            opacity: 0;
+            animation: float 15s infinite;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        @keyframes float {
+            0%, 100% { 
+                transform: translateY(100vh) scale(0); 
+                opacity: 0; 
+            }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { 
+                transform: translateY(-10vh) scale(1); 
+                opacity: 0; 
+            }
+        }
+
+        /* 标题光效 */
+        .title-glow {
+            position: relative;
+            background: linear-gradient(135deg, #fff 0%, var(--primary) 50%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 30px rgba(0, 212, 255, 0.3));
+            animation: textPulse 4s ease-in-out infinite;
+        }
+
+        @keyframes textPulse {
+            0%, 100% { filter: drop-shadow(0 0 30px rgba(0, 212, 255, 0.3)); }
+            50% { filter: drop-shadow(0 0 50px rgba(0, 212, 255, 0.6)); }
+        }
+
+        /* 打字机光标 */
+        .cursor-blink {
+            display: inline-block;
+            width: 3px;
+            height: 1.2em;
+            background: var(--primary);
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 引擎标签动画 */
+        .engine-tag {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .engine-tag::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .engine-tag:hover::before {
+            left: 100%;
+        }
+
+        .engine-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px -10px var(--glow);
+        }
+
+        /* 代码片段装饰 */
+        .code-snippet {
+            font-family: 'JetBrains Mono', monospace;
+            position: relative;
+        }
+
+        .code-snippet::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, transparent 50%, rgba(0,212,255,0.3) 50%);
+        }
+
+        /* 按钮磁吸效果 */
+        .magnetic-btn {
+            transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* 扫描线效果 */
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            opacity: 0.5;
+            animation: scan 8s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100vh); }
+        }
+
+        /* 玻璃拟态卡片 */
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 212, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 功能图标脉冲 */
+        .feature-icon {
+            animation: iconPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes iconPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 渐变边框动画 */
+        .gradient-border {
+            position: relative;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 16px;
+        }
+
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 18px;
+            padding: 2px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent), var(--primary));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            background-size: 300% 300%;
+            animation: gradientRotate 4s ease infinite;
+        }
+
+        @keyframes gradientRotate {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-white relative">
+
+    <!-- 动态背景 -->
+    <div class="fixed inset-0 grid-bg pointer-events-none"></div>
+    <div class="fixed inset-0 pointer-events-none overflow-hidden" id="particles"></div>
+    <div class="fixed inset-0 pointer-events-none">
+        <div class="scanline"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <main class="relative z-10 min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-5xl w-full">
+            
+            <!-- 核心标题组件 -->
+            <div class="glass-card gradient-border rounded-2xl p-8 md:p-12 mb-8 relative overflow-hidden group">
+                <!-- 装饰性代码元素 -->
+                <div class="absolute top-4 right-4 text-xs text-cyan-400/50 font-mono code-snippet bg-slate-800/50 px-3 py-1 rounded border border-cyan-500/20">
+                    &lt;Agent /&gt;
+                </div>
+                
+                <div class="absolute bottom-4 left-4 text-xs text-purple-400/50 font-mono code-snippet bg-slate-800/50 px-3 py-1 rounded border border-purple-500/20">
+                    v2.0.1
+                </div>
+
+                <!-- 主标题区域 -->
+                <div class="text-center mb-8 relative">
+                    <!-- Logo/Icon -->
+                    <div class="inline-flex items-center justify-center w-20 h-20 mb-6 relative">
+                        <div class="absolute inset-0 bg-gradient-to-br from-cyan-400 to-purple-600 rounded-xl rotate-3 opacity-75 blur-sm animate-pulse"></div>
+                        <div class="relative bg-slate-900 rounded-xl p-4 border border-cyan-500/30 shadow-2xl shadow-cyan-500/20">
+                            <svg class="w-12 h-12 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 项目名称 -->
+                    <h1 class="text-6xl md:text-8xl font-black font-mono tracking-tighter mb-4 title-glow select-none">
+                        APIX
+                    </h1>
+                    
+                    <!-- 动态副标题 -->
+                    <div class="h-8 flex items-center justify-center">
+                        <p class="text-lg md:text-xl text-cyan-100/80 font-mono">
+                            <span id="typewriter"></span><span class="cursor-blink"></span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 简介卡片 -->
+                <div class="bg-slate-800/40 rounded-xl p-6 mb-8 border border-white/5 backdrop-blur-sm">
+                    <p class="text-slate-300 text-lg leading-relaxed text-center max-w-2xl mx-auto">
+                        <span class="text-cyan-400 font-semibold">APIX</span> 是一个<span class="text-purple-400 font-semibold">兼容多引擎</span>的 
+                        <span class="text-pink-400 font-semibold">Agent 平台</span>，
+                        能够进行<span class="text-cyan-300">代码开发</span>、<span class="text-purple-300">PPT 生成</span>等复杂任务
+                    </p>
+                </div>
+
+                <!-- 多引擎标签 -->
+                <div class="flex flex-wrap justify-center gap-3 mb-8">
+                    <span class="engine-tag px-4 py-2 bg-slate-800/80 rounded-full text-sm font-mono text-cyan-300 border border-cyan-500/30 flex items-center gap-2">
+                        <span class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+                        GPT-4
+                    </span>
+                    <span class="engine-tag px-4 py-2 bg-slate-800/80 rounded-full text-sm font-mono text-purple-300 border border-purple-500/30 flex items-center gap-2">
+                        <span class="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style="animation-delay: 0.2s"></span>
+                        Claude
+                    </span>
+                    <span class="engine-tag px-4 py-2 bg-slate-800/80 rounded-full text-sm font-mono text-pink-300 border border-pink-500/30 flex items-center gap-2">
+                        <span class="w-2 h-2 bg-pink-400 rounded-full animate-pulse" style="animation-delay: 0.4s"></span>
+                        Gemini
+                    </span>
+                    <span class="engine-tag px-4 py-2 bg-slate-800/80 rounded-full text-sm font-mono text-emerald-300 border border-emerald-500/30 flex items-center gap-2">
+                        <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style="animation-delay: 0.6s"></span>
+                        Local LLM
+                    </span>
+                </div>
+
+                <!-- 功能展示 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="feature-icon bg-slate-800/40 rounded-lg p-4 border border-white/5 hover:border-cyan-500/30 transition-colors group/card">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="p-2 bg-cyan-500/10 rounded-lg">
+                                <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                                </svg>
+                            </div>
+                            <span class="font-semibold text-slate-200">代码开发</span>
+                        </div>
+                        <p class="text-xs text-slate-400">智能编程助手，支持多语言</p>
+                    </div>
+                    
+                    <div class="feature-icon bg-slate-800/40 rounded-lg p-4 border border-white/5 hover:border-purple-500/30 transition-colors group/card" style="animation-delay: 0.5s">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="p-2 bg-purple-500/10 rounded-lg">
+                                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                                </svg>
+                            </div>
+                            <span class="font-semibold text-slate-200">PPT 生成</span>
+                        </div>
+                        <p class="text-xs text-slate-400">自动排版，智能内容生成</p>
+                    </div>
+                    
+                    <div class="feature-icon bg-slate-800/40 rounded-lg p-4 border border-white/5 hover:border-pink-500/30 transition-colors group/card" style="animation-delay: 1s">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="p-2 bg-pink-500/10 rounded-lg">
+                                <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <span class="font-semibold text-slate-200">复杂任务</span>
+                        </div>
+                        <p class="text-xs text-slate-400">多步骤自动化工作流</p>
+                    </div>
+                </div>
+
+                <!-- 开发者信息 -->
+                <div class="flex items-center justify-center gap-4 pt-6 border-t border-white/10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-600 p-[2px]">
+                            <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-sm font-bold text-cyan-400">
+                                J
+                            </div>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-slate-200">Justiy</p>
+                            <p class="text-xs text-slate-500">Creator & Maintainer</p>
+                        </div>
+                    </div>
+                    <div class="h-8 w-px bg-white/10"></div>
+                    <div class="flex gap-3">
+                        <button class="magnetic-btn p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/10 hover:border-cyan-500/50 transition-all group">
+                            <svg class="w-5 h-5 text-slate-400 group-hover:text-cyan-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </button>
+                        <button class="magnetic-btn px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-cyan-500/25 transition-all border border-white/10">
+                            Get Started
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部状态栏 -->
+            <div class="flex justify-between items-center text-xs text-slate-500 font-mono px-4">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span>System Operational</span>
+                </div>
+                <div class="flex gap-4">
+                    <span>MIT License</span>
+                    <span>•</span>
+                    <span>Open Source</span>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // 打字机效果
+        const phrases = [
+            "Multi-Engine Agent Platform",
+            "Code Development Assistant",
+            "PPT Generation Expert",
+            "Complex Task Automation"
+        ];
+        let phraseIndex = 0;
+        let charIndex = 0;
+        let isDeleting = false;
+        const typewriterElement = document.getElementById('typewriter');
+
+        function typeWriter() {
+            const currentPhrase = phrases[phraseIndex];
+            
+            if (isDeleting) {
+                typewriterElement.textContent = currentPhrase.substring(0, charIndex - 1);
+                charIndex--;
+            } else {
+                typewriterElement.textContent = currentPhrase.substring(0, charIndex + 1);
+                charIndex++;
+            }
+
+            let typeSpeed = isDeleting ? 50 : 100;
+
+            if (!isDeleting && charIndex === currentPhrase.length) {
+                typeSpeed = 2000;
+                isDeleting = true;
+            } else if (isDeleting && charIndex === 0) {
+                isDeleting = false;
+                phraseIndex = (phraseIndex + 1) % phrases.length;
+                typeSpeed = 500;
+            }
+
+            setTimeout(typeWriter, typeSpeed);
+        }
+
+        // 生成背景粒子
+        function createParticles() {
+            const container = document.getElementById('particles');
+            const particleCount = 20;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // 磁吸按钮效果
+        document.querySelectorAll('.magnetic-btn').forEach(btn => {
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                btn.style.transform = `translate(${x * 0.2}px, ${y * 0.2}px)`;
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = 'translate(0, 0)';
+            });
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            typeWriter();
+            createParticles();
+        });
+
+        // 鼠标轨迹光效
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            document.documentElement.style.setProperty('--mouse-x', x);
+            document.documentElement.style.setProperty('--mouse-y', y);
+        });
+    </script>
+</body>
+</html>

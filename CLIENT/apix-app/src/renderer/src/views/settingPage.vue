@@ -1,0 +1,1582 @@
+<template>
+  <el-container>
+    <el-aside style="width: auto;">
+      <HomePage />
+    </el-aside>
+
+    <keep-alive>
+      <transition name="fade" mode="out-in">
+        <el-main
+          v-if="showPage"
+          ref="page"
+          class="main-page"
+          :style="{ 
+            height: pageHeight + 'px',
+            background: `rgba(255, 255, 255, ${store.transparencyValue / 100})`
+          }"
+        >
+          <div class="title-tag-wrapper">
+            <div
+              class="title-tag"
+              v-html="titleDocs"
+            ></div>
+          </div>
+          <div
+            class="app-layout"
+          >
+            <!-- 组1: 界面设置 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">界面设置</span>
+              </div>
+              <!-- Brightness -->
+              <div class="setting-card">
+                <div class="setting-title">背景亮度</div>
+                <div class="setting-control">
+                  <el-slider
+                    v-model="store.config.lightValue"
+                    :min="0"
+                    :max="100"
+                    @change="changeLightValue"
+                  />
+                  <span class="setting-value">{{ store.config.lightValue }}%</span>
+                </div>
+              </div>
+
+              <!-- Transparency -->
+              <div class="setting-card">
+                <div class="setting-title">背景透明度</div>
+                <div class="setting-control"> 
+                  <el-slider
+                    v-model="store.config.transparencyValue"
+                    :min="0"
+                    :max="100"
+                    @change="changeTransparencyValue"
+                  />
+                  <span class="setting-value">{{ store.config.transparencyValue }}%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组2: 数据管理 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">数据管理</span>
+              </div>
+              <!-- Reset -->
+              <div class="setting-card">
+                <div class="setting-title">重载预设卡片</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    恢复预设卡片到初始状态，已修改或新增的卡片不会被删除。
+                  </div>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="resetPresetCard"
+                    class="confirm-button"
+                  >
+                    恢复
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- Clear cache -->
+              <div class="setting-card">
+                <div class="setting-title">打开缓存文件夹</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    打开保存卡片以及用例的文件夹位置。
+                  </div>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click=""
+                    class="confirm-button"
+                  >
+                    打开
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组3: 网络代理 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">网络代理</span>
+              </div>
+              <!-- Port -->
+              <div class="setting-card">
+                <div class="setting-title">为AI服务设置全局网络代理</div>
+                <div class="setting-control">
+                  <el-input
+                    placeholder="http://expmale.com:7890 ,http://expmale.com:7890 "
+                    v-model="store.config.httpProxyUrl"
+                    class="line-input"
+                  >
+                  </el-input>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="setNetProxy"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">全局代理排除以下地址</div>
+                <div class="setting-control">
+                  <el-input
+                    placeholder="localhost,127.0.0.1,expmale.com"
+                    v-model="store.config.excludeUrl"
+                    class="line-input"
+                  >
+                  </el-input>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="setNetProxy"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组4: AI设置 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">能力设置</span>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">允许 Agent 操作文件</div>
+                <div class="setting-control">
+                  <div class="setting-info">允许Agent对工作区文件进行修改，包括读取用户上传文件、查看工作区目录、新建或<strong>删改</strong>工作区文件。</div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.fileOpration }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.fileOpration }"
+                      @click="switchMode('fileOpration', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.fileOpration }"
+                      @click="switchMode('fileOpration', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">允许 Agent 执行命令</div>
+                <div class="setting-control">
+                  <div class="setting-info">开放命令行权限给Agent，允许Agent在沙箱内执行命令。</div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.commandOpration }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.commandOpration }"
+                      @click="switchMode('commandOpration', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.commandOpration }"
+                      @click="switchMode('commandOpration', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">允许 Agent 浏览网页</div>
+                <div class="setting-control">
+                  <div class="setting-info" :class="{ danger_info: store.config.webSearch && store.config.knowledgeRetrieval}">
+                    允许Agent使用网络搜索工具在互联网上搜索信息。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.webSearch }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.webSearch }"
+                      @click="switchMode('webSearch', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.webSearch }"
+                      @click="switchMode('webSearch', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">允许 Agent 访问知识库</div>
+                <div class="setting-control">
+                  <div class="setting-info" :class="{ danger_info: store.config.webSearch && store.config.knowledgeRetrieval }">
+                    允许Agent使用知识库检索工具在知识库中搜索信息。与网络搜索能力同时开启时，会降低模型知识库检索表现。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.knowledgeRetrieval }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.knowledgeRetrieval }"
+                      @click="switchMode('knowledgeRetrieval', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.knowledgeRetrieval }"
+                      @click="switchMode('knowledgeRetrieval', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">允许 Agent 使用技能包</div>
+                <div class="setting-control">
+                  <div class="setting-info">允许Agent加载技能包，获取技能包扩展。</div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.skillLoad }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.skillLoad }"
+                      @click="switchMode('skillLoad', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.skillLoad }"
+                      @click="switchMode('skillLoad', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">启用模型视觉输入</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    开启后，图片将发送给模型进行理解，而不使用OCR工具提取文字。系统会自动检测模型是否具备视觉处理能力。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.visionOn }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.visionOn }"
+                      @click="switchMode('visionOn', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.visionOn }"
+                      @click="switchMode('visionOn', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">启用 Agent 子代理   <span class="setting-label">Beta</span></div>
+                <div class="setting-control">
+                  <div class="setting-info" :class="{ danger_info: store.config.agentAssign }">
+                    开启智能体子代理模式，提供异步任务处理能力，不推荐在个人PC本地部署时开启。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.agentAssign }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.agentAssign }"
+                      @click="switchMode('agentAssign', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.agentAssign }"
+                      @click="switchMode('agentAssign', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">启用 Agent-Term 蜂群模式   <span class="setting-label">Beta</span></div>
+                <div class="setting-control">
+                  <div class="setting-info" :class="{ danger_info: store.config.agentSwarm }">
+                    开启多智能体协作模式，不推荐在个人PC本地部署时开启。开启此项默认将 <strong>Agent 子代理</strong> 视为已开启。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.agentSwarm }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.agentSwarm }"
+                      @click="switchMode('agentSwarm', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.agentSwarm }"
+                      @click="switchMode('agentSwarm', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组4: AI设置 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">记忆设置</span>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">开启长期记忆</div>
+                <div class="setting-control">
+                  <div class="setting-info"  :class="{ danger_info: store.config.longtermMemory }">
+                    不推荐在个人PC本地部署时开启, 算力不足时可能导致Agent运行缓慢。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.longtermMemory }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.longtermMemory }"
+                      @click="switchMode('longtermMemory', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.longtermMemory }"
+                      @click="switchMode('longtermMemory', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">当上下文达到窗口大小限制时自动总结上下文</div>
+                <div class="setting-control">
+                  <div class="setting-info">需同步设置上下文总结触发阈值与保留的窗口长度</div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.shorttermMemory }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.shorttermMemory }"
+                      @click="switchMode('shorttermMemory', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.shorttermMemory }"
+                      @click="switchMode('shorttermMemory', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div v-if="store.config.shorttermMemory" class="setting-title">上下文总结触发阈值</div>
+                <div v-else class="setting-title">上下文截断触发阈值</div>
+                <div class="setting-control">
+                  <div class="setting-info">过小的触发阈值可能导致Agent陷入死循环，最小生效值为16</div>
+                  <el-input-number 
+                    v-model="summaryMessages"
+                    controls-position="right" 
+                    class="number-input"
+                  />
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeMessageSummary"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div v-if="store.config.shorttermMemory" class="setting-title">总结时保留的上下文长度</div>
+                <div v-else class="setting-title">截断时保留的上下文长度</div>
+                <div class="setting-control">
+                  <div class="setting-info">过小的保留长度可能导致Agent陷入死循环，最小生效值为4</div>
+                  <el-input-number 
+                    v-model="keepMessages"
+                    controls-position="right" 
+                    class="number-input"
+                  />
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeKeepNotSummary"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组5: 联网搜索配置 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">联网搜索</span>
+              </div>
+              <!-- Online search -->
+              <div class="setting-card">
+                <div class="setting-title">配置关键词搜索引擎</div>
+                <div class="setting-control">
+                  <el-select v-model="linkProvider" placeholder="Auto" class="select-input">
+                    <el-option
+                      v-for="item in linkProviderOptions"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                      :disabled="item.disabled"
+                    />
+                  </el-select>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeLinkProvider"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">配置关键词搜索引擎API-Key</div>
+                <div class="setting-control">
+                  <el-input
+                    v-model="linkApiKey"
+                    type="password"
+                    placeholder="Your API key"
+                    show-password
+                    class="line-input"
+                  />
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeLinkApiKey"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">配置网页内容搜索引擎</div>
+                <div class="setting-control">
+                  <el-select v-model="contentPovider" placeholder="Auto" class="select-input">
+                    <el-option
+                      v-for="item in contentPoviderOptions"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeContentPovider"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">配置网页内容搜索API-Key</div>
+                <div class="setting-control">
+                  <el-input
+                    v-model="contentApiKey"
+                    type="password"
+                    placeholder="Your API key"
+                    show-password
+                    class="line-input"
+                  />
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeContentApiKey"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">配置AI联网搜索内容过滤规则</div>
+                <div class="setting-control">
+                  <el-select v-model="webContentFilter" placeholder="规则过滤 (默认)" class="select-input">
+                    <el-option
+                      v-for="item in webContentFilterOptions"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeWebContentFilter"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">允许的域名关键字</div>
+                <div class="setting-control">
+                  <el-input
+                    placeholder="选择一个配置文件或直接输入 e.g: wiki,github,arxiv"
+                    v-model="store.config.excludeWebUrl"
+                    class="line-input"
+                  >
+                  </el-input>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click=""
+                    class="confirm-button"
+                  >
+                    打开
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组6: 功能开关 -->
+            <div class="setting-group">
+              <div class="group-divider">
+                <span class="group-label">其他设置</span>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">限制LLM单节点最大输出Chunk数</div>
+                <div class="setting-control">
+                  <div class="setting-info">超出限制时将<strong>强制停止</strong>模型输出，能一定程度上制止重复诅咒</div>
+                  <el-input-number 
+                    v-model="tokenLimit"
+                    controls-position="right" 
+                    class="number-input"
+                  />
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="storeTokenLimit"
+                    class="confirm-button"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">异步工具返回时唤醒AI</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    异步工具返回结果时主动唤醒AI (若AI正在生成, 将会打断)。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.toolsInvokeAi }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.toolsInvokeAi }"
+                      @click="switchMode('toolsInvokeAi', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.toolsInvokeAi }"
+                      @click="switchMode('toolsInvokeAi', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-card">
+                <div class="setting-title">使用模型视觉处理文档   <span class="danger-label">已废弃</span></div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    使用视觉模型处理Office文档以及PDF，单次最大处理页数取决于模型能力，不推荐在大文档使用。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.visionDocument }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.visionDocument }"
+                      @click="switchMode('visionDocument', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.visionDocument }"
+                      @click="switchMode('visionDocument', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">将过去的工具返回内容写入提示词</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    工具的返回结果通常会携带大量的文本信息，极大增加Token消耗，如果是本地模型，将同时增加GPU的计算负担。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.remainToolsCache }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.remainToolsCache }"
+                      @click="switchMode('remainToolsCache', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.remainToolsCache }"
+                      @click="switchMode('remainToolsCache', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">重置模型能力缓存</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    重置服务器对于模型能力的缓存信息，如果您发现支持视觉输入的模型错误的使用了OCR工具提取文字，可尝试此功能。
+                  </div>
+                  <el-button
+                    type="primary"
+                    off
+                    size="default"
+                    @click="clearVisionCache()"
+                    class="confirm-button"
+                  >
+                    重置
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">开启纯对话模式</div>
+                <div class="setting-control">
+                  <div class="setting-info" :class="{ danger_info: store.config.pureChat }">
+                    开启此选项将禁用Agent全部工具（含生成计划、多模态、联网搜索、文件操作等），适用于无工具调用能力的模型。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.pureChat }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.pureChat }"
+                      @click="switchMode('pureChat', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.pureChat }"
+                      @click="switchMode('pureChat', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Logout -->
+          <div class="logout-btn-wrapper">
+            <el-button
+              type="danger"
+              off
+              @click="onLogout"
+            >
+              Logout {{ username }}
+            </el-button>
+          </div>
+        </el-main>
+      </transition>
+    </keep-alive>
+  </el-container>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+
+import HomePage from './homePage.vue'
+import { useAppCacheData } from '../store/app'
+import { useAuthStore } from "../store/auth"
+import { defaultCards } from '../store/globalData.js'
+import { ConfirmDialog } from './component/comp/confirmDialog.js'
+import titleDocs from '../assets/background/title.html?raw'
+
+const router = useRouter()
+const store = useAppCacheData()
+const authStore = useAuthStore()
+const username = ref("")
+
+/* Layout */
+const pageHeight = ref(window.innerHeight - 30)
+const showPage = ref(false)
+
+const updatePageHeight = () => {
+  pageHeight.value = window.innerHeight - 30
+}
+
+onMounted(async () => {
+  window.addEventListener('resize', updatePageHeight)
+  showPage.value = true
+
+  await authStore.restore()
+  username.value = authStore.user.username
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updatePageHeight)
+})
+
+/* Settings */
+const changeLightValue = (value) => {
+  store.saveAppConfig('lightValue', value)
+}
+
+const changeTransparencyValue = (value) => {
+  store.saveAppConfig('transparencyValue', value)
+}
+
+/* Proxy */
+const setNetProxy = async () => {
+  store.saveAppConfig('httpProxyUrl', store.config.httpProxyUrl)
+  try {
+    const res = await window.api.setProxy(
+      store.config.httpProxyUrl,
+      store.config.httpsProxyUrl,
+      store.config.excludeUrl
+    )
+    ElMessage.success('代理已保存')
+  } catch (err) {
+    ElMessage.error('代理保存失败')
+    console.error(err)
+  }
+}
+
+/* Reset cards */
+const resetPresetCard = () => {
+  const presets = defaultCards()
+  const cardMap = new Map(store.cards.map(c => [c.id, c]))
+
+  let index = 0
+  presets.forEach(preset => {
+    if (cardMap.has(preset.id)) {
+      const exist = cardMap.get(preset.id)
+      Object.assign(exist, preset)
+
+      const oldIndex = store.cards.indexOf(exist)
+      if (oldIndex !== index) {
+        store.cards.splice(oldIndex, 1)
+        store.cards.splice(index, 0, exist)
+      }
+    } else {
+      store.cards.splice(index, 0, preset)
+    }
+    index++
+  })
+
+  store.saveCards()
+  ElMessage.success('已恢复预设')
+}
+
+const clearVisionCache = async () => {
+  try {
+    await ConfirmDialog.confirm(
+      `确定模型能力清除缓存？`,
+      '重置确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+
+    try {
+      await window.api.clearVisionCache()
+      ElMessage.success('已重置')
+    }catch (err) {
+      ElMessage.error('重置失败')
+      console.error("error to restore vision_cache: ", err)
+    }
+  } catch (err) {
+  }
+}
+
+/* Token limit */
+const tokenLimit = ref(store.config.tokenLimit || 0)
+function storeTokenLimit() {
+  store.config.tokenLimit = tokenLimit.value
+  store.saveAppConfig('tokenLimit', tokenLimit.value)
+  ElMessage.success('保存成功')
+}
+
+/* Summary messages */
+const summaryMessages = ref(store.config.messageSummary || 0)
+function storeMessageSummary() {
+  store.config.messageSummary = summaryMessages.value
+  store.saveAppConfig('messageSummary', summaryMessages.value)
+  ElMessage.success('保存成功')
+}
+const keepMessages = ref(store.config.keepNotSummary || 0)
+function storeKeepNotSummary() {
+  store.config.keepNotSummary = keepMessages.value
+  store.saveAppConfig('keepNotSummary', keepMessages.value)
+  ElMessage.success('保存成功')
+}
+
+/* Search Links (Urls) Provider */
+const linkProvider = ref(store.config.linkProvider || '')
+const linkProviderOptions = [
+  {
+    value: '',
+    label: 'Auto',
+  },
+  {
+    value: 'duckduckgo',
+    label: 'DuckDuckGo',
+  },
+  {
+    value: 'bing',
+    label: 'Bing',
+  },
+  {
+    value: 'bocha',
+    label: 'Bocha',
+  },
+  {
+    value: 'google',
+    label: 'Google',
+    disabled: true,
+  },
+  {
+    value: 'searxng',
+    label: 'Searxng',
+    disabled: true,
+  },
+  {
+    value: 'tavily',
+    label: 'Tavily',
+  },
+  {
+    value: 'uniFuncs',
+    label: 'UniFuncs',
+  }
+]
+function storeLinkProvider() {
+  store.config.linkProvider = linkProvider.value
+  store.saveAppConfig('linkProvider', linkProvider.value)
+  ElMessage.success('保存成功')
+}
+const linkApiKey = ref(store.config.linkApiKey || '')
+function storeLinkApiKey() {
+  store.config.linkApiKey = linkApiKey.value
+  store.saveAppConfig('linkApiKey', linkApiKey.value)
+  ElMessage.success('保存成功')
+}
+
+/* Search Contents Provider */
+const contentPovider = ref(store.config.contentPovider || '')
+const contentPoviderOptions = [
+  {
+    value: '',
+    label: 'Auto',
+  },
+  {
+    value: 'tavily',
+    label: 'Tavily',
+  },
+  {
+    value: 'crawl4ai',
+    label: 'Crawl4AI',
+  },
+  {
+    value: 'jina',
+    label: 'Jina',
+  }
+]
+function storeContentPovider() {
+  store.config.contentPovider = contentPovider.value
+  store.saveAppConfig('contentPovider', contentPovider.value)
+  ElMessage.success('保存成功')
+}
+
+const contentApiKey = ref(store.config.contentApiKey || '')
+function storeContentApiKey() {
+  store.config.contentApiKey = contentApiKey.value
+  store.saveAppConfig('contentApiKey', contentApiKey.value)
+  ElMessage.success('保存成功')
+}
+
+/* Search Contents filter */
+const webContentFilter = ref(store.config.webContentFilter || '')
+const webContentFilterOptions = [
+  {
+    value: 'rule',
+    label: '规则过滤 (默认)',
+  },
+  {
+    value: 'llm',
+    label: '大模型过滤',
+  },
+  {
+    value: 'none',
+    label: '无过滤',
+  }
+]
+function storeWebContentFilter() {
+  store.config.webContentFilter = webContentFilter.value
+  store.saveAppConfig('webContentFilter', webContentFilter.value)
+  ElMessage.success('保存成功')
+}
+
+/* Generic boolean mode switch */
+const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
+  const value = target === 'on'
+
+  // Update reactive config
+  store.config[key] = value as any
+
+  // Persist to local storage / backend
+  store.saveAppConfig(key as string, value)
+}
+
+/* Logout */
+const onLogout = async () => {
+  try {
+    await ConfirmDialog.confirm(
+      `确定登出账户 "${username.value}" 吗？`,
+      '登出确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    authStore.logout()
+    window.api.closeWebsocket()
+    store.messages.length = 0
+    router.replace("/loginPage")
+  } catch (err) {
+  }
+}
+</script>
+
+<style scoped>
+:deep(.el-select__wrapper .el-tooltip__trigger .el-tooltip__trigger) {
+  display: block !important;
+  opacity: 1 !important;
+}
+
+:deep(.el-slider__bar) {
+  background-color:rgb(136, 202, 197);
+}
+
+:deep(.el-slider__button) {
+  background-color:rgb(235, 247, 255);
+  /* backdrop-filter: blur(6px); */
+  border: 2px solid rgb(136, 202, 197);
+  border-radius: 10px;
+}
+
+:deep(.el-slider__button:hover) {
+  width: 24px;
+  transform: none;
+}
+
+:deep(.el-popper:deep(*)) {
+  color: #000;
+}
+
+span.el-popper__arrow {
+    display: none;
+}
+
+:deep(.el-slider__button:active) {
+  transform: scale(1.2);
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, rgb(136, 202, 197) 25%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(3px);
+  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
+  color: #2f3a3a;
+}
+
+.main-page {
+  position: relative;
+  padding: 16px;
+  background-color: rgba(225, 233, 231, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title-tag-wrapper {
+  position: relative;
+  width: 100%;
+  height: fit-content;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  opacity: 0.95;
+}
+
+.title-tag {
+  width: 1000px;
+  transition: all 0.25s ease;
+}
+
+.title-tag:hover {
+  transform: scale(1.01);
+}
+
+.app-layout {
+  padding: 24px 32px;
+  padding-bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: rgba(255, 255, 255, 0);
+  border-radius: 14px;
+  width: 1000px;
+  max-width: 1200px;
+}
+
+.setting-group {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 50% 50%;
+  gap: 18px;
+  width: 100%;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.group-divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.group-label {
+  position: relative;
+  width: 100%;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgb(136, 202, 197);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 4px 12px;
+  background: rgba(136, 202, 197, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(136, 202, 197, 0.2);
+}
+
+.setting-card {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: 12px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+.setting-card:hover {
+  position: relative;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.setting-label {
+  margin-right: 6px;
+  padding: 2px 6px;
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.1);
+  background: rgba(5, 150, 105, 0.05);
+  border-radius: 16px;
+  font-size: 10px;
+}
+
+.danger-label {
+  margin-right: 6px;
+  padding: 2px 6px;
+  color: #960505;
+  border: 1px solid rgba(150, 22, 5, 0.1);
+  background: rgba(150, 22, 5, 0.05);
+  border-radius: 16px;
+  font-size: 10px;
+}
+
+.setting-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f3a3a;
+  position: relative;
+}
+
+.setting-control {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  width: calc(100% - 78px);
+}
+
+.setting-info {
+  font-size: 12px;
+  color: #5a6a6a;
+  position: relative;
+  -webkit-transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.danger_info {
+  color: #ff2f28ca;
+  -webkit-transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.confirm-button {
+  position: absolute;
+  right: 14px;
+  width: 64px;
+  color: rgb(84, 125, 122);
+  border: 2px solid color-mix(in srgb, rgb(136, 202, 197) 25%, transparent);
+  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background-color: #d6eeeb0c;
+}
+
+.confirm-button:hover {
+  background-color: #00aa9315;
+}
+
+.confirm-button:active {
+  background-color: rgba(136, 202, 196, 0.236);
+}
+
+.setting-value {
+  width: 44px;
+  text-align: right;
+  font-size: 13px;
+  color: #5a6a6a;
+}
+
+.line-input {
+  width: 100%;
+}
+
+/* 输入框基础样式 - 青绿色主题边框 */
+.line-input:deep(.el-input__wrapper) {
+  background: rgba(214, 238, 235, 0.05);
+  border: 2px solid color-mix(in srgb, rgb(136, 202, 197) 25%, transparent);
+  border-radius: 999px;
+  padding: 0 12px;
+  box-shadow: none;
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* 悬浮状态 */
+.line-input:deep(.el-input__wrapper:hover),
+.line-input:deep(.el-input__wrapper.is-hover) {
+  border-color: color-mix(in srgb, rgb(136, 202, 197) 50%, transparent);
+  background: rgba(0, 170, 147, 0.08);
+}
+
+/* 聚焦状态 */
+.line-input:deep(.el-input__wrapper.is-focus) {
+  background: rgba(136, 202, 196, 0.24);
+  background: rgba(184, 225, 222, 0.1);
+}
+
+/* 输入文字样式 */
+.line-input:deep(.el-input__inner) {
+  color: rgb(84, 125, 122);
+  font-weight: 500;
+  height: 32px;
+  line-height: 32px;
+}
+
+/* placeholder 颜色 */
+.line-input:deep(.el-input__inner::placeholder) {
+  color: color-mix(in srgb, rgb(136, 202, 197) 60%, transparent);
+}
+
+/* 禁用状态 */
+.line-input:deep(.el-input__wrapper.is-disabled) {
+  background: rgba(214, 238, 235, 0.02);
+  border-color: color-mix(in srgb, rgb(136, 202, 197) 15%, transparent);
+}
+
+.line-input:deep(.el-input__inner:disabled) {
+  color: color-mix(in srgb, rgb(84, 125, 122) 50%, transparent);
+}
+
+.number-input {
+  width: 100%;
+}
+
+/* 输入框基础样式 - 青绿色主题边框 */
+.number-input:deep(.el-input__wrapper) {
+  background: rgba(214, 238, 235, 0.05);
+  border: 2px solid color-mix(in srgb, rgb(136, 202, 197) 25%, transparent);
+  border-radius: 999px;
+  padding: 0 12px;
+  box-shadow: none;
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* 覆盖 Element Plus 默认的蓝色悬浮 - 关键修复 */
+.number-input:deep(.el-input__wrapper:hover),
+.number-input:deep(.el-input__wrapper.is-hover) {
+  border-color: color-mix(in srgb, rgb(136, 202, 197) 50%, transparent) !important;
+  background: rgba(0, 170, 147, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* 覆盖按钮悬浮时父级的蓝色边框 - 关键修复 */
+.number-input:deep(.el-input__wrapper:has(.el-input-number__increase:hover)),
+.number-input:deep(.el-input__wrapper:has(.el-input-number__decrease:hover)) {
+  border-color: color-mix(in srgb, rgb(136, 202, 197) 50%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.number-input:deep(.el-input__wrapper.is-focus) {
+  border-color: rgba(66, 167, 161, 0.528) !important;
+  background: rgba(136, 202, 196, 0.1);
+  box-shadow: none !important;
+}
+
+/* 输入文字左对齐 */
+.number-input:deep(.el-input__inner) {
+  text-align: left;
+  color: rgb(84, 125, 122);
+  font-weight: 500;
+  height: 34px;
+  line-height: 34px;
+  padding-right: 70px;
+}
+
+/* 控制按钮 - 圆形青绿色主题 */
+.number-input:deep(.el-input-number__increase),
+.number-input:deep(.el-input-number__decrease) {
+  background: rgba(214, 238, 235, 0.05);
+  border: none;
+  color: rgb(84, 125, 122);
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  right: 8px;
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* 增加按钮在上，减少按钮在下 */
+.number-input:deep(.el-input-number__increase) {
+  border-radius: 0px 16px 0px 0px;
+  right: 3px;
+  top: 3px;
+  height: 16px;
+}
+
+.number-input:deep(.el-input-number__decrease) {
+  border-radius: 0px 0px 16px 0px;
+  right: 3px;
+  bottom: 3px;
+  height: 16px;
+}
+
+/* 按钮悬浮 */
+.number-input:deep(.el-input-number__increase:hover),
+.number-input:deep(.el-input-number__decrease:hover) {
+  background: rgba(0, 170, 147, 0.15);
+  border-color: color-mix(in srgb, rgb(136, 202, 197) 50%, transparent);
+}
+
+/* 按钮点击 */
+.number-input:deep(.el-input-number__increase:active),
+.number-input:deep(.el-input-number__decrease:active) {
+  background: rgba(136, 202, 196, 0.24);
+  transform: scale(0.95);
+}
+
+/* 禁用状态 */
+.number-input:deep(.el-input-number__increase.is-disabled),
+.number-input:deep(.el-input-number__decrease.is-disabled) {
+  background: transparent;
+  border-color: rgba(200, 200, 200, 0.3);
+  color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.select-input {
+  width: 100%;
+}
+
+/* 外层输入框 */
+.select-input:deep(.el-select__wrapper) {
+  background: rgba(214, 238, 235, 0.05);
+  border: 2px solid color-mix(in srgb, rgb(136, 202, 197) 25%, transparent);
+  border-radius: 999px;
+  padding: 0 14px;
+  min-height: 36px;
+  box-shadow: none;
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* hover */
+.select-input:deep(.el-select__wrapper:hover) {
+  border-color: color-mix(in srgb, rgb(136, 202, 197) 50%, transparent) !important;
+  background: rgba(0, 170, 147, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* focus */
+.select-input:deep(.el-select__wrapper.is-focused) {
+  border-color: rgba(66, 167, 161, 0.528) !important;
+  background: rgba(136, 202, 196, 0.1);
+  box-shadow: none !important;
+}
+
+/* 文字区域 */
+.select-input:deep(.el-select__selection) {
+  color: rgb(84, 125, 122);
+  font-weight: 500;
+}
+
+/* placeholder */
+.select-input:deep(.el-select__placeholder) {
+  color: rgba(84, 125, 122, 0.65);
+}
+
+/* 选中值 */
+.select-input:deep(.el-select__selected-item) {
+  color: rgb(84, 125, 122);
+  font-weight: 500;
+}
+
+/* 下拉箭头 */
+.select-input:deep(.el-select__caret) {
+  color: rgb(84, 125, 122);
+  font-size: 14px;
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+
+/* hover 箭头颜色 */
+.select-input:deep(.el-select__wrapper:hover .el-select__caret) {
+  color: rgb(66, 167, 161);
+}
+
+/* 打开时旋转 */
+.select-input:deep(.is-reverse .el-select__caret) {
+  transform: rotate(180deg);
+}
+
+/* disabled */
+.select-input:deep(.is-disabled.el-select__wrapper) {
+  background: rgba(200, 200, 200, 0.08);
+  border-color: rgba(200, 200, 200, 0.3);
+}
+
+.mode-switch {
+  position: absolute;
+  right: 14px;
+  display: flex;
+  background: rgba(226, 226, 226, 0.32);
+  border-radius: 999px;
+  border: 1px solid rgba(213, 213, 213, 0.318);
+  box-shadow: inset 1px -1px 16px rgba(117, 187, 248, 0.083);
+}
+
+.mode-switch button {
+  flex: 1;
+  height: 24px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  z-index: 1;
+  font-size: 12px;
+  color: #4040409A;
+  transition: color 0.25s ease;
+}
+
+.mode-switch button.active {
+  color: #0000009A;
+}
+
+/* Slider */
+.slider {
+  position: absolute;
+  width: calc(50% + 4px);
+  height: calc(100% + 2px);
+  margin-top: -1px;
+  margin-left: -1px;
+  border-radius: 32px;
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  box-shadow:
+    0 8px 24px rgba(62, 67, 66, 0.12),
+    0 0 0 2px rgba(136, 202, 196, 0.471);
+  background-color: #ffffff2c;
+}
+
+.slider.right {
+  transform: translateX(82%);
+}
+
+.mode-switch:active:deep(.slider) {
+  z-index: 999;
+  box-shadow:
+    0 8px 24px rgba(62, 67, 66, 0.12),
+    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(3px);
+  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
+}
+
+/* Logout */
+.logout-btn-wrapper {
+  position: fixed;
+  right: 36px;
+  bottom: 22px;
+  z-index: 999;
+}
+
+/* Fade */
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px) scale(0.985);
+}
+
+.fade-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+</style>

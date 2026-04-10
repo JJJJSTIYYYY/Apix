@@ -1,0 +1,22 @@
+RAG Benchmark Notes
+===================
+
+Project: Atlas Lantern
+Owner: Retrieval Systems Group
+Status: Active
+
+Summary:
+The Atlas Lantern prototype indexes mixed internal notes, customer FAQs, and release memos.
+Its main weakness is resolving references like "the June rollback" when multiple incidents exist.
+
+Key facts:
+- The first pilot region was Osaka.
+- The fallback search path uses lexical matching before semantic reranking.
+- A red-team exercise found that abbreviations were often expanded incorrectly.
+- Average answer latency target: 900 ms.
+- Review cadence: every second Thursday.
+
+Sample questions:
+1. Which region was used for the first pilot?
+2. What happens before semantic reranking?
+3. What latency target is documented?

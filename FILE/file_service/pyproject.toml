@@ -1,0 +1,25 @@
+[project]
+name = "file-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiomysql>=0.3.2",
+    "bs4>=0.0.2",
+    "cryptography>=46.0.5",
+    "fastapi>=0.128.3",
+    "httpx>=0.28.1",
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.2.9",
+    "langchain-milvus>=0.3.3",
+    "langchain-ollama>=1.0.1",
+    "langchain-text-splitters>=1.1.0",
+    "pillow>=12.1.1",
+    "pymilvus==2.6.9",
+    "pymupdf>=1.27.1",
+    "python-multipart>=0.0.22",
+    "redis>=7.1.0",
+    "ulid-py>=1.1.0",
+    "uvicorn>=0.40.0",
+]
