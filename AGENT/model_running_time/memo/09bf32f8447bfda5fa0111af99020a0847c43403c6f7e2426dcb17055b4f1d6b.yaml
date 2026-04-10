@@ -1,7 +1,0 @@
-Todo List项目需求与架构: "# 项目：简单任务管理应用（Todo List）\n\n## 项目目标\n创建一个前后端分离的简单任务管理应用，用于测试Agent\
-  \ Team协作能力。\n\n## 技术架构\n1. **前端**：React应用，提供用户界面\n   - 技术栈：React, HTML, CSS\n  \
-  \ - 功能：任务列表显示、添加任务、标记完成、删除任务\n   \n2. **后端**：Node.js + Express REST API\n   - 技术栈：Node.js,\
-  \ Express.js\n   - 功能：任务CRUD操作API\n   - 数据存储：使用JSON文件或内存存储（简化版）\n\n3. **项目结构**：\n\
-  \   - /frontend/ - 前端代码\n   - /backend/ - 后端代码\n   - /project-docs/ - 项目文档\n\n##\
-  \ 模块划分\n1. 项目初始化和架构设计\n2. 后端API开发\n3. 前端React应用开发\n4. 前后端集成测试\n5. 项目文档和部署说明\n\n\
-  ## 约束条件\n- 保持简单，避免复杂依赖\n- 每个模块独立可测试\n- 提供清晰的API文档\n- 子代理任务需自包含"
