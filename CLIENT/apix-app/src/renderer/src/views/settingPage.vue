@@ -9,10 +9,9 @@
         <el-main
           v-if="showPage"
           ref="page"
-          class="main-page"
+          class="main-area"
           :style="{ 
             height: pageHeight + 'px',
-            background: `rgba(255, 255, 255, ${store.transparencyValue / 100})`
           }"
         >
           <div class="title-tag-wrapper">
@@ -56,6 +55,34 @@
                   <span class="setting-value">{{ store.config.transparencyValue }}%</span>
                 </div>
               </div>
+          
+              <div class="setting-card">
+                <div class="setting-title">在AI消息中显示工具调用标签</div>
+                <div class="setting-control">
+                  <div class="setting-info">
+                    开启后实时显示AI当前正在调用的工具名称。
+                  </div>
+                  <div class="mode-switch">
+                    <div class="slider" :class="{ right: store.config.showToolLabels }" />
+
+                    <button
+                      class="off-select"
+                      :class="{ active: !store.config.showToolLabels }"
+                      @click="switchMode('showToolLabels', 'off')"
+                    >
+                      Off
+                    </button>
+
+                    <button
+                      class="on-select"
+                      :class="{ active: store.config.showToolLabels }"
+                      @click="switchMode('showToolLabels', 'on')"
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- 组2: 数据管理 -->
@@ -87,13 +114,13 @@
                 <div class="setting-title">打开缓存文件夹</div>
                 <div class="setting-control">
                   <div class="setting-info">
-                    打开保存卡片以及用例的文件夹位置。
+                    打开保存卡片以及任务的文件夹位置。
                   </div>
                   <el-button
                     type="primary"
                     off
                     size="default"
-                    @click=""
+                    @click="openCacheDir"
                     class="confirm-button"
                   >
                     打开
@@ -671,33 +698,6 @@
                   </div>
                 </div>
               </div>
-              <div class="setting-card">
-                <div class="setting-title">使用模型视觉处理文档   <span class="danger-label">已废弃</span></div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    使用视觉模型处理Office文档以及PDF，单次最大处理页数取决于模型能力，不推荐在大文档使用。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.visionDocument }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.visionDocument }"
-                      @click="switchMode('visionDocument', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.visionDocument }"
-                      @click="switchMode('visionDocument', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
 
               <div class="setting-card">
                 <div class="setting-title">将过去的工具返回内容写入提示词</div>
@@ -878,6 +878,15 @@ const resetPresetCard = () => {
 
   store.saveCards()
   ElMessage.success('已恢复预设')
+}
+
+const openCacheDir = async () => {
+  try {
+    await window.api.openCacheDir()
+  }catch (err) {
+    ElMessage.error('打开失败')
+    console.error("error to open cache directory: ", err)
+  }
 }
 
 const clearVisionCache = async () => {
@@ -1104,10 +1113,9 @@ span.el-popper__arrow {
   color: #2f3a3a;
 }
 
-.main-page {
+.main-area {
   position: relative;
   padding: 16px;
-  background-color: rgba(225, 233, 231, 0);
   display: flex;
   flex-direction: column;
   align-items: center;

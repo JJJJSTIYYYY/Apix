@@ -4,6 +4,10 @@
   user-select: none; /* 标准属性 */
 }
 
+.main-area {
+  background: #ffffffa7;
+}
+
 .selectable,
 .selectable * {
   user-select: none !important;        /* 标准写法 */

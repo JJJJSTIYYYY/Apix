@@ -6,75 +6,98 @@
         class="q-primary-btn melt-btn"
         type="primary"
         size="small"
-        @click="createNewChat"
+        @click="hidePannel"
       >
-        <el-icon><Plus /></el-icon>
+        <el-icon v-if="!isHide"><ArrowLeft /></el-icon>
+        <el-icon v-else><Expand /></el-icon>
       </el-button>
 
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索"
-        size="small"
-        clearable
-        @input="handleSearch"
-        @focus="isSearchFocused = true"
-        @blur="isSearchFocused = false"
-      >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
+      <transition name="fade">
+        <div v-if="!isHide" style="width: 100%;">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索"
+            size="small"
+            clearable
+            @input="handleSearch"
+            @focus="isSearchFocused = true"
+            @blur="isSearchFocused = false"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </div>
+      </transition>
+    </div>
+
+
+    <div class="q-create">
+        <el-button
+          class="create-btn"
+           :class="{ 'is-history-hide': isHide }"
+          type="primary"
+          size="small"
+          @click="createNewChat"
+          
+        >
+          <el-icon style="font-size: 15px;"><ChatLineRound /></el-icon>
+          <div style="width: 6px;" v-if="!isHide"></div>
+          <div v-if="!isHide">开启新对话</div>
+        </el-button>
     </div>
 
     <!-- List -->
-    <el-scrollbar ref="scrollbarRef" class="q-scroll" max-height="100%">
-      <div class="q-scroll-inner" ref="scrollInnerRef">
-        <el-menu
-          ref="menuRef"
-          :default-active="activeHistoryId"
-          class="q-menu"
-          @select="handleSelect"
-        >
-          <div
-            class="q-slider"
-            :class="{ 'is-missing': !isActiveInFiltered && !isActiveInHistories }"
-            :style="sliderStyle"
-
-          />
-
-          <div v-for="group in groupedHistories" :key="group.date" class="q-section">
-            <div class="q-section-title">{{ group.date }}</div>
-
-            <el-menu-item
-              v-for="h in group.items"
-              :key="h.id"
-              :index="String(h.id)"
-              class="q-cell"
-              :ref="(el) => setItemRef(h.id, el)"
+    <transition name="fade">
+      <div v-if="!isHide" style="flex: 1; min-height: 0; display: flex;">
+        <el-scrollbar ref="scrollbarRef" class="q-scroll" max-height="100%">
+          <div class="q-scroll-inner" ref="scrollInnerRef">
+            <el-menu
+              ref="menuRef"
+              :default-active="activeHistoryId"
+              class="q-menu"
+              @select="handleSelect"
             >
-              <HistoryCard 
-                :history="h" 
-                @rename-history="handleRenameHistory"
-                @delete-history="handleDeleteHistory"
+              <div
+                class="q-slider"
+                :class="{ 'is-missing': !isActiveInFiltered && !isActiveInHistories }"
+                :style="sliderStyle"
+
               />
-            </el-menu-item>
-          </div>
 
-          <div v-if="filteredHistories.length === 0" class="q-empty">
-            <el-icon class="shadow-icon" style="font-size: 48px;"><Search /></el-icon>
-            <div style="margin-top: 8px;">暂无对话历史</div>
+              <div v-for="group in groupedHistories" :key="group.date" class="q-section">
+                <button class="q-section-title" @click="switchFold(group.date)">{{ group.date }}</button>
+
+                <el-menu-item
+                  v-for="h in group.items"
+                  v-if="foldStatus[group.date]"
+                  :key="h.id"
+                  :index="String(h.id)"
+                  class="q-cell"
+                  :ref="(el) => setItemRef(h.id, el)"
+                >
+                  <HistoryCard 
+                    :history="h" 
+                    @rename-history="handleRenameHistory"
+                    @delete-history="handleDeleteHistory"
+                  />
+                </el-menu-item>
+              </div>
+
+              <div v-if="filteredHistories.length === 0" class="q-empty">
+                <el-icon class="shadow-icon" style="font-size: 48px;"><Search /></el-icon>
+                <div style="margin-top: 8px;">暂无对话历史</div>
+              </div>
+            </el-menu>
           </div>
-        </el-menu>
+        </el-scrollbar>
       </div>
-    </el-scrollbar>
-
-    <!-- Rename dialog -->
+    </transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { Search, Plus } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, onActivated, watch, nextTick } from 'vue'
 import type { ElScrollbar } from 'element-plus'
 import { ElMessage } from 'element-plus'
 
@@ -91,6 +114,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [id: number | string]
   create: []
+  hide: [toHide: boolean]
   rename: [id: number | string, newTitle: string]
   delete: [id: number | string]
   clear: []
@@ -104,22 +128,17 @@ const activeHistoryId = ref('')
 const authStore = useAuthStore()
 const cid = ref("")
 
-const renameDialogVisible = ref(false)
-const renameForm = ref<{ id: number | string | null; title: string }>({
-  id: null,
-  title: '',
-})
-
 const isSearchFocused = ref(false)
+const isHide = ref(true)
 
-// ✅ scrollbar / menu ref
+// scrollbar / menu ref
 const scrollbarRef = ref<InstanceType<typeof ElScrollbar> | null>(null)
 const menuRef = ref<any>(null)
 
-// ✅ 存每个菜单项 DOM
+// store menu item DOM
 const itemElMap = new Map<string, HTMLElement>()
 
-// ✅ 滑动窗口样式
+// slider style
 const sliderStyle = ref<Record<string, string>>({
   '--slider-y': '0px',
   '--slider-scale': '1',
@@ -127,20 +146,78 @@ const sliderStyle = ref<Record<string, string>>({
   opacity: '0',
 })
 
-// ✅ 当前选中项是否仍在搜索结果里
+// active item check
 const isActiveInFiltered = computed(() => {
   if (!activeHistoryId.value) return false
   return filteredHistories.value.some((h) => String(h.id) === activeHistoryId.value)
 })
 
-// ✅ 检查当前选中项是否在 histories 中
-const isActiveInHistories = computed(() => {
-  if (!activeHistoryId.value || !props.histories) return false
-  return props.histories.some((h) => String(h.id) === activeHistoryId.value)
+// grouped list
+const groupedHistories = computed(() => {
+  const starred: ChatHistory[] = []
+  const normalGroups: Record<string, ChatHistory[]> = {}
+
+  for (const item of filteredHistories.value) {
+    if (item.star) {
+      starred.push(item)
+    } else {
+      ;(normalGroups[item.date] ||= []).push(item)
+    }
+  }
+
+  const result: { date: string; items: ChatHistory[] }[] = []
+
+  if (starred.length > 0) {
+    result.push({
+      date: 'Pinned',
+      items: [...starred].sort((a, b) => b.createTime - a.createTime),
+    })
+  }
+
+  const normalGroupList = Object.entries(normalGroups)
+    .map(([date, items]) => ({
+      date,
+      items: [...items].sort((a, b) => b.createTime - a.createTime),
+    }))
+    .sort(
+      (a, b) =>
+        (b.items[0]?.createTime ?? 0) - (a.items[0]?.createTime ?? 0)
+    )
+
+  result.push(...normalGroupList)
+
+  return result
 })
 
+// ✅ fold 状态
+const foldStatus = ref<Record<string, boolean>>({
+  'Pinned': false,
+  'Today': true,
+  'Yesterday': true,
+  'In this Week': true,
+  'Further more': true,
+})
+
+// ✅ 当前 active 所在 group
+const activeGroupDate = computed(() => {
+  if (!activeHistoryId.value) return null
+
+  for (const group of groupedHistories.value) {
+    if (group.items.some(h => String(h.id) === activeHistoryId.value)) {
+      return group.date
+    }
+  }
+  return null
+})
+
+// ✅ 当前 active group 是否展开
+const isActiveGroupVisible = computed(() => {
+  if (!activeGroupDate.value) return false
+  return !!foldStatus.value[activeGroupDate.value]
+})
+
+// hide slider but keep position
 const hideSliderMissing = () => {
-  // 保留当前位置/高度，只做“放大 + 渐隐”
   sliderStyle.value = {
     ...sliderStyle.value,
     opacity: '0',
@@ -148,7 +225,7 @@ const hideSliderMissing = () => {
   }
 }
 
-// ✅ 绑定每个 item 的 DOM（el-menu-item 是组件，需要取 $el）
+// bind item DOM
 const setItemRef = (id: number | string, el: any) => {
   const key = String(id)
   const dom = el?.$el as HTMLElement | undefined
@@ -157,18 +234,18 @@ const setItemRef = (id: number | string, el: any) => {
 }
 
 const getWrapEl = () => {
-  // element-plus ElScrollbar 暴露 wrapRef
   return (scrollbarRef.value as any)?.wrapRef as HTMLElement | undefined
 }
 
+// core: update slider position
 const updateSliderTo = async (index: string, alsoScroll = true) => {
+  await nextTick()
   await nextTick()
 
   const wrapEl = getWrapEl()
   const itemEl = itemElMap.get(index)
 
-  // ✅ 选中项不在当前渲染列表（比如搜索过滤掉了）：放大渐隐消失
-  if (!wrapEl || !itemEl) {
+  if (!wrapEl || !itemEl || !itemEl.isConnected) {
     hideSliderMissing()
     return
   }
@@ -176,7 +253,6 @@ const updateSliderTo = async (index: string, alsoScroll = true) => {
   const wrapRect = wrapEl.getBoundingClientRect()
   const itemRect = itemEl.getBoundingClientRect()
 
-  // item 在 wrap 内容中的“绝对”top（包含当前 scrollTop）
   const top = itemRect.top - wrapRect.top + wrapEl.scrollTop
   const height = itemRect.height
 
@@ -188,23 +264,42 @@ const updateSliderTo = async (index: string, alsoScroll = true) => {
   }
 
   if (alsoScroll) {
-    // 让选中项尽量居中
     const targetTop = Math.max(0, top - (wrapEl.clientHeight - height) / 2)
     wrapEl.scrollTo({ top: targetTop, behavior: 'smooth' })
   }
 }
 
+// unified sync entry（✅ 已整合 fold 判断）
+const syncSlider = async (alsoScroll = false) => {
+  if (!activeHistoryId.value) return
+
+  if (!isActiveInFiltered.value || !isActiveGroupVisible.value) {
+    hideSliderMissing()
+    return
+  }
+
+  await updateSliderTo(activeHistoryId.value, alsoScroll)
+}
+
+// lifecycle
 onMounted(async () => {
   await authStore.restore()
   cid.value = authStore.user.user_uid
+
   filteredHistories.value = props.histories ? [...props.histories] : []
+
   if (props.activeId !== undefined && props.activeId !== null) {
     activeHistoryId.value = String(props.activeId)
   }
-  // ✅ 初次定位 slider（不强制滚动）
-  await updateSliderTo(activeHistoryId.value, false)
+
+  await syncSlider(false)
 })
 
+onActivated(async () => {
+  await syncSlider(false)
+})
+
+// props watchers
 watch(
   () => props.histories,
   (list) => {
@@ -219,72 +314,55 @@ watch(
   async (id) => {
     if (id !== undefined && id !== null) {
       activeHistoryId.value = String(id)
-      await updateSliderTo(activeHistoryId.value, true)
+      await syncSlider(true)
     }
   }
 )
 
-const groupedHistories = computed(() => {
-  const starred: ChatHistory[] = []
-  const normalGroups: Record<string, ChatHistory[]> = {}
-
-  // 1. Split starred / normal
-  for (const item of filteredHistories.value) {
-    if (item.star) {
-      starred.push(item)
-    } else {
-      ;(normalGroups[item.date] ||= []).push(item)
+// panel show
+watch(
+  isHide,
+  async (hidden) => {
+    if (!hidden) {
+      await syncSlider(false)
     }
-  }
+  },
+  { flush: 'post' }
+)
 
-  const result: { date: string; items: ChatHistory[] }[] = []
+// ✅ fold 变化监听（核心新增）
+watch(
+  () => foldStatus.value,
+  async () => {
+    if (!activeHistoryId.value) return
 
-  // 2. Star group (always on top)
-  if (starred.length > 0) {
-    result.push({
-      date: 'Pinned',
-      // Group internal sort: newest first
-      items: [...starred].sort((a, b) => b.createTime - a.createTime),
-    })
-  }
+    if (!isActiveGroupVisible.value) {
+      hideSliderMissing()
+      return
+    }
 
-  // 3. Normal date groups
-  const normalGroupList = Object.entries(normalGroups)
-    .map(([date, items]) => ({
-      date,
-      // Group internal sort: newest first
-      items: [...items].sort((a, b) => b.createTime - a.createTime),
-    }))
-    // Group sort: compare by newest item in each group
-    .sort(
-      (a, b) =>
-        (b.items[0]?.createTime ?? 0) - (a.items[0]?.createTime ?? 0)
-    )
+    await syncSlider(false)
+  },
+  { deep: true, flush: 'post' }
+)
 
-  result.push(...normalGroupList)
-
-  return result
-})
-
-
-// ✅ 列表变更（搜索/重新分组）后重新对齐 slider
+// list change
 watch(
   () => groupedHistories.value,
   async () => {
     if (!activeHistoryId.value) return
 
-    // ✅ 搜索结果不包含当前选中
-    if (!isActiveInFiltered.value) {
+    if (!isActiveInFiltered.value || !isActiveGroupVisible.value) {
       hideSliderMissing()
       return
     }
 
-    // ✅ 仍包含：正常对齐
-    await updateSliderTo(activeHistoryId.value, false)
+    await syncSlider(false)
   },
-  { deep: true }
+  { deep: true, flush: 'post' }
 )
 
+// search
 const handleSearch = () => {
   const list = props.histories ? [...props.histories] : []
   const kw = searchKeyword.value.trim().toLowerCase()
@@ -299,20 +377,41 @@ const handleSearch = () => {
   )
 }
 
+// toggle panel
+const hidePannel = async () => {
+  isHide.value = !isHide.value
+  emit('hide', isHide.value)
+
+  if (!isHide.value) {
+    await syncSlider(false)
+  }
+}
+
+// select
 const handleSelect = (index: string) => {
   activeHistoryId.value = index
   emit('select', isNaN(Number(index)) ? index : Number(index))
-
-  // ✅ 选中后滑动窗口移动 + 滚动到目标
   updateSliderTo(index, true)
+}
+
+// ✅ fold toggle（增强版）
+const switchFold = async (date: string) => {
+  foldStatus.value[date] = !foldStatus.value[date]
+
+  await nextTick()
+
+  if (!activeHistoryId.value) return
+
+  if (!isActiveGroupVisible.value) {
+    hideSliderMissing()
+  } else {
+    await syncSlider(false)
+  }
 }
 
 const createNewChat = () => emit('create')
 
-const handleStarHistory = (history_id: string) => {
-  
-}
-
+// rename / delete（原样保留）
 const handleRenameHistory = async (history_id: string, new_title: string) => {
   try {
     await window.api.updateConversation(
@@ -321,16 +420,15 @@ const handleRenameHistory = async (history_id: string, new_title: string) => {
       history_id,
       { title: new_title }
     )
-    ElMessage({ type: 'success', message: '已更新', plain: true, })
+    ElMessage({ type: 'success', message: '已更新', plain: true })
   } catch (err) {
-    console.log("对话删除失败："+err)
-    ElMessage({ type: 'error', message: '更新失败', plain: true, })
+    console.log("对话删除失败：" + err)
+    ElMessage({ type: 'error', message: '更新失败', plain: true })
   }
   emit('rename', history_id, new_title)
 }
 
 const handleDeleteHistory = async (history_id: string) => {
-  // Find target history
   const index = props.histories.findIndex(c => String(c.id) === history_id)
   if (index === -1) return
 
@@ -346,6 +444,7 @@ const handleDeleteHistory = async (history_id: string) => {
         type: 'warning',
       }
     )
+
     try {
       await window.api.updateConversation(
         cid.value,
@@ -353,25 +452,24 @@ const handleDeleteHistory = async (history_id: string) => {
         history_id,
         { deleted: true }
       )
-      ElMessage({ type: 'success', message: '已删除', plain: true, })
+      ElMessage({ type: 'success', message: '已删除', plain: true })
     } catch (err) {
-      console.log("对话删除失败："+err)
-      ElMessage({ type: 'error', message: '删除失败', plain: true, })
+      console.log("对话删除失败：" + err)
+      ElMessage({ type: 'error', message: '删除失败', plain: true })
     }
 
-    // User confirmed
     emit('delete', history_id)
   } catch (err) {
     console.error("pannel: handleDeleteHistory error:", err)
-    ElMessage({ type: 'error', message: '删除失败', plain: true, })
+    ElMessage({ type: 'error', message: '删除失败', plain: true })
   }
 }
 
-// 以下是列表滚动至边界的回弹
+// overscroll
 const scrollInnerRef = ref(null)
 
 useOverscrollBounce(
-  () => getWrapEl(),   // el-scrollbar wrap
+  () => getWrapEl(),
   scrollInnerRef,
   {
     maxBounce: 30,
@@ -381,10 +479,19 @@ useOverscrollBounce(
     idleMs: 40,
   }
 )
-// 以上是列表滚动至边界的回弹
 </script>
 
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 /* Layout */
 .chat-history.q {
   z-index: 99;
@@ -433,7 +540,7 @@ useOverscrollBounce(
 /* Search */
 .q-search {
   margin-top: 8px;
-  padding: 10px 10px 14px;
+  padding: 10px 10px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -447,7 +554,7 @@ useOverscrollBounce(
 .q-search :deep(.el-input) {
   flex: 1;
   min-width: 0;
-  transform-origin: left center;
+  transform-origin: center;
   transform: scale(1);
   transition: transform 0.22s cubic-bezier(0.34, 3.5, 0.64, 1);
 }
@@ -501,6 +608,81 @@ useOverscrollBounce(
   border-width: 0;
   pointer-events: none;
   overflow: hidden;
+}
+
+.q-create {
+  padding: 5px 10px 20px;
+}
+
+.create-btn {
+  /* 基础样式 */
+  border-radius: 20px;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 1px;
+  width: 100%;
+  height: 32px;
+  transition: all 0.24s cubic-bezier(0.23, 1, 0.32, 1);
+  background: rgba(228, 228, 228, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.345);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.03);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);  
+  color: #00000065;
+}
+
+.create-btn.is-history-hide {
+  width: 34px;
+  height: 34px;
+  padding: 0 0 1.5px 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(232, 238, 237, 0.304);
+  border: 1px solid rgba(255, 255, 255, 0.495);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.123),
+    0 2px 6px rgba(0, 0, 0, 0.05);
+
+  color: rgba(0, 0, 0, 0.78);
+  transform: translateZ(0) scale(1);
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+/* 悬停效果 */
+.create-btn:hover {
+  background-color: #7dd4c7;
+  box-shadow: 0 6px 20px rgba(156, 221, 211, 0.6);
+  transform: scale(1.02);
+}
+
+/* 点击效果 */
+.create-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(156, 221, 211, 0.4);
+}
+
+/* 禁用状态 */
+.create-btn.is-disabled {
+  background-color: #c5e8e2;
+  border-color: #c5e8e2;
+  color: #7f8c8d;
+  box-shadow: none;
+}
+
+/* 内部 div 样式 */
+.create-btn > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Scroll */
@@ -591,6 +773,9 @@ useOverscrollBounce(
   ) 1;
   border-radius: 16px;
   background-color: rgba(255, 255, 255, 0);
+}
+.q-section-title:hover {
+  color: rgba(5, 164, 140, 0.46);
 }
 
 .q-menu :deep(.el-menu-item.q-cell) {

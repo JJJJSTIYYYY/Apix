@@ -15,7 +15,7 @@ import { registerWebsocketIpc } from '../ws/wsClient'
 import { registerAiConfigIpc } from '../ipc/ai_configuration'
 import { registerAiFilesIpc } from '../ipc/ai_files'
 import { registerAiTaskIpc } from '../ipc/ai_task'
-import { registerApiTestIpc } from '../ipc/api_test'
+import { registerLocalTaskIpc } from '../ipc/local_task'
 
 // ---------- Windows Mica Support ----------
 let MicaBrowserWindow = null
@@ -90,7 +90,7 @@ export function createMainWindow() {
   // ---------- Window event bindings ----------
   registerWindowIpc(mainWindow)
   registerFileIpc()
-  registerApiTestIpc()
+  registerLocalTaskIpc()
   registerAiIpc()
   registerAiConfigIpc()
   registerAiFilesIpc()
@@ -120,10 +120,10 @@ export function createMainWindow() {
   })
 
   // Intercept in-app navigation 生产环境解除注释以下代码
-  // mainWindow.webContents.on('will-navigate', (event, url) => {
-  //   event.preventDefault()
-  //   shell.openExternal(url)
-  // })
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    event.preventDefault()
+    shell.openExternal(url)
+  })
 
   // ---------- Load renderer ----------
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

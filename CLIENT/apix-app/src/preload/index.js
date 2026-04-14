@@ -8,6 +8,7 @@ const api = {
   submitCase: (cid, content) => ipcRenderer.invoke('api:submit_case', cid, content),
 
   openFileDialog: () => ipcRenderer.invoke('openFileDialog'),
+  openCacheDir: () => ipcRenderer.invoke('openCacheDir'),
 
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, chat_config) =>
@@ -70,6 +71,9 @@ const api = {
     ipcRenderer.invoke('api:update_document_description', cid, document_id, desc),
   deleteDocument: (cid, document_id) =>
     ipcRenderer.invoke('api:delete_document', cid, document_id),
+
+  openImageTemp: (base64, fileName) =>
+    ipcRenderer.invoke('openImageTemp', base64, fileName),
   
   // Clipboard helper
   copyToClipboard: (payload) =>

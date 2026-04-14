@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 import json
 import os
 import traceback
@@ -140,7 +141,7 @@ DEFAULT_TOOLS_PROMPT = """
 {tool_list}
 """
 
-class AI_Agent:
+class AgentRuningtime:
 
     def __init__(self):
         self.config = self._load_config()
@@ -1515,7 +1516,172 @@ class AI_Agent:
         astream = agent.astream(initial_state, {"recursion_limit": 1024}, stream_mode="custom")
 
         return astream
+    
+
+# @dataclass
+# class AgentConfigSchema:
+#     """
+#     Config for a single AI agent.
+#     """
+
+#     # LLM Runtime
+#     models_provider: str
+#     model_name: str
+#     api_key: str = field(default="")
+
+#     enable_think: bool = field(default=False)
+#     max_chunk_per_invoking: int = field(default=0)
+#     use_model_vision: bool = field(default=False)  # If true, the picture will be sent to the LLM to analyze if the LLM supports picture input.
+
+
+#     # Agent Runtime Behavior
+#     work_dir: str = field(default="")
+#     async_tools_invoke: bool = field(default=False)
+#     save_async_tools_message: bool = field(default=False)  # If true, async returns will save to database.
+#     pure_chat_on: bool = field(default=False)  # If true, the agent will be a simple LLM without tools.
+
+
+#     # Memory Strategy
+#     enable_longterm_memory: bool = field(default=False)
+#     enable_shortterm_memory: bool = field(default=False)  # If is true, message_summary node will invoke llm to compress else just truncate.
+#     summary_trigger_threshold: int = field(default=0)  # If zero, not compress or truncate.
+#     summary_exempt_tail_length: int = field(default=0)
+
+
+#     # Capabilities / Tools
+#     enable_file_opration: bool = field(default=False)
+#     enable_web_search: bool = field(default=False)
+#     enable_knowledge_retrieval: bool = field(default=False)
+#     enable_command_opration: bool = field(default=False)
+#     enable_skill_load: bool = field(default=False)
+#     enable_agent_assign: bool = field(default=False)
+#     enable_agent_swarm: bool = field(default=False)
+
+
+#     # External Services
+#     link_provider: str = field(default="")
+#     link_api_key: str = field(default="")
+#     content_provider: str = field(default="")
+#     content_api_key: str = field(default=""
+#     )
+#     embed_model: str = field(default="")  # The embed model for knowledge retrieval.
+#     web_cleaner_mode: str = field(default="")
+
+
+#     # Agent Identity / Prompt
+#     role_prompt: dict = field(default_factory=lambda: {
+#         "name": "",
+#         "definition": ""
+#     })
+#     higher_role_prompt_permission: bool = field(default=False)  # If true, the role prompt will insert into system prompt.
+
+
+# class AgentNode:
+#     async def context_prepare(state: MessagesState) -> Command:
+#         generation_id = state.get("generation_id")
+#         client_id = state.get("client_id")
+#         history_id = state.get("history_id")
+#         input_msg = state["input"]
+#         sandbox = ""
+
+#         if not state.get("sandbox"): 
+#             cached_sandbox = await agent_sandbox.get_sandbox_container_id(client_id=client_id, conversation_id=history_id, work_dir=work_dir)
+#             if not cached_sandbox:
+#                 container_id = await agent_sandbox.configure_sandbox(
+#                     client_id=client_id,
+#                     conversation_id=history_id,
+#                     work_dir=work_dir,
+#                 )
+#                 cached_sandbox = container_id
+#             sandbox = cached_sandbox
+        
+#         if not pure_chat_on:
+#             ai_context_manager.init_memorandum_list(state=state) # Load memorandum list.
+
+#         skills = []
+#         if not pure_chat_on and enable_skill_load:
+#             skills = await ai_context_manager.fetch_available_skills(client_id)
+
+#         documents = []
+#         if not pure_chat_on and enable_knowledge_retrieval:
+#             documents = await ai_context_manager.fetch_available_documents(client_id)
+
+#         if not input_msg: raise RuntimeError("Error: Attempt invoke agent without input.")
+#         client_message = input_msg # Fetch the latest one only.
+#         timestamp = state.get("timestamp")
+
+
+#         if client_message.get("role") == "human":
+#             client_message.update({
+#                 "timestamp": timestamp,
+#                 "generation_id": generation_id,
+#             })
+#             await ai_context_manager.append_to_messages(client_id, history_id, client_message)
+#             client_messages = await ai_context_manager.fetch_messages(client_id, history_id, 0)
+
+#             longterm_memory_prompt = shortterm_memory_prompt = ""
+#             after_index = ""
+#             if longterm_memory:
+#                 memory = await ai_context_manager.fetch_longterm_memory(client_id)
+#                 longterm_memory_prompt = ai_context_manager.create_memory_prompt(memory)
+#                 # Extract longterm memory from user message.
+#                 await longterm_memory_manager.submit_memory(client_id, [client_message], memory, config)
+
+#             if shortterm_memory:
+#                 shortterm = await ai_context_manager.fetch_shortterm_memory(client_id, history_id)
+#                 shortterm_memory_prompt = ai_context_manager.create_shortterm_prompt(shortterm)
+#                 if shortterm: after_index = shortterm[0].get("memory_id")
+
+#             messages = ai_context_manager.create_agent_messages(client_messages, remain_tools_cache, after_index=after_index)
+#             return Command(
+#                 update={
+#                     "messages": messages,
+#                     "sandbox": sandbox,
+#                     "skills": skills,
+#                     "documents": documents,
+#                     "longterm_memory": longterm_memory_prompt if longterm_memory_prompt else "",
+#                     "shortterm_memory": shortterm_memory_prompt if shortterm_memory_prompt else "",
+#                 }
+#             )
+#         elif client_message.get("role") == "tools": # async tools return.
+#             if remain_tools_cache:
+#                 logger.warning("[context_prepare] Invoke llm after async tools return is not support keep tools result in database.")
+#             client_messages = await ai_context_manager.fetch_messages(client_id, history_id, 0)
+#             longterm_memory_prompt = shortterm_memory_prompt = ""
+#             after_index = ""
+#             if longterm_memory:
+#                 memory = await ai_context_manager.fetch_longterm_memory(client_id)
+#                 longterm_memory_prompt = ai_context_manager.create_memory_prompt(memory)
+#                 # Extract longterm memory from user message.
+#                 await longterm_memory_manager.submit_memory(client_id, [client_message], memory, config)
+
+#             if shortterm_memory:
+#                 shortterm = await ai_context_manager.fetch_shortterm_memory(client_id, history_id)
+#                 shortterm_memory_prompt = ai_context_manager.create_shortterm_prompt(shortterm)
+#                 if shortterm: after_index = shortterm[0].get("memory_id")
+#             messages = ai_context_manager.create_agent_messages(client_messages, remain_tools_cache, after_index=after_index)
+#             tool_name = client_message.get("info").get("tool_name", "")
+#             tool_call_id = client_message.get("info").get("task_id", (str(uuid4())))
+#             protocol_sync_msg = AIMessage(
+#                 content=f"I have gotton the {tool_name}'s result. I will analyse its result for you." if not enable_think else "", 
+#                 additional_kwargs = {"reasoning_content": f"I have gotton the {tool_name}'s result. I will analyse its result for you."} if enable_think else "",
+#                 tool_calls=[{"name": "_internal_protocol_sync", "args": {}, "id": tool_call_id}]
+#             )
+#             messages = messages + [
+#                 protocol_sync_msg,
+#                 ToolMessage(tool_call_id=tool_call_id, content=client_message.get("content"))
+#             ]
+#             return Command(
+#                 update={
+#                     "messages": messages,
+#                     "sandbox": sandbox,
+#                     "skills": skills,
+#                     "documents": documents,
+#                     "longterm_memory": longterm_memory_prompt if longterm_memory_prompt else "",
+#                     "shortterm_memory": shortterm_memory_prompt if shortterm_memory_prompt else "",
+#                 }
+#             )
         
         
 
-ai_agent = AI_Agent()
+ai_agent = AgentRuningtime()

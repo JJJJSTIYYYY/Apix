@@ -9,10 +9,9 @@
         <el-main
           v-if="showPage"
           ref="page"
-          class="main-page"
+          class="main-area"
           :style="{
             height: pageHeight + 'px',
-            background: `rgba(255, 255, 255, ${store.transparencyValue / 100})`
           }"
         >
           <div class="app-layout" style="height: 100%;">
@@ -26,7 +25,7 @@
                 color: '#666666'
               }"
             >
-              <h3 style="display: table; margin: 0 auto;">Preset Cards</h3>
+              <h3 style="display: table; margin: 0 auto; opacity: 0.65;">任务卡</h3>
 
               <el-scrollbar
                 class="left-card-container"
@@ -105,7 +104,7 @@
                       class="submit-btn fixed-submit"
                       @click="submitCase(tab)"
                     >
-                      ✨Submit✨
+                      提交
                     </el-button>
 
                     <el-button
@@ -114,7 +113,7 @@
                       class="commom-btn"
                       @click="unfoldAllCards(tab)"
                     >
-                      Unfold All
+                      全部展开
                     </el-button>
 
                     <el-button
@@ -123,7 +122,7 @@
                       class="commom-btn"
                       @click="foldAllCards(tab)"
                     >
-                      Fold All
+                      全部折叠
                     </el-button>
                   </div>
                 </n-tab-pane>
@@ -295,7 +294,7 @@ function addTab() {
 
   tabs.push({
     tabKey,
-    title: `会话 ${tabs.length + 1}`,
+    title: `任务流 ${tabs.length + 1}`,
     items: [] as TabCardItem[],
   })
 
@@ -489,28 +488,28 @@ function foldAllCards(tab: TabItem) {
 
 /* 左边拖拽面板 */
 .left-panel {
-  background: rgba(255, 255, 255, 0.437);
+  background: rgba(255, 255, 255, 0.887);
   border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
-  box-shadow: 0 2px 6px rgba(97, 133, 124, 0.1);
+  /* box-shadow: 0 2px 6px rgba(97, 133, 124, 0.1); */
   max-width: 170px;
 }
 
 /* 右边标签页窗口 */
 .right-panel {
   position: relative;
-  background: rgba(255, 255, 255, 0.437);
+  background: rgba(255, 255, 255, 0.887);
   border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
-  box-shadow: 0 2px 6px rgba(97, 133, 124, 0.243);
+  /* box-shadow: 0 2px 6px rgba(97, 133, 124, 0.243); */
 }
 
 .no-drag {
@@ -597,7 +596,7 @@ function foldAllCards(tab: TabItem) {
         rgba(0, 0, 0, 1) 100%);
 }
 
-.main-page {
+.main-area {
   padding: 0px;
   position: relative;
 }

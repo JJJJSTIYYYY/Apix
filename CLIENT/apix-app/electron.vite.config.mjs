@@ -32,6 +32,9 @@ export default defineConfig({
     },
     plugins: [
       vue()
-    ]
+    ],
+    server: {
+      hmr: false  // 关闭热重载
+    }
   }
 })

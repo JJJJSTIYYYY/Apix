@@ -16,7 +16,7 @@ const staticRoutes = [
   {
     path: '/home',
     name: 'home-page',
-    redirect: '/sessionPage',
+    redirect: '/assistPage',
     component: () => import('@renderer/views/homePage.vue')
   }
 ]

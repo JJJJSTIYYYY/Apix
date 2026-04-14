@@ -41,7 +41,8 @@ async def ws_endpoint(websocket: WebSocket, client_id: str):
             try:
                 temp = data.get("data") or {}
                 history_id = temp.get("history_id")
-                generation_id = await websocket_list.create_generation(client_id, history_id, append_cache_memory=(action=="chat_with_llm"))
+                # generation_id = await websocket_list.create_generation(client_id, history_id, append_cache_memory=(action=="chat_with_llm"))
+                generation_id = await websocket_list.create_generation(client_id, history_id)
             except Exception as e:
                 logger.error(f"[ws] create_generation failed client={client_id}: {e}")
                 continue
@@ -58,7 +59,7 @@ async def ws_endpoint(websocket: WebSocket, client_id: str):
             if action == "chat_with_llm":
                 asyncio.create_task(ws_msg_handler.chat_with_llm(generation_id, data))
             elif action == "abort_generation":
-                pass
+                logger.warning(f"[ws] abort_generation by client={client_id}")
             else:
                 raise ValueError(f"unknown action: {action}")
 

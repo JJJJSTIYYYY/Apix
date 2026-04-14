@@ -16,7 +16,7 @@ import easyocr
 import cv2
 import numpy as np
 
-from apix_agent.apix_agent_core.LLM_node.llm_adapter import LlmNodeAdapter
+from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.global_config import BASE_DIR

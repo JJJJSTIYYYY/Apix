@@ -7,7 +7,7 @@ import re
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from apix_agent.apix_agent_core.tools.web_search.models import UrlResultItem, ContentResultItem
-from apix_agent.apix_agent_core.LLM_node.llm_adapter import LlmNodeAdapter
+from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.commons.logger import logger
 
 

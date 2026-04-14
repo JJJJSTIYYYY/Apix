@@ -18,6 +18,18 @@
           </transition>
 
           <span class="q-time">{{ history.time }}</span>
+
+          <span v-if="history.isGenerating" class="q-label generating">
+            <span class="loading-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </span>
+
+          <span v-if="showNewMessage" class="q-label new">
+            新消息
+          </span>
         </div>
 
         <!-- Right: actions -->
@@ -62,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, nextTick, onMounted, onBeforeUnmount, computed } from 'vue'
 import HistoryCardMenu from './comp/historyCardMenu.vue'
 import { useAuthStore } from '../../../store/auth'
 import { useAppCacheData } from '../../../store/app'
@@ -77,7 +89,13 @@ export interface ChatHistory {
   tokens?: number
   createTime: number
   star: boolean
+  isGenerating?: boolean   // 当前是否正在生成
+  hasNewMessage?: boolean  // 是否有未读新消息
 }
+
+const showNewMessage = computed(() => {
+  return !!props.history.hasNewMessage && !props.history.isGenerating
+})
 
 const props = defineProps<{ history: ChatHistory }>()
 
@@ -388,4 +406,53 @@ const handleConnectProject = async () => {
   }
 }
 
+.q-label {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 加载动画 */
+.loading-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 12px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* 配色微调 - 让加载动画更低调 */
+.q-label.generating {
+  color: #87879f;
+  background: #f5f5f7;
+  min-width: 32px; /* 固定宽度避免跳动 */
+}
+
+.q-label.new {
+  color: #1ad0b2;
+  background: #e6faf7;
+}
 </style>

@@ -2,18 +2,18 @@
 // Add new pages here or push at runtime
 export const pageRegistry = [
   {
-    path: '/sessionPage',
-    name: 'session-page',
-    title: 'Testing',
-    icon: 'House',
-    component: () => import('@renderer/views/casePage.vue')
-  },
-  {
     path: '/assistPage',
     name: 'assist-page',
     title: 'Assistant',
     icon: 'ChatDotSquare',
     component: () => import('@renderer/views/assistPage.vue')
+  },
+  {
+    path: '/sessionPage',
+    name: 'session-page',
+    title: 'Testing',
+    icon: 'CollectionTag',
+    component: () => import('@renderer/views/casePage.vue')
   },
   {
     path: '/dataPage',

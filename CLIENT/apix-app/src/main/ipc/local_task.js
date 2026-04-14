@@ -8,8 +8,8 @@ const TEST_API_BASE = "http://127.0.0.1:5090"
 // =====================================================
 //              Data write / read handlers
 // =====================================================
-export function registerApiTestIpc() {
-    console.log('registerApiTestIpc...')
+export function registerLocalTaskIpc() {
+    console.log('registerLocalTaskIpc...')
     const dataDir = path.join(app.getPath('userData'), 'ApiX')
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
     console.log('Apix data dir:', dataDir)

@@ -7,7 +7,7 @@
     <keep-alive>
     <el-main class="main-area">
       <div class="ai-page-wrapper" :class="{ 'is-history-hide': isHistoryHide }">
-        <ChatHistoryPannel
+        <ChatHistory
           style="margin-left: 6%;"
           :histories="historyList"
           :active-id="store.current_history_id"
@@ -175,8 +175,7 @@ import HomePage from './homePage.vue'
 import HumanMessageBubble from './component/msg_bubble_body/human_message_bubble.vue'
 import AiMessageBubble from './component/msg_bubble_body/ai_message_bubble.vue'
 import ToolMessageCard from './component/msg_bubble_body/tool_message_card.vue'
-import ChatHistoryPannel from './component/dialog_history/history_pannel.vue'
-import { type ChatHistory } from './component/dialog_history/history_card.vue'
+import ChatHistory from './component/dialog_history/history_pannel.vue'
 import { useAppCacheData } from '../store/app'
 import { useAuthStore } from '../store/auth'
 import { ElMessage } from 'element-plus'
@@ -204,9 +203,9 @@ const inputText = ref('')
 type Role = 'human' | 'ai' | 'system' | 'tools' | 'info'
 
 interface ToolLabel {
-  tool_call_id: string
-  content: string
-  status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
+  tool_call_id: string,
+  content: string,
+  status: "pending" | "in_progress" | "completed" | "error" | "outdated",
 }
 
 type MessageChunk = string | ToolLabel
@@ -245,9 +244,7 @@ interface TagsItem {
   type?: TagProps['type']
 }
 
-// ################################
-// Chunk helpers
-// ################################
+// Ensure field is array
 function ensureArrayField(msg: ChatMessage, field: 'content' | 'think') {
   if (!Array.isArray(msg[field])) {
     if (!msg[field]) {
@@ -258,21 +255,17 @@ function ensureArrayField(msg: ChatMessage, field: 'content' | 'think') {
   }
 }
 
-// Append string chunk and merge with the last string when possible.
-function appendChunk(
-  msg: ChatMessage,
-  field: 'content' | 'think',
-  delta: string,
-  guardId?: string
-) {
+// Append string chunk (merge with last string if possible)
+function appendChunk(msg: ChatMessage, field: 'content' | 'think', delta: string) {
   if (!delta) return
-  if (guardId && msg.id !== guardId) return
 
   ensureArrayField(msg, field)
 
   const arr = msg[field] as MessageChunk[]
+
   const last = arr[arr.length - 1]
 
+  // If last is string → merge（流式拼接关键）
   if (typeof last === 'string') {
     arr[arr.length - 1] = last + delta
   } else {
@@ -280,15 +273,12 @@ function appendChunk(
   }
 }
 
-// Append or update tool label chunk.
+// Append tool label
 function appendToolLabel(
   msg: ChatMessage,
   field: 'content' | 'think',
-  label: ToolLabel,
-  guardId?: string
+  label: ToolLabel
 ) {
-  if (guardId && msg.id !== guardId) return
-
   ensureArrayField(msg, field)
 
   const arr = msg[field] as MessageChunk[]
@@ -298,11 +288,14 @@ function appendToolLabel(
       (item: any) => item?.tool_call_id === label.tool_call_id
     )
 
+    // 已存在 → 更新状态（关键！）
     if (index !== -1) {
       const old = arr[index] as ToolLabel
+
       arr[index] = {
         ...old,
         ...label,
+        // 防止content被覆盖为空
         content: label.content || old.content,
       }
       return
@@ -312,32 +305,23 @@ function appendToolLabel(
   arr.push(label)
 }
 
-function cloneMaybeArray<T>(value: T[] | undefined | null): T[] {
-  return Array.isArray(value) ? [...value] : []
-}
-
-function pickToolTargetField(r: any): 'content' | 'think' {
-  if (r?.lastField === 'think' || r?.last_field === 'think') return 'think'
-  if (r?.lastField === 'content' || r?.last_field === 'content') return 'content'
-
-  const hasThink = !!r?.think && String(r.think).length > 0
-  const hasContent = !!r?.content && String(r.content).length > 0
-
-  if (hasThink && !hasContent) return 'think'
-  if (hasContent && !hasThink) return 'content'
-
-  return 'think'
-}
-
 function appendToolCallsFromExtra(
   msg: ChatMessage,
   extra: any,
-  r: any
+  r: any 
 ) {
   const toolCalls = extra?.tool_calls
   if (!Array.isArray(toolCalls) || toolCalls.length === 0) return
 
-  const targetField = pickToolTargetField(r)
+  // --- 判断挂载位置 ---
+  let targetField: 'content' | 'think' = 'think' // 默认兜底
+
+  if (r.think && r.think.length > 0) {
+    targetField = 'think'
+  } 
+  if (r.content && r.content.length > 0) {
+    targetField = 'content'
+  }
 
   for (const call of toolCalls) {
     const label: ToolLabel = {
@@ -404,12 +388,12 @@ const stream_state_text = computed(() => {
 // ################################
 // Chat history
 // ################################
-const historyList = ref<ChatHistory[]>([])
+const historyList = ref<any[]>([])
 
 async function get_conversation_list(cidValue: string) {
   const res = await window.api.getChatlist(cidValue)
   const raw_list = res.messages
-  const chat_list: ChatHistory[] = []
+  const chat_list: any[] = []
 
   for (const raw_chat of raw_list) {
     const format_date = formatTime(raw_chat.last_active_at)
@@ -426,112 +410,30 @@ async function get_conversation_list(cidValue: string) {
   return chat_list
 }
 
-function findLatestIndexById(list: ChatMessage[], id: string, role: Role) {
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (list[i].id === id && list[i].role === role) {
-      return i
-    }
-    if (list[i].role === 'human') {
-      break
-    }
-  }
-  return -1
-}
-
-function findLatestIndexByStatus(list: ChatMessage[], status: boolean, role: Role) {
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (list[i].pending === status && list[i].role === role) {
-      return i
-    }
-  }
-  return -1
-}
-
-function mergeHistoryAiMessage(
-  msg: ChatMessage,
-  r: any,
-  extra: any,
-  info: any
-) {
-  appendChunk(msg, 'content', r.content ?? '')
-  appendChunk(msg, 'think', r.think ?? '')
-
-  const prevInfo = msg.info ?? {}
-  msg.info = {
-    ...prevInfo,
-    ...info,
-    total_tokens: (prevInfo.total_tokens ?? 0) + (info.total_tokens ?? 0),
-    total_duration: Math.round(
-      ((prevInfo.total_duration ?? 0) + (info.total_duration ?? 0)) * 1000
-    ) / 1000,
-  }
-
-  const prevExtra = msg.extra ?? {}
-  const nextExtra = {
-    ...prevExtra,
-    ...extra,
-    key_word: [prevExtra.key_word, extra.key_word].filter(Boolean).join('\n'),
-    link_provider: prevExtra.link_provider ?? extra.link_provider,
-    content_provider: prevExtra.content_provider ?? extra.content_provider,
-    urls: [...(prevExtra.urls ?? []), ...(extra.urls ?? [])],
-    tool_calls: extra?.tool_calls ?? prevExtra.tool_calls,
-  }
-
-  msg.extra = nextExtra
-
-  appendToolCallsFromExtra(msg, extra, r)
-
-  if ((nextExtra.todo_list?.length ?? 0) > 0) {
-    msg.todos = cloneMaybeArray(nextExtra.todo_list)
-  }
-
-  if ((nextExtra.image_meta?.length ?? 0) > 0) {
-    msg.images = cloneMaybeArray(nextExtra.image_meta)
-  }
-
-  msg.pending = false
-  msg.lastField = r.think ? 'think' : 'content'
-}
-
 function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
   const list: ChatMessage[] = []
-  const aiIndexByGeneration = new Map<string, number>()
-  const systemIndexByTask = new Map<string, number>()
 
   for (const r of raw) {
     const extra = r.extra ?? {}
     const info = r.info ?? {}
 
     if (r.role === 'system' || r.role === 'tools') {
-      const taskId = String(info?.task_id ?? r.generation_id ?? genUUID())
-      const existingIndex = systemIndexByTask.get(taskId)
-
-      if (existingIndex !== undefined) {
-        const existing = list[existingIndex]
-        existing.content = info?.tool_name ?? existing.content ?? 'Unnamed task'
-        existing.desc = info?.desc ?? existing.desc ?? null
-        existing.status = info?.status ?? existing.status ?? null
-        existing.pending = false
-      } else {
-        const msg: ChatMessage = {
-          id: taskId,
-          cid: cid.value,
-          hid,
-          role: r.role,
-          content: info?.tool_name ?? 'Unnamed task',
-          desc: info?.desc ?? null,
-          status: info?.status ?? null,
-          pending: false,
-        }
-        list.push(msg)
-        systemIndexByTask.set(taskId, list.length - 1)
-      }
+      list.push({
+        id: info?.task_id ?? genUUID(),
+        cid: cid.value,
+        hid,
+        role: r.role,
+        content: info?.tool_name ?? 'Unnamed task',
+        desc: info?.desc ?? null,
+        status: info?.status ?? null,
+        pending: false,
+      })
       continue
     }
 
     if (r.role === 'human') {
       list.push({
-        id: String(genUUID()),
+        id: r.generation_id ?? genUUID(),
         cid: cid.value,
         hid,
         role: 'human',
@@ -540,38 +442,67 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
         error: false,
         pending: false,
       })
-
-      aiIndexByGeneration.clear()
       continue
     }
 
     if (r.role === 'ai' || r.role === 'info') {
-      const generationId = String(r.generation_id ?? genUUID())
-      const index = aiIndexByGeneration.get(generationId)
+      const targetRole: Role = 'ai'
+      const index = findIndexInListById(list, r.generation_id, targetRole)
 
-      if (index === undefined) {
+      if (index === -1) {
         const newMsg: ChatMessage = {
-          id: generationId,
+          id: r.generation_id ?? genUUID(),
           cid: cid.value,
           hid,
-          role: 'ai',
+          role: targetRole,
           label: '已思考',
           content: r.content ? [r.content] : [],
           think: r.think ? [r.think] : [],
           info,
           extra,
-          todos: cloneMaybeArray(extra?.todo_list ?? []),
-          images: cloneMaybeArray(extra?.image_meta ?? []),
+          todos: extra?.todo_list ?? [],
+          images: extra?.image_meta ?? [],
           pending: false,
-          lastField: r.think ? 'think' : 'content',
         }
 
         appendToolCallsFromExtra(newMsg, extra, r)
+
         list.push(newMsg)
-        aiIndexByGeneration.set(generationId, list.length - 1)
       } else {
         const msg = list[index]
-        mergeHistoryAiMessage(msg, r, extra, info)
+        const prevInfo = msg.info ?? {}
+        const prevExtra = msg.extra ?? {}
+
+        appendChunk(msg, 'content', r.content ?? '') 
+        appendChunk(msg, 'think', r.think ?? '')
+
+        msg.info = {
+          ...info,
+          total_tokens: (prevInfo.total_tokens ?? 0) + (info.total_tokens ?? 0),
+          total_duration: Math.round(((prevInfo.total_duration ?? 0) + (info.total_duration ?? 0)) * 1000) / 1000,
+        }
+
+        const nextExtra = {
+          ...prevExtra,
+          ...extra,
+          key_word: [prevExtra.key_word, extra.key_word].filter(Boolean).join('\n'),
+          link_provider: prevExtra.link_provider ?? extra.link_provider,
+          content_provider: prevExtra.content_provider ?? extra.content_provider,
+          urls: [...(prevExtra.urls ?? []), ...(extra.urls ?? [])],
+        }
+
+        msg.extra = nextExtra
+        appendToolCallsFromExtra(msg, extra, r)
+
+        if ((nextExtra.todo_list?.length ?? 0) > 0) {
+          msg.todos = nextExtra.todo_list
+        }
+
+        if ((nextExtra.image_meta?.length ?? 0) > 0) {
+          msg.images = nextExtra.image_meta
+        }
+
+        msg.pending = false
       }
     }
   }
@@ -595,7 +526,7 @@ async function loadHistoryMessages(hid: string, force = false) {
     list.splice(0, list.length, ...parsed)
     loadedHistorySet.add(hid)
   } catch (err) {
-    console.error('Failed to load history messages:', err)
+    console.error('加载历史消息失败:', err)
   } finally {
     loadingHistorySet.delete(hid)
   }
@@ -613,13 +544,6 @@ const handleSelectHistory = async (id: string | number) => {
 
   if (!loadedHistorySet.has(nextHid)) {
     await loadHistoryMessages(nextHid)
-  }
-
-  // console.log('hid = ', nextHid, '\n', messages.value)
-
-  const index = historyList.value.findIndex(c => String(c.id) === store.current_history_id)
-  if (index !== -1) {
-    historyList.value[index].hasNewMessage = false
   }
 
   nextTick(scrollToBottom)
@@ -661,8 +585,11 @@ const createChat = async () => {
 
   historyList.value.unshift(chat)
   store.current_history_id = newHid
+  // store.currentWorkDir = store.getWorkDir(newHid)
   store.setWorkDir(store.current_history_id, store.currentWorkDir)
   loadedHistorySet.add(newHid)
+
+
 }
 
 const handleDeleteHistory = (history_id: string) => {
@@ -711,11 +638,6 @@ function handleWsMessage(payload: any) {
   ensureHistoryMessages(historyId)
   ensureGeneratingState(historyId)
 
-  const index = historyList.value.findIndex(c => String(c.id) === historyId)
-  if (index !== -1) {
-    historyList.value[index].isGenerating = true
-  }
-
   if (payload.action === 'tool_return') handleToolRtn(payload, historyId)
   else if (payload.action === 'msg_stream_start') handleStreamStart(payload, historyId)
   else if (payload.action === 'think_chunk_rtn') handleThinkChunkRtn(payload, historyId)
@@ -733,17 +655,16 @@ function handleWsMessage(payload: any) {
 const handleConnectProject = async () => {
   const result = await window.api.openFileDialog()
   if (result.canceled || result.filePaths.length === 0) {
-    return
-  }
-
-  console.log('Current history id: ', store.current_history_id)
+      return
+    }
+    console.log("Current history id: ", store.current_history_id)
   if (store.current_history_id !== '-1') store.setWorkDir(store.current_history_id, result.filePaths[0])
-  store.currentWorkDir = result.filePaths[0]
+  store.currentWorkDir=result.filePaths[0]
   store.removeWorkDir('-1')
 }
 
 function ensureAiMessage(list: ChatMessage[], historyId: string, generationId: string) {
-  let index = findLatestIndexById(list, generationId, 'ai')
+  let index = findIndexInListById(list, generationId, 'ai')
   if (index === -1) {
     list.push({
       id: generationId,
@@ -751,11 +672,12 @@ function ensureAiMessage(list: ChatMessage[], historyId: string, generationId: s
       hid: historyId,
       role: 'ai',
       label: '已准备',
+
       content: [],
       think: [],
+
       info: null,
       pending: true,
-      lastField: undefined,
     })
     index = list.length - 1
   }
@@ -768,7 +690,8 @@ function handleToolRtn(payload: any, historyId: string) {
   if (!toolMsg || !taskId) return
 
   const list = ensureHistoryMessages(historyId)
-  const index = findLatestIndexById(list, taskId, 'system')
+  const state = ensureGeneratingState(historyId)
+  const index = findIndexInListById(list, taskId, 'system')
 
   if (index !== -1) {
     list[index].content = toolMsg.info?.tool_name ?? null
@@ -795,7 +718,7 @@ function handleStreamStart(payload: any, historyId: string) {
 
   const list = ensureHistoryMessages(historyId)
   const state = ensureGeneratingState(historyId)
-  const humanIndex = findLatestIndexByStatus(list, true, 'human')
+  const humanIndex = findIndexInListByStatus(list, true, 'human')
 
   if (humanIndex !== -1) {
     list[humanIndex].pending = false
@@ -804,7 +727,7 @@ function handleStreamStart(payload: any, historyId: string) {
   state.isGenerating = true
   state.streamStateText = '停止生成'
 
-  const existingIndex = findLatestIndexById(list, generationId, 'ai')
+  const existingIndex = findIndexInListById(list, generationId, 'ai')
   if (existingIndex === -1) {
     list.push({
       id: generationId,
@@ -816,12 +739,10 @@ function handleStreamStart(payload: any, historyId: string) {
       think: [],
       info: null,
       pending: true,
-      lastField: undefined,
     })
   } else {
     list[existingIndex].pending = true
     list[existingIndex].label = '已准备'
-    list[existingIndex].lastField = undefined
   }
 
   if (historyId === store.current_history_id) {
@@ -845,9 +766,11 @@ function handleThinkChunkRtn(payload: any, historyId: string) {
 
   if (msg.pending === true) {
     msg.label = '思考中...'
-    appendChunk(msg, 'think', deltaThink, generationId)
+
+    appendChunk(msg, 'think', deltaThink)
     msg.lastField = 'think'
   }
+
 }
 
 function handleContentChunkRtn(payload: any, historyId: string) {
@@ -866,9 +789,11 @@ function handleContentChunkRtn(payload: any, historyId: string) {
 
   if (msg.pending === true) {
     msg.label = '回答中...'
-    appendChunk(msg, 'content', deltaContent, generationId)
+
+    appendChunk(msg, 'content', deltaContent)
     msg.lastField = 'content'
   }
+
 }
 
 function handleSummaryChunkRtn(payload: any, historyId: string) {
@@ -893,7 +818,7 @@ function handleTodoChunkRtn(payload: any, historyId: string) {
   state.isGenerating = true
 
   if (list[index].pending === true) {
-    list[index].todos = cloneMaybeArray(todos)
+    list[index].todos = todos
   }
 }
 
@@ -928,7 +853,7 @@ async function handleStreamEnd(payload: any, historyId: string) {
 
   const list = ensureHistoryMessages(historyId)
   const state = ensureGeneratingState(historyId)
-  const index = findLatestIndexById(list, generationId, 'ai')
+  const index = findIndexInListById(list, generationId, 'ai')
 
   state.isGenerating = false
   state.streamStateText = ''
@@ -940,18 +865,11 @@ async function handleStreamEnd(payload: any, historyId: string) {
   }
 
   await syncHistoryMessages(historyId)
-
-  const hIndex = historyList.value.findIndex(c => String(c.id) === historyId)
-  if (hIndex !== -1) {
-    historyList.value[hIndex].isGenerating = false
-    if (store.current_history_id !== historyId) {
-      historyList.value[hIndex].hasNewMessage = true
-    }
-  }
 }
 
 async function handleStreamAbort(payload: any, historyId: string) {
   const generationId = payload.generation_id
+  const reason = payload.data?.reason
   const detail = payload.data?.content
   if (!generationId) return
 
@@ -961,49 +879,43 @@ async function handleStreamAbort(payload: any, historyId: string) {
   state.isGenerating = false
   state.streamStateText = ''
 
-  const index = findLatestIndexById(list, generationId, 'ai')
-  if (index !== -1 && list[index].pending === true) {
-    list[index].pending = false
-    appendChunk(list[index], list[index].lastField ?? 'content', ' [Conversation Abort]', generationId)
-    list[index].errors = detail
-    list[index].lastField = undefined
-  }
-
-  const indexHuman = findLatestIndexByStatus(list, true, 'human')
+  const indexHuman = findIndexInListByStatus(list, true, 'human')
   if (indexHuman !== -1) {
     list[indexHuman].pending = false
     list[indexHuman].error = true
   }
 
   await syncHistoryMessages(historyId)
-  console.warn('Generation abort, generation_id = ', generationId)
 
-  const hIndex = historyList.value.findIndex(c => String(c.id) === historyId)
-  if (hIndex !== -1) {
-    historyList.value[hIndex].isGenerating = false
-    if (store.current_history_id !== historyId) {
-      historyList.value[hIndex].hasNewMessage = true
-    }
-  }
+  const index = findIndexInListById(list, generationId, 'ai')
+  if (index !== -1 && list[index].pending === true) {
+    list[index].pending = false
+    appendChunk(list[index], list[index].lastField ?? 'content', ` [Conversation Abort]`)
+    list[index].errors = detail
+    list[index].lastField = undefined
+  } 
+  console.warn("Generation abort, generation_id = ", generationId)
 }
 
 function handleToolsChunkRtn(payload: any, historyId: string) {
   const generationId = payload.generation_id
   const toolData = payload.data?.messages?.extra
+  console.log(toolData)
   if (!generationId || !toolData) return
 
   const toolChunkRtn = toolData?.tool_chunk_rtn
   const toolCallId = toolData?.tool_call_id
   const chunkPosition = toolData?.chunk_position
-  const chunkStatus = toolData?.status
+  const chunkStatus = toolData?.status // success / fail
 
   const list = ensureHistoryMessages(historyId)
-  const index = findLatestIndexById(list, generationId, 'ai')
+  const index = findIndexInListById(list, generationId, 'ai')
 
   if (toolCallId && toolCallId !== '' && index !== -1) {
     const msg = list[index]
 
     let status: ToolLabel['status'] = 'pending'
+
     if (chunkPosition === 'start') {
       status = 'in_progress'
     } else if (chunkPosition === 'end') {
@@ -1017,7 +929,8 @@ function handleToolsChunkRtn(payload: any, historyId: string) {
     }
 
     const field = msg.lastField ?? 'think'
-    appendToolLabel(msg, field, toolLabel, generationId)
+
+    appendToolLabel(msg, field, toolLabel)
   }
 
   if (toolChunkRtn === 'send_images') {
@@ -1133,7 +1046,7 @@ async function sendMessage() {
           { title: content.slice(0, 30) }
         )
       } catch (err) {
-        console.warn('Failed to update conversation title:', err)
+        console.warn('对话标题更新失败:', err)
       }
     }
   }
@@ -1181,14 +1094,14 @@ async function sendMessage() {
       }
     )
   } catch (err) {
-    console.error('Request failed', err)
+    console.error('请求失败', err)
     ElMessage({
       type: 'error',
       message: '消息发送失败',
       plain: true,
     })
 
-    const index = findLatestIndexByStatus(list, true, 'human')
+    const index = findIndexInListByStatus(list, true, 'human')
     if (index !== -1) {
       list[index].pending = false
       list[index].error = true
@@ -1218,7 +1131,7 @@ onMounted(async () => {
       store.currentWorkDir = store.getWorkDir(store.current_history_id)
     }
   } catch (err) {
-    console.error('Initialization failed', err)
+    console.error('初始化失败', err)
   }
 
   startTypewriter()
@@ -1285,6 +1198,24 @@ function formatTime(timeStr: string) {
     time: timePart,
     full: inputTime.toLocaleString(),
   }
+}
+
+function findIndexInListById(list: ChatMessage[], id: string, role: Role) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].id === id && list[i].role === role) {
+      return i
+    }
+  }
+  return -1
+}
+
+function findIndexInListByStatus(list: ChatMessage[], status: boolean, role: Role) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].pending === status && list[i].role === role) {
+      return i
+    }
+  }
+  return -1
 }
 
 // ################################
@@ -1527,7 +1458,7 @@ const stopGenerating = async () => {
       store.current_history_id,
     )
   } catch (err) {
-    console.error('Request failed', err)
+    console.error('请求失败', err)
   }
 }
 

@@ -6,6 +6,7 @@ const api = {
   writeData: (key, value) => electron.ipcRenderer.invoke("writeData", key, value),
   submitCase: (cid, content) => electron.ipcRenderer.invoke("api:submit_case", cid, content),
   openFileDialog: () => electron.ipcRenderer.invoke("openFileDialog"),
+  openCacheDir: () => electron.ipcRenderer.invoke("openCacheDir"),
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, chat_config) => electron.ipcRenderer.invoke("api:chat", cid, sid, hid, content, chat_config),
   stopGeneration: (cid, sid, hid) => electron.ipcRenderer.invoke("api:stop", cid, sid, hid),
@@ -37,6 +38,7 @@ const api = {
   updateDocumentsStatus: (cid, document_id, active) => electron.ipcRenderer.invoke("api:update_document_status", cid, document_id, active),
   updateDocumentsDesc: (cid, document_id, desc) => electron.ipcRenderer.invoke("api:update_document_description", cid, document_id, desc),
   deleteDocument: (cid, document_id) => electron.ipcRenderer.invoke("api:delete_document", cid, document_id),
+  openImageTemp: (base64, fileName) => electron.ipcRenderer.invoke("openImageTemp", base64, fileName),
   // Clipboard helper
   copyToClipboard: (payload) => electron.ipcRenderer.invoke("api:copyToClipboard", payload),
   auth: {

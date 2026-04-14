@@ -4,7 +4,7 @@
       <HomePage />
     </el-aside>
 
-    <el-main class="main">
+    <el-main class="main-area">
         <!-- 左侧菜单 -->
         <el-aside class="menu-aside">
           <el-menu
@@ -81,7 +81,7 @@ const handleSelect = (key: string) => {
 </script>
 
 <style scoped>
-.main {
+.main-area {
   position: relative;
   width: 100%;
   height: calc(100vh - 32px) !important;

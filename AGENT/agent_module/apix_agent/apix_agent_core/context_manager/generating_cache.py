@@ -11,6 +11,9 @@ from .context_process import ai_context_manager
 
 
 class GeneratingCache:
+    '''
+    Append dialog history for sub_agent to local file system.
+    '''
 
     def __init__(self):
         # Root directory for sub-agent histories

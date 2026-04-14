@@ -17,7 +17,7 @@ from apix_agent.commons.type_def import MessagesState
 from apix_agent.global_config import BASE_DIR, FILE_SERVICE_URL, MEMORY_SERVICE_BASE_URL
 from apix_agent.commons.logger import logger
 from apix_agent.commons.file_content_reader import image_to_base64, audio_to_base64, load_from_yaml, video_to_base64, load_text
-from apix_agent.apix_agent_core.LLM_node.llm_adapter import LlmNodeAdapter
+from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 
 
 class AIContextManager:
@@ -577,6 +577,9 @@ class AIContextManager:
         message: AIMessage | AIMessageChunk | ToolMessage,
         timestamp: int,
         *,
+        fallback_model_provider: str = 'Custom Provider',
+        fallback_model_name: str = 'Custom Model',
+        fallback_total_duration: int = 0,
         filter: bool = False,
     ) -> dict:
         """
@@ -584,6 +587,9 @@ class AIContextManager:
 
         This method no longer appends to memory service.
         It only converts LangChain messages into structured dicts.
+
+        Args: 
+            filter[bool]: Provide simpler dict message.
 
         Returns:
             list[dict]: Memory message dicts list (len 1)
@@ -597,7 +603,7 @@ class AIContextManager:
             think_content = (message.additional_kwargs or {}).get("reasoning_content", "")
             tool_calls = (message.tool_calls or [])
             extra = {'tool_calls': tool_calls} if tool_calls else {}
-            message_info = self._extract_mes_info(message)
+            message_info = self._extract_mes_info(message, fallback_model_name=fallback_model_name, fallback_model_provider=fallback_model_provider, fallback_total_duration=fallback_total_duration)
 
             if filter:
                 messages = {
@@ -796,112 +802,6 @@ class AIContextManager:
             }
             memory = {"role": "tools", "content": message.content, "info": message_info, "timestamp": timestamp}
             await self.append_to_messages(client_id, history_id, memory)
-
-    async def process_tool_message(self, tool_message: ToolMessage, state: MessagesState):
-        """
-        process_tool_message extracts text or binary data from a ToolMessage.
-
-        When working with a multimodal LLM, binary data cannot be transmitted
-        via a ToolMessage because only string content is forwarded to the model.
-
-        To handle this limitation, we extract the file path from the ToolMessage
-        content, construct a HumanMessage, and pass it to the agent instead.
-
-        :param tool_message: Tool message in lang graph state.
-        :type tool_message: ToolMessage
-        :param state: Lang graph state.
-        :type state: MessagesState
-        """
-        logger.trace('[context_process.py] [AIContextManager] [process_tool_message] Enter')
-        if tool_message.name != "get_file_content_user_uploaded":
-            return
-
-        try:
-            content = tool_message.content
-            parsed = {}
-
-            if isinstance(content, dict):
-                parsed = content
-            elif isinstance(content, str):
-                stripped = content.strip()
-                if not stripped:
-                    return
-                try:
-                    parsed = json.loads(stripped)
-                except Exception:
-                    logger.error("[process_tool_message] Can not load file from ToolMessage.")
-
-            if not isinstance(parsed, dict):
-                logger.warning(
-                    f"[process_tool_message] Unexpected file_reader content type: {type(parsed)}"
-                )
-                return
-
-            binary_paths = parsed.get("binary", []) or []
-            if not isinstance(binary_paths, list):
-                logger.warning("[process_tool_message] field 'binary' is not list")
-                return
-
-            valid_paths = [
-                p for p in binary_paths
-                if isinstance(p, str) and p and os.path.exists(p)
-            ]
-            if not valid_paths:
-                logger.error(f"[process_tool_message] Can not read path: {binary_paths}")
-                return
-
-            image_ext = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
-            audio_ext = {".mp3", ".wav", ".m4a", ".ogg", ".aac", ".flac"}
-            video_ext = {".mp4", ".webm", ".mov", ".mkv", ".avi"}
-            text_ext = {".txt",".md",".log",".json",".csv",".xml",".html",".htm",".py",".js",".ts",".yaml",".yml"}
-
-            image_data = []
-            audio_data = []
-            video_data = []
-            text_data = []
-
-            for path in valid_paths:
-                ext = os.path.splitext(path)[1].lower()
-                data = {}
-
-                if ext in text_ext:
-                    data["type"] = "text"
-                    data["text"] = load_text(path)
-                    text_data.append(data)
-                elif ext in image_ext:
-                    data["type"] = "image"
-                    data["base64"], data["mime_type"] = image_to_base64(path)
-                    image_data.append(data)
-                elif ext in audio_ext:
-                    data["type"] = "audio"
-                    data["base64"], data["mime_type"] = audio_to_base64(path)
-                    audio_data.append(data)
-                elif ext in video_ext:
-                    data["type"] = "video"
-                    data["base64"], data["mime_type"] = video_to_base64(path)
-                    video_data.append(data)
-                else:
-                    logger.warning(f"[process_tool_message] Unsupport file to load in ToolMessage: {ext}")
-
-            human_blocks = text_data + image_data + audio_data + video_data
-            tool_message.content = f"The tool 'file_reader' has loaded {len(human_blocks)} files."
-
-            state_messages = state.get("messages", [])
-            if not isinstance(state_messages, list):
-                logger.warning("[process_tool_message] state['messages'] is not list")
-                return
-
-            state_messages.append(HumanMessage(role='file_reader', content=human_blocks))
-            # Construct a virtual tool call to prevent ToolMessage from appearing after HumanMessage.
-            tool_call_id = str(uuid4())
-            state_messages.append(AIMessage(content="", tool_calls=[{"name": "_internal_protocol_sync", "args": {}, "id": tool_call_id}]))
-            state_messages.append(ToolMessage(tool_call_id=tool_call_id, content=f"The tool 'file_reader' has inserted a human message above. This system-inserted user message is invisible to the user."))
-            logger.info(
-                f"[process_tool_message] appended multimodal HumanMessage with {len(human_blocks)} file(s)"
-            )
-
-        except Exception as e:
-            logger.warning(f"[process_tool_message] parse tool message error: {e}")
     
     async def append_info_message(
         self,
@@ -941,9 +841,16 @@ class AIContextManager:
         memory = {"role": "info", "content": "", "extra": extra, "info": {}, "timestamp": timestamp, "generation_id": generation_id}
         await self.append_to_messages(client_id, history_id, memory)
 
-    def _extract_mes_info(self, message: AIMessage | AIMessageChunk) -> dict:
+    def _extract_mes_info(
+        self, 
+        message: AIMessage | AIMessageChunk,
+        *,
+        fallback_model_provider: str = 'Custom Provider',
+        fallback_model_name: str = 'Custom Model',
+        fallback_total_duration: int = 0,
+    ) -> dict:
         if not message.response_metadata:
-            return {}
+            message.response_metadata = {}
         message_info = {
             "model": message.response_metadata.get("model", "Unknow model"),
             "total_duration": round((message.response_metadata.get('total_duration', 0) / 1_000_000_000), 3),  # ns to s
@@ -1560,7 +1467,7 @@ class AIContextManager:
         if no_sandbox:
             prompt = f"## Your workspace is {work_dir}"
         elif sandbox:
-            prompt = "## [Ubuntu] Sandbox has been configured. \n- The file /workspace/sub_agent_bus.log is a shared agent communication log. You may append new entries but must not delete or overwrite existing content."
+            prompt = "## [Ubuntu] Sandbox has been configured. \n- The user will share access to this sandbox with you."
         else:
             prompt = "## Sandbox configure failed."
 

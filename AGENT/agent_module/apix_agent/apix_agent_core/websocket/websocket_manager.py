@@ -2,7 +2,7 @@ import asyncio
 import copy
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Literal
 from uuid import uuid4
 from fastapi import WebSocket
 import traceback
@@ -11,19 +11,25 @@ from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.commons.type_def import MessagesState
-from apix_agent.global_config import AGENT_SERVICE_ID
+from apix_agent.global_config import GENERATION_TTL_SECONDS
 
 
+# =========================
+# Generation State
+# =========================
 @dataclass
 class GenerationState:
     """
     State for a single AI generation.
-    One generation == one AI invoke lifecycle.
     """
+
+    history_id: str
     generation_id: str
     client_id: str
-    history_id: str
-    # {"role": "ai", "content": "", "think": "", "extra": {}, "info": {}, "generation_id": "", "timestamp": int}
+
+    # running / finished / aborted
+    status: Literal["running", "finished", "aborted"] = "running"
+
     cache_tokens: dict = field(default_factory=lambda: {
         "role": "ai",
         "content": "",
@@ -33,146 +39,83 @@ class GenerationState:
         "generation_id": "",
         "timestamp": 0
     })
+
     created_at: float = field(default_factory=time.time)
-    is_aborted: bool = False
 
     # Protect cache_tokens concurrent access
     gen_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
+# =========================
+# User Context
+# =========================
 @dataclass
 class UserSocketContext:
-    """
-    WebSocket context for one client.
-    """
     websocket: WebSocket
     client_id: str
 
-    # Currently active generation (front-stage)
-    active_generation_id: Optional[str] = None
-
-    # All generations for this client
+    active_generation_ids: list[str] = field(default_factory=list)
     generations: Dict[str, GenerationState] = field(default_factory=dict)
 
-    # Ensure websocket.send_json is serialized
     send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    ctx_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
+# =========================
+# Websocket Manager
+# =========================
 class WebsocketList:
-    """
-    WebSocket connection and event routing manager.
-    """
 
     def __init__(self):
-        # key: client_id
         self._connections: Dict[str, UserSocketContext] = {}
 
-    async def register(
-        self,
-        websocket: WebSocket,
-        client_id: str,
-    ):
+        self._ttl_seconds = GENERATION_TTL_SECONDS
+        self._cleanup_interval = 30  # run every 30s
+        self._cleanup_task = None
+
+    async def start(self):
         """
-        Register a websocket connection.
+        Start background cleanup task.
+        Must be called after event loop is running (e.g. FastAPI lifespan).
         """
-        # Handle duplicate connections (same client_id reconnect)
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+            logger.info("[WebsocketList] cleanup task started")
+
+    async def stop(self):
+        """
+        Gracefully stop background cleanup task.
+        """
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
+            logger.info("[WebsocketList] cleanup task stopped")
+
+    async def register(self, websocket: WebSocket, client_id: str):
         old_ctx = self._connections.get(client_id)
         if old_ctx:
-            # Abort all existing generations silently
             for gen in old_ctx.generations.values():
-                gen.is_aborted = True
+                gen.status = "aborted"
 
-            # NOTE:
-            # Do NOT close old websocket here.
-            # FastAPI / ASGI layer should manage websocket lifecycle.
-
-        # Replace with new context
         self._connections[client_id] = UserSocketContext(
             websocket=websocket,
             client_id=client_id,
         )
 
     def unregister(self, client_id: str):
-        """
-        Unregister websocket connection.
-        """
         ctx = self._connections.pop(client_id, None)
         if not ctx:
             return
 
-        # Cleanup generations
         for gen in ctx.generations.values():
-            gen.is_aborted = True
+            gen.status = "aborted"
 
         ctx.generations.clear()
-        ctx.active_generation_id = None
-
-    async def create_generation(self, client_id: str, history_id: str, append_cache_memory: bool = True) -> str:
-        """
-        Create a new generation and abort previous active one.
-        """
-        ctx = self._get_ctx(client_id)
-        new_gen_id = str(uuid4())
-
-        # Abort previous active generation
-        if ctx.active_generation_id:
-            old_gen = ctx.generations.get(ctx.active_generation_id)
-            if old_gen:
-                old_gen.is_aborted = True
-                interrupted_msg = None
-
-                if append_cache_memory:
-                    async with old_gen.gen_lock:
-                        if old_gen.cache_tokens.get("content") or old_gen.cache_tokens.get("think"):
-                            interrupted_msg = copy.deepcopy(old_gen.cache_tokens)
-                            
-                    # TODO: FIX BUG caused by append_to_messages()
-                    if interrupted_msg:
-                        timestamp = time.time() * 1_000_000
-                        content = interrupted_msg.get("content") or ""
-                        think = interrupted_msg.get("think") or ""
-                        interrupted_msg.update({
-                            "content": content + ("[Conversation Abort]" if content else ""),
-                            "think": think + ("[Conversation Abort]" if think else ""),
-                            "generation_id": old_gen.generation_id,
-                            "timestamp": timestamp,
-                        })
-                        await ai_context_manager.append_to_messages(
-                            client_id,
-                            history_id,
-                            interrupted_msg,
-                        )
-
-        # Register new generation
-        ctx.generations[new_gen_id] = GenerationState(new_gen_id, client_id, history_id)
-        ctx.active_generation_id = new_gen_id
-
-        return new_gen_id
-
-    def abort_generation(
-        self,
-        client_id: str,
-        generation_id: str,
-    ):
-        """
-        Abort a specific generation.
-        """
-        ctx = self._get_ctx(client_id)
-        gen = ctx.generations.get(generation_id)
-        if gen:
-            gen.is_aborted = True
-
-    def is_generation_aborted(
-        self,
-        client_id: str,
-        generation_id: str,
-    ) -> bool:
-        """
-        Check whether a generation has been aborted.
-        """
-        ctx = self._get_ctx(client_id)
-        gen = ctx.generations.get(generation_id)
-        return gen.is_aborted if gen else True
+        ctx.active_generation_ids = []
 
     def _get_ctx(self, client_id: str) -> UserSocketContext:
         ctx = self._connections.get(client_id)
@@ -180,27 +123,144 @@ class WebsocketList:
             raise RuntimeError(f"WebSocket not registered, client id: {client_id}")
         return ctx
 
-    async def send_ai_stream_token(
-        self,
-        generation_id: str,
-        client_id: str,
-        history_id: str,
-        delta: dict,
-    ):
+    async def create_generation(self, client_id: str, history_id: str, append_cache_memory: bool = True) -> str:
+        ctx = self._get_ctx(client_id)
+        new_gen_id = str(uuid4())
+
+        async with ctx.ctx_lock:
+            old_gen = None
+
+            for gid in ctx.active_generation_ids:
+                gen = ctx.generations.get(gid)
+                if gen and gen.history_id == history_id and gen.status == "running":
+                    old_gen = gen
+                    break
+
+            if old_gen:
+                old_gen.status = "aborted"
+
+            ctx.generations[new_gen_id] = GenerationState(
+                history_id=history_id,
+                generation_id=new_gen_id,
+                client_id=client_id
+            )
+            ctx.active_generation_ids.append(new_gen_id)
+
+        if old_gen and append_cache_memory and old_gen.status == "aborted":
+            async with old_gen.gen_lock:
+                interrupted_msg = copy.deepcopy(old_gen.cache_tokens)
+
+            if interrupted_msg:
+                ts = int(time.time() * 1000)
+
+                content = interrupted_msg.get("content", "")
+                think = interrupted_msg.get("think", "")
+
+                think_endswith = "[Conversation Abort]" if think and not content else ""
+                content_endswith = "[Conversation Abort]" if content or not think_endswith else ""
+
+                interrupted_msg.update({
+                    "content": content + content_endswith,
+                    "think": think + think_endswith,
+                    "generation_id": old_gen.generation_id,
+                    "timestamp": ts,
+                })
+
+                await ai_context_manager.append_to_messages(
+                    client_id,
+                    history_id,
+                    interrupted_msg
+                )
+
+        return new_gen_id
+
+    def abort_generation(self, client_id: str, generation_id: str):
+        ctx = self._get_ctx(client_id)
+        gen = ctx.generations.get(generation_id)
+        if not gen:
+            return
+
+        gen.status = "aborted"
+
+        try:
+            ctx.active_generation_ids.remove(generation_id)
+        except ValueError:
+            pass
+
+    def is_generation_aborted(self, client_id: str, generation_id: str) -> bool:
+        ctx = self._get_ctx(client_id)
+        gen = ctx.generations.get(generation_id)
+        return (not gen) or gen.status != "running"
+    
+    async def _cleanup_loop(self):
         """
-        Send a single token delta.
+        Background task: periodically cleanup expired generations.
         """
+        while True:
+            try:
+                await asyncio.sleep(self._cleanup_interval)
+                await self._cleanup_expired_generations()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[cleanup_loop error] {e}")
+
+    async def _cleanup_expired_generations(self):
+        """
+        Remove finished/aborted generations after TTL.
+        """
+        if not self._connections:
+            return
+
+        now = time.time()
+
+        for client_id, ctx in list(self._connections.items()):
+            async with ctx.ctx_lock:
+
+                to_delete = []
+
+                for gen_id, gen in ctx.generations.items():
+                    if gen.status == "running":
+                        continue
+
+                    age = now - gen.created_at
+
+                    if age > self._ttl_seconds:
+                        to_delete.append(gen_id)
+
+                for gen_id in to_delete:
+                    ctx.generations.pop(gen_id, None)
+
+                    try:
+                        ctx.active_generation_ids.remove(gen_id)
+                    except ValueError:
+                        pass
+
+                if to_delete:
+                    logger.debug(
+                        f"[cleanup] client={client_id}, removed={len(to_delete)} generations"
+                    )
+
+    # =========================
+    # Send helpers
+    # =========================
+    async def _safe_send(self, ctx: UserSocketContext, payload: dict):
+        try:
+            async with ctx.send_lock:
+                await ctx.websocket.send_json(payload)
+        except Exception:
+            logger.warning("websocket send failed")
+
+    async def send_ai_stream_token(self, generation_id, client_id, history_id, delta):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
 
-        # Stop sending token if generation is aborted
-        if not gen or gen.is_aborted:
-            await self.send_ai_stream_abort(generation_id, client_id, history_id)
+        if not gen or gen.status != "running":
             return
 
         for action, content in delta.items():
             async with gen.gen_lock:
-                if action == "node_stream_end" or action == "node_stream_start":
+                if action == "node_stream_start":
                     gen.cache_tokens = {
                         "role": "ai",
                         "content": "",
@@ -211,14 +271,14 @@ class WebsocketList:
                         "timestamp": 0
                     }
 
-                gen.cache_tokens.update({
-                    "content": gen.cache_tokens.get("content") + (content if action == 'content_chunk_rtn' else ""),
-                    "think": gen.cache_tokens.get("think") + (content if action == 'think_chunk_rtn' else ""),
-                })
+                if action == "content_chunk_rtn":
+                    gen.cache_tokens["content"] += content
+                elif action == "think_chunk_rtn":
+                    gen.cache_tokens["think"] += content
 
             payload = {
                 "action": action,
-                "ts": int(time.time()),
+                "ts": int(time.time() * 1000),
                 "generation_id": generation_id,
                 "data": {
                     "client_id": client_id,
@@ -230,65 +290,39 @@ class WebsocketList:
                         "extra": content if action == 'tool_chunk_rtn' else {},
                         "info": content if action == 'info_chunk_rtn' else {},
                         "todos": content if action == 'todo_chunk_rtn' else [],
-                        "msg_cursor": None,
-                        "created_at": None,
                     },
                 },
             }
 
-            async with ctx.send_lock:
-                await ctx.websocket.send_json(payload)
+            await self._safe_send(ctx, payload)
 
-    async def send_ai_stream_start(
-        self,
-        generation_id: str,
-        client_id: str,
-        history_id: str,
-    ):
-        """
-        Send final AI message after streaming completes.
-        """
+    async def send_ai_stream_start(self, generation_id, client_id, history_id):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
-
-        # Do not finalize aborted generations
-        if not gen or gen.is_aborted:
+        if not gen or gen.status != "running":
             return
 
         payload = {
             "action": "msg_stream_start",
-            "ts": int(time.time()),
+            "ts": int(time.time() * 1000),
             "generation_id": generation_id,
             "data": {
                 "client_id": client_id,
                 "history_id": history_id,
-                "messages": {},
             },
         }
 
-        async with ctx.send_lock:
-            await ctx.websocket.send_json(payload)
+        await self._safe_send(ctx, payload)
 
-    async def send_ai_stream_end(
-        self,
-        generation_id: str,
-        client_id: str,
-        history_id: str,
-        reason: str = "graph_finish"
-    ):
-        """
-        Send final AI message after streaming completes.
-        """
+    async def send_ai_stream_end(self, generation_id, client_id, history_id, reason="graph_finish"):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
-
-        # Do not finalize aborted generations
-        if not gen or gen.is_aborted:
+        if not gen or gen.status != "running":
             return
 
         payload = {
             "action": "msg_stream_end",
-            "ts": int(time.time()),
+            "ts": int(time.time() * 1000),
             "generation_id": generation_id,
             "data": {
                 "client_id": client_id,
@@ -297,22 +331,16 @@ class WebsocketList:
             },
         }
 
-        async with ctx.send_lock:
-            await ctx.websocket.send_json(payload)
+        await self._safe_send(ctx, payload)
 
-        gen.is_aborted = True
+        gen.status = "finished"
 
-    async def send_ai_stream_abort(
-        self,
-        generation_id: str,
-        client_id: str,
-        history_id: str,
-        reason: str = "user_interrupt",
-        content: str = ""
-    ):
-        """
-        Notify client that a generation has been aborted.
-        """
+        try:
+            ctx.active_generation_ids.remove(generation_id)
+        except ValueError:
+            pass
+
+    async def send_ai_stream_abort(self, generation_id, client_id, history_id, reason="user_interrupt", content=""):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
         if not gen:
@@ -320,7 +348,7 @@ class WebsocketList:
 
         payload = {
             "action": "msg_stream_abort",
-            "ts": int(time.time()),
+            "ts": int(time.time() * 1000),
             "generation_id": generation_id,
             "data": {
                 "client_id": client_id,
@@ -330,78 +358,24 @@ class WebsocketList:
             },
         }
 
-        async with ctx.send_lock:
-            await ctx.websocket.send_json(payload)
-
-    async def send_tool_event(
-        self,
-        task_id: str,
-        client_id: str,
-        history_id: str,
-        tool_message: dict,
-    ):
-        """
-        Send tool-related events.
-
-        tool_message:
-            Must match your existing tool message structure.
-        """
-        ctx = self._get_ctx(client_id)
-
-        payload = {
-            "action": "tool_return",
-            "ts": int(time.time()),
-            "generation_id": task_id,
-            "data": {
-                "task_id": task_id,
-                "client_id": client_id,
-                "history_id": history_id,
-                "messages": tool_message,
-            },
-        }
-
-        async with ctx.send_lock:
-            await ctx.websocket.send_json(payload)
-
-        # NOTE:
-        # Tool events are NEVER blocked by generation abort.
+        await self._safe_send(ctx, payload)
 
 
+
+# =========================
+# Handler
+# =========================
 class WebsocketMessageHandler:
 
     def __init__(self, ws_lst: WebsocketList):
         self.ws_list = ws_lst
 
-    async def return_error_msg(self, generation_id: str, client_id: str, history_id: str, error_msg: str):
-        """
-        Chat with LLM agent and get completions.
-        """
-        logger.trace('[websocket_manager.py] [WebsocketMessageHandler] [return_error_msg] Enter')
-        try:
-            await self.ws_list.send_ai_stream_start(
-                generation_id=generation_id,
-                client_id=client_id,
-                history_id=history_id
-            )
-            raise RuntimeError(error_msg)
-
-        except Exception as e:
-            logger.error(f"[chat_with_llm error] {client_id}: {e}")
-
-            await self.ws_list.send_ai_stream_abort(
-                generation_id,
-                client_id,
-                history_id,
-                reason="error_occured",
-                content=f"Error Occured: {e}"
-            )
-            return
-
     async def chat_with_llm(self, generation_id, payload: dict):
-        """
-        Chat with LLM agent and get completions.
-        """
-        logger.trace('[websocket_manager.py] [WebsocketMessageHandler] [chat_with_llm] Enter')
+        logger.trace('[WebsocketMessageHandler] chat_with_llm Enter')
+
+        client_id = None
+        history_id = None
+
         try:
             data = payload.get("data") or {}
             client_id = data.get("client_id")
@@ -422,7 +396,7 @@ class WebsocketMessageHandler:
                 class_name = type(message).__name__
                 raise ValueError(f"[chat_with_llm] Unexpected data type: message is {class_name}, expected dict.")
 
-            timestamp = time.time() * 1_000_000
+            timestamp = int(time.time() * 1000)
             initial_state: MessagesState = {
                 "agent_name": "APIX",
                 "agent_role": agent_role,
@@ -449,35 +423,22 @@ class WebsocketMessageHandler:
 
             astream = await ai_agent.submit_agent_task(initial_state, config, "MAIN")
 
-            await self.ws_list.send_ai_stream_start(
-                generation_id=generation_id,
-                client_id=client_id,
-                history_id=history_id
-            )
+            await self.ws_list.send_ai_stream_start(generation_id, client_id, history_id)
 
             async for achunk in astream:
-                if websocket_list.is_generation_aborted(client_id, generation_id):
-                    logger.warning(
-                        f"[chat_with_llm] generation aborted: client={client_id}, generation={generation_id}"
-                    )
+                if self.ws_list.is_generation_aborted(client_id, generation_id):
                     await astream.aclose()
                     await self.ws_list.send_ai_stream_abort(
                         generation_id, client_id, history_id
                     )
+                    logger.warning(f"[chat_with_llm] this generation has been aborted, generation_id = {generation_id}")
                     return
 
                 await self.ws_list.send_ai_stream_token(
-                    generation_id=generation_id,
-                    client_id=client_id,
-                    history_id=history_id,
-                    delta=achunk,
+                    generation_id, client_id, history_id, achunk
                 )
 
-            await self.ws_list.send_ai_stream_end(
-                generation_id=generation_id,
-                client_id=client_id,
-                history_id=history_id
-            )
+            await self.ws_list.send_ai_stream_end(generation_id, client_id, history_id)
 
         except Exception as e:
             logger.error(f"[chat_with_llm error] {client_id}: {traceback.format_exc()}")
@@ -487,9 +448,8 @@ class WebsocketMessageHandler:
                 client_id,
                 history_id,
                 reason="error_occured",
-                content=f"Error Occured: {e.__class__.__name__}: {str(e)}"
+                content=f"{e.__class__.__name__}: {str(e)}"
             )
-            return
 
 
 websocket_list = WebsocketList()

@@ -7,6 +7,7 @@ const DEFAULT_CONFIG = {
   lightValue: 95,
   transparencyValue: 90,
   backgroundImage: '',
+  showToolLabels: false,
 
   // ----- chat config in setting page -----
   httpProxyUrl: '',
@@ -25,7 +26,6 @@ const DEFAULT_CONFIG = {
   shorttermMemory: false,
   messageSummary: 0,
   keepNotSummary: 0,
-  visionDocument: false,
   pureChat: false,
   agentSwarm: false,
   
@@ -36,14 +36,14 @@ const DEFAULT_CONFIG = {
   commandOpration: false,
   skillLoad: false,
   agentAssign: false,
-
+  
   // ----- chat config in ai page -----
   modelProvider: '',
   modelName: '',
   apiKey: '',
   deepThink: false,
   visionOn: false,
-
+  
   // ----- extra config in data page -----
   embeddingModel: '',
   rolePrompt: {
@@ -348,7 +348,7 @@ export const useAppCacheData = defineStore("app", {
 
       return [{
         tabKey: Date.now().toString(),
-        title: "会话 1",
+        title: "任务流 1",
         items: [],
       }]
     },
@@ -357,7 +357,7 @@ export const useAppCacheData = defineStore("app", {
       return (
         (await window.api.readData(`tab_${tabKey}`)) ?? {
           tabKey,
-          title: "会话 1",
+          title: "任务流 1",
           items: [],
         }
       )

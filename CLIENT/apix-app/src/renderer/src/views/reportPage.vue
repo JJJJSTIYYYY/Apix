@@ -3,12 +3,12 @@
     <el-aside style="width: auto;">
       <HomePage />
     </el-aside>
-    <el-main class="main-content">
+    <el-main class="main-area">
       <div class="page-wrapper">
         <!-- 页面标题 -->
         <div class="page-header">
-          <h1 class="page-title">测试用例日志审查</h1>
-          <p class="page-subtitle">查看测试用例执行详情与结果</p>
+          <h1 class="page-title">任务日志审查</h1>
+          <p class="page-subtitle">查看任务执行详情与结果</p>
         </div>
 
         <!-- 统计栏 -->
@@ -232,13 +232,11 @@ onMounted(() => {
 <style scoped>
 .report-page {
   height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
 }
 
-.main-content {
+.main-area {
   padding: 0;
   overflow-y: auto;
-  background: transparent;
 }
 
 .page-wrapper {
@@ -592,20 +590,20 @@ onMounted(() => {
 }
 
 /* 滚动条美化 */
-.main-content::-webkit-scrollbar {
+.main-area::-webkit-scrollbar {
   width: 6px;
 }
 
-.main-content::-webkit-scrollbar-track {
+.main-area::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.main-content::-webkit-scrollbar-thumb {
+.main-area::-webkit-scrollbar-thumb {
   background: rgba(136, 202, 197, 0.3);
   border-radius: 3px;
 }
 
-.main-content::-webkit-scrollbar-thumb:hover {
+.main-area::-webkit-scrollbar-thumb:hover {
   background: rgba(136, 202, 197, 0.5);
 }
 

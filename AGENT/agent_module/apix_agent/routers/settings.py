@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 from urllib.parse import urlparse
 
-from apix_agent.apix_agent_core.LLM_node.llm_adapter import LlmNodeAdapter
+from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.commons.logger import logger
 from apix_agent.global_config import _ORIGINAL_PROXY_ENV
 

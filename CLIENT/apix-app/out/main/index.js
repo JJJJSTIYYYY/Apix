@@ -3,10 +3,11 @@ const electron = require("electron");
 const utils = require("@electron-toolkit/utils");
 const path = require("path");
 const fs = require("fs");
-const yaml = require("js-yaml");
+const os = require("os");
 const crypto = require("crypto");
 const axios = require("axios");
 const FormData = require("form-data");
+const yaml = require("js-yaml");
 const WebSocket$1 = require("ws");
 let ws = null;
 let reconnectTimer = null;
@@ -159,6 +160,39 @@ function registerFileIpc() {
       throw new Error("File size exceeds 5MB limit.");
     }
     return result;
+  });
+  electron.ipcMain.handle("openCacheDir", async () => {
+    try {
+      const dataDir2 = path.join(electron.app.getPath("userData"), "ApiX");
+      if (!fs.existsSync(dataDir2)) {
+        fs.mkdirSync(dataDir2, { recursive: true });
+      }
+      console.log("Apix data dir:", dataDir2);
+      const err = await electron.shell.openPath(dataDir2);
+      if (err) {
+        console.error("Failed to open directory:", err);
+        return { success: false, error: err };
+      }
+      return { success: true, path: dataDir2 };
+    } catch (e) {
+      console.error("openCacheDir error:", e);
+      return { success: false, error: String(e) };
+    }
+  });
+  electron.ipcMain.handle("openImageTemp", async (_, base64, fileName) => {
+    try {
+      const tempDir = path.join(os.tmpdir(), "apix-images");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      const filePath = path.join(tempDir, fileName);
+      fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
+      await electron.shell.openPath(filePath);
+      return { success: true, path: filePath };
+    } catch (err) {
+      console.error("openImageTemp error:", err);
+      return { success: false, error: String(err) };
+    }
   });
 }
 const WebSocket = require("ws");
@@ -914,8 +948,8 @@ function registerAiTaskIpc() {
   });
 }
 const TEST_API_BASE = "http://127.0.0.1:5090";
-function registerApiTestIpc() {
-  console.log("registerApiTestIpc...");
+function registerLocalTaskIpc() {
+  console.log("registerLocalTaskIpc...");
   const dataDir = path.join(electron.app.getPath("userData"), "ApiX");
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   console.log("Apix data dir:", dataDir);
@@ -1006,7 +1040,7 @@ function createMainWindow() {
   let mainWindow = createAppWindow();
   registerWindowIpc(mainWindow);
   registerFileIpc();
-  registerApiTestIpc();
+  registerLocalTaskIpc();
   registerAiIpc();
   registerAiConfigIpc();
   registerAiFilesIpc();
@@ -1026,6 +1060,10 @@ function createMainWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     electron.shell.openExternal(url);
     return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    event.preventDefault();
+    electron.shell.openExternal(url);
   });
   if (utils.is.dev && process.env["ELECTRON_RENDERER_URL"]) {
     mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);

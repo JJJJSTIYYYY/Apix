@@ -40,6 +40,8 @@ BASE_URL = {       # Base URL for the LLM service
     'moonshot': 'https://api.moonshot.cn',
 }  
 
+GENERATION_TTL_SECONDS = 300  # Clear those finished and aborted generation ctx
+
 MAX_LLM_CONNECTIONS = 12  # Maximum number of llm connections
 
 # KEEP_ALIVE_S = 300  # Keep-alive time for connections in seconds

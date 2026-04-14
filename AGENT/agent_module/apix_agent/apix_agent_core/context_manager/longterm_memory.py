@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import redis.asyncio as redis
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, AIMessageChunk, AnyMessage
 
-from apix_agent.apix_agent_core.LLM_node import llm_factory as lf
+from apix_agent.apix_agent_core.LLM import llm_factory as lf
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.commons.logger import logger
 

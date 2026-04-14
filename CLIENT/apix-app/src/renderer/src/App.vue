@@ -1,16 +1,5 @@
 <template>
-  <div class="app-wrapper" :style="{
-    background: `
-      linear-gradient(
-        rgba(${255*(store.config.lightValue / 100)}, ${255*(store.config.lightValue / 100)}, ${255*(store.config.lightValue / 100)}, ${store.config.transparencyValue / 100}),
-        rgba(${255*(store.config.lightValue / 100)}, ${255*(store.config.lightValue / 100)}, ${255*(store.config.lightValue / 100)}, ${store.config.transparencyValue / 100})
-      ),
-      url('${store.config.backgroundImage}')
-    `,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat'
-  }">
+  <div class="app-wrapper">
     <el-config-provider :locale="lacale" :message="config">
       <div class="common-layout">
         <el-container class="root-container">
@@ -277,7 +266,7 @@ async function showAppInfo() {
 }
 
 .main-window {
-  /* background-color: #ecf0f1; */
+  background-color: #ffffff00;
   padding: 0%;
   border-radius: 5px;
   position: relative;

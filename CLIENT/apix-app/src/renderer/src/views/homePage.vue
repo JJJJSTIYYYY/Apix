@@ -2,7 +2,7 @@
   <el-menu
     router
     :default-active="$route.path"
-    class="el-menu-vertical-demo"
+    class="el-menu-vertical"
     :collapse-transition="false"
     :collapse="true"
     :style="{ height: menuHeight + 'px' }"
@@ -71,12 +71,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
-.el-menu-vertical-demo:not(.el-menu--collapse) {
+.el-menu-vertical:not(.el-menu--collapse) {
   width: 140px;
   min-height: 400px;
 }
 
-.el-menu-vertical-demo {
+.el-menu-vertical {
+  background: #ffffff00;
   width: 64px;
   min-height: 400px;
   border-radius: 0 0 5px 0; /* 左上 右上 左下 右下 */
@@ -86,7 +87,7 @@ onBeforeUnmount(() => {
 }
 
 .el-menu {
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0);
   padding: 2px;
   padding-left: 4px;
 }
