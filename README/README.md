@@ -7,7 +7,7 @@ git clone https://github.com/JJJJSTIYYYY/Apix.git
 cd Apix
 ```
 
-> 除去含有cd命令的bash命令块，以下所有 Bash 命令均在项目*根目录*（`APIX/Apix`）下执行
+> 除去含有cd命令的bash命令块，以下所有 Bash 命令均在项目*根目录*（`./Apix`）下执行
 
 ---
 
@@ -204,6 +204,10 @@ uv run main.py
 ### 安装 Volta（用于管理 Node.js）
 
 ```bash
+# Windows
+winget install Volta.Volta
+
+# MacOS/Linux
 curl https://get.volta.sh | bash
 ```
 

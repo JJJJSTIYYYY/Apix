@@ -4,4 +4,13 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "aiomysql>=0.3.2",
+    "cryptography>=46.0.7",
+    "fastapi>=0.135.3",
+    "httpx>=0.28.1",
+    "pandas>=3.0.2",
+    "redis>=7.4.0",
+    "ulid>=1.1",
+    "uvicorn>=0.44.0",
+]
