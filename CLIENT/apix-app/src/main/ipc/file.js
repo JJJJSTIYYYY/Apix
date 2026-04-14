@@ -3,8 +3,6 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
-
 // =====================================================
 //              Data write / read handlers
 // =====================================================
@@ -14,22 +12,56 @@ export function registerFileIpc() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   console.log('Apix data dir:', dataDir)
 
-  ipcMain.handle('openFileDialog', async () => {
+  ipcMain.handle('openFileDialog', async (event, type, extensions = []) => {
+    let properties = []
+
+    if (type === 'file') {
+      properties = ['openFile']
+    } else if (type === 'folder') {
+      properties = ['openDirectory']
+    } else {
+      throw new Error(`Unknown dialog type: ${type}`)
+    }
+
+    const normalizedExtensions = Array.isArray(extensions)
+      ? extensions
+          .filter((ext) => typeof ext === 'string' && ext.trim() !== '')
+          .map((ext) => ext.replace(/^\./, '').toLowerCase())
+      : []
+
     const result = await dialog.showOpenDialog({
-      title: '选择文件',
-      properties: ['openFile', 'openDirectory'],
+      title: 'APIX',
+      properties,
+      filters:
+        type === 'file' && normalizedExtensions.length > 0
+          ? [
+              {
+                name: 'Allowed Files',
+                extensions: normalizedExtensions,
+              },
+            ]
+          : [],
     })
 
     if (result.canceled || result.filePaths.length === 0) {
       return result
     }
 
-    const filePath = result.filePaths[0]
+    const selectedPath = result.filePaths[0]
+    const stat = fs.statSync(selectedPath)
 
-    const stat = fs.statSync(filePath)
+    if (type === 'file') {
+      if (!stat.isFile()) {
+        throw new Error('Please select a file.')
+      }
 
-    if (stat.size > MAX_FILE_SIZE) {
-      throw new Error('File size exceeds 5MB limit.')
+      const ext = path.extname(selectedPath).slice(1).toLowerCase()
+
+      if (normalizedExtensions.length > 0 && !normalizedExtensions.includes(ext)) {
+        throw new Error(`Unsupported file type: .${ext}`)
+      }
+    } else if (!stat.isDirectory()) {
+      throw new Error('Please select a folder.')
     }
 
     return result

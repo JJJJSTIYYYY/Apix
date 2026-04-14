@@ -238,7 +238,7 @@ const uploadSkill = async () => {
 
   try {
 
-    const result = await window.api.openFileDialog()
+    const result = await window.api.openFileDialog('file')
 
     if (result.canceled || result.filePaths.length === 0) {
       return

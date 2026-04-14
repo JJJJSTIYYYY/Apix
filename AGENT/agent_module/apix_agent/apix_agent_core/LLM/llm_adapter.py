@@ -195,6 +195,12 @@ class LlmNodeAdapter:
         except TypeError:
             # Provider doesn't support reasoning parameter
             return await llm_node.ainvoke(input)
+        
+
+
+    @classmethod
+    def filter_empty_content():
+        pass
 
         
 

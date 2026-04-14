@@ -111,7 +111,7 @@ class PatchedChatDeepSeek(ChatDeepSeek):
                 and (msg.tool_calls or msg.invalid_tool_calls)
                 and not msg.content
             ):
-                reasoning_content_map[i] = "continue."
+                reasoning_content_map[i] = "."
                 logger.warning("[PatchedChatDeepSeek] Empty message with tool calls.")
 
         # Call original implementation
@@ -239,8 +239,13 @@ class PatchedChatMoonshot(ChatOpenAI):
                 and (msg.tool_calls or msg.invalid_tool_calls)
                 and not msg.content
             ):
-                reasoning_content_map[i] = "continue."
+                reasoning_content_map[i] = "."
                 logger.warning("[PatchedChatMoonshot] Empty message with tool calls.")
+            if (
+                isinstance(msg, AIMessage)
+                and not msg.content
+            ):
+                msg.content = '.'
 
         # Call original implementation
         payload = super()._get_request_payload(

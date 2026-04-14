@@ -5,7 +5,7 @@ const api = {
   readData: (key) => electron.ipcRenderer.invoke("readData", key),
   writeData: (key, value) => electron.ipcRenderer.invoke("writeData", key, value),
   submitCase: (cid, content) => electron.ipcRenderer.invoke("api:submit_case", cid, content),
-  openFileDialog: () => electron.ipcRenderer.invoke("openFileDialog"),
+  openFileDialog: (type, extensions) => electron.ipcRenderer.invoke("openFileDialog", type, extensions),
   openCacheDir: () => electron.ipcRenderer.invoke("openCacheDir"),
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, chat_config) => electron.ipcRenderer.invoke("api:chat", cid, sid, hid, content, chat_config),

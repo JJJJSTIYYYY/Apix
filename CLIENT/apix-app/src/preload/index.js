@@ -7,7 +7,7 @@ const api = {
   writeData: (key, value) => ipcRenderer.invoke('writeData', key, value),
   submitCase: (cid, content) => ipcRenderer.invoke('api:submit_case', cid, content),
 
-  openFileDialog: () => ipcRenderer.invoke('openFileDialog'),
+  openFileDialog: (type, extensions) => ipcRenderer.invoke('openFileDialog', type, extensions),
   openCacheDir: () => ipcRenderer.invoke('openCacheDir'),
 
   // Send chat request (fire-and-forget, result comes from WS push)

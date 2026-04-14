@@ -218,7 +218,7 @@ const handleReEditPreview = async (data) => {
 }
 
 const handleConnectProject = async () => {
-  const result = await window.api.openFileDialog()
+  const result = await window.api.openFileDialog("folder")
   if (result.canceled || result.filePaths.length === 0) {
       return
     }

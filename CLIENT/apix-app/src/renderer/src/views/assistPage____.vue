@@ -653,7 +653,7 @@ function handleWsMessage(payload: any) {
 }
 
 const handleConnectProject = async () => {
-  const result = await window.api.openFileDialog()
+  const result = await window.api.openFileDialog("folder")
   if (result.canceled || result.filePaths.length === 0) {
       return
     }
@@ -1527,7 +1527,7 @@ const selectFile = async () => {
   if (isUploading.value) return
 
   try {
-    const result = await window.api.openFileDialog()
+    const result = await window.api.openFileDialog("file")
     if (result.canceled || result.filePaths.length === 0) return
 
     isUploading.value = true

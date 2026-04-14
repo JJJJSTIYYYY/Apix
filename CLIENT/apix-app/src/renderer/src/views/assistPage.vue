@@ -431,9 +431,9 @@ function findLatestIndexById(list: ChatMessage[], id: string, role: Role) {
     if (list[i].id === id && list[i].role === role) {
       return i
     }
-    if (list[i].role === 'human') {
-      break
-    }
+    // if (list[i].role === 'human') {
+    //   break
+    // }
   }
   return -1
 }
@@ -731,7 +731,7 @@ function handleWsMessage(payload: any) {
 }
 
 const handleConnectProject = async () => {
-  const result = await window.api.openFileDialog()
+  const result = await window.api.openFileDialog("folder")
   if (result.canceled || result.filePaths.length === 0) {
     return
   }
@@ -969,11 +969,13 @@ async function handleStreamAbort(payload: any, historyId: string) {
     list[index].lastField = undefined
   }
 
-  const indexHuman = findLatestIndexByStatus(list, true, 'human')
-  if (indexHuman !== -1) {
-    list[indexHuman].pending = false
-    list[indexHuman].error = true
-  }
+  console.log("index is ", index, ", list[index].pending is ", list[index].pending)
+
+  // const indexHuman = findLatestIndexByStatus(list, true, 'human')
+  // if (indexHuman !== -1) {
+  //   list[indexHuman].pending = false
+  //   list[indexHuman].error = true
+  // }
 
   await syncHistoryMessages(historyId)
   console.warn('Generation abort, generation_id = ', generationId)
@@ -1596,7 +1598,7 @@ const selectFile = async () => {
   if (isUploading.value) return
 
   try {
-    const result = await window.api.openFileDialog()
+    const result = await window.api.openFileDialog("file")
     if (result.canceled || result.filePaths.length === 0) return
 
     isUploading.value = true

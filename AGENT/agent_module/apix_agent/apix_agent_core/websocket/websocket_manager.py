@@ -123,7 +123,7 @@ class WebsocketList:
             raise RuntimeError(f"WebSocket not registered, client id: {client_id}")
         return ctx
 
-    async def create_generation(self, client_id: str, history_id: str, append_cache_memory: bool = True) -> str:
+    async def create_generation(self, client_id: str, history_id: str, *, append_cache_memory: bool = True, not_active_generation_id = False) -> str:
         ctx = self._get_ctx(client_id)
         new_gen_id = str(uuid4())
 
@@ -144,7 +144,7 @@ class WebsocketList:
                 generation_id=new_gen_id,
                 client_id=client_id
             )
-            ctx.active_generation_ids.append(new_gen_id)
+            if not not_active_generation_id: ctx.active_generation_ids.append(new_gen_id)
 
         if old_gen and append_cache_memory and old_gen.status == "aborted":
             async with old_gen.gen_lock:
@@ -171,6 +171,7 @@ class WebsocketList:
                     history_id,
                     interrupted_msg
                 )
+                logger.warning("[create_generation] Append [Conversation Abort] mark to database.")
 
         return new_gen_id
 

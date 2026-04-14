@@ -140,24 +140,46 @@ function registerWindowIpc(win) {
     isWin ? win.close() : electron.app.quit();
   });
 }
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
 function registerFileIpc() {
   console.log("registerFileIpc...");
   const dataDir = path.join(electron.app.getPath("userData"), "ApiX");
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   console.log("Apix data dir:", dataDir);
-  electron.ipcMain.handle("openFileDialog", async () => {
+  electron.ipcMain.handle("openFileDialog", async (event, type, extensions = []) => {
+    let properties = [];
+    if (type === "file") {
+      properties = ["openFile"];
+    } else if (type === "folder") {
+      properties = ["openDirectory"];
+    } else {
+      throw new Error(`Unknown dialog type: ${type}`);
+    }
+    const normalizedExtensions = Array.isArray(extensions) ? extensions.filter((ext) => typeof ext === "string" && ext.trim() !== "").map((ext) => ext.replace(/^\./, "").toLowerCase()) : [];
     const result = await electron.dialog.showOpenDialog({
-      title: "选择文件",
-      properties: ["openFile", "openDirectory"]
+      title: "APIX",
+      properties,
+      filters: type === "file" && normalizedExtensions.length > 0 ? [
+        {
+          name: "Allowed Files",
+          extensions: normalizedExtensions
+        }
+      ] : []
     });
     if (result.canceled || result.filePaths.length === 0) {
       return result;
     }
-    const filePath = result.filePaths[0];
-    const stat = fs.statSync(filePath);
-    if (stat.size > MAX_FILE_SIZE) {
-      throw new Error("File size exceeds 5MB limit.");
+    const selectedPath = result.filePaths[0];
+    const stat = fs.statSync(selectedPath);
+    if (type === "file") {
+      if (!stat.isFile()) {
+        throw new Error("Please select a file.");
+      }
+      const ext = path.extname(selectedPath).slice(1).toLowerCase();
+      if (normalizedExtensions.length > 0 && !normalizedExtensions.includes(ext)) {
+        throw new Error(`Unsupported file type: .${ext}`);
+      }
+    } else if (!stat.isDirectory()) {
+      throw new Error("Please select a folder.");
     }
     return result;
   });
