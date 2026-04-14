@@ -358,7 +358,7 @@ const uploadDocument = async () => {
   if (isUploading.value) return
 
   try {
-    const result = await window.api.openFileDialog('file', ['zip'])
+    const result = await window.api.openFileDialog('file')
 
     if (result.canceled || result.filePaths.length === 0) {
       return
