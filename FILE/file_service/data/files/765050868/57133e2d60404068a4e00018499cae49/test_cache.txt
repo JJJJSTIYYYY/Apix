@@ -1,1 +1,0 @@
-Testing sandbox persistence and caching. This file was created to test if the sandbox retains files across operations.

@@ -1,4 +1,0 @@
-pptx_skill_loaded: The PPTX skill package has been loaded into the sandbox. Available
-  commands include markitdown for extraction, editing workflow, and creation via pptxgenjs.
-  The skill files are located under /workspace/SKILL/pptx. Ready for user tasks involving
-  .pptx files.

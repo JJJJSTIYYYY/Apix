@@ -1,0 +1,63 @@
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# virtual env
+.venv/
+venv/
+env/
+
+# cache
+.pytest_cache/
+.mypy_cache/
+
+# Node / Vite / Vue / Electron
+node_modules/
+dist/
+dist-electron/
+.vite/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env & IDE
+.env
+.env.*
+*.local
+
+.vscode/
+.idea/
+
+## Runtime / Data
+# AGENT
+AGENT/model_running_time/
+AGENT/agent_module/data/
+# MEMORY
+MEMORY/memory_module/data/
+# FILE
+FILE/file_service/data/
+FILE/file_service/embed_models/
+# TASK
+TASK/logs/
+
+# logs
+logs/
+*.log
+cache/
+tmp/
+temp/
+
+# Extra
+*.sqlite3
+*.db
