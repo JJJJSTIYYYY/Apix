@@ -51,8 +51,8 @@ APIX/
 
 Please refer to the detailed setup guides:
 
-* 🇨🇳 中文文档: `./README/README_zh.md`
-* 🇺🇸 English Docs: `./README/README_en.md`
+* 🇨🇳 [中文文档](./README/README_zh.md): `./README/README_zh.md`
+* 🇺🇸 [English Docs](./README/README_en.md): `./README/README_en.md`
 
 ---
 
