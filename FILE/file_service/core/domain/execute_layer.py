@@ -398,9 +398,9 @@ class DataExecutors:
                     "client_id": payload["client_id"],
                     "document_id": payload["document_id"],
                 }
-                return (await self.milvus.delete_file_vectors(milvus_payload)).update({
-                    "success": True # Ignore the failures of milvus
-                })
+                milvus_res = await self.milvus.delete_file_vectors(milvus_payload)
+                milvus_res["success"] = True
+                return milvus_res
             return res
 
         except Exception as e:
