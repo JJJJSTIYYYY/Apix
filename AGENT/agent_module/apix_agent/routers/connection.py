@@ -96,7 +96,7 @@ async def _task_info_rtn_with_invoke_background(
         logger.info(f"\n\033[93m[task_info_rtn_with_invoke]\033[0m Tool memory received: {tool_messages}")
         await websocket_list.send_tool_event(tool_task_id, client_id, history_id, tool_messages)
 
-        if not config.get('tools_invoke', True): 
+        if not config.get('max_chunk_per_invoking', True): 
             return
             # timestamp = time.time() * 1_000_000
             # tool_messages.update({

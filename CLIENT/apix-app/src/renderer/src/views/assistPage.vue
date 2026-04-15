@@ -25,18 +25,6 @@
             {{ show_work_dir===''?'未指定工作目录，继续处理文件相关工作时请先关联项目':show_work_dir }}
           </div>
           <div class="message-list">
-            <div style="display: block; align-items: center;">
-              <div
-                v-if="messages.length === 0"
-                class="hello-div"
-              >
-                <div style="white-space: nowrap; width: fit-content;">
-                  <span class="typewriter" style="display: inline-block; width: fit-content;">{{ displayText }}</span>
-                  <span class="cursor" :style="{display: 'inline-block', width: '16px', opacity: showCursor?'1':'0'}">_</span>
-                </div>
-              </div>
-            </div>
-
             <div
               v-for="msg in messages"
               :key="msg.id"
@@ -55,6 +43,17 @@
             class="ctrl-area"
             :class="{ empty_messages_list: messages.length === 0 }"
           >
+            <div style="display: block; align-items: center;">
+              <div
+                v-if="messages.length === 0"
+                class="hello-div"
+              >
+                <div style="white-space: nowrap; width: fit-content;">
+                  <span class="typewriter" style="display: inline-block; width: fit-content;">{{ displayText }}</span>
+                  <span class="cursor" :style="{display: 'inline-block', width: '16px', opacity: showCursor?'1':'0'}">_</span>
+                </div>
+              </div>
+            </div>
             <Transition name="stop-btn">
               <div class="stop-btn-wrapper" v-if="isGenerating">
                 <el-button
@@ -1150,31 +1149,31 @@ async function sendMessage() {
         models_provider: store.config.modelProvider,
         model_name: store.config.modelName,
         api_key: store.config.apiKey,
-        think: store.config.deepThink,
+        enable_think: store.config.deepThink,
         work_dir: store.currentWorkDir,
 
-        max_token: store.config.tokenLimit,
-        tools_invoke: store.config.toolsInvokeAi,
+        max_chunk_per_invoking: store.config.tokenLimit,
+        async_tools_invoke: store.config.toolsInvokeAi,
         link_provider: store.config.linkProvider,
         link_api_key: store.config.linkApiKey,
         content_provider: store.config.contentPovider,
         content_api_key: store.config.contentApiKey,
         web_cleaner_mode: store.config.webContentFilter,
-        remain_tools_cache: store.config.remainToolsCache,
-        longterm_memory: store.config.longtermMemory,
-        shortterm_memory: store.config.shorttermMemory,
-        message_summary: store.config.messageSummary,
-        keep_not_summary: store.config.keepNotSummary,
-        pure_chat: store.config.pureChat,
+        save_async_tools_message: store.config.remainToolsCache,
+        enable_longterm_memory: store.config.longtermMemory,
+        enable_shortterm_memory: store.config.shorttermMemory,
+        summary_trigger_threshold: store.config.messageSummary,
+        summary_exempt_tail_length: store.config.keepNotSummary,
+        pure_chat_on: store.config.pureChat,
         use_model_vision: store.config.visionOn,
 
-        file_opration: store.config.fileOpration,
-        web_search: store.config.webSearch,
-        knowledge_retrieval: store.config.knowledgeRetrieval,
-        command_opration: store.config.commandOpration,
-        skill_load: store.config.skillLoad,
-        agent_assign: store.config.agentAssign,
-        agent_swarm: store.config.agentSwarm,
+        enable_file_opration: store.config.fileOpration,
+        enable_web_search: store.config.webSearch,
+        enable_knowledge_retrieval: store.config.knowledgeRetrieval,
+        enable_command_opration: store.config.commandOpration,
+        enable_skill_load: store.config.skillLoad,
+        enable_agent_assign: store.config.agentAssign,
+        enable_agent_swarm: store.config.agentSwarm,
 
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
@@ -1734,7 +1733,6 @@ const setFullInput = () => {
 }
 
 .hello-div {
-  padding-top: 30vh;
   display: flex;
   justify-content: center;  /* 水平居中 */
   align-items: center;
@@ -1761,24 +1759,39 @@ const setFullInput = () => {
   padding: 0px 12px 0px 0px;
   font-weight: bold;
   overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
+  display: block;
   z-index: 99999;
-  transition: all 0.28s ease;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .work-dir-label.no_work_dir {
-  color: #b947474c;
-  background-color: #efe4e457;
-  border: 1px solid #c34e4e23;
+  width: 28px;
+  height: 16px;
+  color: transparent;
+  background-color: #d1d1d130;
+  border: 1px solid #a6a6a623;
+}
+
+.work-dir-label.no_work_dir::before {
+  content: "•••";
+  color: #62626238;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .work-dir-label.no_work_dir:hover {
+  width: 60%;
+  height: 24px;
   color: #df0f0f4c;
   background-color: #ebb7b757;
   border: 1px solid #c82c2c23;
+}
+
+.work-dir-label.no_work_dir:hover::before {
+  content: "";
 }
 
 .message-list {
@@ -1793,6 +1806,20 @@ const setFullInput = () => {
   width: 80%;
   height: calc(100vh - 190px);
   scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
 }
 
 .message-item {

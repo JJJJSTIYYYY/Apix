@@ -410,8 +410,8 @@ class WebsocketMessageHandler:
             message = data.get("messages", {})
             config = data.get("config", {})
             
-            enable_agent_assign = bool(config.get("agent_assign", False))
-            enable_agent_swarm = bool(config.get("agent_swarm", False))
+            enable_agent_assign = bool(config.get("enable_agent_assign", False))
+            enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
             agent_role = "agent"
             if enable_agent_assign:
                 agent_role = "main_agent"

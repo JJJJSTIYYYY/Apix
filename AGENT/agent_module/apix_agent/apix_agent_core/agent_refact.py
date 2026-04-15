@@ -1,8 +1,7 @@
-from dataclasses import dataclass, field
 import json
 import os
 import traceback
-from typing import AsyncIterator, Any, Dict, List, Literal
+from typing import AsyncIterator, Any, Dict, Literal
 import time
 import threading
 import asyncio
@@ -24,7 +23,7 @@ from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.apix_agent_core.tools.registry import get_available_tools
 from apix_agent.global_config import BASE_DIR, OUTPUT_GRAPH_PNG, GRAPH_CACHE_TTL, GRAPH_CACHE_CLEAN_INTERVAL
 from apix_agent.commons.file_content_reader import load_from_yaml
-from apix_agent.commons.type_def import MessagesState, SubAssistantState
+from apix_agent.commons.type_def import MessagesState, SubAssistantState, AgentConfigSchema
 from apix_agent.commons.logger import logger
 from apix_agent.commons.common_func import get_date_natural_language
 
@@ -226,14 +225,14 @@ class AgentRuningtime:
         return final_prompt
     
     def _collect_permission(self, config: dict, permission_level: Literal["main", "sub"]) -> list:
-        pure_chat_on = config.get("pure_chat", False)
-        enable_file_opration = bool(config.get("file_opration", False))
-        enable_web_search = bool(config.get("web_search", False))
-        enable_knowledge_retrieval = bool(config.get("knowledge_retrieval", False))
-        enable_command_opration = bool(config.get("command_opration", False))
-        enable_skill_load = bool(config.get("skill_load", False))
-        enable_agent_assign = bool(config.get("agent_assign", False))
-        enable_agent_swarm = bool(config.get("agent_swarm", False))
+        pure_chat_on = config.get("pure_chat_on", False)
+        enable_file_opration = bool(config.get("enable_file_opration", False))
+        enable_web_search = bool(config.get("enable_web_search", False))
+        enable_knowledge_retrieval = bool(config.get("enable_knowledge_retrieval", False))
+        enable_command_opration = bool(config.get("enable_command_opration", False))
+        enable_skill_load = bool(config.get("enable_skill_load", False))
+        enable_agent_assign = bool(config.get("enable_agent_assign", False))
+        enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
 
         interface_test_mode = bool(config.get("interface_test_mode", False))
     
@@ -304,23 +303,23 @@ class AgentRuningtime:
             work_dir = config.get("work_dir", "")
             api_key = config.get("api_key", "")
 
-            enable_think = bool(config.get("think", False))
-            enable_file_opration = bool(config.get("file_opration", False))
-            enable_web_search = bool(config.get("web_search", False))
-            enable_knowledge_retrieval = bool(config.get("knowledge_retrieval", False))
-            enable_command_opration = bool(config.get("command_opration", False))
-            enable_skill_load = bool(config.get("skill_load", False))
-            enable_agent_assign = bool(config.get("agent_assign", False))
-            enable_agent_swarm = bool(config.get("agent_swarm", False))
+            enable_think = bool(config.get("enable_think", False))
+            enable_file_opration = bool(config.get("enable_file_opration", False))
+            enable_web_search = bool(config.get("enable_web_search", False))
+            enable_knowledge_retrieval = bool(config.get("enable_knowledge_retrieval", False))
+            enable_command_opration = bool(config.get("enable_command_opration", False))
+            enable_skill_load = bool(config.get("enable_skill_load", False))
+            enable_agent_assign = bool(config.get("enable_agent_assign", False))
+            enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
 
             extra_config = config.get("extra_config", {})
-            max_token = config.get("max_token", 0) or 0
-            remain_tools_cache = config.get("remain_tools_cache", False)
-            longterm_memory = config.get("longterm_memory", False)
-            shortterm_memory = config.get("shortterm_memory", False)
-            summary_trigger_threshold = config.get("message_summary", 0)
-            summary_exempt_tail_length = config.get("keep_not_summary", 0)
-            pure_chat_on = config.get("pure_chat", False)
+            max_token = config.get("max_chunk_per_invoking", 0) or 0
+            remain_tools_cache = config.get("save_async_tools_message", False)
+            longterm_memory = config.get("enable_longterm_memory", False)
+            shortterm_memory = config.get("enable_shortterm_memory", False)
+            summary_trigger_threshold = config.get("summary_trigger_threshold", 0)
+            summary_exempt_tail_length = config.get("summary_exempt_tail_length", 0)
+            pure_chat_on = config.get("pure_chat_on", False)
 
             agent_permission = self._collect_permission(config=config, permission_level='main')
 
@@ -479,11 +478,11 @@ class AgentRuningtime:
                 len(messages) >= summary_trigger_threshold
 
             Behavior:
-                shortterm_memory = True
+                enable_shortterm_memory = True
                     -> summarize old messages
                     -> keep last `summary_exempt_tail_length` messages
 
-                shortterm_memory = False
+                enable_shortterm_memory = False
                     -> directly truncate history
                     -> keep last `summary_exempt_tail_length` messages
 
@@ -796,20 +795,20 @@ class AgentRuningtime:
             work_dir = config.get("work_dir", "")
             api_key = config.get("api_key", "")
 
-            enable_think = bool(config.get("think", False))
-            enable_file_opration = bool(config.get("file_opration", False))
-            enable_web_search = bool(config.get("web_search", False))
-            enable_knowledge_retrieval = bool(config.get("knowledge_retrieval", False))
-            enable_command_opration = bool(config.get("command_opration", False))
-            enable_skill_load = bool(config.get("skill_load", False))
+            enable_think = bool(config.get("enable_think", False))
+            enable_file_opration = bool(config.get("enable_file_opration", False))
+            enable_web_search = bool(config.get("enable_web_search", False))
+            enable_knowledge_retrieval = bool(config.get("enable_knowledge_retrieval", False))
+            enable_command_opration = bool(config.get("enable_command_opration", False))
+            enable_skill_load = bool(config.get("enable_skill_load", False))
 
             extra_config = config.get("extra_config", {})
-            max_token = config.get("max_token", 0) or 0
-            remain_tools_cache = config.get("remain_tools_cache", False)
-            shortterm_memory = config.get("shortterm_memory", False)
-            summary_trigger_threshold = config.get("message_summary", 0)
-            summary_exempt_tail_length = config.get("keep_not_summary", 0)
-            pure_chat_on = config.get("pure_chat", False)
+            max_token = config.get("max_chunk_per_invoking", 0) or 0
+            remain_tools_cache = config.get("save_async_tools_message", False)
+            shortterm_memory = config.get("enable_shortterm_memory", False)
+            summary_trigger_threshold = config.get("summary_trigger_threshold", 0)
+            summary_exempt_tail_length = config.get("summary_exempt_tail_length", 0)
+            pure_chat_on = config.get("pure_chat_on", False)
 
             agent_permission = self._collect_permission(config=config, permission_level='sub')
 
@@ -932,11 +931,11 @@ class AgentRuningtime:
                 len(messages) >= summary_trigger_threshold
 
             Behavior:
-                shortterm_memory = True
+                enable_shortterm_memory = True
                     -> summarize old messages
                     -> keep last `summary_exempt_tail_length` messages
 
-                shortterm_memory = False
+                enable_shortterm_memory = False
                     -> directly truncate history
                     -> keep last `summary_exempt_tail_length` messages
 
@@ -1523,65 +1522,62 @@ class AgentRuningtime:
         return astream
     
 
-# @dataclass
-# class AgentConfigSchema:
-#     """
-#     Config for a single AI agent.
-#     """
-
-#     # LLM Runtime
-#     models_provider: str
-#     model_name: str
-#     api_key: str = field(default="")
-
-#     enable_think: bool = field(default=False)
-#     max_chunk_per_invoking: int = field(default=0)
-#     use_model_vision: bool = field(default=False)  # If true, the picture will be sent to the LLM to analyze if the LLM supports picture input.
-
-
-#     # Agent Runtime Behavior
-#     work_dir: str = field(default="")
-#     async_tools_invoke: bool = field(default=False)
-#     save_async_tools_message: bool = field(default=False)  # If true, async returns will save to database.
-#     pure_chat_on: bool = field(default=False)  # If true, the agent will be a simple LLM without tools.
-
-
-#     # Memory Strategy
-#     enable_longterm_memory: bool = field(default=False)
-#     enable_shortterm_memory: bool = field(default=False)  # If is true, message_summary node will invoke llm to compress else just truncate.
-#     summary_trigger_threshold: int = field(default=0)  # If zero, not compress or truncate.
-#     summary_exempt_tail_length: int = field(default=0)
-
-
-#     # Capabilities / Tools
-#     enable_file_opration: bool = field(default=False)
-#     enable_web_search: bool = field(default=False)
-#     enable_knowledge_retrieval: bool = field(default=False)
-#     enable_command_opration: bool = field(default=False)
-#     enable_skill_load: bool = field(default=False)
-#     enable_agent_assign: bool = field(default=False)
-#     enable_agent_swarm: bool = field(default=False)
-
-
-#     # External Services
-#     link_provider: str = field(default="")
-#     link_api_key: str = field(default="")
-#     content_provider: str = field(default="")
-#     content_api_key: str = field(default=""
-#     )
-#     embed_model: str = field(default="")  # The embed model for knowledge retrieval.
-#     web_cleaner_mode: str = field(default="")
-
-
-#     # Agent Identity / Prompt
-#     role_prompt: dict = field(default_factory=lambda: {
-#         "name": "",
-#         "definition": ""
-#     })
-#     higher_role_prompt_permission: bool = field(default=False)  # If true, the role prompt will insert into system prompt.
-
 
 # class AgentNode:
+
+#     def __init__(self, config: dict):
+#         self.node_config: AgentConfigSchema = None
+#         self.node_config[""]
+#         # LLM Runtime
+#         self.node_config.models_provider: str
+#         self.node_config.model_name: str
+#         self.node_config.api_key: str = field(default="")
+
+#         self.node_config.enable_think: bool = field(default=False)
+#         self.node_config.max_chunk_per_invoking: int = field(default=0)
+#         self.node_config.use_model_vision: bool = field(default=False)  # If true, the picture will be sent to the LLM to analyze if the LLM supports picture input.
+
+
+#         # Agent Runtime Behavior
+#         self.node_config.work_dir: str = field(default="")
+#         self.node_config.async_tools_invoke: bool = field(default=False)
+#         self.node_config.save_async_tools_message: bool = field(default=False)  # If true, async returns will save to database.
+#         self.node_config.pure_chat_on: bool = field(default=False)  # If true, the agent will be a simple LLM without tools.
+
+
+#         # Memory Strategy
+#         self.node_config.enable_longterm_memory: bool = field(default=False)
+#         self.node_config.enable_shortterm_memory: bool = field(default=False)  # If is true, message_summary node will invoke llm to compress else just truncate.
+#         self.node_config.summary_trigger_threshold: int = field(default=0)  # If zero, not compress or truncate.
+#         self.node_config.summary_exempt_tail_length: int = field(default=0)
+
+
+#         # Capabilities / Tools
+#         self.node_config.enable_file_opration: bool = field(default=False)
+#         self.node_config.enable_web_search: bool = field(default=False)
+#         self.node_config.enable_knowledge_retrieval: bool = field(default=False)
+#         self.node_config.enable_command_opration: bool = field(default=False)
+#         self.node_config.enable_skill_load: bool = field(default=False)
+#         self.node_config.enable_agent_assign: bool = field(default=False)
+#         self.node_config.enable_agent_swarm: bool = field(default=False)
+
+
+#         # External Services
+#         self.node_config.link_provider: str = field(default="")
+#         self.node_config.link_api_key: str = field(default="")
+#         self.node_config.content_provider: str = field(default="")
+#         self.node_config.content_api_key: str = field(default="")
+#         self.node_config.embed_model: str = field(default="")  # The embed model for knowledge retrieval.
+#         self.node_config.web_cleaner_mode: str = field(default="")
+
+
+#         # Agent Identity / Prompt
+#         self.node_config.role_prompt: dict = field(default_factory=lambda: {
+#             "name": "",
+#             "definition": ""
+#         })
+#         self.node_config.higher_role_prompt_permission: bool = field(default=False)  # If true, the role prompt will insert into system prompt.
+
 #     async def context_prepare(state: MessagesState) -> Command:
 #         generation_id = state.get("generation_id")
 #         client_id = state.get("client_id")

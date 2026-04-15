@@ -2,6 +2,8 @@
 
 > A modern, modular AI agent system with extensible architecture and full-stack integration.
 
+*Version 1.1*
+
 ---
 
 ## ✨ Overview
@@ -94,6 +96,12 @@ MIT License
 ## 💡 Vision
 
 APIX aims to provide a flexible foundation for building next-generation AI applications, combining agent-based intelligence with robust engineering practices.
+
+---
+
+| Broken Feature | Estimated Fix Version |
+|----------------|------------------------|
+| Async tools service | v1.3 |
 
 ---
 

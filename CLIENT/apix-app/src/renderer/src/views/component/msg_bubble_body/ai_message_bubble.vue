@@ -51,7 +51,7 @@
         <div>{{ hasError ? '已停止思考' : msg.label }}</div>
       </button>
 
-      <div class="think-border-line" :class="{ thinkVisiable: isThinkVisiable }"></div>
+      <div></div>
 
       <div style="display: flex; flex-direction: column;">
         <transition name="scale-fade-height">
@@ -830,16 +830,6 @@ onBeforeUnmount(() => {
 .think-border-point:deep(.icon) {
   width: 24px;
   height: 24px;
-}
-
-/* 默认状态：线缩放为0 */
-.think-border-line:not(.thinkVisiable) {
-  transform: scaleY(0);
-}
-
-/* 可见状态：线正常显示 */
-.think-border-line.thinkVisiable{
-  transform: scaleY(1);
 }
 
 .think-render-list {

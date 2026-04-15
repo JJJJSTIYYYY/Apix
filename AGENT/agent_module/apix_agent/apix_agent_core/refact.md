@@ -253,7 +253,7 @@ async def context_prepare(self, state):
 async def context_summary(self, state):
 
     messages = state.get("messages", [])
-    threshold = max(16, self.agent.config.get("message_summary", 0))
+    threshold = max(16, self.agent.config.get("summary_trigger_threshold", 0))
 
     if len(messages) < threshold:
         return {}

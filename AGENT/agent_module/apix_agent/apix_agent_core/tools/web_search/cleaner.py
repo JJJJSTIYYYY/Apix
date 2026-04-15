@@ -91,7 +91,7 @@ class SearchResultCleaner:
                 return item
 
             no_reasoning_config = config.copy()
-            no_reasoning_config["think"] = False
+            no_reasoning_config["enable_think"] = False
 
             llm = LlmNodeAdapter.get_atapted_llm_node(
                 provider=llm_provider,

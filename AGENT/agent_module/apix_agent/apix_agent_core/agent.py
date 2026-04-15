@@ -225,14 +225,14 @@ class AI_Agent:
         return final_prompt
     
     def _collect_permission(self, config: dict, permission_level: Literal["main", "sub"]) -> list:
-        pure_chat_on = config.get("pure_chat", False)
-        enable_file_opration = bool(config.get("file_opration", False))
-        enable_web_search = bool(config.get("web_search", False))
-        enable_knowledge_retrieval = bool(config.get("knowledge_retrieval", False))
-        enable_command_opration = bool(config.get("command_opration", False))
-        enable_skill_load = bool(config.get("skill_load", False))
-        enable_agent_assign = bool(config.get("agent_assign", False))
-        enable_agent_swarm = bool(config.get("agent_swarm", False))
+        pure_chat_on = config.get("pure_chat_on", False)
+        enable_file_opration = bool(config.get("enable_file_opration", False))
+        enable_web_search = bool(config.get("enable_web_search", False))
+        enable_knowledge_retrieval = bool(config.get("enable_knowledge_retrieval", False))
+        enable_command_opration = bool(config.get("enable_command_opration", False))
+        enable_skill_load = bool(config.get("enable_skill_load", False))
+        enable_agent_assign = bool(config.get("enable_agent_assign", False))
+        enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
 
         interface_test_mode = bool(config.get("interface_test_mode", False))
     
@@ -303,23 +303,23 @@ class AI_Agent:
             work_dir = config.get("work_dir", "")
             api_key = config.get("api_key", "")
 
-            enable_think = bool(config.get("think", False))
-            enable_file_opration = bool(config.get("file_opration", False))
-            enable_web_search = bool(config.get("web_search", False))
-            enable_knowledge_retrieval = bool(config.get("knowledge_retrieval", False))
-            enable_command_opration = bool(config.get("command_opration", False))
-            enable_skill_load = bool(config.get("skill_load", False))
-            enable_agent_assign = bool(config.get("agent_assign", False))
-            enable_agent_swarm = bool(config.get("agent_swarm", False))
+            enable_think = bool(config.get("enable_think", False))
+            enable_file_opration = bool(config.get("enable_file_opration", False))
+            enable_web_search = bool(config.get("enable_web_search", False))
+            enable_knowledge_retrieval = bool(config.get("enable_knowledge_retrieval", False))
+            enable_command_opration = bool(config.get("enable_command_opration", False))
+            enable_skill_load = bool(config.get("enable_skill_load", False))
+            enable_agent_assign = bool(config.get("enable_agent_assign", False))
+            enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
 
             extra_config = config.get("extra_config", {})
-            max_token = config.get("max_token", 0) or 0
-            remain_tools_cache = config.get("remain_tools_cache", False)
-            longterm_memory = config.get("longterm_memory", False)
-            shortterm_memory = config.get("shortterm_memory", False)
-            summary_trigger_threshold = config.get("message_summary", 0)
-            summary_exempt_tail_length = config.get("keep_not_summary", 0)
-            pure_chat_on = config.get("pure_chat", False)
+            max_token = config.get("max_chunk_per_invoking", 0) or 0
+            remain_tools_cache = config.get("save_async_tools_message", False)
+            longterm_memory = config.get("enable_longterm_memory", False)
+            shortterm_memory = config.get("enable_shortterm_memory", False)
+            summary_trigger_threshold = config.get("summary_trigger_threshold", 0)
+            summary_exempt_tail_length = config.get("summary_exempt_tail_length", 0)
+            pure_chat_on = config.get("pure_chat_on", False)
 
             agent_permission = self._collect_permission(config=config, permission_level='main')
 
@@ -795,20 +795,20 @@ class AI_Agent:
             work_dir = config.get("work_dir", "")
             api_key = config.get("api_key", "")
 
-            enable_think = bool(config.get("think", False))
-            enable_file_opration = bool(config.get("file_opration", False))
-            enable_web_search = bool(config.get("web_search", False))
-            enable_knowledge_retrieval = bool(config.get("knowledge_retrieval", False))
-            enable_command_opration = bool(config.get("command_opration", False))
-            enable_skill_load = bool(config.get("skill_load", False))
+            enable_think = bool(config.get("enable_think", False))
+            enable_file_opration = bool(config.get("enable_file_opration", False))
+            enable_web_search = bool(config.get("enable_web_search", False))
+            enable_knowledge_retrieval = bool(config.get("enable_knowledge_retrieval", False))
+            enable_command_opration = bool(config.get("enable_command_opration", False))
+            enable_skill_load = bool(config.get("enable_skill_load", False))
 
             extra_config = config.get("extra_config", {})
-            max_token = config.get("max_token", 0) or 0
-            remain_tools_cache = config.get("remain_tools_cache", False)
-            shortterm_memory = config.get("shortterm_memory", False)
-            summary_trigger_threshold = config.get("message_summary", 0)
-            summary_exempt_tail_length = config.get("keep_not_summary", 0)
-            pure_chat_on = config.get("pure_chat", False)
+            max_token = config.get("max_chunk_per_invoking", 0) or 0
+            remain_tools_cache = config.get("save_async_tools_message", False)
+            shortterm_memory = config.get("enable_shortterm_memory", False)
+            summary_trigger_threshold = config.get("summary_trigger_threshold", 0)
+            summary_exempt_tail_length = config.get("summary_exempt_tail_length", 0)
+            pure_chat_on = config.get("pure_chat_on", False)
 
             agent_permission = self._collect_permission(config=config, permission_level='sub')
 

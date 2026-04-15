@@ -1221,7 +1221,7 @@ class AIContextManager:
     # Before graph rule prompt
     def create_workflow_prompt(self, state: MessagesState, agent_role: str = None) -> str:
         config = state.get("config", {})
-        enable_think = bool(config.get("think", False))
+        enable_think = bool(config.get("enable_think", False))
 
         if not enable_think:
             return ""

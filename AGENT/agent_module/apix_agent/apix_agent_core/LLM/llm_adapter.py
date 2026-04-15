@@ -71,7 +71,7 @@ class LlmNodeAdapter:
         if provider not in ['ollama:local', 'ollama', 'openai', 'deepseek', 'moonshot']:
             raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
         if provider == 'deepseek':
-            enable_think = bool(config.get("think", False))
+            enable_think = bool(config.get("enable_think", False))
             if enable_think: model = 'deepseek-reasoner'
             else: model = 'deepseek-chat'
             return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
