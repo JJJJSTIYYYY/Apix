@@ -534,7 +534,8 @@ class FileService:
 
                 mime_type, _ = mimetypes.guess_type(file_name)
                 if not mime_type:
-                    mime_type = "application/octet-stream"
+                    _, mime_type = os.path.splitext(file_name)
+                    mime_type = mime_type.lower().lstrip(".")
 
                 # ------------------------------------------------------------
                 # Build response
