@@ -1071,8 +1071,6 @@ async function syncHistoryMessages(historyId: string) {
 // Send message
 // ################################
 async function sendMessage() {
-  if (store.current_history_id === '-1') await createChat()
-
   if (isUploading.value) {
     ElMessage({
       type: 'warning',
@@ -1084,6 +1082,7 @@ async function sendMessage() {
 
   const content = inputText.value.trim()
   if (!content) return
+  if (store.current_history_id === '-1') await createChat()
 
   const currentHid = store.current_history_id
   const list = ensureHistoryMessages(currentHid)
@@ -1159,7 +1158,7 @@ async function sendMessage() {
         content_provider: store.config.contentPovider,
         content_api_key: store.config.contentApiKey,
         web_cleaner_mode: store.config.webContentFilter,
-        save_async_tools_message: store.config.remainToolsCache,
+        keep_tools_message: store.config.remainToolsCache,
         enable_longterm_memory: store.config.longtermMemory,
         enable_shortterm_memory: store.config.shorttermMemory,
         summary_trigger_threshold: store.config.messageSummary,
