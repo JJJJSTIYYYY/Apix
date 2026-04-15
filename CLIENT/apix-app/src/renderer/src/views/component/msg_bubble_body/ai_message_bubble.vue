@@ -62,6 +62,7 @@
                 :tool_call_id="item.tool.tool_call_id"
                 :content="item.tool.content"
                 :status="item.tool.status"
+                style="margin-left: 6px;"
               />
               <div
                 v-else
@@ -101,7 +102,11 @@
     <transition name="fade">
       <div class="todos-block" v-if="msg.todos && msg.todos.length > 0 && isTodosVisiable">
         <div v-for="item in displayTodos" class="todo-card" :key="`${item.content}-${item.status}`">
-          <TodoCard :content="item.content" :status="item.status" :pending="msg.pending" />
+          <TodoCard 
+            :content="item.content" 
+            :status="item.status" 
+            :pending="msg.pending"
+          />
         </div>
       </div>
     </transition>
@@ -118,6 +123,7 @@
           :tool_call_id="item.tool.tool_call_id"
           :content="item.tool.content"
           :status="item.tool.status"
+            style="margin-left: 6px;" 
         />
         <div
           v-else
@@ -840,8 +846,54 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 6px 0px;
   max-height: 500px;
-  overflow: scroll;
+  overflow-y: auto;
+  overflow-x: hidden; /* 隐藏横向滚动条 */
+
+  /* 顶部和底部渐隐效果 */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+
+  /* 滚动条样式 - Webkit (Chrome, Safari, Edge) */
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent; /* Firefox */
+}
+
+/* Webkit 滚动条样式 */
+.think-render-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.think-render-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.think-render-list::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.think-render-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
+
+/* 隐藏横向滚动条 - 双重保险 */
+.think-render-list::-webkit-scrollbar-horizontal {
+  display: none;
+  height: 0;
 }
 
 .expend-think-btn {

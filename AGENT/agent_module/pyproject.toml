@@ -14,6 +14,7 @@ dependencies = [
     "docx>=0.2.4",
     "easyocr>=1.7.2",
     "fastapi>=0.121.0",
+    "inflect>=7.5.0",
     "langchain>=1.0.4",
     "langchain-community>=0.4.1",
     "langchain-deepseek>=1.0.1",

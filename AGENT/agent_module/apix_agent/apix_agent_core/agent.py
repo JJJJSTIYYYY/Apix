@@ -25,6 +25,7 @@ from apix_agent.global_config import BASE_DIR, OUTPUT_GRAPH_PNG, GRAPH_CACHE_TTL
 from apix_agent.commons.file_content_reader import load_from_yaml
 from apix_agent.commons.type_def import MessagesState, SubAssistantState
 from apix_agent.commons.logger import logger
+from apix_agent.commons.common_func import get_date_natural_language
 
 
 DEFAULT_AGENT_PROMPT = """
@@ -211,8 +212,12 @@ class AI_Agent:
             tool_list=tool_list_text
         )
 
+        time_msg = get_date_natural_language()
+
         final_prompt = (
-            base
+            time_msg
+            + "\n\n"
+            + base
             + "\n\n"
             + tools_block
         )

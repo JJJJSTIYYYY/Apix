@@ -1,147 +1,211 @@
 <template>
-  <div 
-    class="tool-card-wrapper"
-    :class="`status-${status}`"
-  >
-    <!-- Left Icon Area -->
-    <div class="icon-area">
+  <div class="tool-chip" :class="`is-${status}`">
+    <!-- 状态指示器 -->
+    <div class="status-indicator">
+      <!-- 加载动画 -->
+      <div v-if="status === 'in_progress'" class="loader">
+        <div class="loader-ring"></div>
+      </div>
       
-      <!-- Loading spinner for in_progress -->
-      <div v-if="status === 'in_progress'" class="spinner"></div>
-
-      <!-- SVG for pending & completed & error -->
-      <svg t="1772106837681" v-else-if="status === 'completed'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4845" width="200" height="200"><path d="M939.388444 629.900889a34.287561 34.287561 0 1 1 66.095153 18.271766c-53.903309 195.069501-218.413202 342.107617-422.314589 370.77925C303.236595 1058.295401 44.391911 863.2259 5.048415 583.245487-34.29508 303.249075 160.75842 44.388391 440.706834 5.044895a510.329461 510.329461 0 0 1 199.949438 11.343855 34.287561 34.287561 0 0 1-17.279779 66.36715c-55.967283-14.559813-114.526533-18.031769-173.117782-9.791875C207.781818 107.043589 38.887982 331.232716 72.967545 573.69361 107.047109 816.170503 331.204237 985.112338 573.63313 951.032775a443.386319 443.386319 0 0 0 365.755314-321.131886z m25.119678-469.113989a34.287561 34.287561 0 1 1 50.399355 46.527404L574.065125 684.956184c-13.29583 14.399816-35.93554 14.751811-49.663364 0.76799l-229.597058-233.805004a34.287561 34.287561 0 0 1 48.911373-48.063384l204.381382 208.109333L964.508122 160.8029z" fill="#00e37d" p-id="4846"></path></svg>
-      <svg t="1772107037742" v-else-if="status === 'pending'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2537" width="200" height="200"><path d="M221.78789744 920.38454701c-15.71774359 0-28.4991453-12.78249572-28.49914531-28.4991453s12.78140171-28.50023931 28.49914531-28.50023932h28.99145299V732.11186325c0-88.83309402 74.38659829-147.01948718 128.70345299-189.51111112 14.95521367-11.70160684 33.45723077-26.17545299 42.02119658-35.78201708l4.02160684-4.51500856-4.20102564-4.34652991c-8.86700854-9.1580171-27.59111111-22.61770941-42.6425983-33.43425641-54.56300854-39.20957265-129.26905983-92.90393162-129.26905982-178.6945641V160.61483761h-27.63049573a28.53305983 28.53305983 0 0 1-28.50023932-28.4991453 28.53305983 28.53305983 0 0 1 28.4991453-28.50023932h580.44170941a28.53305983 28.53305983 0 0 1 28.50023931 28.4991453 28.52758974 28.52758974 0 0 1-28.4991453 28.50023932h-27.63158974v125.22447863c0 85.80157265-74.71699146 139.49046154-129.26358975 178.6945641-15.07336752 10.83295726-33.79309402 24.28717949-42.6371282 33.43425641l-4.20649573 4.34762394 4.02707693 4.51391452c8.55302564 9.60109402 27.03316239 24.0574359 41.88663248 35.67589744 54.44594872 42.58680342 128.8259829 100.76225641 128.8259829 189.61723077v131.27329914h29.0045812a28.53305983 28.53305983 0 0 1 28.50461539 28.49476923 28.33176069 28.33176069 0 0 1-8.33969231 20.15835898 28.31535043 28.31535043 0 0 1-20.15398291 8.34735043h-580.45264957z m84.62550427-634.54523077c0 56.56287179 58.51131624 98.6114188 105.52888888 132.40451282 39.70844444 28.53962393 71.06516239 51.07418803 71.0651624 83.89251282 0 31.85449572-30.18064957 55.45900854-68.38700855 85.35302564-47.61162393 37.23815385-106.8351453 83.56758974-106.83514529 144.62249573v131.26782906h408.44034188V732.11186325c0-61.0494359-59.22352136-107.38434188-106.81217095-144.60499146-38.22386325-29.91152136-68.40451282-53.52150428-68.40451282-85.37709402 0-32.81176069 31.35671795-55.34632479 71.05422223-83.87938461 47.02851282-33.79418803 105.53982906-75.84820513 105.53982905-132.41107692V160.61483761H306.41449572v125.22447863z" fill="#2C2C2C" p-id="2538"></path><path d="M412.28820513 765.81538462c-13.6 0-24.66461538-11.06461538-24.66461539-24.66564103s11.06461538-24.66461538 24.66461539-24.66461538h199.42871795c13.6 0 24.66461538 11.06461538 24.66461538 24.66461538s-11.06461538 24.66666667-24.66461538 24.66666667H412.28717949z" fill="#2C2C2C" p-id="2539"></path></svg>
-      <svg t="1772109073754" v-else-if="status === 'error'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3529" width="200" height="200"><path d="M1007.983211 512c0-273.924743-222.059492-495.984235-495.983211-495.984235S16.016789 238.075257 16.016789 512s222.059492 495.984235 495.984235 495.984235c113.738437 0 221.667565-38.428218 308.796972-107.830891 10.45205-8.325619 12.175297-23.547299 3.849678-33.998325-8.325619-10.45205-23.547299-12.175297-33.998325-3.849678-78.636988 62.638619-175.962617 97.290837-278.648324 97.290837-247.200078 0-447.595154-200.395076-447.595154-447.595154S264.799922 64.404846 512 64.404846s447.595154 200.395076 447.595154 447.595154c0 84.755336-23.572882 165.977195-67.401086 236.329497-7.065929 11.341303-3.598968 26.263154 7.742335 33.329083 11.341303 7.065929 26.263154 3.598968 33.329083-7.742335C981.841831 695.941336 1007.983211 605.866854 1007.983211 512zM524.260232 537.694195 371.999432 692.738387c-9.362228 9.534144-24.681122 9.67229-34.214243 0.310062-9.533121-9.362228-9.67229-24.681122-0.310062-34.214243l152.875806-155.669432L337.475128 347.495342c-9.362228-9.534144-9.224082-24.852014 0.310062-34.214243 9.534144-9.362228 24.852014-9.224082 34.214243 0.310062l152.260799 155.044192 152.261822-155.044192c9.362228-9.534144 24.681122-9.67229 34.214243-0.310062 9.533121 9.362228 9.67229 24.681122 0.310062 34.214243L558.170552 503.164774l152.875806 155.669432c9.362228 9.533121 9.224082 24.852014-0.310062 34.214243-9.534144 9.362228-24.852014 9.224082-34.214243-0.310062L524.260232 537.694195z" fill="#e30000" p-id="3530"></path></svg>
-      <svg t="1775969840435" v-else-if="status === 'outdated'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7533" width="200" height="200"><path d="M275.84 908.8c-32.64 0-65.28-12.16-90.24-37.12-24.32-24.32-37.12-56.32-37.12-90.24s13.44-65.92 37.12-90.24l96-96c10.88-10.88 14.72-26.88 10.24-40.96-39.04-119.04-8.32-248.32 80.64-337.28 72.32-72.32 172.8-106.88 274.56-94.08 33.28 3.84 60.16 26.24 71.04 57.6 10.88 31.36 3.2 65.92-20.48 89.6L548.48 418.56c-12.16 12.16-18.56 28.16-18.56 44.8s6.4 33.28 18.56 44.8c12.16 12.16 28.16 18.56 44.8 18.56s33.28-6.4 44.8-18.56L787.2 359.68c23.68-23.68 58.24-31.36 89.6-20.48 31.36 10.88 53.76 37.76 57.6 71.04 12.8 101.76-21.76 202.24-94.08 274.56-88.32 88.96-217.6 119.68-337.28 80.64-14.08-4.48-30.08-0.64-40.96 10.24l-96 96c-24.96 24.96-57.6 37.12-90.24 37.12zM605.44 183.68c-70.4 0-137.6 27.52-188.16 78.08-71.04 71.68-96 176-64.64 272 12.16 37.12 2.56 78.08-25.6 106.24l-96 96c-24.96 24.96-24.96 65.28 0 90.24 24.96 24.96 65.28 24.96 90.24 0l96-96c28.16-28.16 69.12-38.4 106.24-25.6 96 31.36 200.32 6.4 272-64.64 58.24-58.24 86.4-139.52 76.16-221.44-1.28-12.16-10.88-17.28-14.72-18.56-3.84-1.28-14.72-3.84-23.68 5.12l-149.12 149.12c-24.32 24.32-56.32 37.12-90.24 37.12s-65.92-13.44-90.24-37.12c-24.32-24.32-37.12-56.32-37.12-90.24s13.44-65.92 37.12-90.24L652.8 224.64c8.96-8.96 7.04-19.84 5.12-23.68-1.28-3.84-5.76-13.44-18.56-14.72-11.52-1.28-22.4-2.56-33.92-2.56z" fill="#515151" p-id="7534"></path></svg>
+      <!-- 状态图标 -->
+      <svg v-else-if="status === 'completed'" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      
+      <svg v-else-if="status === 'pending'" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 6v6l4 2" stroke-linecap="round"/>
+      </svg>
+      
+      <svg v-else-if="status === 'error'" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M15 9l-6 6M9 9l6 6" stroke-linecap="round"/>
+      </svg>
+      
+      <svg v-else-if="status === 'outdated'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7533" width="200" height="200">
+        <path d="M275.84 908.8c-32.64 0-65.28-12.16-90.24-37.12-24.32-24.32-37.12-56.32-37.12-90.24s13.44-65.92 37.12-90.24l96-96c10.88-10.88 14.72-26.88 10.24-40.96-39.04-119.04-8.32-248.32 80.64-337.28 72.32-72.32 172.8-106.88 274.56-94.08 33.28 3.84 60.16 26.24 71.04 57.6 10.88 31.36 3.2 65.92-20.48 89.6L548.48 418.56c-12.16 12.16-18.56 28.16-18.56 44.8s6.4 33.28 18.56 44.8c12.16 12.16 28.16 18.56 44.8 18.56s33.28-6.4 44.8-18.56L787.2 359.68c23.68-23.68 58.24-31.36 89.6-20.48 31.36 10.88 53.76 37.76 57.6 71.04 12.8 101.76-21.76 202.24-94.08 274.56-88.32 88.96-217.6 119.68-337.28 80.64-14.08-4.48-30.08-0.64-40.96 10.24l-96 96c-24.96 24.96-57.6 37.12-90.24 37.12zM605.44 183.68c-70.4 0-137.6 27.52-188.16 78.08-71.04 71.68-96 176-64.64 272 12.16 37.12 2.56 78.08-25.6 106.24l-96 96c-24.96 24.96-24.96 65.28 0 90.24 24.96 24.96 65.28 24.96 90.24 0l96-96c28.16-28.16 69.12-38.4 106.24-25.6 96 31.36 200.32 6.4 272-64.64 58.24-58.24 86.4-139.52 76.16-221.44-1.28-12.16-10.88-17.28-14.72-18.56-3.84-1.28-14.72-3.84-23.68 5.12l-149.12 149.12c-24.32 24.32-56.32 37.12-90.24 37.12s-65.92-13.44-90.24-37.12c-24.32-24.32-37.12-56.32-37.12-90.24s13.44-65.92 37.12-90.24L652.8 224.64c8.96-8.96 7.04-19.84 5.12-23.68-1.28-3.84-5.76-13.44-18.56-14.72-11.52-1.28-22.4-2.56-33.92-2.56z" fill="#818181" p-id="7534"></path>
+      </svg>
     </div>
 
-    <!-- Content -->
-    <div class="tool-content">
-      {{ content }}
-    </div>
-
+    <!-- 内容区 -->
+    <span class="content">{{ content }}</span>
+    
+    <!-- 可选：工具类型标签 -->
+    <span v-if="toolType" class="badge">{{ toolType }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{
-  tool_call_id: string,
-  content: string,
-  status: "pending" | "in_progress" | "completed" | "error" | "outdated",
+defineProps<{
+  tool_call_id: string
+  content: string
+  status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
+  toolType?: string
 }>()
 </script>
 
 <style scoped>
-
-/* ===== Wrapper ===== */
-.tool-card-wrapper {
-  display: grid;
-  grid-template-columns: 18px auto;
+.tool-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-
-  padding: 10px 14px;
+  gap: 8px;
+  
+  padding: 8px 14px;
   border-radius: 16px;
-  max-width: 180px;
-
-  font-size: 15px;
-  line-height: 1.6;
-
-  background: rgba(255, 255, 255, 0.573);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-
-  transition: all 0.25s ease;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  
+  /* 透明背景 + 细边框 */
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: none;
+  
+  transition: all 0.2s ease;
+  cursor: default;
+  max-width: 200px;
 }
 
-/* Subtle hover effect */
-.tool-card-wrapper:hover {
-  transform: scale(1.01);
+.tool-chip:hover {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
-.tool-card-wrapper.status-pending {
-  border: 1px solid #aaaaaa31;
+/* Pending */
+.tool-chip.is-pending {
+  color: #78716c;
+  border-color: rgba(120, 113, 108, 0.2);
 }
 
-.tool-card-wrapper.status-in_progress {
-  border: 1px solid #0037ff31;
+/* In Progress */
+.tool-chip.is-in_progress {
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.25);
+  background: rgba(167, 188, 233, 0.04);
 }
 
-.tool-card-wrapper.status-completed {
-  border: 1px solid #00e37d4c;
+/* Completed */
+.tool-chip.is-completed {
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.25);
 }
 
-.tool-card-wrapper.status-error {
-  border: 1px solid #e300004c;
+/* Error */
+.tool-chip.is-error {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.25);
+  background: rgba(220, 38, 38, 0.04);
 }
 
-/* ===== Icon Area ===== */
-.icon-area {
-  width: 20px;
-  height: 20px;
+/* Outdated */
+.tool-chip.is-outdated {
+  color: #a8a29e;
+  border-color: rgba(168, 162, 158, 0.2);
+  font-style: italic;
+}
+
+/* ===== 状态指示器 ===== */
+.status-indicator {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  position: relative;
+}
 
+.icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+/* 加载动画 */
+.loader {
+  width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* ===== Loading Spinner ===== */
-.spinner {
-  width: 16px;
-  height: 16px;
-
-  border: 2px solid rgba(77, 159, 252, 0.2);
-  border-top-color: rgba(0, 60, 255, 0.85);
-
-  border-radius: 16px;
+.loader-ring {
+  width: 100%;
+  height: 100%;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
   animation: spin 0.8s linear infinite;
+  box-sizing: border-box;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-/* ===== Placeholder SVG ===== */
-.placeholder-svg {
-  width: 16px;
-  height: 16px;
-  opacity: 0.4;
-}
-
-/* ===== Content ===== */
-.tool-content {
+/* ===== 内容区 ===== */
+.content {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
+  min-width: 0;
 }
 
-/* ===== Status Styling ===== */
-
-/* Pending */
-.status-pending {
-  opacity: 0.75;
+/* ===== 工具类型标签（可选） ===== */
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  opacity: 0.7;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-/* In Progress */
-.status-in_progress {
-  font-weight: 500;
+/* In Progress 状态下的脉冲效果 */
+.tool-chip.is-in_progress .status-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.15;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Completed */
-.status-error,
-.status-outdated,
-.status-completed {
-  opacity: 0.55;
+@keyframes pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.15; }
+  50% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
 }
 
+/* 完成状态的勾选动画 */
+.tool-chip.is-completed .icon {
+  animation: check-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes check-in {
+  0% { transform: scale(0) rotate(-45deg); }
+  50% { transform: scale(1.2) rotate(0deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* 错误状态的抖动提示 */
+.tool-chip.is-error {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-2px); }
+  40%, 60% { transform: translateX(2px); }
+}
 </style>

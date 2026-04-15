@@ -509,6 +509,11 @@ class AIContextManager:
 
                 content = str(raw_text) if raw_text else ""
                 think = str(raw_think if raw_think else "")
+                suffix = "[Conversation Abort]"
+                if content.endswith(suffix):
+                    content = content[:-len(suffix)]
+                if think.endswith(suffix):
+                    think = think[:-len(suffix)]
                 tool_calls = extra.get("tool_calls")
                 if not content and not remain_tool_message:
                     continue  # Skip empty AI message
