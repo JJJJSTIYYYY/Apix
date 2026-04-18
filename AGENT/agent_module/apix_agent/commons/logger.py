@@ -152,4 +152,4 @@ class Logger:
 
 
 
-logger = Logger(name="AppLogger", show_time=True, show_level=True)
+logger = Logger(name="AI_SERVER", show_time=True, show_level=True)

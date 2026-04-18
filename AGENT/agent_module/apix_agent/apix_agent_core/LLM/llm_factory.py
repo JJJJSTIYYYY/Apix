@@ -2,11 +2,12 @@ from typing import Any
 
 from langchain.chat_models import BaseChatModel
 
+from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.commons.logger import logger
 from apix_agent.global_config import BASE_URL
 
 
-def get_llm_node(*, provider: str, model: str, api_key: str, config: dict | None = None) -> BaseChatModel | Any:
+def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfigSchema | None = None) -> BaseChatModel | Any:
     logger.trace('[llm_factory.py] [ ] [get_llm_node] Enter')
     logger.info(f"[get_llm_node] Trying to get {model} from {provider}...")
     if not provider.strip() or not model.strip():

@@ -1,92 +1,20 @@
 import asyncio
 from pathlib import Path
-import shlex
 from typing import Annotated, List, Optional
 from uuid import uuid4
 
-import httpx
 from langchain.messages import ToolMessage
 from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from langgraph.config import get_stream_writer
 
-from apix_agent import global_config
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 
 
 @tool
-async def _execute_python_code(
-    code: str,
-    run_args: Optional[List[str]] | None,
-    describe: str,
-    state: Annotated[dict, InjectedState],
-) -> str:
-    """
-    Submit Python source code for asynchronous execution in the tools service.
-
-    This tool sends the provided Python code to a remote execution environment.
-    The code is NOT executed locally.
-
-    Execution is asynchronous:
-    - If submission succeeds, a task will be created.
-    - A unique task_id will be returned immediately.
-    - The execution result will be delivered later through the task system.
-
-    Use this tool when you need to:
-    - Run non-trivial Python logic
-    - Perform data processing or computation
-    - Execute scripts that require isolated runtime
-
-    Args:
-        description (str): A short, clear description of the execution purpose.
-        code (str): The complete Python source code to execute.
-        args (List[str], optional): Command-line arguments passed to the script.
-
-    Returns:
-        str: The task_id of the submitted execution task.
-    """
-    logger.trace('[python_code_runner.py] [tool] [python_code_runner] Enter')
-    try:
-        client_id = state["client_id"]
-        session_id = state.get("session_id")
-        history_id = state["history_id"]
-        config = state["config"]
-
-        data = {
-            "tool_name": "CodeRunner",
-            "client_id": client_id,
-            "history_id": history_id,
-            "payload": {
-                "describe": describe,
-                "params": {
-                    "code": code,
-                    "run_args": run_args,
-                },
-                "config": config,
-            },
-        }
-
-        logger.info(f"[python_code_runner] submit data: {data}")
-
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{global_config.TOOLS_SERVICE_URL}/execute/task",
-                json=data,
-            )
-
-        resp_data = resp.json()
-        return f"{resp_data}"
-
-    except Exception as e:
-        logger.exception("[python_code_runner] submit failed")
-        return f"Failed to submit python execution task: {str(e)}"
-
-
-
-@tool
-async def execute_python_code(
+async def run_python_code(
     code: str,
     run_args: Optional[List[str]] = None,
     state: Annotated[dict, InjectedState] = None,
@@ -111,6 +39,7 @@ async def execute_python_code(
     2. When temporary Python code needs to be executed immediately.
     3. When performing one-off analysis, transformations, or calculations.
     4. When the code does not need to persist after execution.
+    5. When you want to sleep and wait for something to finish, using sleep().
 
     ## When NOT to Use This Tool
     Do NOT use this tool when:
@@ -124,31 +53,18 @@ async def execute_python_code(
     - Ensure required input files exist before execution.
     - Return outputs that help progress the task.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-    state = state or {}
-    run_args = run_args or []
-
-    def finish_fail(message: str) -> Command:
-        writer({
-            "tool_chunk_rtn": {
-                "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "run_code",
-                "content": message,
-                "chunk_position": "end",
-                "status": "fail",
-            }
-        })
-        return Command(update={
-            "messages": [
-                ToolMessage(message, tool_call_id=tool_call_id)
-            ]
-        })
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "run_python_code",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "run_code",
             "content": (
                 "Running Python code\n\n"
                 "'''python\n"
@@ -159,17 +75,52 @@ async def execute_python_code(
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
 
+    run_args = run_args or []
     container_id = state.get("sandbox")
     config = state.get("config", {}) or {}
     sandbox_root = config.get("work_dir")
 
     if not container_id or not sandbox_root:
-        return finish_fail("Error: Sandbox configure failed.")
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_python_code",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Sandbox configure failed.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+        return Command(update={
+            "messages": [
+                ToolMessage("Error: Sandbox configure failed.", tool_call_id=tool_call_id)
+            ]
+        })
 
     if not code or not code.strip():
-        return finish_fail("Error: Python code cannot be empty.")
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_python_code",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Python code cannot be empty.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+        return Command(update={
+            "messages": [
+                ToolMessage("Error: Python code cannot be empty.", tool_call_id=tool_call_id)
+            ]
+        })
 
     container_script_path = f"/workspace/.tmp_exec/{uuid4().hex}.py"
 
@@ -182,7 +133,24 @@ async def execute_python_code(
         )
 
         if not isinstance(host_script_path, Path):
-            return finish_fail("Error: Failed to resolve host script path.")
+            event_writer.send_event(
+                event=StreamEvent.TOOL_EXEC_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "tool_exec_chunk_rtn",
+                    "tool_name": "run_python_code",
+                    "tool_call_id": tool_call_id,
+                    "content": "Error: Failed to resolve host script path.",
+                    "chunk_position": "end",
+                    "status": "fail",
+                }
+            )
+            return Command(update={
+                "messages": [
+                    ToolMessage("Error: Failed to resolve host script path.", tool_call_id=tool_call_id)
+                ]
+            })
 
         host_script_path.parent.mkdir(parents=True, exist_ok=True)
         with open(host_script_path, "w", encoding="utf-8", newline="") as f:
@@ -221,10 +189,14 @@ async def execute_python_code(
         if len(output) > MAX_OUTPUT:
             output = output[:MAX_OUTPUT] + "\n...[output truncated]"
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_python_code",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "run_code",
                 "content": (
                     "Result:\n"
                     "'''text\n"
@@ -237,7 +209,7 @@ async def execute_python_code(
                 "chunk_position": "end",
                 "status": "success" if process.returncode == 0 else "fail",
             }
-        })
+        )
 
         if process.returncode != 0:
             return Command(update={
@@ -256,7 +228,25 @@ async def execute_python_code(
         })
 
     except Exception as e:
-        return finish_fail(f"Error executing Python code: {str(e)}")
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_python_code",
+                "tool_call_id": tool_call_id,
+                "content": f"Error executing Python code: {str(e)}",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+        return Command(update={
+            "messages": [
+                ToolMessage(f"Error executing Python code: {str(e)}", tool_call_id=tool_call_id)
+            ]
+        })
 
     finally:
         try:

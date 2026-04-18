@@ -6,8 +6,8 @@ from langchain.agents.middleware.todo import WRITE_TODOS_TOOL_DESCRIPTION, Todo
 from langchain.messages import ToolMessage
 from langchain.tools import InjectedState, tool, InjectedToolCallId
 from langgraph.types import Command
-from langgraph.config import get_stream_writer
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.commons.file_content_reader import load_from_yaml, append_to_yaml
 from apix_agent.global_config import BASE_DIR
@@ -73,9 +73,23 @@ async def write_todos(
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
     """Create and manage a structured task list for your current work session."""
-    writer = get_stream_writer()
-    yield_tool = {"todo_chunk_rtn": todos}
-    writer(yield_tool)
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "write_todos",
+            "tool_call_id": tool_call_id,
+            "content": todos,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
     
     if not state.get("task_id", None):
         addtional_info = {"todo_list": todos}
@@ -86,10 +100,26 @@ async def write_todos(
             state.get("timestamp"),
             addtional_info,
         )
+
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_END, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "write_todos",
+            "tool_call_id": tool_call_id,
+            "content": f"Finish",
+            "chunk_position": "end",
+            "status": "success",
+        }
+    )
     return Command(
         update={
             "todos": todos,
-            "messages": [ToolMessage(f"Updated todo list to {todos}", tool_call_id=tool_call_id)],
+            "messages": [
+                ToolMessage(f"Updated todo list to {todos}", tool_call_id=tool_call_id)
+            ],
         }
     )
 
@@ -112,7 +142,38 @@ async def write_memorandum(
         title (str): The title of the memorandum, should be concise and indicative of the content.
         content (str): The detailed content of the memorandum, recording the important information to be remembered.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "write_memorandum",
+            "tool_call_id": tool_call_id,
+            "content": "Update memorandum",
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
+
     if not content.strip() or not title.strip():
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": "Empty title or content",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         return Command(
             update={
                 "messages": [
@@ -124,9 +185,21 @@ async def write_memorandum(
             }
         )
 
-    client_id = state.get("client_id")
     history_id = state.get("history_id")
     if not client_id or not history_id:
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": "Error occurred",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         return Command(
             update={
                 "messages": [
@@ -150,6 +223,20 @@ async def write_memorandum(
         append_to_yaml(memo_path, {title: content})
         current_memos = state.get("memorandum", []) + [title]
 
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": "Finish",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
+
         return Command(
             update={
                 "messages": [
@@ -163,6 +250,19 @@ async def write_memorandum(
         )
 
     except Exception as e:
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": f"Error occurred {str(e)}",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         return Command(
             update={
                 "messages": [
@@ -187,10 +287,39 @@ async def read_memorandum(
     Args:
         title (list[str]): Titles of memoranda in the `Current Memorandum Title List` to read.
     """
-
     client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "read_memorandum",
+            "tool_call_id": tool_call_id,
+            "content": "Read memorandum",
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
+
     history_id = state.get("history_id")
     if not client_id or not history_id:
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "read_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": "Error occurred",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         return Command(
             update={
                 "messages": [
@@ -205,6 +334,19 @@ async def read_memorandum(
     memo_path = memo_dir / f"{memo_filename}.yaml"
 
     if not memo_path.exists():
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "read_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": "Nothing here",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
         return Command(
             update={
                 "messages": [
@@ -227,6 +369,19 @@ async def read_memorandum(
             content = str(load_from_yaml(memo_path, t))
             contents.append(content.strip() if content else f"No content found for title: {t}.")
 
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "read_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": f"Read {" ".join(title)}",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
         return Command(
             update={
                 "messages": [
@@ -239,6 +394,19 @@ async def read_memorandum(
         )
 
     except Exception as e:
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "read_memorandum",
+                "tool_call_id": tool_call_id,
+                "content": f"Error occurred {str(e)}",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         return Command(
             update={
                 "messages": [

@@ -1,6 +1,6 @@
 <template>
   <el-container>
-  <el-aside style="width: auto;">
+    <el-aside style="width: var(--apix-left-side-bar-width); transition: width 0.28s cubic-bezier(0.23, 1, 0.32, 1);">
     <HomePage />
   </el-aside>
   <el-main>

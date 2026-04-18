@@ -1,5 +1,5 @@
 
-from typing import Any, NotRequired, TypedDict, Annotated, Literal
+from typing import Any, NotRequired, Required, TypedDict, Annotated, Literal
 import operator
 from langchain_core.messages import AnyMessage 
 from langchain.agents.middleware.todo import Todo
@@ -43,14 +43,14 @@ class AgentConfigSchema(TypedDict):
     api_key: str
 
     enable_think: bool
-    max_chunk_per_invoking: int
+    llm_calls_warning_threshold: int
     use_model_vision: bool  # If true, the picture will be sent to the LLM to analyze if the LLM supports picture input.
 
 
     # Agent Runtime Behavior
     work_dir: str
     async_tools_invoke: bool
-    save_async_tools_message: bool  # If true, async returns will save to database.
+    keep_tools_message: bool  # If true, async returns will save to database.
     pure_chat_on: bool  # If true, the agent will be a simple LLM without tools.
 
 
@@ -67,6 +67,7 @@ class AgentConfigSchema(TypedDict):
     enable_knowledge_retrieval: bool
     enable_command_opration: bool
     enable_skill_load: bool
+    enable_task_flow: bool
     enable_agent_assign: bool
     enable_agent_swarm: bool
 
@@ -83,20 +84,21 @@ class AgentConfigSchema(TypedDict):
     # Agent Identity / Prompt
     role_prompt: RoleSchema
     higher_role_prompt_permission: bool  # If true, the role prompt will insert into system prompt.
-    
+
 
 class GraphRuntimeContext(TypedDict):
     agent_name: str
     agent_role: Literal["team_leader", "team_worker", "main_agent", "sub_agent", "agent"]
     client_id: str
-    session_id: str
+    session_id: NotRequired[str]
     history_id: str
+    platform: NotRequired[Literal["default"]]
     generation_id: str
     config: AgentConfigSchema
     timestamp: int
 
 
-class MessagesState(GraphRuntimeContext):
+class MainAgentState(GraphRuntimeContext):
     input: dict
     messages: Annotated[list[AnyMessage], operator.add]
     current_tool_calls: list
@@ -105,7 +107,8 @@ class MessagesState(GraphRuntimeContext):
     rule_prompt: str
     runtime_prompt: str # Include todos prompt, workspace prompt, memorandum prompt and so on
     llm_calls: Annotated[int, operator.add] # Total LLM call count across the graph
-    # generated_messages_length: Annotated[int, operator.add]
+    retry_count: int
+    context_compress_level: int # Level 0: Drop tool message content; Level 1: Context fold, driven by write_todos; Level 2: Context sumary to summary_exempt_tail_length; 
     sandbox: str # Docker container id
     todos: NotRequired[list[Todo]]
     memorandum: NotRequired[list[str]]
@@ -114,7 +117,7 @@ class MessagesState(GraphRuntimeContext):
 
 
 
-class SubAssistantState(MessagesState):
+class SubAgentState(MainAgentState):
     final_goal: str
     task_id: str
     parent_task_id: str
@@ -123,3 +126,22 @@ class SubAssistantState(MessagesState):
     status: Literal["in_progress", "completed", "pending", "failed", "cancelled"]
     outputs: Annotated[str, operator.add]
     errors: Annotated[str, operator.add]
+
+
+
+class ApixEventEnvelopeTarget(TypedDict):
+    id: str
+    platform: str
+
+
+class MinimalEnvelopeData(TypedDict, total=False):
+    event_name: Required[str]
+    content: Required[Any]
+
+
+class ApixEventEnvelope(TypedDict):
+    event: str
+    target: ApixEventEnvelopeTarget
+    data: MinimalEnvelopeData          # main payload
+    trace_id: str
+    timestamp: float

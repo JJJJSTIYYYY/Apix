@@ -13,6 +13,6 @@ def get_date_natural_language():
     ordinal_day = p.ordinal(day)
     
     # "Wednesday, April 15th, 2026"
-    natural_date = f"{weekday}, {month} {ordinal_day}, {year}"
+    natural_date = f"DATE: {weekday}, {month} {ordinal_day}, {year}"
     
     return natural_date

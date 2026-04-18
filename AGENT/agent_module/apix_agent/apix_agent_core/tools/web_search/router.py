@@ -4,6 +4,7 @@ import json
 import time
 from typing import Dict, List, Type, Optional
 
+from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.apix_agent_core.tools.web_search.providers.base import BaseSearchProvider
 from apix_agent.apix_agent_core.tools.web_search.providers import PROVIDER_REGISTRY
 
@@ -35,7 +36,7 @@ class SearchProviderRouter:
     # ============================================================
     # Cache helpers
     # ============================================================
-    def _hash_cache_key(self, *, task_type: str, config: dict) -> str:
+    def _hash_cache_key(self, *, task_type: str, config: AgentConfigSchema) -> str:
         """
         Build cache key according to task_type.
         """
@@ -82,13 +83,13 @@ class SearchProviderRouter:
     # ============================================================
     # Public APIs
     # ============================================================
-    async def choose_link_provider(self, config: dict) -> str:
+    async def choose_link_provider(self, config: AgentConfigSchema) -> str:
         return await self._choose_provider(
             config=config,
             task_type="link",
         )
 
-    async def choose_content_provider(self, config: dict) -> str:
+    async def choose_content_provider(self, config: AgentConfigSchema) -> str:
         return await self._choose_provider(
             config=config,
             task_type="content",
@@ -100,7 +101,7 @@ class SearchProviderRouter:
     async def _choose_provider(
         self,
         *,
-        config: dict,
+        config: AgentConfigSchema,
         task_type: str,
     ) -> str:
         """

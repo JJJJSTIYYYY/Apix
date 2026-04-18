@@ -5,7 +5,7 @@ from typing import Any, Tuple
 from uuid import uuid4
 
 from apix_agent.commons.logger import logger
-from apix_agent.commons.type_def import SubAssistantState
+from apix_agent.commons.type_def import AgentConfigSchema, SubAgentState
 from apix_agent.global_config import BASE_DIR
 
 
@@ -15,7 +15,7 @@ class TeamTaskManager:
         self.TASK_RESULT_TTL = 3600
         self.task_queue: asyncio.Queue = None
         self.stop_request_queue: asyncio.Queue = None
-        self.task_state_store: dict[Tuple[str, str], SubAssistantState] = {}
+        self.task_state_store: dict[Tuple[str, str], SubAgentState] = {}
 
         self._state_lock = asyncio.Lock()
 
@@ -23,7 +23,7 @@ class TeamTaskManager:
     # Public API
     # ------------------------------------------------------------------
 
-    async def submit_task(self, initial_state: SubAssistantState, config: dict, agent_name: str) -> str:
+    async def submit_task(self, initial_state: SubAgentState, config: AgentConfigSchema, agent_name: str) -> str:
         task_id = str(uuid4())
         initial_state["task_id"] = task_id
         history_id = initial_state["history_id"]
@@ -73,7 +73,7 @@ class TeamTaskManager:
                 "duration": f"{duration} seconds",
                 "status": state.get("status"),
                 "outputs": outputs if outputs else "No content generated yet.",
-                "errors": errors if errors else "No error occured."
+                "errors": errors if errors else "No error occurred."
             })
 
             status = state.get("status")
@@ -119,7 +119,7 @@ class TeamTaskManager:
                 "duration": duration,
                 "status": state.get("status"),
                 "outputs": outputs if outputs else "No content generated yet.",
-                "errors": errors if errors else "No error occured."
+                "errors": errors if errors else "No error occurred."
             })
 
             status = state.get("status")

@@ -17,7 +17,7 @@ class GeneratingCache:
 
     def __init__(self):
         # Root directory for sub-agent histories
-        self.history_root = Path(BASE_DIR) / "sub_agent_history"
+        self.history_root = Path(BASE_DIR) / "team_worker_history"
         self.history_root.mkdir(parents=True, exist_ok=True)
 
         # Async locks per history file
@@ -78,7 +78,7 @@ class GeneratingCache:
         message_dict: dict,
     ):
         """
-        Append pre-built dict message (for HumanMessage).
+        Append pre-built dict message.
         """
 
         key = self._get_file_key(history_id, agent_name)

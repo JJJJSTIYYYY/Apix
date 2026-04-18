@@ -3,7 +3,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
 import traceback
 
-from apix_agent.apix_agent_core.websocket.websocket_manager import websocket_list, ws_msg_handler
+from apix_agent.apix_event_pipe.websocket_manager import websocket_list, ws_msg_handler
 from apix_agent.commons.logger import logger
 
 

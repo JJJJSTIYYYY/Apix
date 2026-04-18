@@ -5,15 +5,15 @@ from langchain.messages import ToolMessage
 from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from langgraph.config import get_stream_writer
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.commons.logger import logger
-from apix_agent.commons.type_def import MessagesState, SubAssistantState
+from apix_agent.commons.type_def import MainAgentState, SubAgentState
 
 
 @tool
-async def assign_task(
+async def assign_sub_assistant(
     agent_identity: str,
     system_prompt: str,
     task_description: str,
@@ -77,27 +77,42 @@ async def assign_task(
     """
 
     assistant_name = agent_identity
-    writer = get_stream_writer()
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "assign_task",
-        "content": f"Assign task to {assistant_name}...",
-        "chunk_position": "start",
-        "status": "success",
-    }})
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "assign_sub_assistant",
+            "tool_call_id": tool_call_id,
+            "content": f"Assign task to {assistant_name}...",
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     # -------------------------
     # Validate inputs
     # -------------------------
 
     if not assistant_name or not task_description or not instruction:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "assign_task",
-            "content": "Error: No props specified.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_call_id": tool_call_id,
+                "tool_name": "assign_sub_assistant",
+                "content": "Error: No props specified.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(
             update={
@@ -115,7 +130,7 @@ async def assign_task(
     # -------------------------
 
     try:
-        parent_state: MessagesState = state.copy()
+        parent_state: MainAgentState = state.copy()
         if parent_state.get("agent_role") == "main_agent":
             agent_role = "sub_agent"
         elif parent_state.get("agent_role") == "team_leader":
@@ -135,7 +150,7 @@ async def assign_task(
         }
         initial_config["higher_role_prompt_permission"] = True
 
-        initial_state: SubAssistantState = {
+        initial_state: SubAgentState = {
             **parent_state,
             "agent_name": assistant_name,
             "agent_role": agent_role,
@@ -159,7 +174,8 @@ async def assign_task(
             "status": "pending",
             "errors": "",
             "outputs": "",
-            "config": initial_config
+            "config": initial_config,
+            "retry_count": 0
         }
         config = state.get("config")
 
@@ -172,13 +188,19 @@ async def assign_task(
         if not task_id:
             raise RuntimeError(f"Failed to assign task to {assistant_name}.")
         
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "assign_task",
-            "content": f"{assistant_name}: {task_description}",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "assign_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": f"{assistant_name}: {task_description}",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
 
         return Command(
             update={
@@ -192,14 +214,20 @@ async def assign_task(
         )
 
     except Exception as e:
-        logger.exception(f'[assign_task] Error occured: {str(e)}')
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "assign_task",
-            "content": f"Error: Failed to assign task",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        logger.exception(f'[assign_sub_assistant] Error occurred: {str(e)}')
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "assign_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": f"Error: Failed to assign task",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(
             update={
@@ -214,7 +242,7 @@ async def assign_task(
 
 
 @tool
-async def query_task_by_id(
+async def query_sub_assistant(
     task_ids: list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId]
@@ -223,7 +251,7 @@ async def query_task_by_id(
     Query the status, result, and logs of a previously assigned task.
 
     This tool retrieves the current progress or final result of a task
-    that was created using the task delegation tool `assign_task`.
+    that was created using the task delegation tool `assign_sub_assistant`.
     The task may still be running, so the result may not be available yet.
 
     ## When to Use
@@ -260,14 +288,23 @@ async def query_task_by_id(
     that means the sub-agent is generating the final response. Please continue waiting before completed.
     """
 
-    writer = get_stream_writer()
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "query_task",
-        "content": f"Querying task...",
-        "chunk_position": "start",
-        "status": "success",
-    }})
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "query_sub_assistant",
+            "tool_call_id": tool_call_id,
+            "content": "Querying task...",
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
     
     if isinstance(task_ids, str):
         task_ids = [task_ids]
@@ -285,13 +322,19 @@ async def query_task_by_id(
         if not results:
             results = "No result or logs found."
         
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "query_task",
-            "content": f"Query success",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "query_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": "Query success",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
 
         return Command(
             update={
@@ -305,14 +348,20 @@ async def query_task_by_id(
         )
 
     except Exception as e:
-        logger.exception(f'[query_task] Error occured: {str(e)}')
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "query_task",
-            "content": f"Error: Failed to query task",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        logger.exception(f'[query_sub_assistant] Error occurred: {str(e)}')
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "query_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Failed to query task",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(
             update={
@@ -327,7 +376,7 @@ async def query_task_by_id(
 
 
 @tool
-async def stop_task_by_id(
+async def stop_sub_assistant(
     task_ids: list[str],
     reason: str,
     state: Annotated[dict, InjectedState],
@@ -337,7 +386,7 @@ async def stop_task_by_id(
     Stop one or more previously assigned tasks.
 
     This tool requests the task system to terminate running tasks
-    that were created using the task delegation tool `assign_task`.
+    that were created using the task delegation tool `assign_sub_assistant`.
 
     If a task is currently pending or in_progress, it will be canceled as soon as possible.
     If the task has already completed or failed, the stop request will have no effect.
@@ -376,28 +425,42 @@ async def stop_task_by_id(
     Stopping a task does not guarantee immediate termination.
     The task system will attempt to stop the task gracefully.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "stop_task",
-        "content": f"Stopping task...",
-        "chunk_position": "start",
-        "status": "success",
-    }})
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "stop_sub_assistant",
+            "tool_call_id": tool_call_id,
+            "content": f"Stopping task...",
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     # -------------------------
     # Validate inputs
     # -------------------------
 
     if not task_ids:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "stop_task",
-            "content": "Error: No task_id specified.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "stop_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": "Error: No task_id specified.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(
             update={
@@ -424,13 +487,19 @@ async def stop_task_by_id(
             reason=reason
         )
         
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "stop_task",
-            "content": f"Stop success",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "stop_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": "Stop success",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
 
         return Command(
             update={
@@ -444,14 +513,20 @@ async def stop_task_by_id(
         )
 
     except Exception as e:
-        logger.exception(f'[stop_task] Error occured: {str(e)}')
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "stop_task",
-            "content": f"Error: Failed to stop task",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        logger.exception(f'[stop_sub_assistant] Error occurred: {str(e)}')
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "stop_sub_assistant",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Failed to stop task",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(
             update={

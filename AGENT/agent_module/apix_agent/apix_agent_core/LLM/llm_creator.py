@@ -8,6 +8,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_deepseek import ChatDeepSeek
 from langchain_core.language_models import LanguageModelInput
 
+from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.commons.logger import logger
 
 
@@ -15,7 +16,7 @@ def get_ollama_model(
     model: str,
     api_key: str,
     base_url: str,
-    config: dict | None = None
+    config: AgentConfigSchema | None = None
 ):
     """
     Create an Ollama chat model instance.
@@ -37,7 +38,7 @@ def get_openai_model(
     model: str,
     api_key: str,
     base_url: str,
-    config: dict | None = None
+    config: AgentConfigSchema | None = None
 ):
     """
     Create an OpenAI chat model instance.
@@ -59,7 +60,7 @@ def get_google_model(
     model: str,
     api_key: str,
     base_url: str,
-    config: dict | None = None
+    config: AgentConfigSchema | None = None
 ):
     """
     Create a Google Generative AI chat model instance.
@@ -156,7 +157,7 @@ def get_deepseek_model(
     model: str,
     api_key: str,
     base_url: str,
-    config: dict | None = None
+    config: AgentConfigSchema | None = None
 ):
     """
     Create a deepseek model instance.
@@ -290,7 +291,7 @@ def get_moonshot_model(
     model: str,
     api_key: str,
     base_url: str,
-    config: dict | None = None
+    config: AgentConfigSchema | None = None
 ):
     """
     Create a Moonshot (月之暗面) chat model instance.

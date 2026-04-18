@@ -1,20 +1,19 @@
-from typing import Annotated, Any, AsyncIterator, List
+from typing import Annotated, List
 
 import httpx
 from langchain.messages import ToolMessage
 from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
-from langchain_core.messages import AIMessage
-from langgraph.config import get_stream_writer
 from langgraph.types import Command
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 
 
 @tool
-async def knowledge_base_retrieval(
+async def search_knowledge_base(
     query: str,
     document_ids: list[str],
     state: Annotated[dict, InjectedState],
@@ -58,32 +57,42 @@ async def knowledge_base_retrieval(
 
     logger.trace('[retrieval_tool.py] [tool] [knowledge_base_retrieval] Enter')
 
-    writer = get_stream_writer()
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "search_knowledge_base",
+            "tool_call_id": tool_call_id,
+            "content": query,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     # Normalize document_ids to list[str]
     if isinstance(document_ids, str):
         document_ids = [document_ids]
 
-    writer({
-        "tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "knowledge_base_retrieval",
-            "content": query,
-            "chunk_position": "start",
-            "status": "success",
-        }
-    })
-
     if not document_ids:
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_knowledge_base",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "knowledge_base_retrieval",
-                "content": "Empty query.",
+                "content": "Empty query",
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -132,15 +141,19 @@ async def knowledge_base_retrieval(
         if not messages:
             msg = "No relevant knowledge base chunks found."
 
-            writer({
-                "tool_chunk_rtn": {
+            event_writer.send_event(
+                event=StreamEvent.TOOL_EXEC_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "tool_exec_chunk_rtn",
+                    "tool_name": "search_knowledge_base",
                     "tool_call_id": tool_call_id,
-                    "tool_chunk_rtn": "knowledge_base_retrieval",
                     "content": "Read 0 chunks.",
                     "chunk_position": "end",
                     "status": "success",
                 }
-            })
+            )
 
             return Command(update={
                 "messages": [
@@ -168,15 +181,19 @@ async def knowledge_base_retrieval(
 
         result_text = "\n\n---\n\n".join(text_lines)
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_knowledge_base",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "knowledge_base_retrieval",
                 "content": f"Read {len(messages)} chunks.",
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -189,15 +206,19 @@ async def knowledge_base_retrieval(
 
         error_msg = f"Failed to retrieve knowledge base chunks: {str(e)}"
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_knowledge_base",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "knowledge_base_retrieval",
                 "content": "Error: " + str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [

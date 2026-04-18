@@ -42,11 +42,12 @@ BASE_URL = {       # Base URL for the LLM service
 
 GENERATION_TTL_SECONDS = 300  # Clear those finished and aborted generation ctx
 
+MAX_RETRY = 3 # Max retry when llm_call failure
 MAX_LLM_CONNECTIONS = 12  # Maximum number of llm connections
 
 # KEEP_ALIVE_S = 300  # Keep-alive time for connections in seconds
 
-APIX_SERVICE_URL = "http://localhost:5090"  # Apix service URL
+TASK_SERVER_BASE_URL = "http://localhost:5090"
 
 AGENT_SERVICE_URL = "http://localhost:5091"  # Apix service URL
 

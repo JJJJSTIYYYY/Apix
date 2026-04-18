@@ -20,45 +20,6 @@ from core.domain.model.longterm_memory_helper import LongtermMemoryMessage, memo
 class MysqlService:
     """
     MySQL service for persistent storage, include task info with status [done | failed] and dialog conversation history.
-
-    Procedures in database:
-    1. User Management:
-        ensure_user_exists: Create user record if not exists else update username.
-            IN p_user_uid VARCHAR(64), 
-            IN p_username VARCHAR(64)
-    2. Conversation Management:
-        create_conversation: Create a new conversation record.
-            IN p_user_uid VARCHAR(64),
-            IN p_conversation_uid VARCHAR(64),
-            IN p_title VARCHAR(255),
-            IN p_session_id VARCHAR(64)
-        fetch_conversation_list: Get conversations list for a user.
-            IN p_user_uid VARCHAR(64)
-        append_message: Append one piece of message to a conversation.
-            IN p_user_uid VARCHAR(64),
-            IN p_conversation_uid VARCHAR(64),
-            IN p_role ENUM('human', 'ai', 'system', 'tools'),
-            IN p_content LONGTEXT,
-            IN p_extra JSON
-        fetch_messages_after_cursor: Load messages after a specific cursor.
-            IN p_user_uid VARCHAR(64),
-            IN p_conversation_uid VARCHAR(64),
-            IN p_after_cursor BIGINT,
-            IN p_limit INT
-    3. Task Management:
-        create_task_record: Create a task record.
-            IN p_task_id VARCHAR(64),
-            IN p_user_uid VARCHAR(64),
-            IN p_conversation_uid VARCHAR(64),
-            IN p_payload JSON,
-            IN p_created_at DATETIME
-        update_task_result: Insert a task record that has funished.
-            IN p_task_id VARCHAR(128),
-            IN p_status ENUM('done', 'failed'),
-            IN p_result JSON,
-            IN p_finished_at DATETIME
-        fetch_task_info: Fetch finised task info.
-            IN p_task_id VARCHAR(128)
     """
 
     def __init__(self, *, host, port, user, password, database, charset="utf8mb4"):

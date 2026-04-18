@@ -10,8 +10,9 @@ import traceback
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.commons.type_def import MessagesState
+from apix_agent.commons.type_def import MainAgentState, MinimalEnvelopeData
 from apix_agent.global_config import GENERATION_TTL_SECONDS
+from apix_agent.commons.type_def import ApixEventEnvelope
 
 
 # =========================
@@ -252,83 +253,96 @@ class WebsocketList:
         except Exception:
             logger.warning("websocket send failed")
 
-    async def send_ai_stream_token(self, generation_id, client_id, history_id, delta):
+    async def send_ai_stream_token(self, generation_id, client_id, history_id, delta: ApixEventEnvelope):
+        target = delta.get("target")
+        client_id = target.get("id") # Refresh client_id
+        platform = target.get("platform")
+
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
 
         if not gen or gen.status != "running":
             return
 
-        for action, content in delta.items():
-            async with gen.gen_lock:
-                if action == "node_stream_start":
-                    gen.cache_tokens = {
-                        "role": "ai",
-                        "content": "",
-                        "think": "",
-                        "extra": {},
-                        "info": {},
-                        "generation_id": "",
-                        "timestamp": 0
-                    }
+        delta_data = delta.get("data")
+        action = delta_data.get("event_name")
+        content = delta_data.get("content")
+        async with gen.gen_lock:
+            if action == "node_stream_start":
+                gen.cache_tokens = {
+                    "role": "ai",
+                    "content": "",
+                    "think": "",
+                    "extra": {},
+                    "info": {},
+                    "generation_id": "",
+                    "timestamp": 0
+                }
 
-                if action == "content_chunk_rtn":
-                    gen.cache_tokens["content"] += content
-                elif action == "think_chunk_rtn":
-                    gen.cache_tokens["think"] += content
-
-            payload = {
-                "action": action,
-                "ts": int(time.time() * 1000),
-                "generation_id": generation_id,
-                "data": {
-                    "client_id": client_id,
-                    "history_id": history_id,
-                    "messages": {
-                        "role": "ai",
-                        "content": content if action == 'content_chunk_rtn' else "",
-                        "think": content if action == 'think_chunk_rtn' else "",
-                        "extra": content if action == 'tool_chunk_rtn' else {},
-                        "info": content if action == 'info_chunk_rtn' else {},
-                        "todos": content if action == 'todo_chunk_rtn' else [],
-                    },
-                },
-            }
-
-            await self._safe_send(ctx, payload)
-
-    async def send_ai_stream_start(self, generation_id, client_id, history_id):
-        ctx = self._get_ctx(client_id)
-        gen = ctx.generations.get(generation_id)
-        if not gen or gen.status != "running":
-            return
+            if action == "content_chunk_rtn":
+                gen.cache_tokens["content"] += content
+            elif action == "think_chunk_rtn":
+                gen.cache_tokens["think"] += content
 
         payload = {
-            "action": "msg_stream_start",
+            "action": action,
             "ts": int(time.time() * 1000),
             "generation_id": generation_id,
+            "client_id": client_id,
+            "platform": platform,
             "data": {
-                "client_id": client_id,
                 "history_id": history_id,
+                "messages": delta_data,
             },
         }
 
         await self._safe_send(ctx, payload)
 
-    async def send_ai_stream_end(self, generation_id, client_id, history_id, reason="graph_finish"):
+    async def send_ai_stream_start(self, generation_id, client_id, history_id, platform='default'):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
         if not gen or gen.status != "running":
             return
 
+        event: MinimalEnvelopeData = {
+            "event_name": "msg_stream_start",
+            "content": None
+        }
+
+        payload = {
+            "action": "msg_stream_start",
+            "ts": int(time.time() * 1000),
+            "generation_id": generation_id,
+            "client_id": client_id,
+            "platform": platform,
+            "data": {
+                "history_id": history_id,
+                "messages": event
+            },
+        }
+
+        await self._safe_send(ctx, payload)
+
+    async def send_ai_stream_end(self, generation_id, client_id, history_id, platform='default'):
+        ctx = self._get_ctx(client_id)
+        gen = ctx.generations.get(generation_id)
+        if not gen or gen.status != "running":
+            return
+
+        event: MinimalEnvelopeData = {
+            "event_name": "msg_stream_end",
+            "content": None
+        }
+
         payload = {
             "action": "msg_stream_end",
             "ts": int(time.time() * 1000),
             "generation_id": generation_id,
+            "client_id": client_id,
+            "platform": platform,
             "data": {
-                "client_id": client_id,
                 "history_id": history_id,
-                "reason": reason,
+                "messages": event
             },
         }
 
@@ -341,21 +355,34 @@ class WebsocketList:
         except ValueError:
             pass
 
-    async def send_ai_stream_abort(self, generation_id, client_id, history_id, reason="user_interrupt", content=""):
+    async def send_ai_stream_abort(
+            self, 
+            generation_id, 
+            client_id, 
+            history_id, 
+            platform = 'default', 
+            reason: Literal["user_interrupt", "error_occurred"] = "user_interrupt", 
+            content = ""
+        ):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
         if not gen:
             return
+        
+        event: MinimalEnvelopeData = {
+            "event_name": reason,
+            "content": content
+        }
 
         payload = {
             "action": "msg_stream_abort",
             "ts": int(time.time() * 1000),
             "generation_id": generation_id,
+            "client_id": client_id,
+            "platform": platform,
             "data": {
-                "client_id": client_id,
                 "history_id": history_id,
-                "reason": reason,
-                "content": content,
+                "messages": event,
             },
         }
 
@@ -380,8 +407,9 @@ class WebsocketMessageHandler:
         try:
             data = payload.get("data") or {}
             client_id = data.get("client_id")
-            session_id = data.get("session_id")
+            session_id = data.get("session_id", "")
             history_id = data.get("history_id")
+            platform = data.get("platform", "default")
             message = data.get("messages", {})
             config = data.get("config", {})
             
@@ -398,12 +426,13 @@ class WebsocketMessageHandler:
                 raise ValueError(f"[chat_with_llm] Unexpected data type: message is {class_name}, expected dict.")
 
             timestamp = int(time.time() * 1000)
-            initial_state: MessagesState = {
+            initial_state: MainAgentState = {
                 "agent_name": "APIX",
                 "agent_role": agent_role,
                 "client_id": client_id,
                 "session_id": session_id,
                 "history_id": history_id,
+                "platform": platform,
                 "generation_id": generation_id,
                 "config": config,
                 "timestamp": timestamp,
@@ -420,6 +449,7 @@ class WebsocketMessageHandler:
                 "memorandum": [],
                 "skills": [],
                 "documents": [],
+                "retry_count": 0
             }
 
             astream = await ai_agent.submit_agent_task(initial_state, config, "MAIN")
@@ -448,7 +478,7 @@ class WebsocketMessageHandler:
                 generation_id,
                 client_id,
                 history_id,
-                reason="error_occured",
+                reason="error_occurred",
                 content=f"{e.__class__.__name__}: {str(e)}"
             )
 

@@ -6,15 +6,14 @@ import re
 import shutil
 from urllib.parse import unquote
 from typing import Annotated, List, Optional
-import shlex
 
 import httpx
 from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from langgraph.config import get_stream_writer
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
@@ -72,7 +71,7 @@ def open_unique_file_atomic(directory: str, filename: str):
 # ------------------------------------------------------
 
 @tool
-async def get_file_by_id(
+async def fetch_files(
     file_ids: List[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
@@ -101,20 +100,40 @@ async def get_file_by_id(
     - Only download files that are necessary for the current objective.
     - Avoid redundant downloads of the same file.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "fetch_files",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "download_file",
             "content": str(file_ids),
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
 
     if not file_ids:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "No file_id provided",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage("No file_ids provided.", tool_call_id=tool_call_id)
@@ -130,6 +149,21 @@ async def get_file_by_id(
 
     container_id = state.get("sandbox")
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage("Sandbox not configured.", tool_call_id=tool_call_id)
@@ -140,6 +174,21 @@ async def get_file_by_id(
     base_path = config.get("work_dir")
 
     if not base_path:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "work_dir not found",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage("work_dir not found.", tool_call_id=tool_call_id)
@@ -241,15 +290,19 @@ async def get_file_by_id(
 
     except Exception as e:
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "fetch_files",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "download_file",
                 "content": str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -271,15 +324,19 @@ async def get_file_by_id(
         if r.get("status") == "error"
     ]
 
-    writer({
-        "tool_chunk_rtn": {
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_END, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "fetch_files",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "download_file",
             "content": f"{len(success_files)} success, {len(failed_files)} failed",
             "chunk_position": "end",
             "status": "success" if success_files else "fail",
         }
-    })
+    )
 
     message_text = (
         f"Downloaded {len(success_files)} file(s).\n"
@@ -295,300 +352,6 @@ async def get_file_by_id(
         ]
     })
 
-
-@tool
-async def _read_workspace_files(
-    file_path: list[str],
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-) -> Command:
-    """
-    Read text files inside sandbox (/workspace) container.
-
-    Args:
-        file_path: A list of file paths to read.\
-        Can be an absolute path inside the container or a relative path, which will be resolved from the container working directory (/workspace)
-
-    Returns:
-        list[dict]: [{ "file": path, "content": "..."}]
-
-    Note: This tool can only read text file.
-    """
-
-    writer = get_stream_writer()
-
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "read_files",
-        "content": file_path,
-        "chunk_position": "start",
-        "status": "success",
-    }})
-
-    container_id = state.get("sandbox")
-
-    if not container_id:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "read_files",
-            "content": "Error: Sandbox not configured.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage("Error: Sandbox not configured. Please call configure_sandbox first.", tool_call_id=tool_call_id)
-            ]
-        })
-
-    if not file_path:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "read_files",
-            "content": "Error: No file path provided.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage("Error: No file_path provided.", tool_call_id=tool_call_id)
-            ]
-        })
-
-    results = []
-
-    try:
-        success_count = 0
-        for path in file_path:
-
-            quoted_path = shlex.quote(path)
-
-            cmd = [
-                "docker", "exec",
-                container_id,
-                "bash", "-lc",
-                f"cat -- {quoted_path}"
-            ]
-
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode != 0:
-                results.append({
-                    "file": path,
-                    "content": stderr.decode().strip()
-                })
-            else:
-                success_count = success_count + 1
-                results.append({
-                    "file": path,
-                    "content": stdout.decode()
-                })
-
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "read_files",
-            "content": f"Read {success_count}/{len(file_path)} files successfully.",
-            "chunk_position": "end",
-            "status": "success",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage(str(results), tool_call_id=tool_call_id)
-            ]
-        })
-
-    except Exception as e:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "read_files",
-            "content": f"Error: {str(e)}",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage(f"Error: {str(e)}", tool_call_id=tool_call_id)
-            ]
-        })
-    
-
-@tool
-async def _write_workspace_file(
-    file_name: str,
-    content: str,
-    over_write: bool,
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-) -> Command:
-    """
-    Write text files inside sandbox (/workspace) container.
-
-    Args:
-        file_name: Name of file. Can be an absolute path inside the container or a relative path, which will be resolved from the container working directory (/workspace).
-        content: File content.
-        over_write: Over write exist file if true.
-
-    Returns:
-        list[dict]: [{ "file": path, "content": "..."}]
-
-    Note: This tool can only write text file such as code file. If path is not exist, it will be created. Parent directory will also be created if not exist.
-    """
-
-    writer = get_stream_writer()
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "write_file",
-        "content": file_name,
-        "chunk_position": "start",
-        "status": "success",
-    }})
-
-    container_id = state.get("sandbox")
-
-    if not container_id:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "write_file",
-            "content": "Error: Sandbox not configured.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage("Error: Sandbox not configured. Please call configure_sandbox first.", tool_call_id=tool_call_id)
-            ]
-        })
-
-    try:
-        quoted_input_path = shlex.quote(file_name)
-
-        resolve_cmd = [
-            "docker", "exec",
-            container_id,
-            "bash", "-lc",
-            f"realpath -m {quoted_input_path}"
-        ]
-
-        process = await asyncio.create_subprocess_exec(
-            *resolve_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        stdout, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            raise RuntimeError(stderr.decode().strip())
-
-        resolved_path = stdout.decode().strip()
-
-        if not (
-            resolved_path == "/workspace"
-            or resolved_path.startswith("/workspace/")
-        ):
-            writer({"tool_chunk_rtn": {
-                "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "write_file",
-                "content": f"Access denied: {resolved_path}",
-                "chunk_position": "end",
-                "status": "fail",
-            }})
-
-            return Command(update={
-                "messages": [
-                    ToolMessage(
-                        f"Error: Path escapes /workspace: {resolved_path}",
-                        tool_call_id=tool_call_id
-                    )
-                ]
-            })
-
-        quoted_resolved = shlex.quote(resolved_path)
-        quoted_content = shlex.quote(content)
-
-        if not over_write:
-            check_cmd = [
-                "docker", "exec",
-                container_id,
-                "bash", "-lc",
-                f"test -f {quoted_resolved}"
-            ]
-            process = await asyncio.create_subprocess_exec(*check_cmd)
-            await process.wait()
-
-            if process.returncode == 0:
-                writer({"tool_chunk_rtn": {
-                    "tool_call_id": tool_call_id,
-                    "tool_chunk_rtn": "write_file",
-                    "content": f"File already exists.",
-                    "chunk_position": "end",
-                    "status": "fail",
-                }})
-
-                return Command(update={
-                    "messages": [
-                        ToolMessage(
-                            f"Error: File already exists: {resolved_path}",
-                            tool_call_id=tool_call_id
-                        )
-                    ]
-                })
-
-        write_cmd = [
-            "docker", "exec",
-            container_id,
-            "bash", "-lc",
-            f"mkdir -p $(dirname {quoted_resolved}) && echo {quoted_content} > {quoted_resolved}"
-        ]
-
-        process = await asyncio.create_subprocess_exec(*write_cmd)
-        await process.wait()
-
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "write_file",
-            "content": f"Write success: {resolved_path}" if process.returncode == 0 else f"Failed to write file: {resolved_path}",
-            "chunk_position": "end",
-            "status": "success" if process.returncode == 0 else "fail",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage(
-                    f"Write file success: {resolved_path}",
-                    tool_call_id=tool_call_id
-                )
-            ]
-        })
-
-    except Exception as e:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "write_file",
-            "content": f"Error: {str(e)}",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
-
-        return Command(update={
-            "messages": [
-                ToolMessage(
-                    f"Error: {str(e)}",
-                    tool_call_id=tool_call_id
-                )
-            ]
-        })
     
 
 @tool
@@ -611,26 +374,47 @@ async def read_workspace_file(
         File content with line numbers.
         Content format: [line_count_prefix] line_content
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-    if start_line in ["None", "0", None, "", 0]: start_line = None
-    if end_line in ["None", "0", None, "", 0]: end_line = None
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "read_workspace_file",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "read_file",
             "content": file_path,
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
+
+    if start_line in ["None", "0", None, "", 0]: start_line = None
+    if end_line in ["None", "0", None, "", 0]: end_line = None
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
     sandbox_root = config.get("work_dir")
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -666,15 +450,19 @@ async def read_workspace_file(
             for i, line in zip(range(s, e+1), selected)
         )
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "read_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "read_file",
                 "content": f"Read lines {s}-{e}",
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -684,15 +472,19 @@ async def read_workspace_file(
 
     except Exception as e:
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "read_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "read_file",
                 "content": str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -720,24 +512,44 @@ async def write_workspace_file(
     Returns:
         Full file content with line numbers
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "write_workspace_file",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "create_file",
             "content": file_path,
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
     sandbox_root = config.get("work_dir")
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -770,15 +582,19 @@ async def write_workspace_file(
             for i, line in enumerate(content.splitlines(keepends=False), start=1)
         )
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "create_file",
                 "content": "File created",
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -788,15 +604,19 @@ async def write_workspace_file(
 
     except Exception as e:
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "create_file",
                 "content": str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -820,24 +640,44 @@ async def delete_workspace_file(
     Returns:
         Success or error message
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "delete_workspace_file",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "delete_file",
             "content": file_path,
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
     sandbox_root = config.get("work_dir")
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -871,15 +711,19 @@ async def delete_workspace_file(
             else:
                 raise Exception("Target path is neither file nor directory")
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "delete_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "delete_file",
                 "content": msg,
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -889,15 +733,19 @@ async def delete_workspace_file(
 
     except Exception as e:
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "delete_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "delete_file",
                 "content": str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -929,24 +777,44 @@ async def move_workspace_file(
     Returns:
         Success or error message
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "move_workspace_file",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "move_file",
             "content": f"{source_path} -> {target_path}",
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
     sandbox_root = config.get("work_dir")
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -990,15 +858,19 @@ async def move_workspace_file(
                 shutil.copy2(str(source_host_path), str(target_host_path))
                 msg = f"File copied to {target_path}"
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "move_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "move_file",
                 "content": msg,
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -1007,15 +879,19 @@ async def move_workspace_file(
         })
 
     except Exception as e:
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "move_workspace_file",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "move_file",
                 "content": str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -1042,26 +918,47 @@ async def list_workspace_files(
         A tree-formatted directory listing of files and folders.
         The result is limited to a maximum of 500 items and a depth of 6 levels.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-    if path == "None": path = None
-    if recursively_scan == "None": recursively_scan = None
-
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "list_workspace_files",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "list_files",
             "content": path or "/workspace",
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
+
+    if path == "None": path = None
+    if recursively_scan == "None": recursively_scan = None
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
     sandbox_root = config.get("work_dir")
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+        
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -1156,15 +1053,19 @@ async def list_workspace_files(
 
         result = "\n".join(lines) if lines else "(empty directory)"
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "list_workspace_files",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "list_files",
                 "content": f"{count} items",
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -1174,15 +1075,19 @@ async def list_workspace_files(
 
     except Exception as e:
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "list_workspace_files",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "list_files",
                 "content": str(e),
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [

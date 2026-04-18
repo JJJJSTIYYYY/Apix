@@ -5,7 +5,8 @@ from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from langgraph.config import get_stream_writer
+
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 
 
 @tool
@@ -46,27 +47,40 @@ async def run_workspace_command(
     - Avoid destructive commands unless explicitly required by the task.
     - Carefully check command syntax before execution.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "run_command",
-        "content": command,
-        "chunk_position": "start",
-        "status": "success",
-    }})
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "run_workspace_command",
+            "tool_call_id": tool_call_id,
+            "content": command,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     container_id = state.get("sandbox")
 
     if not container_id:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "run_command",
-            "content": "Error: Sandbox not configured.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_workspace_command",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Sandbox not configured.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(update={
             "messages": [
@@ -78,13 +92,19 @@ async def run_workspace_command(
         })
 
     if not command.strip():
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "run_command",
-            "content": "Error: command is empty.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_workspace_command",
+                "tool_call_id": tool_call_id,
+                "content": "Error: command is empty.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(update={
             "messages": [
@@ -117,13 +137,19 @@ async def run_workspace_command(
         if len(output) > MAX_OUTPUT:
             output = output[:MAX_OUTPUT//2] + "\n\n...[output truncated]...\n\n" + output[-MAX_OUTPUT//2:]
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "run_command",
-            "content": f"{len(output.strip())} characters output." if output.strip() else "Command executed successfully (no output).",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_workspace_command",
+                "tool_call_id": tool_call_id,
+                "content": f"{len(output.strip())} characters output." if output.strip() else "Command executed successfully (no output).",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
 
         return Command(update={
             "messages": [
@@ -138,13 +164,19 @@ async def run_workspace_command(
         process.kill()
         await process.wait()
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "run_command",
-            "content": "Error: Command execution timed out after 600 seconds.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_workspace_command",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Command execution timed out after 600 seconds.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(update={
             "messages": [
@@ -157,13 +189,19 @@ async def run_workspace_command(
 
     except Exception as e:
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "run_command",
-            "content": f"Error: {str(e)}",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "run_workspace_command",
+                "tool_call_id": tool_call_id,
+                "content": f"Error: {str(e)}",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(update={
             "messages": [

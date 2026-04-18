@@ -9,8 +9,8 @@ from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from langgraph.config import get_stream_writer
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent.global_config import FILE_SERVICE_URL
 
 
@@ -55,29 +55,42 @@ async def load_skill(
     Returns:
         str: The skill guide (SKILL.md content) if successful, or an error message if loading fails.
     """
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer = get_stream_writer()
-
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "load_skill",
-        "content": name,
-        "chunk_position": "start",
-        "status": "success",
-    }})
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "load_skill",
+            "tool_call_id": tool_call_id,
+            "content": name,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
     base_path = config.get("work_dir")
 
     if not container_id:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "load_skill",
-            "content": "Error: Sandbox not configured.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "load_skill",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Sandbox not configured.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(update={
             "messages": [
@@ -89,13 +102,19 @@ async def load_skill(
         })
 
     if not base_path:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "load_skill",
-            "content": "Error: Sandbox not configured.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "load_skill",
+                "tool_call_id": tool_call_id,
+                "content": "Error: Sandbox not configured.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         return Command(update={
             "messages": [
@@ -113,13 +132,19 @@ async def load_skill(
             skill_id = skill['skill_id']
 
     if not skill_id:
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "load_skill",
-            "content": f"Error: Skill: {name} is not available.",
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "load_skill",
+                "tool_call_id": tool_call_id,
+                "content": f"Error: Skill: {name} is not available.",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
         
         skill_names = [item['skill_name'] for item in skills]
         return Command(update={
@@ -170,13 +195,19 @@ async def load_skill(
 
         guide = skill_md_path.read_text(encoding="utf-8")
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "load_skill",
-            "content": f"Skill '{name}' loaded.",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "load_skill",
+                "tool_call_id": tool_call_id,
+                "content": f"Skill '{name}' loaded.",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
         content = f"""{guide}
 
 ---
@@ -197,13 +228,19 @@ async def load_skill(
 
         err = f"Error loading skill '{name}': {type(e)}: {str(e)}"
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "load_skill",
-            "content": err,
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "load_skill",
+                "tool_call_id": tool_call_id,
+                "content": err,
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(update={
             "messages": [

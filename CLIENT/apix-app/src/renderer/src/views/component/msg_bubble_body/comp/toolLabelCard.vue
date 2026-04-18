@@ -28,7 +28,7 @@
     </div>
 
     <!-- 内容区 -->
-    <span class="content">{{ content }}</span>
+    <span class="content">{{ tool_name }}</span>
     
     <!-- 可选：工具类型标签 -->
     <span v-if="toolType" class="badge">{{ toolType }}</span>
@@ -37,6 +37,7 @@
 
 <script setup lang="ts">
 defineProps<{
+  tool_name: string
   tool_call_id: string
   content: string
   status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
@@ -63,7 +64,7 @@ defineProps<{
   
   transition: all 0.2s ease;
   cursor: default;
-  max-width: 200px;
+  max-width: 160px;
 }
 
 .tool-chip:hover {

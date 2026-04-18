@@ -149,7 +149,7 @@
   "data": {
     "client_id": "client_id",
     "history_id": "history_id",
-    "reason": "user_interrupt | error_occured",
+    "reason": "user_interrupt | error_occurred",
     "content": "Error detail"
   }
 }

@@ -2,9 +2,12 @@ import time
 from typing import Annotated
 
 import httpx
-from langchain.tools import tool
+from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
+from langgraph.types import Command
+from langchain_core.messages import ToolMessage
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 
@@ -13,6 +16,7 @@ from apix_agent.commons.logger import logger
 async def check_server(
     describe: str,
     state: Annotated[dict, InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> str:
     """
     Check the system health.
@@ -35,9 +39,25 @@ async def check_server(
     Do NOT use this tool when the user does not explicitly ask to check the system health, even if you suspect there might be some issues with the system.
     """
     logger.trace('[server_check.py] [tool] [check_server] Enter')
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "check_server",
+            "tool_call_id": tool_call_id,
+            "content": "Check tools server",
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
+    
     try:
-        client_id = state["client_id"]
-        session_id = state.get("session_id")
         history_id = state["history_id"]
         config = state["config"]
 
@@ -62,8 +82,46 @@ async def check_server(
             )
 
         resp_data = resp.json()
-        return f"Healthy check task has been submitted: {resp_data}"
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "check_server",
+                "tool_call_id": tool_call_id,
+                "content": "Check tools server task submitted",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
+
+        return Command(update={
+            "messages": [
+                ToolMessage(f"Healthy check task has been submitted: {resp_data}", tool_call_id=tool_call_id)
+            ]
+        })
 
     except Exception as e:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "check_server",
+                "tool_call_id": tool_call_id,
+                "content": str(e),
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         logger.exception("[check_server] submit failed")
-        return f"[Error] Failed to submit health check task: {str(e)}"
+        return Command(update={
+            "messages": [
+                ToolMessage(f"[Error] Failed to submit health check task: {str(e)}", tool_call_id=tool_call_id)
+            ]
+        })

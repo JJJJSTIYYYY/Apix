@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from typing import Dict, List, Optional
 
+from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.apix_agent_core.tools.web_search.models import ImageResultItem, UrlResultItem, ContentResultItem
 from apix_agent.apix_agent_core.tools.web_search.providers.base import BaseSearchProvider
 from apix_agent.apix_agent_core.tools.web_search.providers import PROVIDER_REGISTRY
@@ -36,7 +37,7 @@ class WebSearchManager:
     async def submit_link_search(
         self,
         keyword: str | List[str],
-        config: Optional[Dict] = None,
+        config: Optional[AgentConfigSchema] = None,
     ) -> tuple[str, str]:
         """
         Submit keyword-based link search.
@@ -75,7 +76,7 @@ class WebSearchManager:
         self,
         provider: BaseSearchProvider,
         keyword: str,
-        config: Dict,
+        config: AgentConfigSchema,
     ) -> tuple[List[UrlResultItem], List[ImageResultItem]]:
 
         raw_results = await provider.search_links(keyword)
@@ -94,7 +95,7 @@ class WebSearchManager:
     async def submit_content_fetch(
         self,
         urls: str | List[str],
-        config: Optional[Dict] = None,
+        config: Optional[AgentConfigSchema] = None,
     ) -> tuple[str, str]:
         """
         Submit content fetching task.
@@ -131,7 +132,7 @@ class WebSearchManager:
         self,
         provider: BaseSearchProvider,
         urls: List[str],
-        config: Dict,
+        config: AgentConfigSchema,
     ) -> List[ContentResultItem]:
 
         results: List[ContentResultItem] = []

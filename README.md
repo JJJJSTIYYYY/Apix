@@ -1,8 +1,10 @@
+<img src="./README/source/APIX-bar.jpeg" alt="描述" width="300" height="200" style="border-radius: 12px; display: block; margin: 0 auto;">
+
 # 🚀 APIX - A full-stack AI agent platform
 
 > A modern, modular AI agent system with extensible architecture and full-stack integration.
 
-*Version 1.1*
+*Version 2.0.0*
 
 ---
 
@@ -22,14 +24,7 @@ It integrates:
 
 The project is built with a modular architecture, making it easy to customize, extend, and deploy in different scenarios.
 
----
-
-## 🧩 Architecture Highlights
-
-* **Backend**: Python-based micro-modules (Agent, Memory, Tools, Task Flow, etc.)
-* **Frontend**: Electron + Vue + Vite
-* **Storage**: MySQL + Redis
-* **Optional**: Milvus (vector database) + Ollama (local LLM / embedding)
+<img src="./README/source/main-page.png" alt="描述" width="600" height="auto" style="border-radius: 12px; display: block; margin: 0 auto;">
 
 ---
 
@@ -49,12 +44,47 @@ APIX/
 
 ---
 
-## 🚀 Getting Started
+## 🚀 One-click Setup
+
+For windows:
+
+```bash
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\setup.ps1
+```
+
+For macos or linux:
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+## 😎 Manual setup
 
 Please refer to the detailed setup guides:
 
-* 🇨🇳 [中文文档](./README/README_zh.md): `./README/README_zh.md`
-* 🇺🇸 [English Docs](./README/README_en.md): `./README/README_en.md`
+* [中文文档](./README/README_zh.md): `./README/README_zh.md`
+* [English Docs](./README/README_en.md): `./README/README_en.md`
+
+## 🥳 Start
+
+> Use python3 if you are macos or linux
+
+```bash
+# Start backend server 
+python apix.py up
+
+# Stop backend server
+python apix.py down
+
+# View logs
+python apix.py logs
+
+# Start front
+cd ./CLIENT/apix-app
+npm run dev
+```
 
 ---
 

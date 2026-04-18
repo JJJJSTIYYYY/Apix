@@ -36,7 +36,7 @@ async def get_models_list(request_data: Request):
         config = body.get("config")
     except Exception as e:
         logger.error(f"[get_models_list]: Invalid request body: {e}")
-        return JSONResponse(content={"messages": ['Error occured']}, status_code=400)
+        return JSONResponse(content={"messages": ['Error occurred']}, status_code=400)
 
     # --------------------
     # Ollama (local and cloud)
@@ -52,7 +52,7 @@ async def get_models_list(request_data: Request):
                 raw_models_name_list.append(model.get("name"))
 
         except Exception as e:
-            raw_models_name_list.append(f'Error occured: {e}')
+            raw_models_name_list.append(f'Error occurred: {e}')
             logger.error(f"[get_models_list][ollama]: {e}")
 
     # --------------------
@@ -71,7 +71,7 @@ async def get_models_list(request_data: Request):
                 raw_models_name_list.append(model.get("id"))
 
         except Exception as e:
-            raw_models_name_list.append(f'Error occured: {e}')
+            raw_models_name_list.append(f'Error occurred: {e}')
             logger.error(f"[get_models_list][openai]: {e}")
 
     # --------------------
@@ -103,7 +103,7 @@ async def get_models_list(request_data: Request):
                 raw_models_name_list.append(model.get("id"))
 
         except Exception as e:
-            raw_models_name_list.append(f'Error occured: {e}')
+            raw_models_name_list.append(f'Error occurred: {e}')
             logger.error(f"[get_models_list] [{model_provider}]: {e}")
 
     else:

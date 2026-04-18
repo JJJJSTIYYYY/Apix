@@ -224,6 +224,7 @@ async def update_memories(req: Request):
 async def get_shortterm(req: Request):
     """
     Fetch shortterm memories.
+    Limit 1.
 
     Request Body (JSON):
         {

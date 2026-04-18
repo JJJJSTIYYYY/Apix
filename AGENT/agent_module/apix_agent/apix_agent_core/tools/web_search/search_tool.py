@@ -1,19 +1,18 @@
-from typing import Annotated, Any, AsyncIterator, List
+from typing import Annotated, List
 
 from langchain.messages import ToolMessage
 from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
-from langchain_core.messages import AIMessage
-from langgraph.config import get_stream_writer
 from langgraph.types import Command
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.tools.web_search.manager import manager
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 
 
 @tool
-async def search_links_by_keywords(
+async def search_web_by_keywords(
     key_word: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId]
@@ -49,24 +48,32 @@ async def search_links_by_keywords(
     - The results returned by this tool are only summaries.
     - The images returned by this tool include metadata such as image URLs.
     - Do NOT assume the full content of a webpage based on the title or description.
-    - If detailed information is required, call `fetch_content_by_urls` with the returned URLs.
+    - If detailed information is required, call `search_web_by_urls` with the returned URLs.
     - Never fabricate search results or URLs.
     """
 
-    logger.trace('[search_tool.py] [tool] [search_links_by_keywords] Enter')
+    logger.trace('[search_tool.py] [tool] [search_web_by_keywords] Enter')
 
-    writer = get_stream_writer()
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "search_web_by_keywords",
+            "tool_call_id": tool_call_id,
+            "content": key_word,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     if isinstance(key_word, list):
         key_word = " ".join(key_word)
-
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "search_keywords",
-        "content": key_word,
-        "chunk_position": "start",
-        "status": "success",
-    }})
 
     try:
         config = state.get("config", {})
@@ -91,13 +98,19 @@ async def search_links_by_keywords(
         if not results and not images:
             msg = "No urls and images found, please try other keywords."
 
-            writer({"tool_chunk_rtn": {
-                "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "search_keywords",
-                "content": "Read 0 results.",
-                "chunk_position": "end",
-                "status": "success",
-            }})
+            event_writer.send_event(
+                event=StreamEvent.TOOL_EXEC_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "tool_exec_chunk_rtn",
+                    "tool_name": "search_web_by_keywords",
+                    "tool_call_id": tool_call_id,
+                    "content": "Read 0 results.",
+                    "chunk_position": "end",
+                    "status": "success",
+                }
+            )
 
             return Command(update={
                 "messages": [
@@ -126,13 +139,19 @@ async def search_links_by_keywords(
 
         result_text = "\n\n".join(text_lines) + "\n---\n" + "\n\n".join(image_lines)
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "search_keywords",
-            "content": f"Read {len(results)} results.",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_web_by_keywords",
+                "tool_call_id": tool_call_id,
+                "content": f"Read {len(results)} results.",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
 
         return Command(update={
             "messages": [
@@ -141,17 +160,23 @@ async def search_links_by_keywords(
         })
 
     except Exception as e:
-        logger.exception(f"[search_links_by_keywords] failed: {str(e)}")
+        logger.exception(f"[search_web_by_keywords] failed: {str(e)}")
 
         error_msg = f"Failed to search web by keyword(s) with error(s): {str(e)}"
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "search_keywords",
-            "content": "Error: " + str(e),
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_web_by_keywords",
+                "tool_call_id": tool_call_id,
+                "content": "Error: " + str(e),
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(update={
             "messages": [
@@ -161,7 +186,7 @@ async def search_links_by_keywords(
     
 
 @tool
-async def fetch_content_by_urls(
+async def search_web_by_urls(
     urls: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId]
@@ -182,7 +207,7 @@ async def fetch_content_by_urls(
     ## When to Use This Tool
     Use this tool in these scenarios:
     1. When the user asks to analyze or summarize specific webpages.
-    2. When `search_links_by_keywords` returned relevant URLs and you need their full content.
+    2. When `search_web_by_keywords` returned relevant URLs and you need their full content.
     3. When detailed webpage information is required beyond titles and descriptions.
 
     ## When NOT to Use This Tool
@@ -192,14 +217,30 @@ async def fetch_content_by_urls(
     3. The task does not require reading webpage content.
 
     ## Important Guidelines
-    - Only fetch URLs provided by the user or returned from `search_links_by_keywords`.
+    - Only fetch URLs provided by the user or returned from `search_web_by_keywords`.
     - Never fabricate or guess webpage content.
     - Avoid fetching unnecessary webpages.
     """
 
-    logger.trace('[search_tool.py] [tool] [fetch_content_by_urls] Enter')
+    logger.trace('[search_tool.py] [tool] [search_web_by_urls] Enter')
 
-    writer = get_stream_writer()
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
+
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "search_web_by_urls",
+            "tool_call_id": tool_call_id,
+            "content": urls,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     if isinstance(urls, str):
         urls = [urls]
@@ -207,27 +248,25 @@ async def fetch_content_by_urls(
     if not urls:
         msg = "Empty url is not accepted."
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "search_urls",
-            "content": urls,
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_web_by_urls",
+                "tool_call_id": tool_call_id,
+                "content": "No url provided",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(update={
             "messages": [
                 ToolMessage(msg, tool_call_id=tool_call_id)
             ]
         })
-
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "search_urls",
-        "content": urls,
-        "chunk_position": "start",
-        "status": "success",
-    }})
 
     try:
         config = state.get("config", {})
@@ -242,13 +281,19 @@ async def fetch_content_by_urls(
         if not results:
             msg = "No content fetched from the provided URL(s)."
 
-            writer({"tool_chunk_rtn": {
-                "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "search_urls",
-                "content": "Read 0 results.",
-                "chunk_position": "end",
-                "status": "success",
-            }})
+            event_writer.send_event(
+                event=StreamEvent.TOOL_EXEC_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "tool_exec_chunk_rtn",
+                    "tool_name": "search_web_by_urls",
+                    "tool_call_id": tool_call_id,
+                    "content": "Read 0 results.",
+                    "chunk_position": "end",
+                    "status": "success",
+                }
+            )
 
             return Command(update={
                 "messages": [
@@ -266,13 +311,19 @@ async def fetch_content_by_urls(
 
         result_text = ("\n---\n\n").join(blocks)
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "search_urls",
-            "content": f"Read {len(results)} results.",
-            "chunk_position": "end",
-            "status": "success",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_web_by_urls",
+                "tool_call_id": tool_call_id,
+                "content": f"Read {len(results)} results.",
+                "chunk_position": "end",
+                "status": "success",
+            }
+        )
 
         await ai_context_manager.append_info_message(
             state.get("generation_id"),
@@ -292,17 +343,23 @@ async def fetch_content_by_urls(
         })
 
     except Exception as e:
-        logger.exception(f"[fetch_content_by_urls] failed: {str(e)}")
+        logger.exception(f"[search_web_by_urls] failed: {str(e)}")
 
         error_msg = f"Failed to search web by url(s) with error(s): {str(e)}"
 
-        writer({"tool_chunk_rtn": {
-            "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "search_urls",
-            "content": "Error: " + str(e),
-            "chunk_position": "end",
-            "status": "fail",
-        }})
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "search_web_by_urls",
+                "tool_call_id": tool_call_id,
+                "content": "Error: " + str(e),
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
 
         return Command(update={
             "messages": [

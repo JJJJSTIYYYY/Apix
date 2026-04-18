@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+import time
 from typing import Any, Dict, List, Tuple
 import json
 import os
@@ -11,13 +12,11 @@ from fastapi import HTTPException
 import httpx
 
 from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage, ToolMessage, AIMessage, AnyMessage
-from langchain.agents.middleware.todo import Todo
 
-from apix_agent.commons.type_def import MessagesState
+from apix_agent.commons.type_def import MainAgentState
 from apix_agent.global_config import BASE_DIR, FILE_SERVICE_URL, MEMORY_SERVICE_BASE_URL
 from apix_agent.commons.logger import logger
-from apix_agent.commons.file_content_reader import image_to_base64, audio_to_base64, load_from_yaml, video_to_base64, load_text
-from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
+from apix_agent.commons.file_content_reader import load_from_yaml
 
 
 class AIContextManager:
@@ -584,7 +583,7 @@ class AIContextManager:
         *,
         fallback_model_provider: str = 'Custom Provider',
         fallback_model_name: str = 'Custom Model',
-        fallback_total_duration: int = 0,
+        fallback_timestamp: int = 0,
         filter: bool = False,
     ) -> dict:
         """
@@ -595,6 +594,7 @@ class AIContextManager:
 
         Args: 
             filter[bool]: Provide simpler dict message.
+            fallback_timestamp[int]: Generation timestamp in second.
 
         Returns:
             list[dict]: Memory message dicts list (len 1)
@@ -608,7 +608,7 @@ class AIContextManager:
             think_content = (message.additional_kwargs or {}).get("reasoning_content", "")
             tool_calls = (message.tool_calls or [])
             extra = {'tool_calls': tool_calls} if tool_calls else {}
-            message_info = self._extract_mes_info(message, fallback_model_name=fallback_model_name, fallback_model_provider=fallback_model_provider, fallback_total_duration=fallback_total_duration)
+            message_info = self._extract_mes_info(message, fallback_model_name=fallback_model_name, fallback_model_provider=fallback_model_provider, fallback_timestamp=fallback_timestamp)
 
             if filter:
                 messages = {
@@ -852,14 +852,15 @@ class AIContextManager:
         *,
         fallback_model_provider: str = 'Custom Provider',
         fallback_model_name: str = 'Custom Model',
-        fallback_total_duration: int = 0,
+        fallback_timestamp: int = 0,
     ) -> dict:
+        current_timestamp = int(time.time() * 1000)
         if not message.response_metadata:
             message.response_metadata = {}
         message_info = {
-            "model": message.response_metadata.get("model", "Unknow model"),
-            "total_duration": round((message.response_metadata.get('total_duration', 0) / 1_000_000_000), 3),  # ns to s
-            "model_provider": message.response_metadata.get("model_provider", "Unknow Provider"),
+            "model_provider": fallback_model_provider or message.response_metadata.get("model_provider", 'Custom Provider'),
+            "model": fallback_model_name or message.response_metadata.get("model", 'Custom Model'),
+            "total_duration":  current_timestamp - (fallback_timestamp or current_timestamp),
             "total_tokens": (message.usage_metadata or {}).get("total_tokens", 0),
             "id": message.id,
         }
@@ -1079,7 +1080,7 @@ class AIContextManager:
 
         return visible_skills
     
-    def init_memorandum_list(self, state: MessagesState):
+    def init_memorandum_list(self, state: MainAgentState):
         client_id = state.get("client_id", "")
         history_id = state.get("history_id", "")
 
@@ -1106,7 +1107,7 @@ class AIContextManager:
         state["memorandum"].extend(memorandum_list)
         
     # Runtime prompt
-    def create_skills_prompt(self, state: MessagesState, agent_role: str = None) -> str:
+    def create_skills_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
         """
         Build the skills index prompt for the agent.
 
@@ -1160,7 +1161,7 @@ class AIContextManager:
         return "\n".join(lines) + "\n\n"
         
     # Runtime prompt
-    def create_documents_prompt(self, state: MessagesState, agent_role: str = None) -> str:
+    def create_documents_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
         """
         Build the documents index prompt for the agent.
 
@@ -1219,7 +1220,7 @@ class AIContextManager:
         return "\n".join(lines) + "\n\n"
     
     # Before graph rule prompt
-    def create_workflow_prompt(self, state: MessagesState, agent_role: str = None) -> str:
+    def create_workflow_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
         config = state.get("config", {})
         enable_think = bool(config.get("enable_think", False))
 
@@ -1452,7 +1453,7 @@ class AIContextManager:
     # Runtime prompt
     def create_workspace_prompt(
         self,
-        state: MessagesState,
+        state: MainAgentState,
         agent_role: str = None
     ) -> str:
         work_dir = state.get("work_dir", "")
@@ -1479,7 +1480,7 @@ class AIContextManager:
         return f"{prompt}\n\n"
 
     # Runtime prompt
-    def create_todo_prompt(self, state: MessagesState, agent_role: str = None) -> str:
+    def create_todo_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
         todo_list = state.get("todos", [])
         if not todo_list:
             # return "## Todo list is empty or outdate.\n\n"
@@ -1497,7 +1498,7 @@ class AIContextManager:
         return formatted + "\n\n"
 
     # Runtime prompt
-    def create_memorandum_prompt(self, state: MessagesState, agent_role: str = None) -> str:
+    def create_memorandum_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
         memorandum_title_list: List[str] = state.get("memorandum", [])
 
         if not memorandum_title_list:
@@ -1513,7 +1514,7 @@ class AIContextManager:
         return formatted + "\n\n"
 
     
-    def create_system_prompt_list(self, state: MessagesState, agent_role: str = None):
+    def create_system_prompt_list(self, state: MainAgentState, agent_role: str = None):
         blocks = []
 
         # 1. Rules
@@ -1537,7 +1538,7 @@ class AIContextManager:
         return blocks
 
     
-    def create_role_prompt_list(self, state: MessagesState, agent_role: str = None):
+    def create_role_prompt_list(self, state: MainAgentState, agent_role: str = None):
         prompt = state["config"].get("role_prompt", {})
         higher_role_prompt_permission = state["config"].get("higher_role_prompt_permission", False)
         name = prompt.get("name", "") or state.get("agent_name")

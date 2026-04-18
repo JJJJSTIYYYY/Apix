@@ -3,8 +3,9 @@ from pathlib import Path
 from typing import Any
 
 from langchain.chat_models import BaseChatModel
-from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage, ToolMessage, AIMessage, AnyMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
+from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.commons.logger import logger
 
 from .llm_factory import get_llm_node
@@ -15,6 +16,14 @@ test_img_base64 = """iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAIAAACzY5qXAAAAAXNSR0IArs4
 
 
 class LlmNodeAdapter:
+    """
+    Adapter for:
+    - OpenAI
+    - DeepSeek
+    - MoonShot
+    - Ollama
+    """
+
     # cache: {(provider, model): bool}
     _vision_cache: dict[tuple[str, str], bool] = {}
 
@@ -63,7 +72,7 @@ class LlmNodeAdapter:
         provider: str, 
         model: str, 
         api_key: str, 
-        config: dict | None = None
+        config: AgentConfigSchema | None = None
     ) -> BaseChatModel | Any:
         """
         To adapt different model provider.
@@ -95,6 +104,9 @@ class LlmNodeAdapter:
             - We select model by reasoning flag:
                 reasoning=True  -> deepseek-reasoner
                 reasoning=False -> deepseek-chat
+
+        MoonShot:
+            - MoonShot's model can not turn think-mode on or off by reasoning parameter
 
         Other providers:
             - Pass reasoning if supported
@@ -161,6 +173,9 @@ class LlmNodeAdapter:
                 reasoning=True  -> deepseek-reasoner
                 reasoning=False -> deepseek-chat
 
+        MoonShot:
+            - MoonShot's model can not turn think-mode on or off by reasoning parameter
+
         Other providers:
             - Keep official LangChain behavior
         """
@@ -211,7 +226,7 @@ class LlmNodeAdapter:
         provider: str, 
         model_name: str, 
         api_key: str, 
-        config: dict | None = None
+        config: AgentConfigSchema | None = None
     ) -> bool:
         """
         Detect whether the model has vision capability using probe strategy.
@@ -300,3 +315,7 @@ class LlmNodeAdapter:
         cls._save_cache_to_file()
 
         return result_flag
+    
+    @classmethod
+    def is_token_exceed(err: Exception, provider: str, model: str) -> bool:
+        pass

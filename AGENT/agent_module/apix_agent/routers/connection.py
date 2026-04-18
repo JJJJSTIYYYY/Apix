@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.apix_agent_core.websocket.websocket_manager import websocket_list, ws_msg_handler
+from apix_agent.apix_event_pipe.websocket_manager import websocket_list, ws_msg_handler
 from apix_agent.global_config import AGENT_SERVICE_ID
 from apix_agent.commons.logger import logger
 
@@ -29,7 +29,7 @@ async def _task_info_rtn_no_invoke_background(
     except Exception as e:
         error_msg = {
             "role": "system",
-            "content": f"Error occured: {e}",
+            "content": f"Error occurred: {e}",
         }
         await websocket_list.send_tool_event(tool_task_id, client_id, history_id, error_msg)
         logger.info(f"[task_finish background error] {e}")
@@ -96,7 +96,7 @@ async def _task_info_rtn_with_invoke_background(
         logger.info(f"\n\033[93m[task_info_rtn_with_invoke]\033[0m Tool memory received: {tool_messages}")
         await websocket_list.send_tool_event(tool_task_id, client_id, history_id, tool_messages)
 
-        if not config.get('max_chunk_per_invoking', True): 
+        if not config.get('llm_calls_warning_threshold', True): 
             return
             # timestamp = time.time() * 1_000_000
             # tool_messages.update({

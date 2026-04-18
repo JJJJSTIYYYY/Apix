@@ -1,25 +1,20 @@
 import asyncio
 import base64
-import hashlib
 from pathlib import Path
 from typing import Annotated
 
-import requests
 from langchain.messages import HumanMessage
 from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from langchain_core.messages import SystemMessage, ToolMessage
-from langgraph.config import get_stream_writer
 
 import easyocr
-import cv2
-import numpy as np
 
+from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.global_config import BASE_DIR
 
 
 DEFAULT_OCR_PROMPT = """
@@ -124,7 +119,7 @@ def get_reader():
 
 
 @tool
-async def agent_ocr_analysis(
+async def ocr_analysis(
     prompt: str,
     file_path: str | list[str] = None,
     state: Annotated[dict, InjectedState] = None,
@@ -166,15 +161,23 @@ async def agent_ocr_analysis(
     - If structured output is required, explicitly specify the expected format.
     - Do not assume the content of an image without analysis.
     """
-    writer = get_stream_writer()
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer({"tool_chunk_rtn": {
-        "tool_call_id": tool_call_id,
-        "tool_chunk_rtn": "ocr_analysis",
-        "content": file_path,
-        "chunk_position": "start",
-        "status": "success",
-    }})
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "ocr_analysis",
+            "tool_call_id": tool_call_id,
+            "content": file_path,
+            "chunk_position": "start",
+            "status": "success",
+        }
+    )
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
@@ -186,6 +189,21 @@ async def agent_ocr_analysis(
     model_name = config.get("model_name")
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -196,6 +214,21 @@ async def agent_ocr_analysis(
         })
 
     if not file_path:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "No file_path provided",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -278,16 +311,19 @@ async def agent_ocr_analysis(
                     f"Path: {item['input_path']}\n"
                     f"Extracted text: {text}"
                 )
-
-                writer({
-                    "tool_chunk_rtn": {
+                event_writer.send_event(
+                    event=StreamEvent.TOOL_EXEC_MIDDLE if idx < total else StreamEvent.TOOL_EXEC_END, 
+                    target_id=client_id, 
+                    target_platform=target_platform,
+                    data={
+                        "event_name": "tool_exec_chunk_rtn",
+                        "tool_name": "ocr_analysis",
                         "tool_call_id": tool_call_id,
-                        "tool_chunk_rtn": "ocr_analysis",
                         "content": f"Analyzed {idx}/{total} files successfully.",
                         "chunk_position": "middle" if idx < total else "end",
                         "status": "success",
                     }
-                })
+                )
 
             content = "Vision sub-model is not available, detect to EasyOCR.\n\n"+"\n\n".join(results)
 
@@ -297,15 +333,19 @@ async def agent_ocr_analysis(
                 ]
             })
 
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "ocr_analysis",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "ocr_analysis",
                 "content": f"Analyzed {len(images)}/{len(images)} files successfully.",
                 "chunk_position": "end",
                 "status": "success",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -314,15 +354,19 @@ async def agent_ocr_analysis(
         })
 
     except Exception as e:
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "ocr_analysis",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "ocr_analysis",
                 "content": f"Error: {e}",
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [
@@ -332,7 +376,7 @@ async def agent_ocr_analysis(
     
 
 @tool
-async def send_images_to_user(
+async def send_images(
     file_path: str | list[str] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
@@ -348,17 +392,23 @@ async def send_images_to_user(
     Returns:
         str: The OCR result produced by EasyOCR or the image analysis result produced by a vision sub-model.
     """
-    writer = get_stream_writer()
+    client_id = state.get("client_id")
+    target_platform = state.get("platform")
 
-    writer({
-        "tool_chunk_rtn": {
+    event_writer = ApixStreamWriter()
+    event_writer.send_event(
+        event=StreamEvent.TOOL_EXEC_START, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "send_images",
             "tool_call_id": tool_call_id,
-            "tool_chunk_rtn": "send_images",
             "content": file_path,
             "chunk_position": "start",
             "status": "success",
         }
-    })
+    )
 
     config = state.get("config", {})
     container_id = state.get("sandbox")
@@ -366,6 +416,21 @@ async def send_images_to_user(
     container_workdir = "/workspace"
 
     if not container_id:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "Sandbox not configutrd",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -376,6 +441,21 @@ async def send_images_to_user(
         })
 
     if not file_path:
+
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
+                "tool_call_id": tool_call_id,
+                "content": "No file_path provided",
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
         return Command(update={
             "messages": [
                 ToolMessage(
@@ -425,16 +505,20 @@ async def send_images_to_user(
                     state.get("timestamp"),
                     addtional_info,
                 )
-                    
-                writer({
-                    "tool_chunk_rtn": {
+
+                event_writer.send_event(
+                    event=StreamEvent.TOOL_EXEC_END, 
+                    target_id=client_id, 
+                    target_platform=target_platform,
+                    data={
+                        "event_name": "tool_exec_chunk_rtn",
+                        "tool_name": "send_images",
                         "tool_call_id": tool_call_id,
-                        "tool_chunk_rtn": "send_images",
                         "content": image_ids,
                         "chunk_position": "end",
                         "status": "success",
                     }
-                })
+                )
 
         return Command(update={
             "messages": [
@@ -446,15 +530,19 @@ async def send_images_to_user(
         })
 
     except Exception as e:
-        writer({
-            "tool_chunk_rtn": {
+        event_writer.send_event(
+            event=StreamEvent.TOOL_EXEC_END, 
+            target_id=client_id, 
+            target_platform=target_platform,
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "send_images",
                 "tool_call_id": tool_call_id,
-                "tool_chunk_rtn": "send_images",
                 "content": f"Error: {e}",
                 "chunk_position": "end",
                 "status": "fail",
             }
-        })
+        )
 
         return Command(update={
             "messages": [

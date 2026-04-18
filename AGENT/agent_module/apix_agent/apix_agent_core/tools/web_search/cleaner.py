@@ -6,6 +6,7 @@ from readability import Document
 import re
 from langchain_core.messages import SystemMessage, HumanMessage
 
+from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.apix_agent_core.tools.web_search.models import UrlResultItem, ContentResultItem
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.commons.logger import logger
@@ -73,7 +74,7 @@ class SearchResultCleaner:
     async def clean_content(
         self,
         item: ContentResultItem,
-        config: dict,
+        config: AgentConfigSchema,
     ) -> ContentResultItem:
 
         mode = config.get("web_cleaner_mode", "rules") or "rules"

@@ -1,6 +1,6 @@
 <template>
   <el-container>
-    <el-aside style="width: auto;">
+    <el-aside style="width: var(--apix-left-side-bar-width); transition: width 0.28s cubic-bezier(0.23, 1, 0.32, 1);">
       <HomePage />
     </el-aside>
 
@@ -15,10 +15,45 @@
           }"
         >
           <div class="title-tag-wrapper">
-            <div
-              class="title-tag"
-              v-html="titleDocs"
-            ></div>
+            <div style="width: 100%; max-width: 1000px; margin-bottom: 40px;">
+              <div class="apix-banner">
+                <div class="corner-accent"></div>
+                
+                <div class="banner-content">
+                  <div class="banner-logo">
+                    <svg class="icon" viewBox="0 0 1024 1024">
+                      <path d="M717.12 274H762c82.842 0 150 67.158 150 150v200c0 82.842-67.158 150-150 150H262c-82.842 0-150-67.158-150-150V424c0-82.842 67.158-150 150-150h44.88l-18.268-109.602c-4.086-24.514 12.476-47.7 36.99-51.786 24.514-4.086 47.7 12.476 51.786 36.99l20 120c0.246 1.472 0.416 2.94 0.516 4.398h228.192c0.1-1.46 0.27-2.926 0.516-4.398l20-120c4.086-24.514 27.272-41.076 51.786-36.99 24.514 4.086 41.076 27.272 36.99 51.786L717.12 274z"/>
+                    </svg>
+                  </div>
+                  
+                  <div class="banner-text">
+                    <div class="banner-title-wrapper">
+                      <h1 class="banner-title">APIX</h1>
+                      <span class="version-tag">{{ apix_client_version }}</span>
+                    </div>
+                    
+                    <div class="divider"></div>
+                    
+                    <p class="banner-subtitle">
+                      一款<strong>兼容多引擎</strong>的 Agent 平台，支持处理 
+                      <strong>网页制作</strong>、<strong>代码编写</strong>、<strong>文档处理</strong>、<strong>海报设计</strong> 等复杂任务
+                    </p>
+                    
+                    <div class="banner-meta">
+                      <a class="dev-badge" href="https://github.com/JJJJSTIYYYY/Apix">Github</a>
+                      
+                      <div class="engine-tags">
+                        <span class="engine-tag">Ollama</span>
+                        <span class="engine-tag">OpenAI</span>
+                        <span class="engine-tag">DeepSeek</span>
+                        <span class="engine-tag">MoonShot</span>
+                        <span class="engine-tag">更多引擎等待兼容...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <div
             class="app-layout"
@@ -182,6 +217,7 @@
             <div class="setting-group">
               <div class="group-divider">
                 <span class="group-label">能力设置</span>
+                <button class="group-setting">按工具名放行</button>
               </div>
               <div class="setting-card">
                 <div class="setting-title">允许 Agent 操作文件</div>
@@ -651,9 +687,9 @@
                 <span class="group-label">其他设置</span>
               </div>
               <div class="setting-card">
-                <div class="setting-title">限制LLM单节点最大输出Chunk数</div>
+                <div class="setting-title">单轮生成中LLM调用轮次预警值</div>
                 <div class="setting-control">
-                  <div class="setting-info">超出限制时将<strong>强制停止</strong>模型输出，能一定程度上制止重复诅咒</div>
+                  <div class="setting-info">超出阈值时将提醒Agent加快处理进度</div>
                   <el-input-number 
                     v-model="tokenLimit"
                     controls-position="right" 
@@ -793,16 +829,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 
 import HomePage from './homePage.vue'
 import { useAppCacheData } from '../store/app'
 import { useAuthStore } from "../store/auth"
-import { defaultCards } from '../store/globalData.js'
+import { apix_client_version, defaultCards } from '../store/globalData.js'
 import { ConfirmDialog } from './component/comp/confirmDialog.js'
-import titleDocs from '../assets/background/title.html?raw'
 
 const router = useRouter()
 const store = useAppCacheData()
@@ -1124,6 +1159,7 @@ span.el-popper__arrow {
 .title-tag-wrapper {
   position: relative;
   width: 100%;
+  transition: all 0.25s ease;
   height: fit-content;
   justify-content: center;
   display: flex;
@@ -1131,10 +1167,6 @@ span.el-popper__arrow {
   opacity: 0.95;
 }
 
-.title-tag {
-  width: 1000px;
-  transition: all 0.25s ease;
-}
 
 .title-tag:hover {
   transform: scale(1.01);
@@ -1167,11 +1199,13 @@ span.el-popper__arrow {
   display: flex;
   align-items: center;
   margin-bottom: 4px;
+  gap: 6px
 }
 
 .group-label {
   position: relative;
   width: 100%;
+  height: 30px;
   font-size: 18px;
   font-weight: 600;
   color: rgb(136, 202, 197);
@@ -1181,6 +1215,26 @@ span.el-popper__arrow {
   background: rgba(136, 202, 197, 0.1);
   border-radius: 6px;
   border: 1px solid rgba(136, 202, 197, 0.2);
+}
+
+.group-setting {
+  position: relative;
+  width: 120px;
+  height: 40px;
+  font-size: 12px;
+  font-weight: 300;
+  color: rgb(91, 134, 131);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 4px 12px;
+  background: rgba(136, 202, 197, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(136, 202, 197, 0.2);
+}
+
+.group-setting:hover {
+  color: rgb(42, 58, 56);
+  background: rgba(136, 202, 197, 0.03);
 }
 
 .setting-card {
@@ -1587,4 +1641,209 @@ span.el-popper__arrow {
 .fade-leave-active {
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
+</style>
+
+
+<style scoped>
+    /* 横幅容器 - 纯净深色基底 */
+    .apix-banner {
+        width: 100%;
+        max-width: 900px;
+        background: linear-gradient(145deg, #0b1220 0%, #151d2e 100%);
+        border-radius: 20px;
+        padding: 48px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(136, 202, 197, 0.2);
+        box-shadow: 
+            0 20px 60px -15px rgba(0, 0, 0, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    /* 简化光效 - 更纯净 */
+    .apix-banner::before {
+        content: '';
+        position: absolute;
+        top: -40%;
+        right: -20%;
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(136, 202, 197, 0.12) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    /* 内容布局 - 关键修复：垂直居中对齐 */
+    .banner-content {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center; /* 改为center，解决对齐问题 */
+        gap: 32px;
+        flex-wrap: wrap;
+    }
+
+    /* Logo区域 - 扁平化设计，去除浑浊渐变 */
+    .banner-logo {
+        flex-shrink: 0;
+        width: 80px;
+        height: 80px;
+        background: rgb(136, 202, 197);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 
+            0 12px 40px -8px rgba(136, 202, 197, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        position: relative;
+        border: none;
+    }
+
+    /* 图标样式 - 关键修复：完美居中 */
+    .banner-logo .icon {
+        width: 48px;
+        height: 48px;
+        fill: #0b1220; /* 深色填充，提高对比度 */
+        display: block;
+    }
+
+    /* 文字区域 - 移除顶部padding，与图标对齐 */
+    .banner-text {
+        flex: 1;
+        min-width: 300px;
+        padding-top: 0; /* 移除8px padding */
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* 垂直居中内容 */
+    }
+
+    .banner-title-wrapper {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 12px;
+        width: 150px;
+    }
+
+    .banner-title {
+        font-size: 56px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        margin: 0;
+        font-family: 'You Yuan', monospace;
+        color: transparent;
+        -webkit-text-stroke: 2px rgb(136, 202, 197);
+        text-stroke: 2px rgb(136, 202, 197);
+        line-height: 1;
+        display: flex;
+        align-items: center;
+    }
+
+    /* beta标签 - 绝对定位右上角 */
+    .version-tag {
+        position: absolute;
+        top: -8px;
+        right: -50px;
+        padding: 3px 8px;
+        background: rgba(136, 202, 197, 0.05);
+        border: 1px solid rgba(136, 202, 197, 0.2);
+        border-radius: 18px;
+        font-size: 10px;
+        color: rgb(136, 202, 197);
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* 简化分隔线 */
+    .divider {
+        width: 40px;
+        height: 2px;
+        background: rgb(136, 202, 197);
+        margin: 16px 0;
+        border-radius: 1px;
+        opacity: 0.6;
+    }
+
+    .banner-subtitle {
+        font-size: 15px;
+        color: #8b9aae; /* 更纯净的灰色 */
+        line-height: 1.6;
+        max-width: 550px;
+        margin: 0;
+    }
+
+    .banner-subtitle strong {
+        color: rgb(136, 202, 197);
+        font-weight: 500;
+    }
+
+    /* 开发者标签 - 扁平化 */
+    .banner-meta {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .dev-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px 6px 11px;
+        background: rgba(136, 202, 197, 0.08);
+        border: 1px solid rgba(136, 202, 197, 0.2);
+        border-radius: 20px;
+        font-size: 12px;
+        color: #c4d0dc;
+        transition: all 0.2s ease;
+    }
+
+    .dev-badge:hover {
+        background: rgba(136, 202, 197, 0.15);
+        border-color: rgba(136, 202, 197, 0.35);
+    }
+
+    .dev-badge::before {
+        content: '◆';
+        font-size: 10px;
+        color: rgb(136, 202, 197);
+    }
+
+    /* 引擎标签 - 简化 */
+    .engine-tags {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .engine-tag {
+        padding: 5px 12px;
+        background: rgba(136, 202, 197, 0.06);
+        border: 1px solid rgba(136, 202, 197, 0.15);
+        border-radius: 8px;
+        font-size: 11px;
+        color: #9ab;
+        font-family: 'Courier New', monospace;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        transition: all 0.2s ease;
+    }
+
+    .engine-tag:hover {
+        background: rgba(136, 202, 197, 0.12);
+        border-color: rgba(136, 202, 197, 0.3);
+        color: rgb(200, 235, 230);
+    }
+
+    /* 装饰元素 - 极简 */
+    .corner-accent {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 120px;
+        height: 120px;
+        background: linear-gradient(225deg, rgba(136, 202, 197, 0.08) 0%, transparent 60%);
+        pointer-events: none;
+    }
 </style>

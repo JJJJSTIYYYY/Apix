@@ -1,6 +1,6 @@
 <template>
   <el-container>
-    <el-aside style="width: auto;">
+    <el-aside style="width: var(--apix-left-side-bar-width); transition: width 0.28s cubic-bezier(0.23, 1, 0.32, 1);">
       <HomePage />
     </el-aside>
 
@@ -155,7 +155,7 @@
 
               </div>
               <el-button class="send-button" type="primary" @click="sendMessage">
-                <el-icon><Promotion /></el-icon>
+                <svg t="1776519512558" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11362" width="26" height="26"><path d="M481.834667 183.168a42.666667 42.666667 0 0 1 60.330666 0l298.666667 298.666667a42.666667 42.666667 0 0 1-60.330667 60.330666L554.666667 316.330667V810.666667a42.666667 42.666667 0 1 1-85.333334 0V316.330667l-225.834666 225.834666a42.666667 42.666667 0 0 1-60.330667-60.330666l298.666667-298.666667z" fill="#ffffff" p-id="11363"></path></svg>
               </el-button>
             </div>
           </div>
@@ -204,6 +204,7 @@ type Role = 'human' | 'ai' | 'system' | 'tools' | 'info'
 
 interface ToolLabel {
   tool_call_id: string
+  tool_name: string
   content: string
   status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
 }
@@ -302,7 +303,8 @@ function appendToolLabel(
       arr[index] = {
         ...old,
         ...label,
-        content: label.content || old.content,
+        tool_name: label.tool_name || old.tool_name,
+        content:  old.content + '\n\n' + label.content,
       }
       return
     }
@@ -341,7 +343,8 @@ function appendToolCallsFromExtra(
   for (const call of toolCalls) {
     const label: ToolLabel = {
       tool_call_id: call.id,
-      content: call.name ?? 'unknown_tool',
+      tool_name: call.name ?? 'unknown_tool',
+      content: '已过期',
       status: 'outdated',
     }
 
@@ -460,9 +463,7 @@ function mergeHistoryAiMessage(
     ...prevInfo,
     ...info,
     total_tokens: (prevInfo.total_tokens ?? 0) + (info.total_tokens ?? 0),
-    total_duration: Math.round(
-      ((prevInfo.total_duration ?? 0) + (info.total_duration ?? 0)) * 1000
-    ) / 1000,
+    total_duration: info.total_duration/1000,
   }
 
   const prevExtra = msg.extra ?? {}
@@ -715,18 +716,14 @@ function handleWsMessage(payload: any) {
     historyList.value[index].isGenerating = true
   }
 
-  if (payload.action === 'tool_return') handleToolRtn(payload, historyId)
-  else if (payload.action === 'msg_stream_start') handleStreamStart(payload, historyId)
+  if (payload.action === 'msg_stream_start') handleStreamStart(payload, historyId)
   else if (payload.action === 'think_chunk_rtn') handleThinkChunkRtn(payload, historyId)
   else if (payload.action === 'content_chunk_rtn') handleContentChunkRtn(payload, historyId)
-  else if (payload.action === 'summary_chunk_rtn') handleSummaryChunkRtn(payload, historyId)
-  else if (payload.action === 'todo_chunk_rtn') handleTodoChunkRtn(payload, historyId)
   else if (payload.action === 'info_chunk_rtn') handleInfoChunkRtn(payload, historyId)
   else if (payload.action === 'msg_stream_end') handleStreamEnd(payload, historyId)
   else if (payload.action === 'msg_stream_abort') handleStreamAbort(payload, historyId)
-  else if (payload.action === 'tools_chunk_rtn' || payload.action === 'tool_chunk_rtn') {
-    handleToolsChunkRtn(payload, historyId)
-  }
+  else if (payload.action === 'async_tool_return') handleAsyncToolRtn(payload, historyId)
+  else if (payload.action === 'tool_exec_chunk_rtn') handleToolChunkRtn(payload, historyId)
 }
 
 const handleConnectProject = async () => {
@@ -735,7 +732,7 @@ const handleConnectProject = async () => {
     return
   }
 
-  console.log('Current history id: ', store.current_history_id)
+  // console.log('Current history id: ', store.current_history_id)
   if (store.current_history_id !== '-1') store.setWorkDir(store.current_history_id, result.filePaths[0])
   store.currentWorkDir = result.filePaths[0]
   store.removeWorkDir('-1')
@@ -761,7 +758,7 @@ function ensureAiMessage(list: ChatMessage[], historyId: string, generationId: s
   return index
 }
 
-function handleToolRtn(payload: any, historyId: string) {
+function handleAsyncToolRtn(payload: any, historyId: string) {
   const toolMsg = payload.data?.messages
   const taskId = payload.data?.task_id
   if (!toolMsg || !taskId) return
@@ -829,7 +826,7 @@ function handleStreamStart(payload: any, historyId: string) {
 }
 
 function handleThinkChunkRtn(payload: any, historyId: string) {
-  const deltaThink = payload.data?.messages?.think ?? ''
+  const deltaThink = payload.data?.messages?.content ?? ''
   const generationId = payload.generation_id
   if (!generationId) return
 
@@ -870,34 +867,8 @@ function handleContentChunkRtn(payload: any, historyId: string) {
   }
 }
 
-function handleSummaryChunkRtn(payload: any, historyId: string) {
-  const deltaSummary = payload.data?.messages?.summary
-  const generationId = payload.generation_id
-  if (!deltaSummary || !generationId) return
-
-  const state = ensureGeneratingState(historyId)
-  state.isGenerating = true
-  state.streamStateText = '正在总结上下文'
-}
-
-function handleTodoChunkRtn(payload: any, historyId: string) {
-  const todos = payload.data?.messages?.todos
-  const generationId = payload.generation_id
-  if (!todos || !generationId) return
-
-  const list = ensureHistoryMessages(historyId)
-  const state = ensureGeneratingState(historyId)
-  const index = ensureAiMessage(list, historyId, generationId)
-
-  state.isGenerating = true
-
-  if (list[index].pending === true) {
-    list[index].todos = cloneMaybeArray(todos)
-  }
-}
-
 function handleInfoChunkRtn(payload: any, historyId: string) {
-  const deltaInfo = payload.data?.messages?.info
+  const deltaInfo = payload.data?.messages?.content
   const generationId = payload.generation_id
   if (!deltaInfo || !generationId) return
 
@@ -908,16 +879,7 @@ function handleInfoChunkRtn(payload: any, historyId: string) {
   state.isGenerating = true
 
   if (list[index].pending === true) {
-    const prevInfo = list[index].info ?? {}
-    const totalTokens = (prevInfo.total_tokens ?? 0) + (deltaInfo.total_tokens ?? 0)
-    const totalDuration = (prevInfo.total_duration ?? 0) + (deltaInfo.total_duration ?? 0)
-
-    list[index].info = {
-      ...prevInfo,
-      ...deltaInfo,
-      total_tokens: totalTokens,
-      total_duration: Math.round(totalDuration * 1000) / 1000,
-    }
+    
   }
 }
 
@@ -951,7 +913,8 @@ async function handleStreamEnd(payload: any, historyId: string) {
 
 async function handleStreamAbort(payload: any, historyId: string) {
   const generationId = payload.generation_id
-  const detail = payload.data?.content
+  const event_name = payload.data?.messages?.event_name
+  const detail = payload.data?.messages?.content
   if (!generationId) return
 
   const list = ensureHistoryMessages(historyId)
@@ -963,18 +926,12 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const index = findLatestIndexById(list, generationId, 'ai')
   if (index !== -1 && list[index].pending === true) {
     list[index].pending = false
-    appendChunk(list[index], list[index].lastField ?? 'content', ' [Conversation Abort]', generationId)
-    list[index].errors = detail
+    appendChunk(list[index], list[index].lastField ?? 'content', '[Conversation Abort]', generationId)
+    if (event_name === 'error_occurred') list[index].errors = detail
     list[index].lastField = undefined
   }
 
-  console.log("index is ", index, ", list[index].pending is ", list[index].pending)
-
-  // const indexHuman = findLatestIndexByStatus(list, true, 'human')
-  // if (indexHuman !== -1) {
-  //   list[indexHuman].pending = false
-  //   list[indexHuman].error = true
-  // }
+  // console.log("index is ", index, ", list[index].pending is ", list[index].pending)
 
   await syncHistoryMessages(historyId)
   console.warn('Generation abort, generation_id = ', generationId)
@@ -988,15 +945,16 @@ async function handleStreamAbort(payload: any, historyId: string) {
   }
 }
 
-function handleToolsChunkRtn(payload: any, historyId: string) {
+function handleToolChunkRtn(payload: any, historyId: string) {
   const generationId = payload.generation_id
-  const toolData = payload.data?.messages?.extra
+  const toolData = payload.data?.messages
   if (!generationId || !toolData) return
 
-  const toolChunkRtn = toolData?.tool_chunk_rtn
+  const toolName = toolData?.tool_name
   const toolCallId = toolData?.tool_call_id
   const chunkPosition = toolData?.chunk_position
   const chunkStatus = toolData?.status
+  const toolContent = toolData?.content
 
   const list = ensureHistoryMessages(historyId)
   const index = findLatestIndexById(list, generationId, 'ai')
@@ -1013,7 +971,8 @@ function handleToolsChunkRtn(payload: any, historyId: string) {
 
     const toolLabel: ToolLabel = {
       tool_call_id: toolCallId,
-      content: toolChunkRtn,
+      tool_name: toolName,
+      content: toolContent,
       status,
     }
 
@@ -1021,8 +980,30 @@ function handleToolsChunkRtn(payload: any, historyId: string) {
     appendToolLabel(msg, field, toolLabel, generationId)
   }
 
-  if (toolChunkRtn === 'send_images') {
+  if (toolName === 'send_images') {
     handleImageChunkRtn(generationId, toolData, historyId)
+  }
+  else if (toolName === 'write_todos') {
+    handleTodoChunkRtn(generationId, toolData, historyId)
+  }
+}
+
+function handleTodoChunkRtn(generationId: string, data: any, historyId: string) {
+  // console.log("Todo data: ", data)
+  if (!data || !generationId) return
+
+  const list = ensureHistoryMessages(historyId)
+  const state = ensureGeneratingState(historyId)
+  const index = ensureAiMessage(list, historyId, generationId)
+  const todos = data.content
+
+  if (!todos) return
+  if (data.chunk_position !== 'start' || data.status !== 'success') return
+
+  state.isGenerating = true
+
+  if (list[index].pending === true) {
+    list[index].todos = cloneMaybeArray(todos)
   }
 }
 
@@ -1030,7 +1011,10 @@ function handleImageChunkRtn(generationId: string, data: any, historyId: string)
   if (!data || !generationId) return
 
   const list = ensureHistoryMessages(historyId)
+  const state = ensureGeneratingState(historyId)
   const index = ensureAiMessage(list, historyId, generationId)
+
+  state.isGenerating = true
 
   if (list[index].pending === true) {
     if (data.chunk_position === 'end' && data.status === 'success') {
@@ -1071,6 +1055,19 @@ async function syncHistoryMessages(historyId: string) {
 // Send message
 // ################################
 async function sendMessage() {
+  if (!store.config.modelName
+    || store.config.modelName === ''
+    || !store.config.modelProvider
+    || store.config.modelProvider === ''
+  ) {
+    ElMessage({
+      type: 'warning',
+      message: '请选择一个模型',
+      plain: true,
+    })
+    return
+  }
+
   if (isUploading.value) {
     ElMessage({
       type: 'warning',
@@ -1081,6 +1078,16 @@ async function sendMessage() {
   }
 
   const content = inputText.value.trim()
+
+  if (content.length > 8000) {
+    ElMessage({
+      type: 'warning',
+      message: '输入文本过长',
+      plain: true,
+    })
+    return
+  }
+
   if (!content) return
   if (store.current_history_id === '-1') await createChat()
 
@@ -1151,7 +1158,7 @@ async function sendMessage() {
         enable_think: store.config.deepThink,
         work_dir: store.currentWorkDir,
 
-        max_chunk_per_invoking: store.config.tokenLimit,
+        llm_calls_warning_threshold: store.config.tokenLimit,
         async_tools_invoke: store.config.toolsInvokeAi,
         link_provider: store.config.linkProvider,
         link_api_key: store.config.linkApiKey,
@@ -1177,7 +1184,7 @@ async function sendMessage() {
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
         higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        interface_test_mode: store.config.testExpertMode,
+        enable_task_flow: store.config.testExpertMode,
       }
     )
   } catch (err) {
@@ -1497,7 +1504,7 @@ let cursorTimer: number | null = null
 
 function startTypewriter() {
   fullText.value = getRandomGreeting()
-  displayText.value = '>'
+  displayText.value = '⌘  '
   let index = 1
 
   if (timer) {
@@ -1714,7 +1721,7 @@ const setFullInput = () => {
 .ai-page-wrapper.is-history-hide {
   display: grid;
   position: relative;
-  grid-template-columns: 1% 99%;
+  grid-template-columns: 0% 100%;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -2041,7 +2048,7 @@ const setFullInput = () => {
   height: 38px;
   font-size: 20px;
   border-radius: 100px;
-  background: rgb(94, 104, 103);
+  background: #76827f;
   color: whitesmoke;
   border: none;
   cursor: pointer;
@@ -2160,6 +2167,7 @@ const setFullInput = () => {
 }
 
 .chat-config {
+  opacity: 0.5;
   position: relative;
   display: flex;
   flex-direction: row;
@@ -2167,6 +2175,11 @@ const setFullInput = () => {
   gap: 12px;
   width: 100%;
   max-width: calc(100%-96px);
+  transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.chat-config:hover {
+  opacity: 1;
 }
 
 .model-provider {
@@ -2323,7 +2336,7 @@ const setFullInput = () => {
   width: 52px;
   height: 28px;
   background-color: rgb(255, 255, 255);
-  box-shadow: 0px 0px 6px #f3555583;
+  box-shadow: 0px 0px 6px #f3555521;
   transition: all 0.25s ease;
   padding: 0px 6px;
   transform: translateX(-21px);

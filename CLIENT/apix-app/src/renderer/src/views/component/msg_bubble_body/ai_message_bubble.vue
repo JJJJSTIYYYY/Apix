@@ -54,11 +54,19 @@
       <div></div>
 
       <div style="display: flex; flex-direction: column;">
-        <transition name="scale-fade-height">
-          <div v-if="isThinkVisiable" class="think-render-list">
+        <transition 
+          name="scale-fade-height"
+          @after-enter="scrollThinkToBottom"
+        >
+          <div 
+            v-if="isThinkVisiable"
+            ref="thinkBox"
+            class="think-render-list"
+          >
             <template v-for="item in thinkRenderItems" :key="item.key">
               <ToolLabelCard
                 v-if="item.kind === 'tool' && store.config.showToolLabels"
+                :tool_name="item.tool.tool_name"
                 :tool_call_id="item.tool.tool_call_id"
                 :content="item.tool.content"
                 :status="item.tool.status"
@@ -120,6 +128,7 @@
       <template v-for="item in contentRenderItems" :key="item.key">
         <ToolLabelCard
           v-if="item.kind === 'tool' && store.config.showToolLabels"
+          :tool_name="item.tool.tool_name"
           :tool_call_id="item.tool.tool_call_id"
           :content="item.tool.content"
           :status="item.tool.status"
@@ -185,7 +194,7 @@
       </div>
       <div class="tag-wrapper">
         <div class="tag-name">Duration:</div>
-        <div>{{ msg.info?.total_duration ?? 'N/A' }}</div>
+        <div>{{ msg.info?.total_duration ?? 'N/A' }}S</div>
       </div>
       <div
         class="tag-wrapper"
@@ -248,6 +257,7 @@ const store = useAppCacheData()
 
 type ToolLabel = {
   tool_call_id: string
+  tool_name: string
   content: string
   status: 'pending' | 'in_progress' | 'completed' | 'error' | "outdated"
 }
@@ -365,6 +375,7 @@ function buildRenderItems(
         key: `tool-${chunk.tool_call_id || i}`,
         tool: chunk,
       }
+      scrollThinkToBottom()
     }
   }
 
@@ -387,6 +398,7 @@ function buildRenderItems(
         key: `tool-${chunk.tool_call_id || lastIndex}`,
         tool: chunk,
       }
+      scrollThinkToBottom()
     }
   }
 
@@ -745,6 +757,18 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   revokeAllImageObjectUrls()
 })
+
+const thinkBox = ref<HTMLElement | null>(null)
+
+async function scrollThinkToBottom() {
+  await nextTick() // wait DOM update
+  if (!thinkBox.value) return
+
+  thinkBox.value.scrollTo({
+    top: thinkBox.value.scrollHeight,
+    behavior: 'smooth'
+  })
+}
 </script>
 
 <style scoped>
@@ -1164,7 +1188,7 @@ onBeforeUnmount(() => {
   flex-direction: row;
   font-size: 12px;
   gap: 16px;
-  padding: 8px 4px;
+  padding: 2px 4px;
   color: #5050504b;
   transition: color 0.15s ease;
   width: inherit;
@@ -1245,6 +1269,7 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: visible;   /* 允许 hover 层溢出 */
   height: 150px;
+  padding-bottom: 12px;
 }
 
 /* 专门负责横向滚动 */

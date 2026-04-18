@@ -7,8 +7,9 @@ from fastapi.responses import JSONResponse
 
 import apix_agent.routers as routers_pkg
 from apix_agent.apix_agent_core.context_manager.longterm_memory import longterm_memory_manager
-from apix_agent.apix_agent_core.websocket.websocket_manager import websocket_list
+from apix_agent.apix_event_pipe.websocket_manager import websocket_list
 from apix_agent.apix_agent_core.agent import ai_agent
+from apix_agent.apix_agent_core.agent_factory.agent_creator import agent_creator
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
 
@@ -16,14 +17,12 @@ from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import age
 def auto_load(app: FastAPI):
     pkg_path = routers_pkg.__path__
 
-    # 扫描 routers 包下的所有 .py 模块
     for _, module_name, _ in pkgutil.iter_modules(pkg_path):
         full_name = f"apix_agent.routers.{module_name}"
         print(f"[auto_load] ✅ 加载模块: {full_name}")
 
         module = importlib.import_module(full_name)
 
-        # 从模块中找出 APIRouter 对象
         for attr in dir(module):
             obj = getattr(module, attr)
             if isinstance(obj, APIRouter):
@@ -36,6 +35,7 @@ async def lifespan(app: FastAPI):
     await websocket_list.start()
     await longterm_memory_manager.start()
     await task_manager.start()
+    await agent_creator.start()
     await ai_agent.start()
     
     yield
@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
     await agent_sandbox.cleanup_all()
     await longterm_memory_manager.stop()
     await task_manager.stop()
+    await agent_creator.stop()
     await ai_agent.stop()
 
 
