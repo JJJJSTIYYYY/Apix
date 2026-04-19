@@ -98,7 +98,7 @@ function Down() {
                 $pid = [int]$parts[0]
                 $name = $parts[1]
 
-                Write-Host ("[STOP] {0} ({1})" -f $name, $pid)
+                Write-Host ("``[STOP``] {0} ({1})" -f $name, $pid)
                 Stop-ProcessSafe $pid
             }
         }
