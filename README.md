@@ -131,7 +131,7 @@ APIX aims to provide a flexible foundation for building next-generation AI appli
 
 | Broken Feature | Estimated Fix Version |
 |----------------|------------------------|
-| Async tools service | v1.3 |
+| Async tools service | v2.3 |
 
 ---
 

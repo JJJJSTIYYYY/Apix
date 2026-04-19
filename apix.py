@@ -4,11 +4,14 @@ import os
 import signal
 from pathlib import Path
 
+env = os.environ.copy()
+env["PYTHONIOENCODING"] = "utf-8"
+
 # =========================
 # Config
 # =========================
 
-ROOT = Path(__file__).resolve()
+ROOT = Path(__file__).parent.resolve()
 
 SERVICES = [
     "AGENT/agent_module",
@@ -21,6 +24,8 @@ SERVICES = [
 
 LOG_DIR = ROOT / "logs"
 PID_FILE = ROOT / ".apix_pids"
+
+os.makedirs(LOG_DIR, exist_ok=True)
 
 
 # =========================
@@ -43,11 +48,12 @@ def start_service(path):
         "uv run main.py",
         cwd=ROOT / path,
         shell=True,
-        stdout=open(log_file, "w"),
-        stderr=subprocess.STDOUT
+        stdout=open(log_file, "w", encoding="utf-8"),
+        stderr=subprocess.STDOUT,
+        env=env
     )
 
-    return process.pid
+    return process.pid, name
 
 
 def stop_process(pid):
@@ -68,18 +74,18 @@ def stop_process(pid):
 def up():
     LOG_DIR.mkdir(exist_ok=True)
 
-    pids = []
+    records = []
 
     print("==== Starting APIX Services ====")
 
     for svc in SERVICES:
-        pid = start_service(svc)
-        pids.append(pid)
+        pid, name = start_service(svc)
+        records.append((pid, name))
 
-    # save pids
+    # save pid + name
     with open(PID_FILE, "w") as f:
-        for pid in pids:
-            f.write(str(pid) + "\n")
+        for pid, name in records:
+            f.write(f"{pid},{name}\n")
 
     print("\nAll services started ✅")
 
@@ -93,8 +99,10 @@ def down():
 
     with open(PID_FILE) as f:
         for line in f:
-            pid = int(line.strip())
-            print(f"[STOP] {pid}")
+            pid, name = line.strip().split(",")
+            pid = int(pid)
+
+            print(f"[STOP] {name} ({pid})")
             stop_process(pid)
 
     PID_FILE.unlink()
@@ -111,7 +119,7 @@ def logs():
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python apix.py [up|down|logs]")
+        print("Usage: python apix.py [up|down|status|logs]")
         sys.exit(1)
 
     cmd = sys.argv[1]
