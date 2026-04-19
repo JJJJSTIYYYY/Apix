@@ -11,6 +11,8 @@
           style="margin-left: 6%;"
           :histories="historyList"
           :active-id="store.current_history_id"
+          class="ai-history-pannel"
+          :class="{ 'is-history-hide': isHistoryHide }"
           @select="handleSelectHistory"
           @create="handleCreateChat"
           @delete="handleDeleteHistory"
@@ -1728,6 +1730,11 @@ const setFullInput = () => {
   transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.ai-history-pannel.is-history-hide {
+  width: 40px !important;
+  max-width: 40px;
+}
+
 .chat-wrapper {
   width: 100%;
   height: calc(100vh - 30px);
@@ -2020,6 +2027,7 @@ const setFullInput = () => {
 .input-bar {
   /* position: absolute; */
   /* bottom: 20px; */
+  z-index: 999;
   bottom: 0px;
   overflow: hidden;
   display: grid;

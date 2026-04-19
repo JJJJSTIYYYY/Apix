@@ -1,7 +1,7 @@
 <template>
-  <div class="chat-history q">
+  <div class="chat-history q" :class="{ 'is-hide': isHide }">
     <!-- Search -->
-    <div class="q-search" :class="{ 'is-focused': isSearchFocused }">
+    <div class="q-search" :class="{ 'is-focused': isSearchFocused, 'is-history-hide': isHide }">
       <el-button
         class="q-primary-btn melt-btn"
         type="primary"
@@ -32,10 +32,10 @@
     </div>
 
 
-    <div class="q-create">
+    <div class="q-create" :class="{ 'is-history-hide': isHide }">
         <el-button
           class="create-btn"
-           :class="{ 'is-history-hide': isHide }"
+          :class="{ 'is-history-hide': isHide }"
           type="primary"
           size="small"
           @click="createNewChat"
@@ -505,6 +505,9 @@ useOverscrollBounce(
   width: 100%;
   max-width: 240px;
 }
+.chat-history.is-hide {
+  width: 40px;
+}
 
 /* Primary Button */
 :deep(.q-primary-btn.el-button) {
@@ -550,6 +553,12 @@ useOverscrollBounce(
 .q-search.is-focused {
   gap: 0;
 }
+
+.q-search.is-history-hide {
+  width: 40px;
+}
+
+
 
 .q-search :deep(.el-input) {
   flex: 1;
@@ -612,6 +621,10 @@ useOverscrollBounce(
 
 .q-create {
   padding: 5px 10px 20px;
+}
+
+.q-create.is-history-hide {
+  width: 40px;
 }
 
 .create-btn {
