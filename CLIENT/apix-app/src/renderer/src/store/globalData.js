@@ -1,4 +1,4 @@
-export const apix_client_version = '2.0.0'
+export const apix_client_version = '2.0.1'
 
 export const defaultCards = () => [
   { id: '-annotation-preset', title: '注释卡片', type: 'note', level: 'system' },

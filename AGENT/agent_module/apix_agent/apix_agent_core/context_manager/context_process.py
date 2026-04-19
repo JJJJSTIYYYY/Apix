@@ -423,6 +423,55 @@ class AIContextManager:
         messages = resp_content.get("messages", []) or []
 
         return messages
+    
+    def _ensure_tool_message(self, agent_messages: list[AnyMessage]):
+        if not agent_messages:
+            return
+
+        cursor = 0
+        total_messages = len(agent_messages)
+
+        while cursor < total_messages:
+            current_msg = agent_messages[cursor]
+
+            # Only process AI message with tool_calls
+            if isinstance(current_msg, (AIMessage, AIMessageChunk)) and getattr(current_msg, "tool_calls", None):
+                tool_calls = current_msg.tool_calls or []
+                expected_tool_count = len(tool_calls)
+
+                # Scan existing ToolMessages right after this AIMessage
+                scan_index = cursor + 1
+                existing_tool_count = 0
+
+                while (
+                    scan_index < total_messages
+                    and isinstance(agent_messages[scan_index], ToolMessage)
+                ):
+                    existing_tool_count += 1
+                    scan_index += 1
+
+                # Calculate how many ToolMessages are missing
+                missing_tool_count = expected_tool_count - existing_tool_count
+
+                if missing_tool_count > 0:
+                    # Inject missing ToolMessages at the correct position
+                    for tool_idx in range(existing_tool_count, expected_tool_count):
+                        tool_call = tool_calls[tool_idx]
+
+                        new_msg = ToolMessage(
+                            content="[The outputs of this tool have been lost, or the tool's execution was interrupted by the user.]",
+                            name=tool_call.get("name"),
+                            tool_call_id=tool_call.get("id"),
+                        )
+
+                        agent_messages.insert(scan_index, new_msg)
+                        scan_index += 1
+                        total_messages += 1  # Keep length in sync
+
+                # Move cursor to the end of this AI + Tool block
+                cursor = scan_index
+            else:
+                cursor += 1
 
     def create_agent_messages(
         self,
@@ -573,7 +622,11 @@ class AIContextManager:
         while messages_after_index and isinstance(messages_after_index[0], ToolMessage):
             messages_after_index.pop(0)
 
-        return messages_after_index or messages
+        if after_index:
+            self._ensure_tool_message(messages_after_index)
+            return messages_after_index
+        self._ensure_tool_message(messages)
+        return messages
     
     def create_dict_message(
         self,

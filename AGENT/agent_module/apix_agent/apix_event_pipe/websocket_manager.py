@@ -278,11 +278,17 @@ class WebsocketList:
                     "generation_id": "",
                     "timestamp": 0
                 }
+            elif action == "messages_persist_end":
+                gen.cache_tokens["content"] = ""
+                gen.cache_tokens["think"] = ""
 
-            if action == "content_chunk_rtn":
+            elif action == "content_chunk_rtn":
                 gen.cache_tokens["content"] += content
             elif action == "think_chunk_rtn":
                 gen.cache_tokens["think"] += content
+            elif action == "tool_exec_chunk_rtn":
+                gen.cache_tokens["content"] = ""
+                gen.cache_tokens["think"] = ""
 
         payload = {
             "action": action,

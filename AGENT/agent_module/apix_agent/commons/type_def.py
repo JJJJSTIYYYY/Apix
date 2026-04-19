@@ -108,7 +108,7 @@ class MainAgentState(GraphRuntimeContext):
     runtime_prompt: str # Include todos prompt, workspace prompt, memorandum prompt and so on
     llm_calls: Annotated[int, operator.add] # Total LLM call count across the graph
     retry_count: int
-    context_compress_level: int # Level 0: Drop tool message content; Level 1: Context fold, driven by write_todos; Level 2: Context sumary to summary_exempt_tail_length; 
+    context_compress_level: int # Level 0: Not cpmpress; Level 1: Drop tool message content; Level 2: Context fold, driven by write_todos; Level 3: Context sumary to summary_exempt_tail_length; 
     sandbox: str # Docker container id
     todos: NotRequired[list[Todo]]
     memorandum: NotRequired[list[str]]

@@ -478,12 +478,15 @@ class MainAgentNode(AgentNodeBase):
 
         generation_id = state.get("generation_id")
         client_id = state.get("client_id")
+        target_platform = state.get("platform")
         history_id = state.get("history_id")
         timestamp = state.get("timestamp")
 
         config = state.get("config")
         model_name = config.get("model_name")
         model_provider = config.get("models_provider")
+
+        event_writer = ApixStreamWriter()
 
         current_tool_calls = []
 
@@ -503,6 +506,16 @@ class MainAgentNode(AgentNodeBase):
             )
             await ai_context_manager.append_to_messages(
                 client_id, history_id, client_message
+            )
+            
+            event_writer.send_event(
+                event=StreamEvent.LLM_STREAM_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "messages_persist_end",
+                    "content": ""
+                }
             )
 
             return Command(
@@ -534,6 +547,16 @@ class MainAgentNode(AgentNodeBase):
                 await ai_context_manager.append_to_messages(
                     client_id, history_id, tool_message
                 )
+            
+            event_writer.send_event(
+                event=StreamEvent.LLM_STREAM_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "messages_persist_end",
+                    "content": ""
+                }
+            )
 
             return Command(
                 update={
@@ -554,6 +577,16 @@ class MainAgentNode(AgentNodeBase):
 
             await ai_context_manager.append_to_messages(
                 client_id, history_id, client_message
+            )
+            
+            event_writer.send_event(
+                event=StreamEvent.LLM_STREAM_END, 
+                target_id=client_id, 
+                target_platform=target_platform,
+                data={
+                    "event_name": "messages_persist_end",
+                    "content": ""
+                }
             )
 
             return Command(

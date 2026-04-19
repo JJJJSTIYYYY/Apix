@@ -4,7 +4,7 @@
 
 > A modern, modular AI agent system with extensible architecture and full-stack integration.
 
-*Version 2.0.0*
+*Version 2.0.1*
 
 ---
 
@@ -131,6 +131,7 @@ APIX aims to provide a flexible foundation for building next-generation AI appli
 
 | Broken Feature | Estimated Fix Version |
 |----------------|------------------------|
+| Task service | v2.2 |
 | Async tools service | v2.3 |
 
 ---

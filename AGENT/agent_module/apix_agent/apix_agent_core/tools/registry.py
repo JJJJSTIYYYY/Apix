@@ -4,7 +4,7 @@ from apix_agent.apix_agent_core.tools import *
 from apix_agent.global_config import CHECK_SERVER_HEALTH
 
 
-def get_available_tools(permission: str | list[str] = "") -> list[BaseTool]:
+def get_available_tools(permission: str | list[str] = "", filter_by_name: list[str] = []) -> list[BaseTool]:
     """
     Return a list of LangChain Tool objects.
     Must return @tool-decorated objects ONLY.
@@ -68,7 +68,7 @@ def get_available_tools(permission: str | list[str] = "") -> list[BaseTool]:
         ]
     }
 
-    tools = []
+    tools: list[BaseTool] = []
 
     # Collect tools from all modes
     for m in modes:
@@ -77,11 +77,12 @@ def get_available_tools(permission: str | list[str] = "") -> list[BaseTool]:
     # Optional health check tools
     if CHECK_SERVER_HEALTH:
         tools.append(check_server)
-        # tools.append(test_tool)
 
-    # Deduplicate tools by tool.name (LangChain resolves tools by name)
-    unique_tools = {}
+    # Deduplicate tools by tool.name
+    filter_tools = {}
     for tool in tools:
-        unique_tools[tool.name] = tool
+        if filter_by_name and tool.name not in filter_by_name:
+            continue
+        filter_tools[tool.name] = tool
 
-    return list(unique_tools.values())
+    return list(filter_tools.values())

@@ -928,7 +928,6 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const index = findLatestIndexById(list, generationId, 'ai')
   if (index !== -1 && list[index].pending === true) {
     list[index].pending = false
-    appendChunk(list[index], list[index].lastField ?? 'content', '[Conversation Abort]', generationId)
     if (event_name === 'error_occurred') list[index].errors = detail
     list[index].lastField = undefined
   }
