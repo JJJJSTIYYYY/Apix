@@ -1,8 +1,6 @@
-# =========================
-# Config
-# =========================
+Write-Host "==== APIX Service Manager (Windows) ===="
 
-$ROOT = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ROOT = Get-Location
 
 $SERVICES = @(
     "AGENT/agent_module",
@@ -16,30 +14,49 @@ $SERVICES = @(
 $LOG_DIR = Join-Path $ROOT "logs"
 $PID_FILE = Join-Path $ROOT ".apix_pids"
 
-if (!(Test-Path $LOG_DIR)) {
-    New-Item -ItemType Directory -Path $LOG_DIR | Out-Null
-}
-
 # =========================
 # Utils
 # =========================
+
+function Ensure-Dir($path) {
+    if (!(Test-Path $path)) {
+        New-Item -ItemType Directory -Path $path | Out-Null
+    }
+}
+
+function Get-UV-Path() {
+    $cmd = Get-Command uv -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    } else {
+        Write-Host "[ERROR] uv not found in PATH"
+        exit 1
+    }
+}
 
 function Start-Service($path) {
     $name = $path -replace "/", "_"
     $logFile = Join-Path $LOG_DIR "$name.log"
 
-    Write-Host "[START] $path"
+    Write-Host ("[START] {0}" -f $path)
 
-    $proc = Start-Process -FilePath "uv" -ArgumentList "run main.py" -WorkingDirectory (Join-Path $ROOT $path) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+    $uvPath = Get-UV-Path
 
-    return "$($proc.Id),$name"
+    $proc = Start-Process -FilePath $uvPath -ArgumentList "run main.py" -WorkingDirectory (Join-Path $ROOT $path) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+
+    if (!$proc) {
+        Write-Host ("[ERROR] Failed to start {0}" -f $name)
+        exit 1
+    }
+
+    return ("{0},{1}" -f $proc.Id, $name)
 }
 
-function Stop-ProcessByPid($pid) {
+function Stop-ProcessSafe($pid) {
     try {
         Stop-Process -Id $pid -Force -ErrorAction Stop
     } catch {
-        Write-Host "[WARN] Failed to stop $pid"
+        Write-Host ("[WARN] Failed to stop {0}" -f $pid)
     }
 }
 
@@ -50,6 +67,8 @@ function Stop-ProcessByPid($pid) {
 function Up() {
     Write-Host "==== Starting APIX Services ===="
 
+    Ensure-Dir $LOG_DIR
+
     $records = @()
 
     foreach ($svc in $SERVICES) {
@@ -59,7 +78,8 @@ function Up() {
 
     $records | Out-File -FilePath $PID_FILE -Encoding utf8
 
-    Write-Host "`nAll services started ✅"
+    Write-Host ""
+    Write-Host "All services started ✅"
 }
 
 function Down() {
@@ -71,12 +91,17 @@ function Down() {
     Write-Host "==== Stopping APIX Services ===="
 
     Get-Content $PID_FILE | ForEach-Object {
-        $parts = $_ -split ","
-        $pid = [int]$parts[0]
-        $name = $parts[1]
+        if (![string]::IsNullOrWhiteSpace($_)) {
+            $parts = $_ -split ","
 
-        Write-Host "[STOP] $name ($pid)"
-        Stop-ProcessByPid $pid
+            if ($parts.Length -ge 2) {
+                $pid = [int]$parts[0]
+                $name = $parts[1]
+
+                Write-Host ("[STOP] {0} ({1})" -f $name, $pid)
+                Stop-ProcessSafe $pid
+            }
+        }
     }
 
     Remove-Item $PID_FILE -ErrorAction SilentlyContinue
@@ -85,7 +110,7 @@ function Down() {
 }
 
 function Logs() {
-    Write-Host "Logs directory: $LOG_DIR"
+    Write-Host ("Logs directory: {0}" -f $LOG_DIR)
 }
 
 # =========================
