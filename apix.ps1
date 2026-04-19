@@ -1,4 +1,7 @@
-Write-Host "==== APIX Service Manager (Windows) ===="
+
+param(
+    [string]$cmd
+)
 
 $ROOT = Get-Location
 
@@ -116,10 +119,6 @@ function Logs() {
 # =========================
 # Entry
 # =========================
-
-param(
-    [string]$cmd
-)
 
 switch ($cmd) {
     "up" { Up }
