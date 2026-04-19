@@ -53,6 +53,7 @@ FILE/file_service/embed_models/
 TASK/logs/
 
 # logs
+.apix_pids
 logs/
 *.log
 cache/
