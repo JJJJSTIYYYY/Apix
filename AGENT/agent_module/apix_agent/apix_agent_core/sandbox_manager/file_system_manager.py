@@ -404,6 +404,47 @@ class FileSystemManager:
 
         return host_path
     
+    def get_file_path_in_container(
+        self,
+        *,
+        file_path: str,
+        container_workdir: str,
+        host_root: str,
+        must_exist: bool = True,
+    ) -> Path:
+
+        if not file_path:
+            raise ValueError("Empty file path")
+
+        container_root = Path(container_workdir).resolve()
+        host_root = Path(host_root).resolve()
+
+        p = Path(file_path)
+
+        # Convert to host absolute path
+        if p.is_absolute():
+            host_path = p.resolve(strict=False)
+        else:
+            host_path = (host_root / p).resolve(strict=False)
+
+        # Ensure host path is inside host root
+        if not host_path.is_relative_to(host_root):
+            raise PermissionError("No permission to access this file")
+
+        # Map to container path
+        relative_path = host_path.relative_to(host_root)
+        container_path = (container_root / relative_path).resolve(strict=False)
+
+        # Ensure container path is inside container root
+        if not container_path.is_relative_to(container_root):
+            raise PermissionError("No permission to access this file")
+
+        # Ensure file exists
+        if must_exist and not host_path.exists():
+            raise FileNotFoundError("File not found or is empty")
+
+        return container_path
+    
 
     def _format_lock_record(self, locked_path: str, record: FileLockRecord) -> str:
         return (

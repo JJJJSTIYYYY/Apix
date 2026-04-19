@@ -45,7 +45,7 @@ function Start-Service($path) {
 
     $uvPath = Get-UV-Path
 
-    $proc = Start-Process -FilePath $uvPath -ArgumentList "run main.py" -WorkingDirectory (Join-Path $ROOT $path) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+    $proc = Start-Process -FilePath $uvPath -ArgumentList "run main.py" -WorkingDirectory (Join-Path $ROOT $path) -RedirectStandardError $logFile -PassThru
 
     if (!$proc) {
         Write-Host ("[ERROR] Failed to start {0}" -f $name)

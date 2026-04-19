@@ -265,9 +265,12 @@ async def fetch_files(
                                 "error": f"{file_id} hash mismatch"
                             }
 
+                    target_path = file_system.get_file_path_in_container(
+                        file_path=target_path, container_workdir="/workspace", host_root=base_path, 
+                    )
                     return {
                         "status": "ok",
-                        "path": "/workspace/"+target_path
+                        "path": str(target_path)
                     }
 
             except Exception as e:
