@@ -1,13 +1,9 @@
 <template>
   <div class="popup-menu-wrapper" ref="wrapperRef">
     <div class="popup-content" :style="popupStyle">
-      <div class="title-btn"></div>
-      <el-button @click="rename" class="action-btn">重新命名</el-button>
-      <el-button @click="deleteRecord" class="action-btn">删除记录</el-button>
-      <el-button @click="connectProject" class="action-btn">关联项目</el-button>
-      <!-- <el-button @click="reGenerate">重新生成</el-button>
-      <el-button @click="copyValue">选择文本</el-button>
-      <el-button @click="copyValue">详细信息</el-button> -->
+      <button @click="rename" class="menu-item">重新命名</button>
+      <button @click="connectProject" class="menu-item">工作目录</button>
+      <button @click="deleteRecord" class="menu-item danger-item">删除记录</button>
     </div>
   </div>
 </template>
@@ -66,76 +62,87 @@ const connectProject = async () => {
 
 <style scoped>
 .popup-menu-wrapper {
-  z-index: 99999;
-  overflow: hidden;
-  background: rgba(242, 242, 243, 0.8);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(8, 25, 43, 0.182); /* 添加阴影 */
-  backdrop-filter: blur(24px);
+  z-index: 9999;
+  position: relative;
 }
-
 
 .popup-content {
-  display: grid;
-  gap: 6px;
-  margin-top: -38px;
-  background: rgba(255, 255, 255, 0.66);
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   padding: 6px;
-  width: 120px;
-  height: fit-content;
-  overflow: hidden;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.06);
+  animation: menuEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* .popup-content::deep(.el-button:hover) {
-  color: red;
-} */
+@keyframes menuEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
 
-.title-btn {
-  height: 32px;
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  border-radius: 6px;
-    /* 液态玻璃核心背景 */
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
   background: transparent;
-  box-shadow: 
-    0 8px 24px rgba(103, 104, 126, 0.15),
-    inset 0 4px 16px rgba(255, 255, 255, 0.25);
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 450;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0.01em;
 }
 
-.action-btn {
-  height: 32px;
-  width: 100%;
-  color: rgba(16, 61, 71, 0.661);
-  border-radius: 6px;
-    /* 液态玻璃核心背景 */
-  background: rgba(211, 211, 211, 0.361);
-  backdrop-filter: blur(6px) saturate(180%);
-  -webkit-backdrop-filter: blur(6px) saturate(180%);
-
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 
-    0 8px 24px rgba(94, 97, 133, 0.15),
-    inset 0 4px 16px rgba(255, 255, 255, 0.25);
-
-  transition: all 300ms cubic-bezier(0.8, 0.8, 0.2, 1);
+.menu-item:hover {
+  background: #f3f4f6;
+  color: #1f2937;
 }
 
-.action-btn:hover {
-  transform: scale(1.05);
-  transition: all 300ms cubic-bezier(0.8, 3.8, 0.2, 1);
+.menu-item:active {
+  background: #e5e7eb;
+  transform: scale(0.985);
 }
 
-.el-button+.el-button{
-  margin: 0;
+.danger-item {
+  color: #d81e06;
 }
 
-/* 针对特定组件或元素 */
-.selectable {
-  user-select: none !important;        /* 标准写法 */
-  -webkit-user-select: text !important; /* Chromium 内核 */
-  -moz-user-select: text !important;    /* Firefox */
-  -ms-user-select: text !important;     /* IE/Edge */
+.danger-item:hover {
+  background: #ffe7e7;
+  color: #c10808;
 }
 
+.danger-item:active {
+  background: #f4c6c6;
+  transform: scale(0.985);
+}
+
+.icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #9ca3af;
+  transition: color 0.12s ease;
+}
+
+.menu-item:hover .icon {
+  color: #6b7280;
+}
 </style>

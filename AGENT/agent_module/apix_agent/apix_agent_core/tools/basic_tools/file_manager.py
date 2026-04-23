@@ -510,10 +510,10 @@ async def write_workspace_file(
     Args:
         file_path: File path inside container workspace
         content: File content
-        replace: Replace entire file if already exist
+        replace: Replace entire file if already exist (False -> append)
 
     Returns:
-        Full file content with line numbers
+        Success or error message
     """
     client_id = state.get("client_id")
     target_platform = state.get("platform")
@@ -572,18 +572,26 @@ async def write_workspace_file(
         )
         
         async with file_system.file_lock(host_path, state.get("agent_name", "Unnamed agent"), "create"):
-            if host_path.exists() and not replace:
-                raise Exception("File already exists")
-
             # Ensure parent directory exists
             host_path.parent.mkdir(parents=True, exist_ok=True)
 
-            host_path.write_text(content, encoding="utf-8")
+            if host_path.exists():
+                if replace:
+                    # overwrite file
+                    host_path.write_text(content, encoding="utf-8")
+                    action = "overwritten"
+                else:
+                    # append to existing file
+                    with host_path.open("a", encoding="utf-8") as f:
+                        f.write(content)
+                    action = "appended"
+            else:
+                # create new file
+                host_path.write_text(content, encoding="utf-8")
+                action = "created"
 
-        numbered = "\n".join(
-            f"[{i}] {line}"
-            for i, line in enumerate(content.splitlines(keepends=False), start=1)
-        )
+        # return one-line log instead of full content
+        log_line = f"File {action}: {file_path}"
 
         event_writer.send_event(
             event=StreamEvent.TOOL_EXEC_END, 
@@ -593,7 +601,7 @@ async def write_workspace_file(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "write_workspace_file",
                 "tool_call_id": tool_call_id,
-                "content": "File created",
+                "content": log_line,
                 "chunk_position": "end",
                 "status": "success",
             }
@@ -601,7 +609,7 @@ async def write_workspace_file(
 
         return Command(update={
             "messages": [
-                ToolMessage(numbered, tool_call_id=tool_call_id)
+                ToolMessage(log_line, tool_call_id=tool_call_id)
             ]
         })
 

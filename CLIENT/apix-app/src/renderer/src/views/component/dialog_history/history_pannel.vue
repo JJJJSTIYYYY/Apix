@@ -189,7 +189,7 @@ const groupedHistories = computed(() => {
   return result
 })
 
-// ✅ fold 状态
+// fold 状态
 const foldStatus = ref<Record<string, boolean>>({
   'Pinned': false,
   'Today': true,
@@ -198,7 +198,7 @@ const foldStatus = ref<Record<string, boolean>>({
   'Further more': true,
 })
 
-// ✅ 当前 active 所在 group
+// 当前 active 所在 group
 const activeGroupDate = computed(() => {
   if (!activeHistoryId.value) return null
 
@@ -210,7 +210,7 @@ const activeGroupDate = computed(() => {
   return null
 })
 
-// ✅ 当前 active group 是否展开
+// 当前 active group 是否展开
 const isActiveGroupVisible = computed(() => {
   if (!activeGroupDate.value) return false
   return !!foldStatus.value[activeGroupDate.value]
@@ -269,7 +269,7 @@ const updateSliderTo = async (index: string, alsoScroll = true) => {
   }
 }
 
-// unified sync entry（✅ 已整合 fold 判断）
+// unified sync entry
 const syncSlider = async (alsoScroll = false) => {
   if (!activeHistoryId.value) return
 
@@ -444,23 +444,21 @@ const handleDeleteHistory = async (history_id: string) => {
         type: 'warning',
       }
     )
+  } catch (err) {
+    return
+  }
 
-    try {
-      await window.api.updateConversation(
-        cid.value,
-        "",
-        history_id,
-        { deleted: true }
-      )
-      ElMessage({ type: 'success', message: '已删除', plain: true })
-    } catch (err) {
-      console.log("对话删除失败：" + err)
-      ElMessage({ type: 'error', message: '删除失败', plain: true })
-    }
-
+  try {
+    await window.api.updateConversation(
+      cid.value,
+      "",
+      history_id,
+      { deleted: true }
+    )
+    ElMessage({ type: 'success', message: '已删除', plain: true })
     emit('delete', history_id)
   } catch (err) {
-    console.error("pannel: handleDeleteHistory error:", err)
+    console.log("对话删除失败：" + err)
     ElMessage({ type: 'error', message: '删除失败', plain: true })
   }
 }
@@ -501,7 +499,6 @@ useOverscrollBounce(
   padding: 0 6px;
   padding-right: 16px;
   background: transparent;
-  min-width: 180px;
   width: 100%;
   max-width: 240px;
 }
@@ -741,11 +738,9 @@ useOverscrollBounce(
   pointer-events: none;
   z-index: 0;
 
-  background: rgba(255, 255, 255, 0.249);
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgb(253, 253, 253);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    0 2px 6px rgba(0, 0, 0, 0.106);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 

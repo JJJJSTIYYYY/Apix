@@ -1,3 +1,4 @@
+import copy
 import hashlib
 from pathlib import Path
 import time
@@ -61,18 +62,22 @@ class AIContextManager:
             files = message["extra"]["user_meta_data"]
             if files.get("uploaded_files"):
                 timestamp = message.get("timestamp", 0)
-                generation_id = message.get("generation_id", 0)
+                generation_id = message.get("generation_id", "")
+                node_id = generation_id[-12:] + "-system"
+                parent_id = message.get("parent_id", "")
                 sys_message = {
                     "role": "system",
                     "content": f"User upload file(s): {str(files.get("uploaded_files"))}",
                     "timestamp": timestamp,
-                    "generation_id": generation_id
+                    "generation_id": generation_id,
+                    "node_id": node_id,
+                    "parent_id": parent_id
                 }
                 sys_payload = {
                     "client_id": client_id,
                     "session_id": "",
                     "history_id": history_id,
-                    "messages": [sys_message],
+                    "messages": sys_message,
                 }
 
                 async with httpx.AsyncClient(timeout=5) as client:
@@ -86,12 +91,20 @@ class AIContextManager:
                         status_code=resp.status_code,
                         detail=f"Failed to append memory: {resp.text}",
                     )
+                
+        generation_id = message.get("generation_id", "")
+        role = message.get("role", "")
+        parent_id = message.get("parent_id", "")
 
+        message["node_id"] = generation_id[-12:] + "-" + role
+        if parent_id: message["parent_id"] = parent_id
+        else: message["parent_id"] = generation_id[-12:] + "-human"
+        
         payload = {
             "client_id": client_id,
             "session_id": "",
             "history_id": history_id,
-            "messages": [message],
+            "messages": message,
         }
 
         async with httpx.AsyncClient(timeout=5) as client:
@@ -105,6 +118,74 @@ class AIContextManager:
                 status_code=resp.status_code,
                 detail=f"Failed to append memory: {resp.text}",
             )
+    
+
+    def _extract_mes_info(
+        self, 
+        message: AIMessage | AIMessageChunk,
+        *,
+        fallback_model_provider: str = 'Custom Provider',
+        fallback_model_name: str = 'Custom Model',
+        fallback_timestamp: int = 0,
+    ) -> dict:
+        current_timestamp = int(time.time() * 1000)
+        if not message.response_metadata:
+            message.response_metadata = {}
+        message_info = {
+            "model_provider": fallback_model_provider or message.response_metadata.get("model_provider", 'Custom Provider'),
+            "model": fallback_model_name or message.response_metadata.get("model", 'Custom Model'),
+            "total_duration":  current_timestamp - (fallback_timestamp or current_timestamp),
+            "total_tokens": (message.usage_metadata or {}).get("total_tokens", 0),
+            "id": message.id,
+        }
+        return message_info
+    
+    
+    async def append_info_message(
+        self,
+        generation_id: str,
+        client_id: str,
+        history_id: str,
+        timestamp: int,
+        additional_info: dict
+    ):
+        """
+        Append decorated message to memory service (LangChain message -> memory dict).
+
+        This method is a side-effect method and directly writes to memory service.
+
+        Compare to `create_dict_message` (formerly `create_memory`):
+        - This method DOES append to memory service internally.
+        - This method allows injecting `additional_info` into the message `extra` field.
+        - This method is intended for cases where extra runtime/contextual metadata
+        needs to be persisted together with the message.
+        - Message parsing capability is the same: AIMessage / AIMessageChunk / ToolMessage,
+        text content only at present.
+
+        Args:
+            client_id: Id to indicate which user the data is from.
+            history_id: Id to indicate which history the data belong to.
+            message (AIMessage | AIMessageChunk | ToolMessage):
+                Message object returned from LangGraph / LLM / Tool node.
+            additional_info (dict):
+                Extra metadata to be attached to memory message (stored in `extra` field).
+
+        Returns:
+            None
+        """
+        if history_id.startswith("sub_"): return
+        logger.trace('[context_process.py] [ ] [create_memory] Enter')
+        extra = additional_info
+        memory = {
+            "role": "info", 
+            "content": "", 
+            "extra": extra, 
+            "info": {}, 
+            "timestamp": timestamp, 
+            "generation_id": generation_id
+        }
+        await self.append_to_messages(client_id, history_id, memory)
+        
         
     async def update_longterm_memory(self, client_id: str, memorys: dict):
         """
@@ -484,8 +565,6 @@ class AIContextManager:
         Create agent messages list (dict list -> LangChain message objects).
 
         This method is now a pure converter:
-        - No memory append
-        - No memory fetch
         - Only transforms dict messages into LangChain messages
 
         Args:
@@ -507,7 +586,7 @@ class AIContextManager:
 
         NOTE:
         after_index should equals to msg_dict.get("info").get("id") when its ai message,
-        or equals to msg_dict.get("info").get("task_id") when its tool message,
+        or equals to msg_dict.get("info").get("task_id") when its tool message, but in 
         """
         logger.trace('[context_process.py] [AIContextManager] [create_agent_messages] Enter')
         logger.info(f"[create_agent_messages] client_messages count: {len(client_messages)}")
@@ -622,7 +701,7 @@ class AIContextManager:
         while messages_after_index and isinstance(messages_after_index[0], ToolMessage):
             messages_after_index.pop(0)
 
-        if after_index:
+        if after_index and messages_after_index:
             self._ensure_tool_message(messages_after_index)
             return messages_after_index
         self._ensure_tool_message(messages)
@@ -631,8 +710,8 @@ class AIContextManager:
     def create_dict_message(
         self,
         generation_id: str,
-        message: AIMessage | AIMessageChunk | ToolMessage,
-        timestamp: int,
+        message: AIMessage | AIMessageChunk | ToolMessage | SystemMessage,
+        timestamp: int, 
         *,
         fallback_model_provider: str = 'Custom Provider',
         fallback_model_name: str = 'Custom Model',
@@ -702,6 +781,14 @@ class AIContextManager:
                     "timestamp": timestamp,
                 }
 
+        elif isinstance(message, SystemMessage):
+            messages = {
+                "role": "system",
+                "content": message.content,
+                "generation_id": generation_id,
+                "timestamp": timestamp,
+            }
+
         else:
             logger.warning(
                 f"[create_dict_message] Unsupported message type ignored: {type(message)}"
@@ -709,12 +796,83 @@ class AIContextManager:
 
         return messages
     
+
+    def drop_tool_messages(
+        self,
+        input_messages: list[AnyMessage],
+        *,
+        split_by_todos: bool = True,
+        min_keep: int = 16
+    ) -> list[AnyMessage]:
+        """
+        Drop tool messages content in input message list.
+
+        Args:
+            split_by_todos[bool]: Split by todo item, drop the completed and keep the in_progress.
+            min_keep[int]: The min length of the tail that is not to be dropped.
+        """
+
+        if not input_messages:
+            return input_messages
+
+        n = len(input_messages)
+
+        # Tail protected region start index
+        protected_start = max(0, n - min_keep)
+
+        # Step1: find last write_todos
+        last_todo_idx = -1
+
+        if split_by_todos:
+            for i, msg in enumerate(input_messages):
+                # Only check AIMessage with tool_calls
+                if isinstance(msg, (AIMessage, AIMessageChunk)):
+                    tool_calls = msg.tool_calls
+                    if not tool_calls:
+                        continue
+
+                    # Check if any tool_call is write_todos
+                    for tc in tool_calls:
+                        if tc.get("name") == "write_todos":
+                            last_todo_idx = i
+                            break
+
+        # Step2: process messages
+        messages_after_drop = []
+
+        for i, msg in enumerate(input_messages):
+            # Keep tail untouched (highest priority)
+            if i >= protected_start:
+                messages_after_drop.append(msg)
+                continue
+
+            # Case1: no split or no write_todos found
+            if not split_by_todos or last_todo_idx == -1:
+                if isinstance(msg, ToolMessage):
+                    # mark outdated
+                    new_msg = copy.copy(msg)
+                    new_msg.content = "[Tool Result Outdated]"
+                    messages_after_drop.append(new_msg)
+                else:
+                    messages_after_drop.append(msg)
+                continue
+
+            # Case2: split_by_todos=True and found last write_todos
+            if isinstance(msg, ToolMessage) and i < last_todo_idx:
+                new_msg = copy.copy(msg)
+                new_msg.content = "[outdated]"
+                messages_after_drop.append(new_msg)
+            else:
+                messages_after_drop.append(msg)
+
+        return messages_after_drop
+    
     
     def split_messages(
         self,
         input_messages: list[AnyMessage],
         keep_recent: int = 14,
-    ) -> Tuple[list[AnyMessage], list[AnyMessage]]:
+    ) -> Tuple[list[AnyMessage], list[AnyMessage], list[SystemMessage]]:
         """
         Split messages into:
             - messages to summarize
@@ -780,19 +938,25 @@ class AIContextManager:
     def filter_agent_messages(
         self,
         input_messages: list[AnyMessage]
-    ) -> tuple[list[AnyMessage], str]:
+    ) -> tuple[list[AnyMessage], list[AnyMessage], str]:
         """
         Keep only summary-safe messages:
         - HumanMessage
-        - SystemMessage
         - AIMessage(content only)
 
         ToolMessage and AIMessage.tool_calls are dropped.
+        SystemMessage will return by a independent message list.
+
+        Return:
+            list[AnyMessage]: System message list.
+            list[AnyMessage]: AI and human messages after filtered.
+            str: message's id
         """
         logger.trace('[context_process.py] [AIContextManager] [filter_agent_messages] Enter')
         logger.info(f"[filter_agent_messages] client_messages count: {len(input_messages)}")
 
         messages = []
+        system_msgs = []
         index = ""
 
         for input_msg in input_messages:
@@ -812,239 +976,12 @@ class AIContextManager:
                 if not content: continue
                 messages.append(msg)
 
-            # else:
-            #     logger.warning(
-            #         f"[filter_agent_messages] Unsupport role ignored: {type(input_msg)}"
-            #     )
+            elif isinstance(input_msg, SystemMessage):
+                system_msgs.append(copy.copy(msg))
+
         logger.info(f"[filter_agent_messages] The latest message id is {index}")
-        return messages, index
-
-    
-    async def _create_memory(
-        self,
-        generation_id: str,
-        client_id: str,
-        history_id: str,
-        message: AIMessage | AIMessageChunk | ToolMessage,
-        timestamp: int
-    ):
-        """
-        NOTE:
-        This method has been deprecated by create_dict_message.
+        return system_msgs, messages, index
         
-        Create memory store in MySQL (lang graph message obj -> dict).
-        This method could only parse an AIMessage(or ToolMessage) obj
-        because it should only be called after llm node (or tool node).
-        This method is Only able to parese text message at now.
-
-        Args:
-            client_id: "Id to indicate which user the data is from.",
-            history_id: "Id to indicate which history the data belong to.",
-            message (AIMessage | AIMessageChunk | ToolMessage): Object of graph invoke/stream returned.
-
-        Returns:
-            None
-        """
-        logger.trace('[context_process.py] [AIContextManager] [create_memory] Enter')
-        logger.info(f"\n\n\033[32m[create_memory]\033[0m message: {message}")
-        if isinstance(message, AIMessage) or isinstance(message, AIMessageChunk):
-            think_content = (message.additional_kwargs or {}).get("reasoning_content", "")
-            extra = {} # Reserved
-            message_info = self._extract_mes_info(message)
-            memory = {"role": "ai", "content": message.content, "think": think_content, "extra": extra, "info": message_info, "generation_id": generation_id, "timestamp": timestamp}
-            await self.append_to_messages(client_id, history_id, memory)
-        elif isinstance(message, ToolMessage):
-            message_info = {
-                "name": message.name,
-                "task_id": message.tool_call_id
-            }
-            memory = {"role": "tools", "content": message.content, "info": message_info, "timestamp": timestamp}
-            await self.append_to_messages(client_id, history_id, memory)
-    
-    async def append_info_message(
-        self,
-        generation_id: str,
-        client_id: str,
-        history_id: str,
-        timestamp: int,
-        additional_info: dict
-    ):
-        """
-        Append decorated message to memory service (LangChain message -> memory dict).
-
-        This method is a side-effect method and directly writes to memory service.
-
-        Compare to `create_dict_message` (formerly `create_memory`):
-        - This method DOES append to memory service internally.
-        - This method allows injecting `additional_info` into the message `extra` field.
-        - This method is intended for cases where extra runtime/contextual metadata
-        needs to be persisted together with the message.
-        - Message parsing capability is the same: AIMessage / AIMessageChunk / ToolMessage,
-        text content only at present.
-
-        Args:
-            client_id: Id to indicate which user the data is from.
-            history_id: Id to indicate which history the data belong to.
-            message (AIMessage | AIMessageChunk | ToolMessage):
-                Message object returned from LangGraph / LLM / Tool node.
-            additional_info (dict):
-                Extra metadata to be attached to memory message (stored in `extra` field).
-
-        Returns:
-            None
-        """
-        if history_id.startswith("sub_"): return
-        logger.trace('[context_process.py] [ ] [create_memory] Enter')
-        extra = additional_info
-        memory = {"role": "info", "content": "", "extra": extra, "info": {}, "timestamp": timestamp, "generation_id": generation_id}
-        await self.append_to_messages(client_id, history_id, memory)
-
-    def _extract_mes_info(
-        self, 
-        message: AIMessage | AIMessageChunk,
-        *,
-        fallback_model_provider: str = 'Custom Provider',
-        fallback_model_name: str = 'Custom Model',
-        fallback_timestamp: int = 0,
-    ) -> dict:
-        current_timestamp = int(time.time() * 1000)
-        if not message.response_metadata:
-            message.response_metadata = {}
-        message_info = {
-            "model_provider": fallback_model_provider or message.response_metadata.get("model_provider", 'Custom Provider'),
-            "model": fallback_model_name or message.response_metadata.get("model", 'Custom Model'),
-            "total_duration":  current_timestamp - (fallback_timestamp or current_timestamp),
-            "total_tokens": (message.usage_metadata or {}).get("total_tokens", 0),
-            "id": message.id,
-        }
-        return message_info
-    
-    async def _get_work_dir_structure(
-        self,
-        work_dir,
-    ) -> SystemMessage:
-        """Deprecated method"""
-        # -------------------------
-        # Safety configuration
-        # -------------------------
-        MAX_NODES = 100
-        MAX_CHARS = 80_000
-        MAX_CHILDREN_PER_DIR = 100
-
-        if not work_dir:
-            return SystemMessage(content="No work_dir has been specified by the user.")
-
-        if not os.path.exists(work_dir):
-            return SystemMessage(content="Error: The configured work_dir path does not exist on the filesystem. Please ask the user to configure a valid existing directory.")
-
-        work_dir = os.path.abspath(work_dir)
-
-        total_nodes = 0
-        limit_reason = None
-
-        root: List[Dict[str, Any]] = []
-
-        # Use BFS traversal to avoid recursion depth issues
-        queue = deque()
-        queue.append((work_dir, root))
-
-        while queue:
-            current_path, parent_list = queue.popleft()
-
-            try:
-                entries = sorted(os.listdir(current_path))
-            except Exception:
-                continue
-
-            child_count = 0
-
-            for entry in entries:
-
-                # Ignore hidden files and directories
-                if entry.startswith("."):
-                    continue
-
-                if total_nodes >= MAX_NODES:
-                    limit_reason = "max_nodes_exceeded"
-                    parent_list.append({
-                        "name": "...",
-                        "type": "truncated",
-                        "reason": limit_reason
-                    })
-                    break
-
-                if child_count >= MAX_CHILDREN_PER_DIR:
-                    limit_reason = "max_children_per_directory_exceeded"
-                    parent_list.append({
-                        "name": "...",
-                        "type": "truncated",
-                        "reason": limit_reason
-                    })
-                    break
-
-                full_path = os.path.join(current_path, entry)
-
-                # Do not follow symbolic links
-                if os.path.islink(full_path):
-                    continue
-
-                if os.path.isdir(full_path):
-                    node = {
-                        "name": entry,
-                        "type": "directory",
-                        "children": []
-                    }
-                    parent_list.append(node)
-                    queue.append((full_path, node["children"]))
-                else:
-                    node = {
-                        "name": entry,
-                        "type": "file"
-                    }
-                    parent_list.append(node)
-
-                total_nodes += 1
-                child_count += 1
-
-            if limit_reason:
-                break
-
-        completeness = "complete" if not limit_reason else "partial"
-
-        result = {
-            "meta": {
-                "view_type": "safe_filtered_snapshot",
-                "completeness": completeness,
-                "limit_reason": limit_reason,
-                "hidden_entries_excluded": True,
-                "symbolic_links_followed": False,
-                "total_nodes_returned": total_nodes
-            },
-            "tree": root
-        }
-
-        content = json.dumps(result, ensure_ascii=False)
-
-        # -------------------------
-        # Character budget control
-        # -------------------------
-        if len(content) > MAX_CHARS:
-            result["meta"]["completeness"] = "partial"
-            result["meta"]["limit_reason"] = "max_char_budget_exceeded"
-            content = json.dumps(result, ensure_ascii=False)[:MAX_CHARS]
-
-        # -------------------------
-        # LLM-facing system prompt framing
-        # -------------------------
-        final_content = (
-            "Current work directory structure (safe filtered snapshot):\n"
-            "- The structure may be partial if safety limits were reached.\n"
-            "- If completeness is 'complete', the directory view is fully enumerated within safety constraints.\n\n"
-            "JSON:\n"
-            f"{content}"
-        )
-
-        return SystemMessage(content=final_content)
 
     async def fetch_available_documents(self, client_id: str) -> list:
         """

@@ -113,9 +113,7 @@ function afterLeave() {
   border: 1px solid rgb(255, 255, 255);
   background: rgba(243, 243, 243, 0.637);
   backdrop-filter: blur(14px);
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.12),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
 }
 
 /* ===== text ===== */

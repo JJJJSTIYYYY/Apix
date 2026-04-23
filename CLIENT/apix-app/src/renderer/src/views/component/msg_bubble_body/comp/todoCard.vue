@@ -1,144 +1,153 @@
 <template>
-  <div 
-    class="todo-card-wrapper"
-    :class="`status-${status}`"
-  >
-    <!-- Left Icon Area -->
-    <div class="icon-area">
-      
-      <!-- Loading spinner for in_progress -->
-      <div v-if="status === 'in_progress' && pending !== false" class="spinner"></div>
-
-      <!-- SVG for pending & completed & error -->
-      <svg t="1772106837681" v-else-if="status === 'completed'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4845" width="200" height="200"><path d="M939.388444 629.900889a34.287561 34.287561 0 1 1 66.095153 18.271766c-53.903309 195.069501-218.413202 342.107617-422.314589 370.77925C303.236595 1058.295401 44.391911 863.2259 5.048415 583.245487-34.29508 303.249075 160.75842 44.388391 440.706834 5.044895a510.329461 510.329461 0 0 1 199.949438 11.343855 34.287561 34.287561 0 0 1-17.279779 66.36715c-55.967283-14.559813-114.526533-18.031769-173.117782-9.791875C207.781818 107.043589 38.887982 331.232716 72.967545 573.69361 107.047109 816.170503 331.204237 985.112338 573.63313 951.032775a443.386319 443.386319 0 0 0 365.755314-321.131886z m25.119678-469.113989a34.287561 34.287561 0 1 1 50.399355 46.527404L574.065125 684.956184c-13.29583 14.399816-35.93554 14.751811-49.663364 0.76799l-229.597058-233.805004a34.287561 34.287561 0 0 1 48.911373-48.063384l204.381382 208.109333L964.508122 160.8029z" fill="#00e37d" p-id="4846"></path></svg>
-      <svg t="1772107037742" v-else-if="status === 'pending' || (status === 'in_progress' && pending === false)" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2537" width="200" height="200"><path d="M221.78789744 920.38454701c-15.71774359 0-28.4991453-12.78249572-28.49914531-28.4991453s12.78140171-28.50023931 28.49914531-28.50023932h28.99145299V732.11186325c0-88.83309402 74.38659829-147.01948718 128.70345299-189.51111112 14.95521367-11.70160684 33.45723077-26.17545299 42.02119658-35.78201708l4.02160684-4.51500856-4.20102564-4.34652991c-8.86700854-9.1580171-27.59111111-22.61770941-42.6425983-33.43425641-54.56300854-39.20957265-129.26905983-92.90393162-129.26905982-178.6945641V160.61483761h-27.63049573a28.53305983 28.53305983 0 0 1-28.50023932-28.4991453 28.53305983 28.53305983 0 0 1 28.4991453-28.50023932h580.44170941a28.53305983 28.53305983 0 0 1 28.50023931 28.4991453 28.52758974 28.52758974 0 0 1-28.4991453 28.50023932h-27.63158974v125.22447863c0 85.80157265-74.71699146 139.49046154-129.26358975 178.6945641-15.07336752 10.83295726-33.79309402 24.28717949-42.6371282 33.43425641l-4.20649573 4.34762394 4.02707693 4.51391452c8.55302564 9.60109402 27.03316239 24.0574359 41.88663248 35.67589744 54.44594872 42.58680342 128.8259829 100.76225641 128.8259829 189.61723077v131.27329914h29.0045812a28.53305983 28.53305983 0 0 1 28.50461539 28.49476923 28.33176069 28.33176069 0 0 1-8.33969231 20.15835898 28.31535043 28.31535043 0 0 1-20.15398291 8.34735043h-580.45264957z m84.62550427-634.54523077c0 56.56287179 58.51131624 98.6114188 105.52888888 132.40451282 39.70844444 28.53962393 71.06516239 51.07418803 71.0651624 83.89251282 0 31.85449572-30.18064957 55.45900854-68.38700855 85.35302564-47.61162393 37.23815385-106.8351453 83.56758974-106.83514529 144.62249573v131.26782906h408.44034188V732.11186325c0-61.0494359-59.22352136-107.38434188-106.81217095-144.60499146-38.22386325-29.91152136-68.40451282-53.52150428-68.40451282-85.37709402 0-32.81176069 31.35671795-55.34632479 71.05422223-83.87938461 47.02851282-33.79418803 105.53982906-75.84820513 105.53982905-132.41107692V160.61483761H306.41449572v125.22447863z" fill="#2C2C2C" p-id="2538"></path><path d="M412.28820513 765.81538462c-13.6 0-24.66461538-11.06461538-24.66461539-24.66564103s11.06461538-24.66461538 24.66461539-24.66461538h199.42871795c13.6 0 24.66461538 11.06461538 24.66461538 24.66461538s-11.06461538 24.66666667-24.66461538 24.66666667H412.28717949z" fill="#2C2C2C" p-id="2539"></path></svg>
-      <svg t="1772109073754" v-else-if="status === 'error'" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3529" width="200" height="200"><path d="M1007.983211 512c0-273.924743-222.059492-495.984235-495.983211-495.984235S16.016789 238.075257 16.016789 512s222.059492 495.984235 495.984235 495.984235c113.738437 0 221.667565-38.428218 308.796972-107.830891 10.45205-8.325619 12.175297-23.547299 3.849678-33.998325-8.325619-10.45205-23.547299-12.175297-33.998325-3.849678-78.636988 62.638619-175.962617 97.290837-278.648324 97.290837-247.200078 0-447.595154-200.395076-447.595154-447.595154S264.799922 64.404846 512 64.404846s447.595154 200.395076 447.595154 447.595154c0 84.755336-23.572882 165.977195-67.401086 236.329497-7.065929 11.341303-3.598968 26.263154 7.742335 33.329083 11.341303 7.065929 26.263154 3.598968 33.329083-7.742335C981.841831 695.941336 1007.983211 605.866854 1007.983211 512zM524.260232 537.694195 371.999432 692.738387c-9.362228 9.534144-24.681122 9.67229-34.214243 0.310062-9.533121-9.362228-9.67229-24.681122-0.310062-34.214243l152.875806-155.669432L337.475128 347.495342c-9.362228-9.534144-9.224082-24.852014 0.310062-34.214243 9.534144-9.362228 24.852014-9.224082 34.214243 0.310062l152.260799 155.044192 152.261822-155.044192c9.362228-9.534144 24.681122-9.67229 34.214243-0.310062 9.533121 9.362228 9.67229 24.681122 0.310062 34.214243L558.170552 503.164774l152.875806 155.669432c9.362228 9.533121 9.224082 24.852014-0.310062 34.214243-9.534144 9.362228-24.852014 9.224082-34.214243-0.310062L524.260232 537.694195z" fill="#e30000" p-id="3530"></path></svg>
+  <div class="task-row" :class="`task-row--${computedStatus}`">
+    <!-- 状态指示器 -->
+    <div class="task-row__indicator">
+      <div v-if="isLoading" class="indicator indicator--spinning" />
+      <div v-else class="indicator" :class="`indicator--${computedStatus}`">
+        <svg v-if="computedStatus === 'completed'" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg v-else-if="computedStatus === 'error'" viewBox="0 0 16 16" fill="none">
+          <path d="M8 5V9M8 11H8.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
     </div>
 
-    <!-- Content -->
-    <div class="todo-content">
+    <!-- 内容 -->
+    <div class="task-row__content">
       {{ content }}
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{
-  content: string,
-  status: "pending" | "in_progress" | "completed" | "error",
+import { computed } from 'vue'
+
+type Status = 'pending' | 'in_progress' | 'completed' | 'error'
+
+interface Props {
+  content: string
+  status: Status
   pending?: boolean
-}>()
+}
+
+const props = defineProps<Props>()
+
+const isLoading = computed(() => props.status === 'in_progress' && props.pending !== false)
+const computedStatus = computed(() => {
+  if (props.status === 'in_progress' && props.pending === false) return 'pending'
+  return props.status
+})
 </script>
 
 <style scoped>
-
-/* ===== Wrapper ===== */
-.todo-card-wrapper {
-  display: grid;
-  grid-template-columns: 18px auto;
+.task-row {
+  display: flex;
   align-items: center;
   gap: 12px;
-
-  padding: 10px 14px;
-  border-radius: 10px;
-
-  font-size: 15px;
-  line-height: 1.6;
-
-  background: rgba(255, 255, 255, 0.573);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-
-  transition: all 0.25s ease;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #1a1a1a;
+  transition: background-color 0.15s ease;
 }
 
-/* Subtle hover effect */
-.todo-card-wrapper:hover {
-  transform: scale(1.01);
+.task-row:hover {
+  background-color: #f5f5f5;
 }
 
-.todo-card-wrapper.status-pending {
-  border: 1px solid #aaaaaa6d;
+/* 完成状态 */
+.task-row--completed {
+  color: #6b7280b4;
 }
 
-.todo-card-wrapper.status-in_progress {
-  border: 1px solid #0037ff6d;
+.task-row--completed .task-row__content {
+  text-decoration: line-through;
+  text-decoration-color: #2c2d2e82;
 }
 
-.todo-card-wrapper.status-completed {
-  border: 1px solid #00e37d91;
+/* 错误状态 */
+.task-row--error {
+  color: #dc2626;
+  background-color: #fef2f2;
 }
 
-.todo-card-wrapper.status-error {
-  border: 1px solid #e3000091;
+.task-row--error:hover {
+  background-color: #fee2e2;
 }
 
-/* ===== Icon Area ===== */
-.icon-area {
-  width: 20px;
-  height: 20px;
+/* 等待状态 */
+.task-row--pending {
+  color: #6b7280;
+}
+
+/* 状态指示器 */
+.task-row__indicator {
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* ===== Loading Spinner ===== */
-.spinner {
-  width: 16px;
-  height: 16px;
+.indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-sizing: border-box; /* 关键修复：border 不再增加尺寸 */
+  border: 1.5px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
 
-  border: 2px solid rgba(77, 159, 252, 0.2);
-  border-top-color: rgba(0, 60, 255, 0.85);
+/* 各状态样式 */
+.indicator--pending {
+  border-color: #d1d5db;
+}
 
-  border-radius: 16px;
-  animation: spin 0.8s linear infinite;
+.indicator--in_progress {
+  border-color: #3b82f6;
+  border-top-color: transparent;
+}
+
+.indicator--completed {
+  background-color: #10b981;
+  border-color: #10b981;
+  color: white;
+}
+
+.indicator--error {
+  background-color: #dc2626;
+  border-color: #dc2626;
+  color: white;
+}
+
+/* 加载动画 */
+.indicator--spinning {
+  border-color: #3b82f6;
+  border-top-color: transparent;
+  animation: spin 0.6s linear infinite;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-/* ===== Placeholder SVG ===== */
-.placeholder-svg {
-  width: 16px;
-  height: 16px;
-  opacity: 0.4;
+/* 图标 */
+.indicator svg {
+  width: 10px;
+  height: 10px;
 }
 
-/* ===== Content ===== */
-.todo-content {
+/* 内容区域 */
+.task-row__content {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
 }
-
-/* ===== Status Styling ===== */
-
-/* Pending */
-.status-pending {
-  opacity: 0.75;
-}
-
-/* In Progress */
-.status-in_progress {
-  font-weight: 500;
-}
-
-/* Completed */
-.status-completed {
-  opacity: 0.55;
-  text-decoration: line-through;
-}
-
 </style>

@@ -14,6 +14,7 @@ const api = {
   updateConversation: (cid, sid, hid, new_info) => electron.ipcRenderer.invoke("api:update_conversation", cid, sid, hid, new_info),
   getChatlist: (cid) => electron.ipcRenderer.invoke("api:fetch_chat_list", cid),
   getChatMsgs: (cid, sid, hid) => electron.ipcRenderer.invoke("api:fetch_chat_messages", cid, sid, hid),
+  deleteMsgs: (cid, hid, gen_ids) => electron.ipcRenderer.invoke("api:delete_messages", cid, hid, gen_ids),
   startTask: (tid) => electron.ipcRenderer.invoke("api:start_task", tid),
   killTask: (tname, tid, cid, hid) => electron.ipcRenderer.invoke("api:kill_task", tname, tid, cid, hid),
   getTaskInfo: (tid) => electron.ipcRenderer.invoke("api:fetch_task_info", tid),

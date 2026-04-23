@@ -23,6 +23,8 @@ const api = {
     ipcRenderer.invoke('api:fetch_chat_list', cid),
   getChatMsgs: (cid, sid, hid) =>
     ipcRenderer.invoke('api:fetch_chat_messages', cid, sid, hid),
+  deleteMsgs: (cid, hid, gen_ids) =>
+    ipcRenderer.invoke('api:delete_messages', cid, hid, gen_ids),
   startTask: (tid) =>
     ipcRenderer.invoke('api:start_task', tid),
   killTask: (tname, tid, cid, hid) =>

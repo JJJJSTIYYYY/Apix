@@ -4,6 +4,11 @@
   user-select: none; /* 标准属性 */
 }
 
+::selection {
+  background-color: rgb(133, 186, 188);  /* 选取背景色 */
+  color: #ffffff;              /* 选取文字颜色 */
+}
+
 .main-area {
   background: #ffffffa7;
 }

@@ -34,13 +34,13 @@
         <div 
           class="btn-area"
         >
-          <el-button
+          <button
             plain
             class="close-btn"
             @click="emit('close')"
           >
-            关闭
-          </el-button>
+            ×
+          </button>
         </div>
       </header>
 
@@ -73,7 +73,7 @@
                   {{ item.value }}
                 </div>
 
-                <div class="kv-expand" v-else>
+                <div class="kv-expand" :class="{isSelect: item.active}" v-else>
                   ▶
                 </div>
               </div>
@@ -406,14 +406,10 @@ watch(
   color: #333;
   overflow: hidden;
   border-radius: 20px;
-  background: rgba(247, 248, 248, 0.939);
-  backdrop-filter: blur(3px);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -3px 1px rgba(255, 242, 247, 0.635);
+  background: rgb(247, 248, 248);
+  border-top: 3px solid rgba(43, 159, 140, 0.509);
+  border-bottom: 3px solid rgba(43, 159, 140, 0.509);
+  box-shadow:0 10px 26px rgba(0, 0, 0, 0.166);
 
   /* Width + enter/leave damping */
   transition:
@@ -549,7 +545,12 @@ watch(
 
 .kv-expand {
   font-size: 12px;
-  color: #999;
+  color: #9999992a;
+}
+
+.kv-expand.isSelect {
+  font-size: 12px;
+  color: #999999de;
 }
 
 /* ------------------------
@@ -564,74 +565,49 @@ watch(
 }
 
 .path-ctrl-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 32px;
+  width: 28px;
+  height: 28px;
+  border-radius: 28px;
 
-  background: rgba(239, 239, 239, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -0.5px 2px rgba(136, 58, 68, 0.1);
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
 
-  color: rgba(0, 0, 0, 0.443);
-
-  transition: all 0.2s ease;
+  color: #555555;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .path-ctrl-btn:hover {
-  transform: scale(1.2);
-  background: rgba(255, 255, 255, 0.702);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.155),
-    0 2px 6px rgba(0, 0, 0, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -0.5px 4px rgba(169, 201, 197, 0.18);
+  background: rgba(255, 255, 255, 0.435);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.09);
 }
 
 .path-ctrl-btn:active {
   background: rgba(255, 255, 255, 0.429);
-  transform: scale(0.1);
-}
-
-.before-btn:hover {
-  transform: scale(1.09) translateX(-2px);
-}
-
-.after-btn:hover {
-  transform: scale(1.09) translateX(2px);
 }
 
 .close-btn {
-  border-radius: 10px;
-  transition: all 0.15s ease;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
 
-  background: rgba(239, 239, 239, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -0.5px 2px rgba(136, 58, 68, 0.1);
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+
+  color: #555555;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .close-btn:hover {
-  transform: scale(1.05);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: rgba(255, 0, 0, 0.42) !important;
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.155),
-    0 2px 6px rgba(0, 0, 0, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -0.5px 4px rgba(169, 201, 197, 0.18);
+  color: #be0e0e;
+  background: rgba(255, 47, 0, 0.196);
 }
 
 .close-btn:active {
-  background: rgba(255, 255, 255, 0.429);
-  color: rgba(255, 0, 0, 0.42) !important;
-  transform: scale(0.98);
+  transform: scale(0.9);
 }
 
 /* ------------------------
@@ -678,12 +654,7 @@ watch(
 
 .footer-label:hover { 
   color: #012b2ac4;
-  background: #93c1ba13;
-  border: 1px solid #ffffff80;
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.135),
-    0 2px 6px rgba(0, 0, 0, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -0.5px 4px rgba(169, 201, 197, 0.18);
+  border: 1px solid #83838380;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
 }
 </style>

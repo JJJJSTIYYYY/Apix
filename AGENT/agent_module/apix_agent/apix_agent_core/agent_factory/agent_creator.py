@@ -173,7 +173,15 @@ class AgentCreator:
         graph.add_edge("context_summary", "llm_call")
 
         graph.add_node("messages_persist", agent_node.messages_persist)
-        graph.add_edge("llm_call", "messages_persist")
+        graph.add_conditional_edges(
+            "llm_call",
+            agent_node.route_after_llm,
+            {
+                "retry": "llm_call",
+                "summary": "context_summary",
+                "ok": "messages_persist",
+            },
+        )
 
         if not pure_chat_on:
             graph.add_node("tools", ToolNode(tools))

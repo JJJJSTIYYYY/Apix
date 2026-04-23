@@ -17,6 +17,7 @@ class StreamEvent(str, Enum):
     TOOL_EXEC_START = "tool_exec_start"
     TOOL_EXEC_MIDDLE = "tool_exec_middle"
     TOOL_EXEC_END = "tool_exec_end"
+    RUNTIME_WARNING = "runtime_warning"
     ERROR_OCCURRED = "error_occurred"
 
 

@@ -188,10 +188,10 @@ class DataExecutors:
                 return res
 
             # 2. Best-effort backfill Redis
-            messages_redis = payload.get("messages")[-1]
+            messages_redis = payload.get("messages")
             messages_redis.update(res.get("messages"))
             payload.update({
-                "messages": [messages_redis]
+                "messages": messages_redis
             })
             try:
                 await self.redis.append_messages(payload)
@@ -215,35 +215,101 @@ class DataExecutors:
                 "messages": f"fail: {e}",
             }
 
+    @task_handler("delete_messages")
+    async def delete_messages(self, payload: dict) -> dict:
+        """
+        Delete one or more message from MySQL and try to expire Redis.
+
+        Workflow:
+        - Delete message from MySQL (source of truth)
+        - Expire cache in Redis if exists
+
+        Redis failure NOT fail the whole operation.
+        """
+        try:
+            logger.info("[DataExecutors][delete_messages] enter.")
+
+            try:
+                await self.redis.expire_immediately(payload)
+            except Exception as e:
+                # Redis failure should not break main flow
+                logger.warning(
+                    f"[DataExecutors][delete_messages] Redis backfill failed: {e}"
+                )
+
+            res = await self.mysql.delete_messages(payload)
+            if not res.get("success"):
+                return res
+            
+            msg_info = res.get("messages", []) or []
+            mem_ids = []
+            for info in msg_info:
+                mem_id = info.get("id")
+                if not mem_id: continue
+                mem_ids.append(mem_id)
+
+            if mem_ids:
+                sm_payload = {
+                    "client_id": payload.get("client_id", ""),
+                    "history_id": payload.get("history_id", ""),
+                    "memory_id": mem_ids
+                }
+
+                res = await self.mysql.delete_shortterm_memory(sm_payload)
+                if not res.get("success"):
+                    return res
+
+            return {
+                "success": True,
+                "messages": "success",
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][delete_messages] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
     @task_handler("get_messages")
     async def get_messages(self, payload: dict) -> dict:
         """
-        Fetch conversation messages.
+        Fetch FULL conversation messages (no cursor).
 
         Workflow:
-        1. Preserve original cursor
-        2. Try fetch from Redis using original cursor
-        3. On Redis miss, fetch full messages from MySQL (cursor forced to 1)
-        4. Backfill Redis with full messages (best effort)
-        5. Return messages starting from original cursor
+        1. Try fetch FULL messages from Redis
+        2. On Redis miss, fetch FULL messages from MySQL
+        3. Backfill Redis (best effort)
+        4. Return filtered FULL messages
         """
         try:
             logger.info("[DataExecutors][get_messages] enter.")
 
-            # 1. Preserve original cursor (1-based)
-            origin_cursor = payload.get("cursor", 1)
-            if origin_cursor < 1:
-                origin_cursor = 1
-
-            # 2. Try Redis first (use original cursor)
+            # 1. Try Redis first (FULL messages)
             redis_res = await self.redis.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
+                messages = redis_res.get("messages", [])
+
+                # Filter once
+                parsed_messages = []
+                for msg in messages:
+                    if msg.get('role') not in ('info') and not msg.get('is_deleted'):
+                        extra = msg.get('extra', {})
+                        info = msg.get('info', {})
+                        if not isinstance(extra, dict): extra = json.loads(extra) 
+                        if not isinstance(info, dict): info = json.loads(info)
+                        msg['extra'] = extra
+                        msg['info'] = info
+                        parsed_messages.append(msg)
+
+                redis_res["messages"] = parsed_messages
                 return redis_res
 
-            # 3. Redis miss -> fetch FULL messages from MySQL
-            #    Force cursor = 1, do NOT pollute original payload
+            # 2. Redis miss -> fetch FULL messages from MySQL
             mysql_payload = payload.copy()
-            mysql_payload["cursor"] = 1
+            mysql_payload["cursor"] = 1  # keep compatibility with existing DAO
 
             mysql_res = await self.mysql.fetch_messages_after_cursor(mysql_payload)
             if not mysql_res.get("success"):
@@ -251,13 +317,11 @@ class DataExecutors:
 
             messages = mysql_res.get("messages", [])
             if not messages:
-                # No messages at all, nothing to backfill or slice
                 return mysql_res
 
-            # 4. Backfill Redis with FULL messages (best effort)
+            # 3. Backfill Redis with FULL messages (best effort)
             try:
                 backfill_payload = payload.copy()
-                backfill_payload["cursor"] = 1
                 backfill_payload["messages"] = messages
                 await self.redis.backfill_messages(backfill_payload)
             except Exception as e:
@@ -265,10 +329,19 @@ class DataExecutors:
                     f"[DataExecutors][get_messages] Redis backfill failed: {e}"
                 )
 
-            # 5. Slice messages from original cursor (1-based -> 0-based)
-            start_index = max(origin_cursor - 1, 0)
-            mysql_res["messages"] = messages[start_index:]
+            # 4. Filter once
+            parsed_messages = []
+            for msg in messages:
+                if msg.get('role') not in ('info') and not msg.get('is_deleted'):
+                    extra = msg.get('extra', {})
+                    info = msg.get('info', {})
+                    if not isinstance(extra, dict): extra = json.loads(extra) 
+                    if not isinstance(info, dict): info = json.loads(info) 
+                    msg['extra'] = extra
+                    msg['info'] = info
+                    parsed_messages.append(msg)
 
+            mysql_res["messages"] = parsed_messages
             return mysql_res
 
         except Exception as e:
@@ -279,10 +352,91 @@ class DataExecutors:
                 "success": False,
                 "messages": f"fail: {e}",
             }
-        
+
     @task_handler("get_messages_for_user")
     async def get_messages_for_user(self, payload: dict) -> dict:
         """
+        Fetch FULL conversation messages (no cursor).
+
+        Workflow:
+        1. Try fetch FULL messages from Redis
+        2. On Redis miss, fetch FULL messages from MySQL
+        3. Backfill Redis (best effort)
+        4. Return filtered FULL messages
+        """
+        try:
+            logger.info("[DataExecutors][get_messages_for_user] enter.")
+
+            # 1. Try Redis first (FULL messages)
+            redis_res = await self.redis.get_recent_messages(payload)
+            if redis_res.get("success") and redis_res.get("cache_hit"):
+                messages = redis_res.get("messages", [])
+
+                # Filter once
+                parsed_messages = []
+                for msg in messages:
+                    if msg.get('role') in ('ai', 'human', 'info') and not msg.get('is_deleted'):
+                        extra = msg.get('extra', {})
+                        info = msg.get('info', {})
+                        if not isinstance(extra, dict): extra = json.loads(extra) 
+                        if not isinstance(info, dict): info = json.loads(info) 
+                        msg['extra'] = extra
+                        msg['info'] = info
+                        parsed_messages.append(msg)
+
+                redis_res["messages"] = parsed_messages
+                return redis_res
+
+            # 2. Redis miss -> fetch FULL messages from MySQL
+            mysql_payload = payload.copy()
+            mysql_payload["cursor"] = 1  # keep compatibility with existing DAO
+
+            mysql_res = await self.mysql.fetch_messages_after_cursor(mysql_payload)
+            if not mysql_res.get("success"):
+                return mysql_res
+
+            messages = mysql_res.get("messages", [])
+            if not messages:
+                return mysql_res
+
+            # 3. Backfill Redis with FULL messages (best effort)
+            try:
+                backfill_payload = payload.copy()
+                backfill_payload["messages"] = messages
+                await self.redis.backfill_messages(backfill_payload)
+            except Exception as e:
+                logger.warning(
+                    f"[DataExecutors][get_messages_for_user] Redis backfill failed: {e}"
+                )
+
+            # 4. Filter once
+            parsed_messages = []
+            for msg in messages:
+                if msg.get('role') in ('ai', 'human', 'info') and not msg.get('is_deleted'):
+                    extra = msg.get('extra', {})
+                    info = msg.get('info', {})
+                    if not isinstance(extra, dict): extra = json.loads(extra) 
+                    if not isinstance(info, dict): info = json.loads(info) 
+                    msg['extra'] = extra
+                    msg['info'] = info
+                    parsed_messages.append(msg)
+
+            mysql_res["messages"] = parsed_messages
+            return mysql_res
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_messages_for_user] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("_get_messages_for_user")
+    async def _get_messages_for_user(self, payload: dict) -> dict:
+        """
+        Deprecated.
         Fetch conversation timeline for user rendering.
 
         Workflow:

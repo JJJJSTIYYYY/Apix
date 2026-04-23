@@ -173,6 +173,32 @@ export function registerAiIpc() {
     }
   })
 
+  ipcMain.handle('api:delete_messages', async (event, cid, hid, gen_ids) => {
+    try {
+      const res = await fetch(`${MEMORY_API_BASE}/memory/memory/delete_messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: cid,
+          history_id: hid,
+          messages: gen_ids ?? []
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.detail || "Delete messages failed.")
+      }
+
+      return data
+    } catch (err) {
+      console.error("Delete messages error:", err)
+      throw err
+    }
+  })
+
   ipcMain.handle('api:start_task', async (event, tid) => {
     try {
       const res = await fetch(`${TOOLS_API_BASE}/task/start`, {

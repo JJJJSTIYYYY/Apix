@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import asyncio
 
 from langchain.chat_models import BaseChatModel
 from langgraph.graph.state import Command
@@ -67,31 +68,16 @@ class AgentNodeBase(ABC):
     def _should_inject_alert(
         self,
         llm_calls: int,
-        llm_calls_warning_threshold: int,
-        summary_exempt_tail_length: int,
+        threshold: int,
     ) -> bool:
         """
         Determine whether to inject system alert message.
-
-        Rules:
-        1. First time reaching threshold -> alert
-        2. After threshold -> periodically alert based on summary_exempt_tail_length
         """
 
         next_llm_calls = llm_calls + 1
-        threshold = llm_calls_warning_threshold
 
-        # First hit threshold
         if next_llm_calls == threshold:
             return True
-
-        # After threshold
-        if next_llm_calls > threshold:
-            exceed_count = next_llm_calls - threshold
-            if summary_exempt_tail_length > 0:
-                trigger_round = exceed_count // summary_exempt_tail_length
-                if trigger_round >= 1:
-                    return True
 
         return False
 
@@ -109,6 +95,19 @@ class AgentNodeBase(ABC):
         elif isinstance(last_message, ToolMessage):
             return "llm"
         return END
+    
+    async def route_after_llm(self, state: MainAgentState):
+        exception_type = state.get("error")
+        if state.get("llm_retry_count", 0) > 0 and exception_type:
+            logger.warning(f"Redirect to llm call because of {exception_type}")
+            if exception_type == "others":
+                return "retry"
+            elif exception_type == "rate_limit":
+                await asyncio.sleep(5)
+                return "retry"
+            elif exception_type == "token_exceed":
+                return "summary"
+        return "ok"
         
 
     @abstractmethod

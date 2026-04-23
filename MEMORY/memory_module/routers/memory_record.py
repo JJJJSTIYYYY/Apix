@@ -35,23 +35,23 @@ async def append_message(req: Request):
             "client_id": str,
             "history_id": str,
             "session_id": str,
-            "messages": [  # list of message dicts
-                {
-                    "role": 'human', 'ai', 'system', 'tool',
-                    "content": str,
-                    "think": str,  # optional
-                    "extra": {...}  # optional extra metadata
-                    "info": {
-                        "model": "...",
-                        "total_duration": "...",
-                        "model_provider": "...",
-                        "total_tokens": int,
-                        "id": "",
-                    }, 
-                    "timestamp": int
-                },
-                ...
-            ]
+            "messages": {
+                "role": 'human', 'ai', 'system', 'tool',
+                "content": str,
+                "think": str,  # optional
+                "extra": {...}  # optional extra metadata
+                "info": {
+                    "model": "...",
+                    "total_duration": "...",
+                    "model_provider": "...",
+                    "total_tokens": int,
+                    "id": "",
+                }, 
+                "timestamp": int,
+                "generation_id": str,
+                "node_id": str,
+                "parent_id": str
+            }
         }
 
     Returns:
@@ -66,6 +66,50 @@ async def append_message(req: Request):
 
     query_id = await dsm.submit_query(
         action="append_message",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+@router.post("/memory/memory/delete_messages")
+async def delete_messages(req: Request):
+    """
+    Delete one oe more message in database.
+
+    Behavior:
+    - Delete message from MySQL (source of truth)
+    - Expire cache in Redis if exists
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+            "history_id": str,
+            "session_id": str,
+            "messages": [  # list of message generation_id and role
+                {
+                    "generation_id": str,
+                    "role": str # ai or human
+                }
+            ]
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": str
+        }
+    """
+    logger.info(f"[API][delete_messages] enter.")
+    payload = await req.json()
+    logger.info(f"[API][delete_messages] payload:\n{payload}")
+
+    query_id = await dsm.submit_query(
+        action="delete_messages",
         payload=payload,
     )
     result = await dsm.wait_result(query_id)

@@ -127,16 +127,24 @@ class RedisService:
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
                 "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
                 "session_id": "{{ sid }} : to indicate which tab the data belong to",
-                "messages": [  # list of message dicts
-                    {
-                        "role": 'human', 'ai', 'system', 'tool',
-                        "content": "message content",
-                        "extra": {...}  # optional extra metadata
-                        "cursor": int # Unique monotonic increasing index in Mysql
-                        "created_at": "date string"
-                    },
-                    ...
-                ]
+                "messages": {
+                    "role": 'human', 'ai', 'system', 'tool', 'info'
+                    "content": "message content",
+                    "think": "",
+                    "extra": {...},
+                    "info": {
+                        "model": "...",
+                        "total_duration": "...",
+                        "model_provider": "...",
+                        "total_tokens": int,
+                        "id": "",
+                    }, 
+                    "node_id": int,
+                    "parent_id": int,
+                    "msg_cursor": int,
+                    "timestamp": int,
+                    "created_at": str
+                }
             }
 
         Return:
@@ -156,13 +164,10 @@ class RedisService:
                     "messages": "success",
                 }
 
-            messages = payload.get("messages", [])
-            if not isinstance(messages, list):
-                raise ValueError("[RedisService][append_messages] messages must be a list")
+            messages = payload.get("messages", {})
 
             async with self._memo_redis.pipeline() as pipe:
-                for msg in messages:
-                    pipe.rpush(key, json.dumps(msg, ensure_ascii=False))
+                pipe.rpush(key, json.dumps(messages, ensure_ascii=False))
 
                 pipe.expire(key, DEFAULT_EXPIRE_SECONDS)
                 await pipe.execute()
@@ -178,9 +183,65 @@ class RedisService:
                 "success": False, 
                 "messages": f"fail: {e}"
             }
-
+        
     @task_handler("redis.memo.backfill_messages")
     async def backfill_messages(self, payload: dict) -> dict:
+        """
+        Backfill FULL messages into Redis (overwrite mode).
+
+        This method should only be called after fetching FULL messages from MySQL.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }}",
+                "history_id": "{{ hid }}",
+                "session_id": "{{ sid }}",
+                "messages": [ ... ]  # FULL message list
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "success / fail: {e}",
+            }
+        """
+        logger.info(f"[RedisService][backfill_messages] enter.")
+
+        try:
+            key = self._build_memo_key(payload)
+            messages = payload.get("messages", [])
+
+            if not isinstance(messages, list):
+                raise ValueError("[RedisService][backfill_messages] messages must be a list")
+
+            # Empty list is allowed → clear cache
+            async with self._memo_redis.pipeline() as pipe:
+                # ---- Overwrite instead of append ----
+                pipe.delete(key)
+
+                if messages:
+                    pipe.rpush(
+                        key,
+                        *[json.dumps(msg, ensure_ascii=False) for msg in messages]
+                    )
+
+                pipe.expire(key, DEFAULT_EXPIRE_SECONDS)
+                await pipe.execute()
+
+            return {
+                "success": True,
+                "messages": "success",
+            }
+
+        except Exception as e:
+            logger.exception(f"[RedisService][backfill_messages] error: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}"
+            }
+
+    @task_handler("_redis.memo.backfill_messages")
+    async def _backfill_messages(self, payload: dict) -> dict:
         """
         Append message whether redis key already exists. If not exist, create and append, else append only.
         This method should only be called after querying messages in MySQL and then backfilling Redis.
@@ -240,9 +301,61 @@ class RedisService:
                 "success": False, 
                 "messages": f"fail: {e}"
             }
-
+        
     @task_handler("redis.memo.get_recent_messages")
     async def get_recent_messages(self, payload: dict) -> dict:
+        """
+        Fetch FULL messages from Redis cache (no cursor).
+
+        Redis miss should be handled by caller (fallback to MySQL and backfill).
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }}",
+                "history_id": "{{ hid }}",
+                "session_id": "{{ sid }}"
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or [...] (list of message dicts),
+                "cache_hit": bool
+            }
+        """
+        logger.info("[RedisService][get_recent_messages] enter.")
+
+        try:
+            key = self._build_memo_key(payload)
+
+            # ---- Fetch FULL list from Redis ----
+            raw = await self._memo_redis.lrange(key, 0, -1)
+            if not raw:
+                # Redis miss: empty or expired
+                return {
+                    "success": True,
+                    "messages": [],
+                    "cache_hit": False,
+                }
+
+            # ---- Decode all messages ----
+            messages = [json.loads(m) for m in raw]
+
+            return {
+                "success": True,
+                "messages": messages,
+                "cache_hit": True,
+            }
+
+        except Exception as e:
+            logger.exception(f"[RedisService][get_recent_messages] error: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("_redis.memo.get_recent_messages")
+    async def _get_recent_messages(self, payload: dict) -> dict:
         """
         Incremental fetch from Redis cache.
         Redis miss should be handled by caller (fallback to MySQL and then backfill to redis and set TTL).

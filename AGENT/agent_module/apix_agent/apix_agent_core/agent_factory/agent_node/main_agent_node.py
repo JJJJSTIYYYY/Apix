@@ -1,9 +1,7 @@
-import asyncio
-import time
+from openai import BadRequestError, RateLimitError
 
 from langchain.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage, ToolMessage, AIMessage
-from langgraph.graph import END
 from langgraph.graph.state import Command
 from langgraph.types import Overwrite
 
@@ -137,23 +135,160 @@ class MainAgentNode(AgentNodeBase):
         else: raise TypeError("Unkonw role when invoke agent.")
         
 
+    # async def _context_summary(self, state: MainAgentState) -> Command:
+    #     """
+    #     Context summary or truncate node.
+
+    #     Trigger condition:
+    #         len(messages) >= summary_trigger_threshold
+
+    #     Behavior:
+    #         enable_shortterm_memory = True
+    #             -> summarize old messages
+    #             -> keep last `summary_exempt_tail_length` messages
+
+    #         enable_shortterm_memory = False
+    #             -> directly truncate history
+    #             -> keep last `summary_exempt_tail_length` messages
+
+    #     Tool call boundaries are preserved via split_messages().
+    #     """
+    #     logger.trace('[agent.py] [AgentNode] [context_summary] Enter')
+
+    #     # Config
+    #     config = state.get("config", {})
+    #     enable_shortterm_memory = config.get("enable_shortterm_memory")
+    #     summary_trigger_threshold = config.get("summary_trigger_threshold")
+    #     summary_exempt_tail_length = config.get("summary_exempt_tail_length")
+
+    #     # State
+    #     llm_retry_count = state.get("llm_retry_count", 0)
+    #     last_error = state.get("error", "")
+    #     context_compress_level = state.get("context_compress_level", 0)
+    #     shortterm_memory = state.get("shortterm_memory", "")
+
+    #     # Messages
+    #     messages = state.get("messages", [])
+
+    #     # Threshold calculation
+    #     threshold = max(16, summary_trigger_threshold)
+    #     keep_recent = max(8, summary_exempt_tail_length)
+
+    #     # Early exit
+    #     if len(messages) < threshold:
+    #         return Command(update={})
+
+    #     # Prevent keep_recent from being too large
+    #     if keep_recent > threshold:
+    #         keep_recent = threshold // 2
+
+    #     logger.info(
+    #         f"[context_summary] Trigger context control. "
+    #         f"message_len={len(messages)} threshold={threshold}"
+    #     )
+
+    #     # Split messages
+    #     to_process, recent_messages = ai_context_manager.split_messages(
+    #         messages,
+    #         keep_recent=keep_recent,
+    #     )
+
+    #     # Truncate mode (no short-term memory)
+    #     if not enable_shortterm_memory:
+    #         logger.success(
+    #             "[context_summary] Truncate mode. "
+    #             f"Reduced to {len(recent_messages)} messages."
+    #         )
+
+    #         return Command(
+    #             update={
+    #                 "messages": Overwrite(recent_messages),
+    #             }
+    #         )
+
+    #     # Filter summarizable messages
+    #     to_summarize, to_summarize_last_index = (
+    #         ai_context_manager.filter_agent_messages(to_process)
+    #     )
+
+    #     if not to_summarize:
+    #         return Command(update={})
+
+    #     # Limit summarize size
+    #     max_summarize_messages = summary_trigger_threshold
+    #     to_summarize = to_summarize[-max_summarize_messages:]
+
+    #     # Build summary prompt
+    #     summary_prompt = [
+    #         SystemMessage(content=DEFAULT_SUMMARY_PROMPT)
+    #     ]
+
+    #     # Inject existing short-term memory if exists
+    #     if state.get("shortterm_memory"):
+    #         summary_prompt.append(
+    #             SystemMessage(
+    #                 content=(
+    #                     self.SUMMARY_MEMORY_PREFIX
+    #                     + state["shortterm_memory"]
+    #                 )
+    #             )
+    #         )
+
+    #     # Add messages to summarize
+    #     summary_prompt.extend(to_summarize)
+
+    #     # Add instruction
+    #     summary_prompt.append(HumanMessage(content=(self.SUMMARY_INSTRUCTION_PROMPT)))
+
+    #     # Call LLM
+    #     try:
+    #         summary_msg: AIMessage = await LlmNodeAdapter.ainvoke(
+    #             llm_node=self.llm,
+    #             input=summary_prompt,
+    #             reasoning=False,
+    #         )
+    #     except Exception as e:
+    #         logger.error(f"[context_summary] Summary failed: {e}")
+    #         return Command(update={})
+
+    #     summary_text = summary_msg.content.strip()
+
+    #     # Persist short-term memory
+    #     await ai_context_manager.insert_shortterm_memory(
+    #         state["client_id"],
+    #         state["history_id"],
+    #         to_summarize_last_index,
+    #         summary_text
+    #     )
+
+    #     logger.success(
+    #         "[context_summary] Summary finished. "
+    #         f"Reduced to {len(recent_messages)} messages."
+    #     )
+
+    #     # Return result
+    #     return Command(
+    #         update={
+    #             "messages": Overwrite(recent_messages),
+    #             "shortterm_memory": summary_text
+    #         }
+    #     )
+    
+
     async def context_summary(self, state: MainAgentState) -> Command:
         """
-        Context summary or truncate node.
+        Context compression node (multi-level).
 
-        Trigger condition:
-            len(messages) >= summary_trigger_threshold
+        Trigger:
+            1. len(messages) >= threshold
+            2. OR retry caused by token_exceed
 
-        Behavior:
-            enable_shortterm_memory = True
-                -> summarize old messages
-                -> keep last `summary_exempt_tail_length` messages
-
-            enable_shortterm_memory = False
-                -> directly truncate history
-                -> keep last `summary_exempt_tail_length` messages
-
-        Tool call boundaries are preserved via split_messages().
+        Compression levels:
+            0: no-op
+            1: drop_tool_messages (light, reversible)
+            2: LLM summary (lossy)
+            3: drop_tool_messages(min_keep=2)
+            4+: exponential truncate (reversible)
         """
         logger.trace('[agent.py] [AgentNode] [context_summary] Enter')
 
@@ -163,37 +298,50 @@ class MainAgentNode(AgentNodeBase):
         summary_trigger_threshold = config.get("summary_trigger_threshold")
         summary_exempt_tail_length = config.get("summary_exempt_tail_length")
 
-        # Messages
+        # State
+        llm_retry_count = state.get("llm_retry_count", 0)
+        last_error = state.get("error", "")
+        context_compress_level = state.get("context_compress_level", 0)
+        shortterm_memory = state.get("shortterm_memory", "")
+
         messages = state.get("messages", [])
 
-        # Threshold calculation
+        # Threshold
         threshold = max(16, summary_trigger_threshold)
-        keep_recent = max(8, summary_exempt_tail_length)
+        keep_recent_base = max(8, summary_exempt_tail_length)
 
-        # Early exit
-        if len(messages) < threshold:
+        # Trigger condition
+        should_trigger = (
+            len(messages) >= threshold
+            or (llm_retry_count > 0 and last_error == "token_exceed")
+        )
+
+        if not should_trigger:
             return Command(update={})
 
-        # Prevent keep_recent from being too large
-        if keep_recent > threshold:
-            keep_recent = threshold // 2
-
         logger.info(
-            f"[context_summary] Trigger context control. "
-            f"message_len={len(messages)} threshold={threshold}"
+            f"[context_summary] Triggered. "
+            f"len={len(messages)} level={context_compress_level} "
+            f"retry={llm_retry_count} error={last_error}"
         )
 
-        # Split messages
-        to_process, recent_messages = ai_context_manager.split_messages(
-            messages,
-            keep_recent=keep_recent,
-        )
+        # Helper: exponential keep
+        def calc_keep(level: int) -> int:
+            # exponential backoff: keep shrinks as level increases
+            keep = keep_recent_base // (2 ** max(1, level - 3))
+            return max(2, keep)
 
-        # Truncate mode (no short-term memory)
+        # Case 1: shortterm memory disabled: always truncate
         if not enable_shortterm_memory:
+            keep_recent = calc_keep(context_compress_level)
+
+            _, recent_messages = ai_context_manager.split_messages(
+                messages,
+                keep_recent=keep_recent,
+            )
+
             logger.success(
-                "[context_summary] Truncate mode. "
-                f"Reduced to {len(recent_messages)} messages."
+                f"[context_summary] Truncate (memory disabled). keep={keep_recent}"
             )
 
             return Command(
@@ -202,74 +350,151 @@ class MainAgentNode(AgentNodeBase):
                 }
             )
 
-        # Filter summarizable messages
-        to_summarize, to_summarize_last_index = (
-            ai_context_manager.filter_agent_messages(to_process)
-        )
+        # Case 2: Level-based compression
 
-        if not to_summarize:
+        # Level 0: no-op
+        if context_compress_level <= 0:
             return Command(update={})
 
-        # Limit summarize size
-        max_summarize_messages = summary_trigger_threshold
-        to_summarize = to_summarize[-max_summarize_messages:]
+        # Level 1: drop tool messages
+        if context_compress_level == 1:
+            new_messages = ai_context_manager.drop_tool_messages(
+                messages,
+                split_by_todos=True,
+                min_keep=keep_recent_base,
+            )
 
-        # Build summary prompt
-        summary_prompt = [
-            SystemMessage(content=DEFAULT_SUMMARY_PROMPT)
-        ]
+            logger.success(
+                f"[context_summary] Level1 drop_tool_messages "
+                f"(min_keep={keep_recent_base})"
+            )
 
-        # Inject existing short-term memory if exists
-        if state.get("shortterm_memory"):
-            summary_prompt.append(
-                SystemMessage(
-                    content=(
-                        self.SUMMARY_MEMORY_PREFIX
-                        + state["shortterm_memory"]
+            return Command(
+                update={
+                    "messages": Overwrite(new_messages),
+                }
+            )
+
+        # Level 2: LLM summary, this will commit to database and can not roll back
+        if context_compress_level == 2:
+            # Split messages (preserve tool boundary)
+            to_process, recent_messages = ai_context_manager.split_messages(
+                messages,
+                keep_recent=keep_recent_base,
+            )
+
+            # Filter summarizable messages
+            sys_msgs, to_summarize, to_summarize_last_index = (
+                ai_context_manager.filter_agent_messages(to_process)
+            )
+
+            # Nothing to summarize: go to level 3 in next loop
+            if not to_summarize:
+                return Command(update={})
+
+            # Limit summarize size
+            max_summarize_messages = summary_trigger_threshold
+            to_summarize = to_summarize[-max_summarize_messages:]
+
+            # Build prompt
+            summary_prompt = [
+                SystemMessage(content=DEFAULT_SUMMARY_PROMPT)
+            ]
+
+            if shortterm_memory:
+                summary_prompt.append(
+                    SystemMessage(
+                        content=self.SUMMARY_MEMORY_PREFIX + shortterm_memory
                     )
                 )
+
+            summary_prompt.extend(to_summarize)
+            summary_prompt.append(
+                HumanMessage(content=self.SUMMARY_INSTRUCTION_PROMPT)
             )
 
-        # Add messages to summarize
-        summary_prompt.extend(to_summarize)
+            # Call LLM
+            try:
+                summary_msg: AIMessage = await LlmNodeAdapter.ainvoke(
+                    llm_node=self.llm,
+                    input=summary_prompt,
+                    reasoning=False,
+                )
+            except Exception as e:
+                logger.error(f"[context_summary] Summary failed: {e}")
+                # Directly entry next level
+                return Command(update={})
 
-        # Add instruction
-        summary_prompt.append(HumanMessage(content=(self.SUMMARY_INSTRUCTION_PROMPT)))
+            summary_text = summary_msg.content.strip()
 
-        # Call LLM
-        try:
-            summary_msg: AIMessage = await LlmNodeAdapter.ainvoke(
-                llm_node=self.llm,
-                input=summary_prompt,
-                reasoning=False,
+            # Persist memory
+            await ai_context_manager.insert_shortterm_memory(
+                state["client_id"],
+                state["history_id"],
+                to_summarize_last_index,
+                summary_text
             )
-        except Exception as e:
-            logger.error(f"[context_summary] Summary failed: {e}")
-            return Command(update={})
 
-        summary_text = summary_msg.content.strip()
+            logger.success(
+                f"[context_summary] Level2 summary done. "
+                f"remain={len(recent_messages)}"
+            )
 
-        # Persist short-term memory
-        await ai_context_manager.insert_shortterm_memory(
-            state["client_id"],
-            state["history_id"],
-            to_summarize_last_index,
-            summary_text
+            return Command(
+                update={
+                    "messages": Overwrite(sys_msgs+recent_messages),
+                    "shortterm_memory": summary_text
+                }
+            )
+
+        event_writer = ApixStreamWriter()
+        client_id = state.get("client_id")
+        target_platform = state.get("platform")
+        event_writer.send_event(
+            event=StreamEvent.RUNTIME_WARNING,
+            target_id=client_id,
+            target_platform=target_platform,
+            data={
+                "event_name": "token_limit_warning",
+                "content": "The currently selected model is too small to load the full context."
+            }
+        )
+
+        # Level 3: aggressive drop tool messages
+        if context_compress_level == 3:
+            new_messages = ai_context_manager.drop_tool_messages(
+                messages,
+                split_by_todos=True,
+                min_keep=2,
+            )
+
+            logger.success("[context_summary] Level 3 drop_tool_messages(min_keep=2)")
+
+            return Command(
+                update={
+                    "messages": Overwrite(new_messages),
+                }
+            )
+
+        # Level >=4: exponential truncate
+        keep_recent = calc_keep(context_compress_level)
+
+        _, recent_messages = ai_context_manager.split_messages(
+            messages,
+            keep_recent=keep_recent,
         )
 
         logger.success(
-            "[context_summary] Summary finished. "
-            f"Reduced to {len(recent_messages)} messages."
+            f"[context_summary] Level{context_compress_level} truncate "
+            f"(keep={keep_recent})"
         )
 
-        # Return result
         return Command(
             update={
                 "messages": Overwrite(recent_messages),
-                "shortterm_memory": summary_text
             }
         )
-    
+
 
     async def llm_call(self, state: MainAgentState) -> Command:
         """
@@ -284,13 +509,13 @@ class MainAgentNode(AgentNodeBase):
         target_platform = state.get("platform")
         config = state.get("config", {})
         llm_calls_warning_threshold = config.get("llm_calls_warning_threshold")
-        summary_exempt_tail_length = config.get("summary_exempt_tail_length")
 
         pure_chat_on = config.get("pure_chat_on")
         enable_think = config.get("enable_think")
 
         enable_skill_load = config.get("enable_skill_load")
         enable_knowledge_retrieval = config.get("enable_knowledge_retrieval")
+        loaded_skills_cache = state.get("loaded_skills_cache")
 
         # Runtime
         event_writer = ApixStreamWriter()
@@ -342,12 +567,35 @@ class MainAgentNode(AgentNodeBase):
         role_prompt = ai_context_manager.create_role_prompt_list(state, agent_role)
 
         llm_input = system_prompt + role_prompt + messages
+                
+        # Inject the skill markdown (only those not injected yet)
+        new_skills_cache = []
+        if enable_skill_load and loaded_skills_cache:
+            skill_msgs = []
+            char_num = 0
+
+            for name, injected, guide in loaded_skills_cache:
+                if not injected:
+                    skill_msgs.append(
+                        SystemMessage(
+                            content=f"# [SKILL.md from the loaded skill package: `{name}`]\n\n{guide}"
+                        )
+                    )
+                    # Mark as injected
+                    new_skills_cache.append((name, True, guide))
+                    char_num = char_num + len(skill_msgs[-1].content)
+                else:
+                    new_skills_cache.append((name, injected, guide))
+
+            if skill_msgs:
+                # Inject
+                llm_input = llm_input + skill_msgs
+                logger.warning(f"[agent.py] [AI_Agent] [llm_call] Injected {len(skill_msgs)} skill(s) markdown. [{char_num} Chars]")
 
         # Inject alert if necessary
         need_alert = self._should_inject_alert(
             llm_calls=state.get("llm_calls", 0),
-            llm_calls_warning_threshold=llm_calls_warning_threshold,
-            summary_exempt_tail_length=summary_exempt_tail_length,
+            threshold=llm_calls_warning_threshold,
         )
         if need_alert:
             llm_input = llm_input + [SystemMessage(self.SYSTEM_ALERT_PROMPT)]
@@ -418,20 +666,33 @@ class MainAgentNode(AgentNodeBase):
                         }
                     )
 
-        except Exception as e:
-            retry_count = state.get("retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({retry_count}/3)...")
-            await asyncio.sleep(1)
-            if retry_count <= MAX_RETRY:
+        except BadRequestError as e:
+            llm_retry_count = state.get("llm_retry_count", 0) + 1
+            context_compress_level = state.get("context_compress_level", 0) + 1
+            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            if llm_retry_count < MAX_RETRY and  LlmNodeAdapter.guess_exception_type(str(e)) == 'token_exceed':
                 return Command(
                     update={
-                        "retry_count": retry_count
+                        "llm_retry_count": llm_retry_count,
+                        "error": "token_exceed",
+                        "context_compress_level": context_compress_level
                     },
-                    goto='llm_call'
                 )
             else:
                 raise e
-
+            
+        except RateLimitError as e:
+            llm_retry_count = state.get("llm_retry_count", 0) + 1
+            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            if llm_retry_count < MAX_RETRY and  LlmNodeAdapter.guess_exception_type(str(e)) == 'rate_limit':
+                return Command(
+                    update={
+                        "llm_retry_count": llm_retry_count,
+                        "error": "rate_limit"
+                    },
+                )
+            else:
+                raise e
 
         print('\n')
 
@@ -458,7 +719,10 @@ class MainAgentNode(AgentNodeBase):
             update={
                 "messages": delta_msg,
                 "llm_calls": 1,
-                "retry_count": 0
+                "llm_retry_count": 0,
+                "context_compress_level": 0 if state.get("context_compress_level", 0) <= 2 else 3,
+                "error": "",
+                "loaded_skills_cache": new_skills_cache,
             }
         )
     
@@ -534,8 +798,15 @@ class MainAgentNode(AgentNodeBase):
                 if isinstance(msg, ToolMessage) and msg.tool_call_id in tool_call_ids
             ]
 
-            # Persist all tool messages in batch
+            dedup_map = {}
             for msg in tool_msg_list:
+                # Always overwrite to keep the latest message for same id
+                dedup_map[msg.tool_call_id] = msg
+
+            deduped_tool_msgs = list(dedup_map.values())
+
+            # Persist all tool messages in batch
+            for msg in deduped_tool_msgs:
                 tool_message = ai_context_manager.create_dict_message(
                     generation_id,
                     msg,

@@ -150,6 +150,11 @@ async def assign_sub_assistant(
         }
         initial_config["higher_role_prompt_permission"] = True
 
+        loaded_skills_cache = state.get("loaded_skills_cache", [])
+        new_skills_cache = []
+        for name, injected, guide in loaded_skills_cache:
+            new_skills_cache.append((name, False, guide))
+
         initial_state: SubAgentState = {
             **parent_state,
             "agent_name": assistant_name,
@@ -167,6 +172,7 @@ async def assign_sub_assistant(
             "todos": [],
             "memorandum": [],
             "skills": [],
+            "loaded_skills_cache": new_skills_cache,
             "final_goal": task_description,
             "task_id": "",
             "start_timestamp": int(time.time()),
@@ -175,7 +181,10 @@ async def assign_sub_assistant(
             "errors": "",
             "outputs": "",
             "config": initial_config,
-            "retry_count": 0
+            "llm_retry_count": 0,
+            "context_compress_level": 0,
+            "context_fold_split_mark": [],
+            "error": "",
         }
         config = state.get("config")
 

@@ -234,14 +234,11 @@ const handleEdit = () => {
   display: flex;
   flex-direction: column;
 
-  background: rgba(245, 247, 247, 0.768);
+  background: rgb(245, 247, 247);
   border: 1px solid rgba(255, 255, 255, 0.28);
 
   box-shadow:
-    0 10px 26px rgba(4, 52, 42, 0.106),
-    0 2px 6px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -3px 1px rgba(252, 246, 249, 0.635);
+    0 2px 6px rgba(0, 0, 0, 0.166);
 
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -251,9 +248,7 @@ const handleEdit = () => {
 
   box-shadow:
     0 10px 26px rgba(4, 52, 42, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -3px 1px rgba(255, 242, 247, 0.635);
+    0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 /* Header */

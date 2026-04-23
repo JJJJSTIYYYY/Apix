@@ -128,6 +128,7 @@ onBeforeUnmount(() => {
 }
 
 .menu-buttom-item {
+  opacity: 0.4;
   border-radius: 12px;
   bottom: 0px;
   left: 4px;
@@ -142,6 +143,7 @@ onBeforeUnmount(() => {
 }
 
 .menu-buttom-item:hover {
+  opacity: 1;
   background-color: #00000000; /* 浅灰背景 */
 }
 

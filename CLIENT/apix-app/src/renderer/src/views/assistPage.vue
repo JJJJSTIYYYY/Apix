@@ -33,17 +33,36 @@
               class="message-item"
               :class="msg.role"
             >
-              <HumanMessageBubble v-if="msg.role === 'human'" :msg="msg" />
-              <AiMessageBubble v-else-if="msg.role === 'ai'" :msg="msg" />
+              <HumanMessageBubble 
+                v-if="msg.role === 'human'" 
+                :msg="msg" 
+                :is_selecting="selectMode"
+                @edit=""
+                @edit-finish="handleEditFinish"
+                @select-text="handleSelectText"
+                @selected="selectMessageBubble"
+                @delete="selectMessageBubble"
+              />
+              <AiMessageBubble 
+                v-else-if="msg.role === 'ai'" 
+                :msg="msg" 
+                :is_selecting="selectMode"
+                @re-generate="handleRegenerate"
+                @select-text="handleSelectText"
+                @selected="selectMessageBubble"
+                @delete="selectMessageBubble"
+                @quoted="handleQuoteShow"
+              />
               <ToolMessageCard v-else-if="msg.role === 'tools' || msg.role === 'system'" :msg="msg" />
             </div>
 
-            <div key="buttom-div"></div>
+            <div key="buttom-div" class="buttom-div"></div>
           </div>
 
           <div 
             class="ctrl-area"
             :class="{ empty_messages_list: messages.length === 0 }"
+            v-if="!selectMode"
           >
             <div style="display: block; align-items: center;">
               <div
@@ -56,7 +75,8 @@
                 </div>
               </div>
             </div>
-            <Transition name="stop-btn">
+
+            <Transition name="fade">
               <div class="stop-btn-wrapper" v-if="isGenerating">
                 <el-button
                   class="stop-generate-button"
@@ -70,6 +90,34 @@
                   </div>
                   <div>{{ stream_state_text }}</div>
                 </el-button>
+              </div>
+            </Transition>
+
+            <Transition name="fade">
+              <div v-if="isWarningShow" class="warning-label">
+                <div style="display: flex; gap: 3px; align-items: center;">
+                  <svg t="1776752724390" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1671" width="20" height="20"><path d="M558 563c0 24.852-20.148 45-45 45S468 587.852 468 563v-150c0-24.852 20.148-45 45-45s45 20.148 45 45v150z m0 132c0 24.852-20.148 45-45 45S468 719.852 468 695v-1c0-24.852 20.148-45 45-45S558 669.148 558 694v1z m-355.006 65.804a15 15 0 0 0 14.986 15.014l589.36 0.55a15 15 0 0 0 12.916-22.646L525.56 256.376a15 15 0 0 0-25.806-0.006l-294.66 496.796a15 15 0 0 0-2.098 7.638z m-75.31-53.552l294.66-496.794c29.584-49.878 93.998-66.328 143.874-36.746a105 105 0 0 1 36.768 36.784l294.7 497.346c29.56 49.89 13.08 114.298-36.808 143.86a105 105 0 0 1-53.624 14.666l-589.358-0.55c-57.99-0.054-104.956-47.108-104.9-105.1a105 105 0 0 1 14.688-53.466z" fill="#856404" p-id="1672"></path></svg>
+                  <span class="warning-content">{{ WarningContent }}</span>
+                </div>
+                <button class="warning-close" @click="handleWarningClose">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              </div>
+            </Transition>
+
+            <Transition name="fade">
+              <div v-if="isQuoteShow && quotedText !== ''" class="quote-label">
+                <div style="display: flex; gap: 3px; align-items: center;">
+                  <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" p-id="1652"></path></svg>
+                  <span class="quote-content">{{ quotedText }}</span>
+                </div>
+                <button class="quote-close" @click="handleQuoteClose">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
               </div>
             </Transition>
 
@@ -156,9 +204,29 @@
                 </div>
 
               </div>
-              <el-button class="send-button" type="primary" @click="sendMessage">
+              <el-button class="send-button" type="primary" @click="handleSendMessage">
                 <svg t="1776519512558" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11362" width="26" height="26"><path d="M481.834667 183.168a42.666667 42.666667 0 0 1 60.330666 0l298.666667 298.666667a42.666667 42.666667 0 0 1-60.330667 60.330666L554.666667 316.330667V810.666667a42.666667 42.666667 0 1 1-85.333334 0V316.330667l-225.834666 225.834666a42.666667 42.666667 0 0 1-60.330667-60.330666l298.666667-298.666667z" fill="#ffffff" p-id="11363"></path></svg>
               </el-button>
+            </div>
+          </div>
+          <div
+            class="ctrl-btns-area"
+            v-if="selectMode"
+          >
+            <div class="cd-actions">
+              <button
+                class="cancel-btn"
+                @click="handleCancel"
+              >
+                取消
+              </button>
+
+              <button
+                class="delete-btn"
+                @click="handleDeleteMessages"
+              >
+                删除
+              </button>
             </div>
           </div>
 
@@ -183,6 +251,9 @@ import { useAuthStore } from '../store/auth'
 import { ElMessage } from 'element-plus'
 import { NAvatar, NSelect } from 'naive-ui'
 import { InputDialog } from './component/comp/inputDialog'
+import { ConfirmDialog } from './component/comp/confirmDialog.js'
+import { mdDisplayer } from './component/comp/mdDisplayer.js'
+import { globalSelection } from '../store/globalData.js'
 import ollamaIcon from '../assets/icons/llm_providers/ollama.svg'
 import googleIcon from '../assets/icons/llm_providers/google.svg'
 import openaiIcon from '../assets/icons/llm_providers/openai.svg'
@@ -218,6 +289,8 @@ interface ChatMessage {
   cid: string
   hid: string
   role: Role
+  node_id?: number
+  parent_id?: number
 
   content?: string | MessageChunk[]
   think?: string | MessageChunk[]
@@ -233,6 +306,8 @@ interface ChatMessage {
   errors?: any
   desc?: string | null
   status?: string | null
+
+  selected?: boolean
 }
 
 interface GeneratingState {
@@ -532,11 +607,14 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
     }
 
     if (r.role === 'human') {
+      const generationId = String(r.generation_id ?? genUUID())
       list.push({
-        id: String(genUUID()),
+        id: generationId,
         cid: cid.value,
         hid,
         role: 'human',
+        node_id: r.node_id,
+        parent_id: r.parent_id,
         content: r.content ?? '',
         extra,
         error: false,
@@ -557,6 +635,8 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
           cid: cid.value,
           hid,
           role: 'ai',
+          node_id: r.node_id,
+          parent_id: r.parent_id,
           label: '已思考',
           content: r.content ? [r.content] : [],
           think: r.think ? [r.think] : [],
@@ -592,6 +672,8 @@ async function loadHistoryMessages(hid: string, force = false) {
     const raw = res?.messages
     if (!Array.isArray(raw)) return
 
+    console.log("Get message list: ", raw)
+
     const parsed = parseHistoryMessages(raw, hid)
     const list = ensureHistoryMessages(hid)
     list.splice(0, list.length, ...parsed)
@@ -606,6 +688,9 @@ async function loadHistoryMessages(hid: string, force = false) {
 const handleSelectHistory = async (id: string | number) => {
   const nextHid = String(id)
   if (nextHid === store.current_history_id) return
+
+  isQuoteShow.value = false
+  quotedText.value = ''
 
   store.current_history_id = nextHid
   store.currentWorkDir = store.getWorkDir(nextHid)
@@ -628,6 +713,11 @@ const handleSelectHistory = async (id: string | number) => {
 }
 
 const handleCreateChat = async () => {
+  selectMode.value = false
+
+  isQuoteShow.value = false
+  quotedText.value = ''
+
   if (messages.value.length === 0 && store.current_history_id !== '-1') return
 
   const newHid = '-1'
@@ -678,6 +768,8 @@ const handleDeleteHistory = (history_id: string) => {
 
   if (hid === store.current_history_id) {
     store.current_history_id = '-1'
+    isQuoteShow.value = false
+    quotedText.value = ''
   }
 
   store.removeWorkDir(hid)
@@ -688,6 +780,169 @@ const handleDeleteHistory = (history_id: string) => {
 
   historyList.value.splice(index, 1)
   ElMessage({ type: 'success', message: '删除成功', plain: true })
+}
+
+const handleEditFinish = async (id: string, newContent: string) => {
+  if (newContent === '') return
+  const list = messages.value
+
+  if(list.at(-1)?.pending === true) {
+    try {
+      ElMessage({
+        type: 'info',
+        message: "等待流式传输完成...",
+        plain: true,
+      })
+      await window.api.stopGeneration(
+        cid.value,
+        sid.value,
+        store.current_history_id,
+      )
+    } catch (err) {
+      console.error('Request failed', err)
+      return
+    }
+  }
+
+  const targetIndex = list.findIndex(
+    msg => msg.id === id && msg.role === 'human'
+  )
+
+  if (targetIndex === -1) return
+
+  const remain = list.slice(0, targetIndex)
+
+  list.splice(0, list.length, ...remain)
+  const last_node = list.at(-1)
+  const parent_id = last_node?.node_id
+
+  await sendMessage(newContent, parent_id)
+}
+
+const handleRegenerate = async (id: string) => {
+  const list = messages.value
+
+  if(list.at(-1)?.pending === true) {
+    try {
+      ElMessage({
+        type: 'info',
+        message: "等待流式传输完成...",
+        plain: true,
+      })
+      await window.api.stopGeneration(
+        cid.value,
+        sid.value,
+        store.current_history_id,
+      )
+    } catch (err) {
+      console.error('Request failed', err)
+      return
+    }
+  }
+
+  const targetIndex = list.findIndex(
+    msg => msg.id === id && msg.role === 'human'
+  )
+
+  if (targetIndex === -1) {
+    ElMessage({
+      type: 'warning',
+      message: "输入内容缺失或已被删除",
+      plain: true,
+    })
+    return
+  }
+
+  console.log("Resend input: [", targetIndex, "] ", list[targetIndex])
+  const inputs = list[targetIndex].content
+  if (!inputs) return
+
+  const remain = list.slice(0, targetIndex)
+
+  list.splice(0, list.length, ...remain)
+  const last_node = list.at(-1)
+  const parent_id = last_node?.node_id
+
+  await sendMessage(inputs, parent_id)
+}
+
+const selectMode = ref(false)
+const selectMessageBubble = (msgId: string) => {
+  const list = messages.value
+
+  let hit = false
+
+  for (const msg of list) {
+    if (msg.id === msgId && msg.pending === false) {
+      msg.selected = true
+      hit = true
+    }
+  }
+
+  if (hit) {
+    selectMode.value = true
+  }
+}
+
+// Normalize MessageChunk to string
+function chunkToString(chunk: MessageChunk): string {
+  if (typeof chunk === 'string') return chunk
+
+  // ToolLabel -> custom display
+  return `\n\n[>_ ${chunk.tool_name}]\n\n`
+}
+
+// Todo -> string
+function todosToString(todos?: TodoItem[]): string {
+  if (!Array.isArray(todos) || todos.length === 0) return ''
+
+  return todos
+    .map(todo => {
+      // Map status to symbol
+      const statusMap: Record<TodoItem['status'], string> = {
+        pending: '⏳',
+        in_progress: '📍',
+        completed: '✅',
+        error: '❌',
+      }
+
+      const icon = statusMap[todo.status] ?? '•'
+
+      return `> - ${icon} ${todo.content}`
+    })
+    .join('\n')
+}
+
+// Normalize field (string | MessageChunk[]) to string
+function fieldToString(field?: string | MessageChunk[]): string {
+  if (!field) return ''
+
+  if (typeof field === 'string') return field
+
+  return field.map(chunkToString).join('')
+}
+
+function handleSelectText(msgId: string, role: string) {
+  const msg = messages.value.find(
+    m => m.id === msgId && m.role === role && m.pending === false
+  )
+
+  if (!msg) return
+
+  let mdContent = fieldToString(msg.think)
+
+  if (mdContent !== '') mdContent += '\n\n---\n\n'
+
+  mdContent += fieldToString(msg.content)
+
+  // append todos
+  const todosStr = todosToString(msg.todos)
+  if (todosStr) {
+    mdContent += '\n\n---\n\n'
+    mdContent += todosStr
+  }
+
+  mdDisplayer.show(mdContent)
 }
 
 // ################################
@@ -706,6 +961,18 @@ const handleHideHistory = (toHide: boolean) => {
   isHistoryHide.value = toHide
 }
 
+const actionMap: Record<string, (payload: any, historyId: string) => void> = {
+  msg_stream_start: handleStreamStart,
+  think_chunk_rtn: handleThinkChunkRtn,
+  content_chunk_rtn: handleContentChunkRtn,
+  info_chunk_rtn: handleInfoChunkRtn,
+  msg_stream_end: handleStreamEnd,
+  msg_stream_abort: handleStreamAbort,
+  async_tool_return: handleAsyncToolRtn,
+  tool_exec_chunk_rtn: handleToolChunkRtn,
+  token_limit_warning: handleWarning,
+}
+
 function handleWsMessage(payload: any) {
   const historyId = getPayloadHistoryId(payload)
   if (!historyId) return
@@ -718,14 +985,10 @@ function handleWsMessage(payload: any) {
     historyList.value[index].isGenerating = true
   }
 
-  if (payload.action === 'msg_stream_start') handleStreamStart(payload, historyId)
-  else if (payload.action === 'think_chunk_rtn') handleThinkChunkRtn(payload, historyId)
-  else if (payload.action === 'content_chunk_rtn') handleContentChunkRtn(payload, historyId)
-  else if (payload.action === 'info_chunk_rtn') handleInfoChunkRtn(payload, historyId)
-  else if (payload.action === 'msg_stream_end') handleStreamEnd(payload, historyId)
-  else if (payload.action === 'msg_stream_abort') handleStreamAbort(payload, historyId)
-  else if (payload.action === 'async_tool_return') handleAsyncToolRtn(payload, historyId)
-  else if (payload.action === 'tool_exec_chunk_rtn') handleToolChunkRtn(payload, historyId)
+  const handler = actionMap[payload.action]
+  if (handler) {
+    handler(payload, historyId)
+  }
 }
 
 const handleConnectProject = async () => {
@@ -796,6 +1059,7 @@ function handleStreamStart(payload: any, historyId: string) {
   const humanIndex = findLatestIndexByStatus(list, true, 'human')
 
   if (humanIndex !== -1) {
+    list[humanIndex].id = generationId
     list[humanIndex].pending = false
   }
 
@@ -918,6 +1182,13 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const event_name = payload.data?.messages?.event_name
   const detail = payload.data?.messages?.content
   if (!generationId) return
+  if (event_name === 'error_occurred') {
+    ElMessage({
+      type: 'error',
+      message: detail,
+      plain: true,
+    })
+  }
 
   const list = ensureHistoryMessages(historyId)
   const state = ensureGeneratingState(historyId)
@@ -928,11 +1199,8 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const index = findLatestIndexById(list, generationId, 'ai')
   if (index !== -1 && list[index].pending === true) {
     list[index].pending = false
-    if (event_name === 'error_occurred') list[index].errors = detail
     list[index].lastField = undefined
   }
-
-  // console.log("index is ", index, ", list[index].pending is ", list[index].pending)
 
   await syncHistoryMessages(historyId)
   console.warn('Generation abort, generation_id = ', generationId)
@@ -944,6 +1212,25 @@ async function handleStreamAbort(payload: any, historyId: string) {
       historyList.value[hIndex].hasNewMessage = true
     }
   }
+}
+
+const isWarningShow = ref(false)
+const WarningContent = ref('')
+
+function handleWarning(payload: any, historyId: string) {
+  const generationId = payload.generation_id
+  if (!generationId) return
+
+  if (payload.action === 'token_limit_warning') {
+    WarningContent.value = '当前选择的模型上下文窗口过小，请及时更换。'
+  }
+
+  isWarningShow.value = true
+}
+
+function handleWarningClose() {
+  WarningContent.value = ''
+  isWarningShow.value = false
 }
 
 function handleToolChunkRtn(payload: any, historyId: string) {
@@ -1052,10 +1339,17 @@ async function syncHistoryMessages(historyId: string) {
   }
 }
 
+async function handleSendMessage() {
+  const list = messages.value
+  const last_node = list.at(-1)
+  const parent_id = last_node?.node_id
+  await sendMessage(inputText.value.trim(), parent_id)
+}
+
 // ################################
 // Send message
 // ################################
-async function sendMessage() {
+async function sendMessage(content:string = '', parent_id: number = 0, pushToList: boolean = true) {
   if (!store.config.modelName
     || store.config.modelName === ''
     || !store.config.modelProvider
@@ -1078,9 +1372,7 @@ async function sendMessage() {
     return
   }
 
-  const content = inputText.value.trim()
-
-  if (content.length > 8000) {
+  if (content.length > 32000) {
     ElMessage({
       type: 'warning',
       message: '输入文本过长',
@@ -1104,9 +1396,17 @@ async function sendMessage() {
       file_id: f.id!,
     }))
 
+  if (quotedText.value !== '') {
+    content = `> “${quotedText.value}”\n\n` + content
+  }
+
+  isQuoteShow.value = false
+  quotedText.value = ''
+
   const messagePayload = {
     role: 'human',
     content,
+    parent_id,
     extra: {
       user_meta_data: {
         uploaded_files: uploadedFiles,
@@ -1114,16 +1414,18 @@ async function sendMessage() {
     },
   }
 
-  list.push({
-    id: genUUID(),
-    cid: cid.value,
-    hid: currentHid,
-    role: 'human',
-    content,
-    extra: messagePayload.extra,
-    error: false,
-    pending: true,
-  })
+  if (pushToList) {
+    list.push({
+      id: genUUID(),
+      cid: cid.value,
+      hid: currentHid,
+      role: 'human',
+      content,
+      extra: messagePayload.extra,
+      error: false,
+      pending: true,
+    })
+  }
 
   inputText.value = ''
   selectedFiles.value = []
@@ -1203,6 +1505,92 @@ async function sendMessage() {
     }
   }
 }
+
+const handleCancel = () => {
+  messages.value.forEach(msg => {
+    if (msg.selected) msg.selected = false
+  })
+
+  selectMode.value = false
+}
+
+const handleDeleteMessages = async () => {
+  const list = messages.value
+
+  const del_list = list
+    .filter(msg => msg.selected)
+    .map(msg => ({
+      generation_id: msg.id,
+      role: msg.role,
+    }))
+
+  const remain = list.filter(msg => !msg.selected)
+
+  if (del_list.length === 0) {
+    ElMessage({
+      type: 'warning',
+      message: '未选择任何消息',
+      plain: true,
+    })
+    return
+  }
+
+  try {
+    await ConfirmDialog.confirm(
+      `确定删除要选中的 ${del_list.length} 条记录吗？<br>` +
+      `⚠︎ 在此之前产生的部分摘要记忆也将删除。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+  } catch (err) {
+    return
+  }
+
+  try {
+    const res = await window.api.deleteMsgs(
+      cid.value, 
+      store.current_history_id, 
+      del_list
+    )
+    if (res.success !== true) throw new Error(res.messages || "Delete messages failed.")
+
+    list.splice(0, list.length, ...remain)
+  } catch (error) {
+    ElMessage({
+      type: 'warning',
+      message: '删除失败: ' + error,
+      plain: true,
+    })
+    return
+  }
+
+  ElMessage({
+    type: 'success',
+    message: '已删除',
+    plain: true,
+  })
+
+  selectMode.value = false
+}
+
+const isQuoteShow = ref(false)
+const quotedText = ref('')
+
+function handleQuoteClose() {
+  isQuoteShow.value = false
+  quotedText.value = ''
+}
+
+function handleQuoteShow(id: string, content: string) {
+  if (id !== store.current_history_id) return
+  isQuoteShow.value = true
+  quotedText.value = content
+}
+
 
 // ################################
 // Lifecycle
@@ -1539,7 +1927,7 @@ const stopGenerating = async () => {
   }
 }
 
-const msgInputHandleKeydown = (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
+const msgInputHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
   if (e.isComposing || e.keyCode === 229) {
     return
   }
@@ -1550,7 +1938,10 @@ const msgInputHandleKeydown = (e: KeyboardEvent & { isComposing?: boolean; keyCo
 
   if (e.key === 'Enter') {
     e.preventDefault()
-    sendMessage()
+    const list = messages.value
+    const last_node = list.at(-1)
+    const parent_id = last_node?.node_id
+    await sendMessage(inputText.value.trim(), parent_id)
   }
 }
 
@@ -1739,7 +2130,6 @@ const setFullInput = () => {
   height: calc(100vh - 30px);
   position: relative;
   background-color: transparent;
-  overflow: hidden;
   display: flex;
   justify-content: center;
 }
@@ -1810,12 +2200,12 @@ const setFullInput = () => {
   position: relative;
   z-index: 0;
   margin-top: 16px;
-  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 12px 24px 108px 24px;
-  width: 80%;
+  gap: 12px;
+  padding: 22px 52px 88px 52px;
+  width: 85%;
   height: calc(100vh - 190px);
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(
@@ -1836,6 +2226,7 @@ const setFullInput = () => {
 
 .message-item {
   display: flex;
+  flex-direction: row;
   position: relative;
   height: fit-content;
 }
@@ -1848,7 +2239,11 @@ const setFullInput = () => {
   justify-content: flex-start;
   flex-direction: column; /* 或 row，根据布局需求 */
   height: fit-content; /* 根据需要设置最大高度 */
-  max-width: calc(100% - 30px);
+  max-width: calc(100% - 24px);
+}
+
+.buttom-div {
+  min-height: 30px;
 }
 
 .ctrl-area {
@@ -1868,24 +2263,153 @@ const setFullInput = () => {
   transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.ctrl-btns-area {
+  z-index: 999;
+  position: absolute;
+  height: 32px;
+  width: 80%;
+  border-radius: 24px;
+  bottom: 30px;
+  padding: 16px 16px;
+  display: flex;
+  justify-content: flex-end;
+  -webkit-backdrop-filter: saturate(300%) blur(16px);
+  backdrop-filter: saturate(300%) blur(16px);
+  background: linear-gradient(0deg, rgb(251, 251, 251) 30%, color-mix(in oklch, #fbfbfb 90%, transparent) 60%, color-mix(in oklch, #fbfbfb 70%, transparent) 80%, color-mix(in oklch, #fbfbfb 50%, transparent));
+  box-shadow:
+    0 10px 26px rgba(77, 77, 77, 0.086),
+    0 2px 6px rgba(0, 0, 0, 0.05),
+    inset 1px 1px 0px rgba(255, 255, 255, 0.506),
+    inset -1px 1px 0px rgba(255, 255, 255, 0.506);
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.cd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-btn {
+  width: 80px;
+  height: 32px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #555;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.cancel-btn:hover {
+  color: #185d56;
+  background: rgb(239, 239, 239);
+}
+
+.delete-btn {
+  width: 80px;
+  height: 32px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #f35050;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.delete-btn:hover {
+  color: #df3f3f;
+  background-color: rgb(255, 209, 209);
+}
+
+.quote-label,
+.warning-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background-color: #fff8ef;
+  border: 1px solid #ffc107;
+  border-radius: 12px;
+  color: #4a4124;
+  font-size: 14px;
+  line-height: 1.5;
+  min-width: 160px;
+  max-width: 75%;
+}
+
+.quote-label {
+  background-color: #f7f7f7;
+  border: 1px solid #cbcbcb;
+  color: #474747;
+}
+
+.quote-content,
+.warning-content {
+  flex: 1;
+  word-break: break-word;
+}
+
+.quote-close,
+.warning-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #856404;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.quote-close {
+  color: #434343;
+}
+
+.warning-close:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: #5a3f02;
+}
+
+.quote-close:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: #202020;
+}
+
+.quote-close:active,
+.warning-close:active {
+  background-color: rgba(0, 0, 0, 0.12);
+}
+
 /* Enter & leave active */
-.stop-btn-enter-active,
-.stop-btn-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition:
     opacity 0.18s ease,
     transform 0.18s ease;
 }
 
 /* Initial & final state */
-.stop-btn-enter-from,
-.stop-btn-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
   transform: translateY(6px) scale(0.98);
 }
 
 /* Stable visible state */
-.stop-btn-enter-to,
-.stop-btn-leave-from {
+.fade-enter-to,
+.fade-leave-from {
   opacity: 1;
   transform: translateY(0) scale(1);
 }

@@ -42,10 +42,7 @@ BASE_URL = {       # Base URL for the LLM service
 
 GENERATION_TTL_SECONDS = 300  # Clear those finished and aborted generation ctx
 
-MAX_RETRY = 3 # Max retry when llm_call failure
-MAX_LLM_CONNECTIONS = 12  # Maximum number of llm connections
-
-# KEEP_ALIVE_S = 300  # Keep-alive time for connections in seconds
+MAX_RETRY = 8 # Max retry when llm_call failure, make sure it great than 3
 
 TASK_SERVER_BASE_URL = "http://localhost:5090"
 

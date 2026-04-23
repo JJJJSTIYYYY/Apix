@@ -107,12 +107,15 @@ class MainAgentState(GraphRuntimeContext):
     rule_prompt: str
     runtime_prompt: str # Include todos prompt, workspace prompt, memorandum prompt and so on
     llm_calls: Annotated[int, operator.add] # Total LLM call count across the graph
-    retry_count: int
-    context_compress_level: int # Level 0: Not cpmpress; Level 1: Drop tool message content; Level 2: Context fold, driven by write_todos; Level 3: Context sumary to summary_exempt_tail_length; 
+    llm_retry_count: int
+    error: NotRequired[str]
+    context_compress_level: int # Level 0: Not compress; Level 1: Drop tool message content; Level 2: Context sumary to summary_exempt_tail_length; 
+    context_fold_split_mark: NotRequired[str] # Split by completed | in_progress & pending todos, store with message id
     sandbox: str # Docker container id
     todos: NotRequired[list[Todo]]
     memorandum: NotRequired[list[str]]
     skills: list # Include available skills name and description
+    loaded_skills_cache: list[tuple[str, bool, str]] # (name, injected, content): Skill name, injection status, and SKILL.md content
     documents: list # Include available documents name and description
 
 

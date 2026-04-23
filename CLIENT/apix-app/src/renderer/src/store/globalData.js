@@ -1,4 +1,6 @@
-export const apix_client_version = '2.0.1'
+import { reactive } from 'vue'
+
+export const apix_client_version = '2.0.2'
 
 export const defaultCards = () => [
   { id: '-annotation-preset', title: '注释卡片', type: 'note', level: 'system' },
@@ -16,8 +18,13 @@ export const globalState = {
   draggedStartCardUid_parent: 0, // 记录被拖拽对象的来源，不是被拖拽对象的uid
   draggedStartCardUid: 0, // 记录被拖拽对象的uid
   draggedTabCard: "",
-  draggedCard: ""
+  draggedCard: "",
 };
+
+export const globalSelection = reactive({
+  id: '',
+  content: ''
+})
 
 export function clearDragMark() {
   globalState.draggedStartCardUid_parent = 0 // 记录被拖拽对象的来源，不是被拖拽对象的uid

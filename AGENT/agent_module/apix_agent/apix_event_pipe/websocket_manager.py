@@ -454,8 +454,12 @@ class WebsocketMessageHandler:
                 "todos": [],
                 "memorandum": [],
                 "skills": [],
+                "loaded_skills_cache": [],
                 "documents": [],
-                "retry_count": 0
+                "llm_retry_count": 0,
+                "context_compress_level": 0,
+                "context_fold_split_mark": [],
+                "error": "",
             }
 
             astream = await ai_agent.submit_agent_task(initial_state, config, "MAIN")
@@ -474,12 +478,14 @@ class WebsocketMessageHandler:
                 await self.ws_list.send_ai_stream_token(
                     generation_id, client_id, history_id, achunk
                 )
+                await asyncio.sleep(0.06)
 
             await self.ws_list.send_ai_stream_end(generation_id, client_id, history_id)
 
         except Exception as e:
             logger.error(f"[chat_with_llm error] {client_id}: {traceback.format_exc()}")
 
+            self.ws_list.abort_generation(client_id, generation_id)
             await self.ws_list.send_ai_stream_abort(
                 generation_id,
                 client_id,

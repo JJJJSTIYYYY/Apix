@@ -194,6 +194,10 @@ async def load_skill(
             raise RuntimeError("SKILL.md not found")
 
         guide = skill_md_path.read_text(encoding="utf-8")
+        if guide.startswith("---"):
+            parts = guide.split("---", 2)
+            if len(parts) >= 3:
+                guide = parts[2].lstrip("\n")
 
         event_writer.send_event(
             event=StreamEvent.TOOL_EXEC_END, 
@@ -208,12 +212,10 @@ async def load_skill(
                 "status": "success",
             }
         )
-        content = f"""{guide}
+        content = f"Skill `{name}` Load Success."
 
----
-
-## Skill Relevant Files Saved to /workspace/SKILL/{name}
-"""
+        loaded_skills_cache = state.get("loaded_skills_cache", []) or []
+        loaded_skills_cache.append((name, False, guide + f"\n\n## Skill Relevant Files in Directory `/workspace/SKILL/{name}`"))
 
         return Command(update={
             "messages": [
@@ -221,7 +223,8 @@ async def load_skill(
                     content,
                     tool_call_id=tool_call_id
                 )
-            ]
+            ],
+            "loaded_skills_cache": loaded_skills_cache
         })
 
     except Exception as e:

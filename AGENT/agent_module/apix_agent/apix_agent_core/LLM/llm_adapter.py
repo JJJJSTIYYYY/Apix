@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from langchain.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -317,5 +317,53 @@ class LlmNodeAdapter:
         return result_flag
     
     @classmethod
-    def is_token_exceed(err: Exception, provider: str, model: str) -> bool:
-        pass
+    def guess_exception_type(cls, err: Exception|str) -> Literal['token_exceed', 'rate_limit', 'others']:
+        if isinstance(err, Exception):
+            err = str(err)
+        err = err.lower()
+
+        rate_limit_keywords = {
+            "too many requests",
+            "rate limit",
+            "quota",
+            "exceeded your current quota",
+            "requests per min",
+            "tokens per min",
+            "rpm",
+            "tpm",
+            "concurrency"
+        }
+
+        if any(kw in err for kw in rate_limit_keywords):
+            return "rate_limit"
+        
+        token_exceed_keywords = {
+            "maximum context length",
+            "context length exceeded",
+            "prompt too long",
+            "input too long",
+            "request too large",
+            "too many tokens",
+            "reduce the length",
+            "reduce tokens",
+            "max tokens",
+            "token limit",
+            "message too long"
+        }
+
+        if any(kw in err for kw in token_exceed_keywords):
+            return "token_exceed"
+        
+        rate_limit_object_set = {"rate", "concurrency", "rpm", "tpm"}
+        rate_limit_action_set = {"exceed", "limit", "reach"}
+
+        if any(o in err for o in rate_limit_object_set) and any(a in err for a in rate_limit_action_set):
+            return "rate_limit"
+        
+        token_exceed_object_set = {"token", "context", "prompt", "input"}
+        token_exceed_action_set = {"exceed", "long", "limit", "large"}
+
+        if any(o in err for o in token_exceed_object_set) and any(a in err for a in token_exceed_action_set):
+            return "token_exceed"
+        
+        return "others"

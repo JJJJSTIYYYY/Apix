@@ -120,10 +120,10 @@ export function createMainWindow() {
   })
 
   // Intercept in-app navigation 生产环境解除注释以下代码
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    event.preventDefault()
-    shell.openExternal(url)
-  })
+  // mainWindow.webContents.on('will-navigate', (event, url) => {
+  //   event.preventDefault()
+  //   shell.openExternal(url)
+  // })
 
   // ---------- Load renderer ----------
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

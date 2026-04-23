@@ -173,6 +173,16 @@ onBeforeUnmount(() => {
 
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
+  animation: opacityFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes opacityFadeIn {
+  0% { 
+    opacity: 0.3; 
+  }
+  100% { 
+    opacity: 1; 
+  }
 }
 
 /* ------------------------
@@ -188,6 +198,18 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: scaleFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes scaleFadeIn {
+  0% { 
+    opacity: 0.3; 
+    transform: scale(0.8); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
 }
 
 /* ------------------------
@@ -221,6 +243,7 @@ onBeforeUnmount(() => {
 }
 
 .md-displayer-close:hover {
+  color: #be0e0e;
   background: rgba(255, 47, 0, 0.196);
 }
 
@@ -300,8 +323,7 @@ onBeforeUnmount(() => {
   background: rgba(226, 226, 226, 0.32);
   border-radius: 999px;
   border: 1px solid rgba(213, 213, 213, 0.318);
-  box-shadow:
-    inset 1px -1px 16px rgba(117, 187, 248, 0.083);
+  box-shadow: inset 1px -1px 16px rgba(117, 187, 248, 0.083);
 }
 
 .mode-switch button {
@@ -312,16 +334,24 @@ onBeforeUnmount(() => {
   cursor: pointer;
   z-index: 1;
   font-size: 12px;
-}
-
-.plain-select {
   color: #4040409A;
   transition: color 0.25s ease;
 }
 
-.plain-select:not(.right) {
+.mode-switch button.active {
   color: #0000009A;
-  transition: color 0.25s ease;
+}
+
+.mode-switch:active:deep(.slider) {
+  z-index: 999;
+  box-shadow:
+    0 8px 24px rgba(62, 67, 66, 0.12),
+    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(3px);
+  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
 }
 
 .highlight-select {
@@ -334,57 +364,34 @@ onBeforeUnmount(() => {
   transition: color 0.25s ease;
 }
 
+/* Slider */
 .slider {
   position: absolute;
-  margin-top: -6px;
-  top: 3px;
-  left: 2px;
-
-  width: calc(50% + 8px);
-  height: calc(100% + 4px);
-
+  width: calc(50% + 4px);
+  height: calc(100% + 2px);
+  margin-top: -1px;
+  margin-left: -1px;
   border-radius: 32px;
-
-  /* Stable physical shadow (never changes) */
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12);
-
-  overflow: hidden;
-  border: 1px solid #fff;
-  -webkit-backdrop-filter: saturate(500%) blur(16px);
-  backdrop-filter: saturate(500%) blur(16px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
   transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  border-color: transparent;
-  background-color: color-mix(in srgb, #7ee4da 15%, transparent);
-}
-
-.slider {
-  transform: translateX(-14%) scale(1);
-  transform-origin: center;
-}
-
-/* active */
-.mode-switch:active:deep(.slider) {
-  transform: translateX(-14%) scale(1.2);
+  box-shadow:
+    0 8px 24px rgba(62, 67, 66, 0.12),
+    0 0 0 2px rgba(136, 202, 196, 0.471);
+  background-color: #ffffff2c;
 }
 
 .slider.right {
-  transform: translateX(65%) scale(1);
+  transform: translateX(88%);
 }
 
-.mode-switch:active:deep(.slider.right) {
-  transform: translateX(65%) scale(1.2);
-}
-
-
-/* Flip highlight direction */
-.slider.right::before {
-  transform: scaleX(-1);
-}
-
-/* Drift refraction to simulate background bending */
-.slider.right::after {
-  transform: translateX(25%);
+.mode-switch:active:deep(.slider) {
+  z-index: 999;
+  box-shadow:
+    0 8px 24px rgba(62, 67, 66, 0.12),
+    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(3px);
+  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
 }
 </style>

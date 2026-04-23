@@ -286,29 +286,28 @@ class MysqlService:
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
                 "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
                 "session_id": "{{ sid }} : to indicate which tab the data belong to",
-                "messages": [  # list of message dicts
-                    {
-                        "role": 'human', 'ai', 'system', 'tool',
-                        "content": "message content",
-                        "think": "",
-                        "extra": {...},
-                        "info": {
-                            "model": "...",
-                            "total_duration": "...",
-                            "model_provider": "...",
-                            "total_tokens": int,
-                            "id": "",
-                        }, 
-                        "timestamp": int,
-                    },
-                    ...
-                ]
+                "messages": {
+                    "role": 'human', 'ai', 'system', 'tool', 'info'
+                    "content": "message content",
+                    "think": "",
+                    "extra": {...},
+                    "info": {
+                        "model": "...",
+                        "total_duration": "...",
+                        "model_provider": "...",
+                        "total_tokens": int,
+                        "id": "",
+                    }, 
+                    "node_id": str,
+                    "parent_id": str,
+                    "timestamp": int,
+                }
             }
 
         Return:
             dict, the format is {
                 "success": True / False,
-                "messages": "fail: {e}" or "success",
+                "messages": "fail: {e}" or dict,
             }
         """
         logger.info(f"[MysqlService][append_message] enter.")
@@ -318,20 +317,17 @@ class MysqlService:
             messages = payload["messages"]
             
             if not messages:
-                raise ValueError("[MysqlService][append_message] messages list is empty")
-            if len(messages) != 1:
-                logger.warning(
-                    f"[MysqlService][append_message] received {len(messages)} messages, only last one will be persisted"
-                )
+                raise ValueError("[MysqlService][append_message] message is empty")
             
-            msg = messages[-1]
-            role = msg["role"]
-            content = msg["content"]
-            think = msg.get("think", "")
-            extra = msg.get("extra", {})
-            info = msg.get("info", {})
-            generation_id = msg.get("generation_id", "")
-            timestamp = msg["timestamp"]
+            role = messages["role"]
+            content = messages["content"]
+            think = messages.get("think", "")
+            extra = messages.get("extra", {})
+            info = messages.get("info", {})
+            generation_id = messages.get("generation_id", "")
+            node_id = messages.get("node_id", "")
+            parent_id = messages.get("parent_id", "")
+            timestamp = messages["timestamp"]
 
             if extra is None:
                 extra = {}
@@ -346,18 +342,87 @@ class MysqlService:
             if not timestamp:
                 raise ValueError("[MysqlService][append_message] message timestamp is empty")
                 
-            result = await self._call_procedure("append_message", (user_uid, conversation_id, role, content, think, extra, info, generation_id, timestamp))
+            result = await self._call_procedure("append_message", (user_uid, conversation_id, role, content, think, extra, info, generation_id, node_id, parent_id, timestamp))
             cursor =  result[0].get("msg_cursor", -1)
+            created_at = result[0].get("created_at")
             if cursor == -1: raise ValueError("Invalid cursor the database returned.")
             return {
                 "success": True,
                 "messages": {
                     "msg_cursor": cursor,
-                    "created_at": result[0].get("created_at")
+                    "created_at": created_at
                 }
             }
         except Exception as e:
             logger.exception(f"[MysqlService][append_message] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.memo.delete_messages")
+    async def delete_messages(self, payload: dict) -> dict:
+        """
+        Persist a peice of message. Call procedure delete_messages.
+        If len of messages list in payload is over one piece, only append the last one.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }} : to indicate which user the data is from.",
+                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
+                "session_id": "{{ sid }} : to indicate which tab the data belong to",
+                "messages": [  # list of message generation_id and role
+                    {
+                        "generation_id": str,
+                        "role": str # ai or human
+                    }
+                ]
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list[dict],
+            }
+        """
+        logger.info(f"[MysqlService][delete_messages] enter.")
+        try:
+            user_uid = payload["client_id"]
+            conversation_id = payload["history_id"]
+            messages = payload["messages"]
+            
+            if not messages:
+                raise ValueError("[MysqlService][delete_messages] list is empty")
+                
+            msg_info = []
+            for msg in messages:
+                role = msg["role"]
+                if role not in ("ai", "human"):
+                    continue
+                generation_id = msg["generation_id"]
+                res = await self._call_procedure("delete_messages", (user_uid, conversation_id, generation_id, role))
+                for row in res:
+                    if not isinstance(row, dict):
+                        continue
+                    raw = row.get("info")
+                    if isinstance(raw, str):
+                        try:
+                            parsed = json.loads(raw)
+                        except Exception:
+                            continue
+                    elif isinstance(raw, dict):
+                        parsed = raw
+                    else:
+                        continue
+
+                    msg_info.append(parsed)
+            
+            return {
+                "success": True,
+                "messages": msg_info
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][delete_messages] ❌ Error: {type(e).__name__}: {e}")
             return {
                 "success": False,
                 "messages": f"fail: {e}",
@@ -390,7 +455,7 @@ class MysqlService:
             conversation_id = payload["history_id"]
             after_cursor = payload.get("cursor", 0)
             after_cursor = max(int(after_cursor), 0)
-            limit = payload.get("limit", 999)
+            limit = payload.get("limit", 65535)
             rows = await self._call_procedure("fetch_messages_after_cursor", (user_uid, conversation_id, after_cursor, limit))
             next_cursor = rows[-1].get('msg_cursor') + 1 if rows else after_cursor
             return {
@@ -1058,6 +1123,41 @@ class MysqlService:
             }
         except Exception as e:
             logger.exception(f"[MysqlService][insert_shortterm_memory] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.memo.delete_shortterm_memory")
+    async def delete_shortterm_memory(self, payload: dict) -> dict:
+        """
+        Get a batch of memories. Call procedure delete_shortterm_memory.
+
+        Args:
+            payload: Dict, the format is {
+                "memory_ids": list[str], // Message's id generated by langChain (task_id in tool massage or id in ai message)
+                "client_id": "{{ cid }} : to indicate which user the data is from.",,
+                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or "success",
+            }
+        """
+        logger.info(f"[MysqlService][delete_shortterm_memory] enter.")
+        try:
+            memory_id = payload["memory_id"]
+            user_uid = payload["client_id"]
+            conversation_uid = payload["history_id"]
+            await self._call_procedure("delete_shortterm_memory", (json.dumps(memory_id), user_uid, conversation_uid))
+            return {
+                "success": True,
+                "messages": "success",
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][delete_shortterm_memory] ❌ Error: {type(e).__name__}: {e}")
             return {
                 "success": False,
                 "messages": f"fail: {e}",

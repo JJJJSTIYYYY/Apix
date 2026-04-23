@@ -1,57 +1,101 @@
 <template>
-  <div
-    class="human-message-wrapper"
+  <div 
+    class="message-wrapper"
+    :class="{ selected: is_selecting && props.msg.selected }"
+    @click.stop="toggleSelectFullArea"
   >
     <div
-      v-if="uploadedFiles.length > 0"
-      key="files"
-      class="uploaded-files"
+      v-if="is_selecting && props.msg.pending === false"
+      class="message-select-box"
+      :class="{ checked: props.msg.selected }"
+      @click.stop="toggleSelect"
+    ></div>
+    <div 
+      class="human-message-wrapper"
+      v-if="!props.msg.is_editing"
+      @contextmenu.prevent="onContextMenu"
     >
       <div
-        v-for="file in uploadedFiles"
-        :key="file.file_id"
-        class="uploaded-file-item"
+        v-if="uploadedFiles.length > 0"
+        key="files"
+        class="uploaded-files"
       >
-        <span class="file-icon"><svg t="1772617848746" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4793" width="200" height="200"><path d="M582.69905013 107.71347886v186.46874477a94.26540064 94.26540064 0 0 0 88.90405556 94.08865163l5.3613451 0.14729014H865.4952507V761.67969266a141.39810029 141.39810029 0 0 1-141.39810028 141.39810028H299.90284958a141.39810029 141.39810029 0 0 1-141.39810028-141.39810028V249.11157915a141.39810029 141.39810029 0 0 1 141.39810028-141.39810029h282.79620055z m91.64364376 543.88190068H349.65730611a43.86286855 43.86286855 0 0 0-4.21248552 87.51953204l4.21248552 0.20620647h324.68538778a43.86286855 43.86286855 0 1 0 0-87.72573851z m0-175.45147562H349.65730611a43.86286855 43.86286855 0 0 0-4.21248552 87.54898949l4.21248552 0.17674763h324.68538778a43.86286855 43.86286855 0 1 0 0-87.72573712z m23.21285525-360.56515571c9.72111939 0 19.08874354 3.82953142 26.04081587 10.66377248l63.12836112 62.15624916 63.09890225 62.12679031a36.29217952 36.29217952 0 0 1-25.45165804 62.12679031H704.65491163a44.18690634 44.18690634 0 0 1-44.18690633-44.18690634v-115.7696946c0-20.50272455 16.61427678-37.11700133 37.11700131-37.11700132z" fill="#666666" p-id="4794"></path></svg></span>
-        <span class="file-name">{{ file.file_name }}</span>
+        <div
+          v-for="file in uploadedFiles"
+          :key="file.file_id"
+          class="uploaded-file-item"
+        >
+          <span class="file-icon"><svg t="1772617848746" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4793" width="200" height="200"><path d="M582.69905013 107.71347886v186.46874477a94.26540064 94.26540064 0 0 0 88.90405556 94.08865163l5.3613451 0.14729014H865.4952507V761.67969266a141.39810029 141.39810029 0 0 1-141.39810028 141.39810028H299.90284958a141.39810029 141.39810029 0 0 1-141.39810028-141.39810028V249.11157915a141.39810029 141.39810029 0 0 1 141.39810028-141.39810029h282.79620055z m91.64364376 543.88190068H349.65730611a43.86286855 43.86286855 0 0 0-4.21248552 87.51953204l4.21248552 0.20620647h324.68538778a43.86286855 43.86286855 0 1 0 0-87.72573851z m0-175.45147562H349.65730611a43.86286855 43.86286855 0 0 0-4.21248552 87.54898949l4.21248552 0.17674763h324.68538778a43.86286855 43.86286855 0 1 0 0-87.72573712z m23.21285525-360.56515571c9.72111939 0 19.08874354 3.82953142 26.04081587 10.66377248l63.12836112 62.15624916 63.09890225 62.12679031a36.29217952 36.29217952 0 0 1-25.45165804 62.12679031H704.65491163a44.18690634 44.18690634 0 0 1-44.18690633-44.18690634v-115.7696946c0-20.50272455 16.61427678-37.11700133 37.11700131-37.11700132z" fill="#666666" p-id="4794"></path></svg></span>
+          <span class="file-name">{{ file.file_name }}</span>
+        </div>
       </div>
+
+      <div class="human-bubble-content-wrapper">
+        <div class="send-state-tag">
+          <svg t="1772620030116" v-if="msg.error" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5818" width="200" height="200"><path d="M512 0C229.205333 0 0 229.205333 0 512s229.205333 512 512 512 512-229.205333 512-512S794.794667 0 512 0z m0 796.458667A56.917333 56.917333 0 1 1 511.957333 682.666667 56.917333 56.917333 0 0 1 512 796.458667z m54.186667-227.797334h0.128a60.501333 60.501333 0 0 1-53.802667 55.893334c2.048 0.256 3.882667 1.152 5.973333 1.152h-11.818666c2.048 0 3.84-0.981333 5.845333-1.109334a59.093333 59.093333 0 0 1-53.162667-55.893333l-13.056-284.16a54.314667 54.314667 0 0 1 54.613334-57.045333h26.282666a52.992 52.992 0 0 1 54.186667 57.002666l-15.146667 284.16z" fill="#d81e06" p-id="5819"></path></svg>
+          <svg v-else-if="msg.pending" t="1772618878456" class="icon rotate-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4818" width="200" height="200"><path d="M469.333333 85.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".8" p-id="4819"></path><path d="M469.333333 725.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".4" p-id="4820"></path><path d="M938.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".2" p-id="4821"></path><path d="M298.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".6" p-id="4822"></path><path d="M783.530667 180.138667m30.169889 30.169889l0 0q30.169889 30.169889 0 60.339779l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339779l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".1" p-id="4823"></path><path d="M330.965333 632.661333m30.16989 30.16989l0 0q30.169889 30.169889 0 60.339778l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339778l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".5" p-id="4824"></path><path d="M843.861333 783.530667m-30.169889 30.169889l0 0q-30.169889 30.169889-60.339779 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339779 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".3" p-id="4825"></path><path d="M391.338667 330.965333m-30.16989 30.16989l0 0q-30.169889 30.169889-60.339778 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339778 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".7" p-id="4826"></path></svg>
+
+        </div>
+        <div
+          key="bubble"
+          class="human-bubble selectable"
+        >
+          <div class="bubble-content markdown-body" v-html="renderedContent"></div>
+        </div>
+      </div>
+
+      <transition name="scale-fade">
+        <msgBubbleMenu 
+          v-if="isShowMenu"
+          ref="menuRef"
+          type="human"
+          :style="menuStyle"
+          @close-menu="closePopMenu"
+          @copy-value="copyContextValue"
+          @re-edit="reEditContext"
+          @select-text="selectText"
+          @delete-item="deleteItem"
+          @click.stop
+        />
+      </transition>
     </div>
 
-    <div class="human-bubble-content-wrapper">
-      <div class="send-state-tag">
-        <svg t="1772620030116" v-if="msg.error" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5818" width="200" height="200"><path d="M512 0C229.205333 0 0 229.205333 0 512s229.205333 512 512 512 512-229.205333 512-512S794.794667 0 512 0z m0 796.458667A56.917333 56.917333 0 1 1 511.957333 682.666667 56.917333 56.917333 0 0 1 512 796.458667z m54.186667-227.797334h0.128a60.501333 60.501333 0 0 1-53.802667 55.893334c2.048 0.256 3.882667 1.152 5.973333 1.152h-11.818666c2.048 0 3.84-0.981333 5.845333-1.109334a59.093333 59.093333 0 0 1-53.162667-55.893333l-13.056-284.16a54.314667 54.314667 0 0 1 54.613334-57.045333h26.282666a52.992 52.992 0 0 1 54.186667 57.002666l-15.146667 284.16z" fill="#d81e06" p-id="5819"></path></svg>
-        <svg v-else-if="msg.pending" t="1772618878456" class="icon rotate-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4818" width="200" height="200"><path d="M469.333333 85.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".8" p-id="4819"></path><path d="M469.333333 725.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".4" p-id="4820"></path><path d="M938.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".2" p-id="4821"></path><path d="M298.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".6" p-id="4822"></path><path d="M783.530667 180.138667m30.169889 30.169889l0 0q30.169889 30.169889 0 60.339779l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339779l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".1" p-id="4823"></path><path d="M330.965333 632.661333m30.16989 30.16989l0 0q30.169889 30.169889 0 60.339778l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339778l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".5" p-id="4824"></path><path d="M843.861333 783.530667m-30.169889 30.169889l0 0q-30.169889 30.169889-60.339779 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339779 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".3" p-id="4825"></path><path d="M391.338667 330.965333m-30.16989 30.16989l0 0q-30.169889 30.169889-60.339778 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339778 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".7" p-id="4826"></path></svg>
-
-      </div>
-      <div
-        key="bubble"
-        class="human-bubble selectable"
-        @contextmenu.prevent="onContextMenu"
+    <div 
+      v-else
+      class="edit-message-wrapper"
+      ref="wrapperRef"
+    >
+      <div 
+        class="edit-message-box"
       >
-        <div class="bubble-content">{{ msg.content }}</div>
+        <textarea
+          ref="reEditInput"
+          v-model="reEditInputValue"
+          class="cd-input"
+          :placeholder="'编辑消息内容...'"
+        >
+        </textarea>
+        <button class="send-button" type="primary" @click="handleSendMessage">
+          <svg t="1776519512558" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11362" width="26" height="26"><path d="M481.834667 183.168a42.666667 42.666667 0 0 1 60.330666 0l298.666667 298.666667a42.666667 42.666667 0 0 1-60.330667 60.330666L554.666667 316.330667V810.666667a42.666667 42.666667 0 1 1-85.333334 0V316.330667l-225.834666 225.834666a42.666667 42.666667 0 0 1-60.330667-60.330666l298.666667-298.666667z" fill="#ffffff" p-id="11363"></path></svg>
+        </button>
       </div>
     </div>
   </div>
-
-
-  <transition name="scale-fade">
-    <msgBubbleMenu 
-      v-if="isShowMenu"
-      ref="menuRef"
-      type="human"
-      :style="menuStyle"
-      @close-menu="closePopMenu"
-      @copy-value="copyContextValue"
-      @re-edit="reEditContext"
-      @re-generate="reGenerateContext"
-    />
-  </transition>
 </template>
 
 
 <script setup lang="ts">
 import { nextTick, ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import msgBubbleMenu from './comp/msgBubbleMenu.vue'
+import MarkdownIt from 'markdown-it'
+
+const emit = defineEmits<{
+  edit: [id: string]
+  editFinish:  [id: string, newContent: string]
+  selectText: [id: string, role: string]
+  selected: [id: string]
+  delete: [id: string]
+}>()
 
 type UploadedFile = {
   file_name: string
@@ -67,10 +111,22 @@ type msgBubData = {
   extra: any
   pending?: boolean
   error?: boolean
+  selected?: boolean
+  is_editing?: boolean
 }
 const props = defineProps<{
   msg: msgBubData
+  is_selecting?: boolean
 }>()
+
+const md = new MarkdownIt({
+  breaks: true,
+  linkify: true,
+})
+
+const renderedContent = computed(() => {
+  return md.render(props.msg.content || '')
+})
 
 const uploadedFiles = computed<UploadedFile[]>(() => {
   return props.msg.extra?.user_meta_data?.uploaded_files ?? []
@@ -82,11 +138,23 @@ const menuRef = ref<any>(null)
 const menuWidthGuess = 144
 const menuHeightGuess = 120
 
+function toggleSelectFullArea() {
+  if (props.is_selecting && props.msg.pending === false) {
+    toggleSelect()
+  }
+}
+
+function toggleSelect() {
+  props.msg.selected = !props.msg.selected
+  if (props.msg.selected) emit("selected", props.msg.id, )
+}
+
 function onContextMenu(e: MouseEvent) {
   showPopMenu(e.clientX, e.clientY)
 }
 
 function showPopMenu(position_x: number, position_y: number) {
+  if (props.is_selecting) return
   isShowMenu.value = true
 
   menuStyle.value = {
@@ -130,12 +198,18 @@ function copyContextValue() {
   window.api?.copyToClipboard({ type: 'text', data: props.msg.content })
 }
 
+const newContext = ref("")
 function reEditContext() {
-  console.log("Note: reEditContext: msg.id = " + props.msg.id)
+  props.msg.is_editing = true
+  emit("edit", props.msg.id)
 }
 
-function reGenerateContext() {
-  console.log("Note: reGenerateContext: msg.id = " + props.msg.id)
+function selectText() {
+  emit("selectText", props.msg.id, 'human')
+}
+
+function deleteItem() {
+  emit("delete", props.msg.id, )
 }
 
 function onDocumentClick(e: MouseEvent) {
@@ -149,19 +223,87 @@ function onWindowResize() {
   closePopMenu()
 }
 
+const reEditInputValue = ref(props.msg.content || '')
+const wrapperRef = ref<HTMLElement | null>(null)
+
+const handleClickOutside = (e: MouseEvent) => {
+  if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
+    props.msg.is_editing = false
+  }
+}
+
+const handleSendMessage = () => {
+  if(reEditInputValue.value !== '') {
+    props.msg.content = reEditInputValue.value
+    emit("editFinish", props.msg.id, reEditInputValue.value)
+    props.msg.is_editing = false
+  }
+}
+
 onMounted(() => {
   document.addEventListener('click', onDocumentClick, true)
+  window.addEventListener('mousedown', handleClickOutside)
   window.addEventListener('resize', onWindowResize)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocumentClick, true)
+  window.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('resize', onWindowResize)
 })
 </script>
 
 
 <style scoped>
+.message-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 18px;
+  align-items: center;
+  background: transparent;
+  transition: background 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.message-wrapper.selected {
+  background: #e3dfdf7a;
+}
+
+.message-select-box {
+  z-index: 999;
+  border: 2px solid #bababa;
+  border-radius: 6px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.message-select-box:hover {
+  border-color: rgb(255, 131, 131);
+}
+
+.message-select-box.checked {
+  background-color: #f35050;
+  border-color: #ea4444;
+}
+
+.message-select-box.checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
 .human-bubble {
   padding: 8px 16px;
   font-size: 16px;
@@ -180,6 +322,7 @@ onBeforeUnmount(() => {
   max-width: 85%;
   display: flex;
   flex-direction: row;
+  /* animation: opacityFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1); */
 }
 
 .send-state-tag {
@@ -205,8 +348,7 @@ onBeforeUnmount(() => {
 }
 
 .bubble-content {
-  white-space: pre-wrap;   /* Keep \n as line break */
-  word-break: break-word;  /* Prevent long text overflow */
+  background-color: transparent;
 }
 
 .scale-fade-enter-active {
@@ -226,10 +368,13 @@ onBeforeUnmount(() => {
 }
 
 .human-message-wrapper {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   width: 100%;
+  max-width: 100%;
+  padding: 0px 16px;
 }
 
 .uploaded-files {
@@ -267,5 +412,132 @@ onBeforeUnmount(() => {
 
 .file-name {
   word-break: break-all;
+}
+
+.edit-message-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-width: 100%;
+  max-width: 100%;
+  min-height: 160px;
+}
+
+.edit-message-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 92%;
+  min-height: 160px;
+  animation: opacityFadeIn .6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes opacityFadeIn {
+  0% { 
+    opacity: 0.3; 
+    transform: scale(0.8); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+.cd-input {
+  border: 1.5px solid #909d9dc9;
+  border-radius: 32px;
+  min-height: 160px;
+  border-radius: 32px;
+  padding: 16px 16px;
+  font-size: 16px;
+  outline: none;
+  color: #2f3d3cdc;
+  background-color: rgba(255, 255, 255, 0.199);
+  resize: none;
+  transition: all 0.3s ease;
+  scrollbar-width: none;
+}
+
+.cd-input:focus {
+  background-color: rgba(255, 255, 255, 0.414);
+  box-shadow: inset 0 0 0 1px #909d9dc9;
+}
+
+.send-button {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  border-radius: 100px;
+  background: #60aca9;
+  color: whitesmoke;
+  border: none;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  right: 12px;
+  bottom: 12px;
+
+  transition: 
+    transform 0.18s ease,
+    box-shadow 0.25s ease,
+    background 0.35s ease;
+}
+
+.send-button:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 14px rgb(255, 255, 255);
+  background: #579f9d;
+}
+
+/* 点击效果：轻微缩小 + 暗色反馈 */
+.send-button:active {
+  transform: scale(0.95);
+  background: #519794;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.908);
+}
+</style>
+
+<style scoped>
+.markdown-body:deep(table) {
+  border-radius: 12px !important;
+  background-color: rgba(255, 255, 255, 0.431) !important;
+  box-shadow: 
+    inset 0 1px 0 1px var(--borderColor-default),  /* 顶部边框 */
+    inset 1px 0 0 1px var(--borderColor-default), /* 右侧边框 */
+    inset 0 -1px 0 1px var(--borderColor-default), /* 底部边框 */
+    inset -1px 0 0 1px var(--borderColor-default); /* 左侧边框 */
+}
+.markdown-body:deep(thead) {
+  background-color: rgba(178, 194, 199, 0.256) !important;
+}
+.markdown-body:deep(th) {
+  background-color: rgba(255, 255, 255, 0) !important;
+}
+.markdown-body:deep(tbody) {
+  background-color: rgba(255, 255, 255, 0) !important;
+}
+.markdown-body:deep(tr) {
+  background-color: rgba(255, 255, 255, 0) !important;
+}
+.markdown-body:deep(td) {
+  background-color: rgba(234, 234, 234, 0) !important;
+}
+
+.markdown-body:deep(pre) {
+  padding: 0px;
+  margin-bottom: 0px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+  scrollbar-width: none;
+  border-radius: 24px !important;
+}
+
+.markdown-body:deep(blockquote) {
+  margin: 16px 3px;
+  padding: 0 1em;
+  color: #59636eb6;
+  border-left: .2em solid #5490914b;
 }
 </style>
