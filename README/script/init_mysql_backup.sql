@@ -926,6 +926,49 @@ DELIMITER ;
 
 
 
+-- Stored Procedure: delete_messages_node
+DROP PROCEDURE IF EXISTS delete_messages_node;
+DELIMITER $$
+
+CREATE PROCEDURE delete_messages_node (
+    IN p_user_uid VARCHAR(64),
+    IN p_conversation_uid VARCHAR(64),
+    IN p_node_id VARCHAR(32)
+)
+BEGIN
+    START TRANSACTION;
+
+    -- Step 1: Cache target rows (only store primary key + info for efficiency)
+    CREATE TEMPORARY TABLE tmp_to_delete (
+        id BIGINT PRIMARY KEY,
+        info JSON
+    ) ENGINE=InnoDB;
+
+    INSERT INTO tmp_to_delete (id, info)
+    SELECT id, info
+    FROM messages
+    WHERE user_uid = p_user_uid
+      AND conversation_uid = p_conversation_uid
+      AND node_id = p_node_id
+    FOR UPDATE; -- lock rows to avoid concurrent modification
+
+    -- Step 2: Update using cached ids
+    UPDATE messages m
+    JOIN tmp_to_delete t ON m.id = t.id
+    SET m.is_deleted = TRUE;
+
+    -- Step 3: Return deleted infos
+    SELECT info FROM tmp_to_delete;
+
+    DROP TEMPORARY TABLE tmp_to_delete;
+
+    COMMIT;
+END$$
+
+DELIMITER ;
+
+
+
 -- Stored Procedure: fetch_messages_after_cursor
 DROP PROCEDURE IF EXISTS fetch_messages_after_cursor;
 DELIMITER $$
