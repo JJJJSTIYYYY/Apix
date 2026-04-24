@@ -14,6 +14,31 @@
       class="ai-bubble-wrapper"
       @contextmenu.prevent="onContextMenu"
     >
+
+      <!-- Branch switch -->
+      <div class="branch-switch-wrapper"
+          v-if="(props.msg.pre_node && props.msg.pre_node.length > 0) || (props.msg.next_node && props.msg.next_node.length > 0)">
+        <div 
+          class="branch-switch-label-wrapper"
+        >
+          <button
+            class="branch-switch-btn pre"
+            :disabled="!props.msg.pre_node || props.msg.pre_node.length === 0"
+            @click="handlePreNodeClick"
+          >
+            <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16"><path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="#7C8394" p-id="1148"></path></svg>
+          </button>
+          <div class="branch-page-label">{{ (props.msg.pre_node.length ?? 0) + 1}}{{ ' / ' }}{{ (props.msg.pre_node.length ?? 0) + (props.msg.next_node.length ?? 0) + 1}}</div>
+          <button
+            class="branch-switch-btn next"
+            :disabled="!props.msg.next_node || props.msg.next_node.length === 0"
+            @click="handleNextNodeClick"
+          >
+            <svg t="1777025401907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16"><path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" fill="#7C8394" p-id="1365"></path></svg>
+          </button>
+        </div>
+      </div>
+
       <!-- Think -->
       <div class="think-block" v-if="hasThink">
         <div class="think-border-point">
@@ -209,7 +234,7 @@
         </div>
         <div class="tag-wrapper">
           <div class="tag-name">Duration:</div>
-          <div>{{ msg.info?.total_duration ?? 'N/A' }}S</div>
+          <div>{{ (msg.info?.total_duration/1000) ?? 'N/A' }}S</div>
         </div>
         <div
           class="tag-wrapper"
@@ -256,16 +281,16 @@
         />
       </transition>
 
-        <msgSelectionBubble
-          v-if="isShowSelectionBubble"
-          :style="{
-            left: bubblePosition.x + 'px',
-            top: bubblePosition.y + 'px'
-          }"
-          @close-bubble="closeSelectionBubble"
-          @copy-value=""
-          @quote-content="handleQuoteContent"
-        />
+      <msgSelectionBubble
+        v-if="isShowSelectionBubble"
+        :style="{
+          left: bubblePosition.x + 'px',
+          top: bubblePosition.y + 'px'
+        }"
+        @close-bubble="closeSelectionBubble"
+        @copy-value=""
+        @quote-content="handleQuoteContent"
+      />
     </div>
   </div>
 </template>
@@ -290,6 +315,7 @@ const emit = defineEmits<{
   selected: [id: string]
   delete: [id: string]
   quoted: [hid: string, content: string]
+  switchToBranch: [id: string]
 }>()
 
 const store = useAppCacheData()
@@ -329,6 +355,10 @@ type MsgBubbleData = {
   id: string
   cid: string
   hid: string
+  node_id?: number
+  parent_id?: number
+  pre_node?: str[]
+  next_node?: str[]
   role: 'ai'
   label: string
   content: string | MessageChunk[]
@@ -494,7 +524,7 @@ const displayTodos = computed(() => {
   return props.msg.todos
 })
 
-// // 选区逻辑
+// 选区逻辑
 function handleMouseDown(e: MouseEvent) {
   globalSelection.id = ''
   globalSelection.content = ''
@@ -751,6 +781,14 @@ const showLinks = async () => {
   })
 }
 
+function handlePreNodeClick() {
+  emit("switchToBranch", props.msg.pre_node?.at(-1))
+}
+
+function handleNextNodeClick() {
+  emit("switchToBranch", props.msg.next_node?.at(0))
+}
+
 function onContextMenu(e: MouseEvent) {
   showPopMenu(e.clientX, e.clientY)
 }
@@ -801,7 +839,7 @@ function copyContextValue() {
 }
 
 function reGenerateContext() {
-  emit("reGenerate", props.msg.id)
+  emit("reGenerate", props.msg.parent_id)
 }
 
 function selectText() {
@@ -812,12 +850,12 @@ function deleteItem() {
   emit("delete", props.msg.id)
 }
 
-function onDocumentClick(e: MouseEvent) {
-  const menuEl = menuRef.value?.$el || menuRef.value
-  if (!menuEl) return
-  if (e.target === menuEl || menuEl.contains(e.target as Node)) return
-  closePopMenu()
-}
+// function onDocumentClick(e: MouseEvent) {
+//   const menuEl = menuRef.value?.$el || menuRef.value
+//   if (!menuEl) return
+//   if (e.target === menuEl || menuEl.contains(e.target as Node)) return
+//   closePopMenu()
+// }
 
 const copy_svg = ref(
   `<svg t="1772102283255" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11499" width="200" height="200"><path d="M624.5 786.3c92.9 0 168.2-75.3 168.2-168.2V309c0-92.4-75.3-168.2-168.2-168.2H303.6c-92.4 0-168.2 75.3-168.2 168.2v309.1c0 92.4 75.3 168.2 168.2 168.2h320.9zM178.2 618.1V309c0-69.4 56.1-125.5 125.5-125.5h320.9c69.4 0 125.5 56.1 125.5 125.5v309.1c0 69.4-56.1 125.5-125.5 125.5h-321c-69.4 0-125.4-56.1-125.4-125.5z" p-id="11500"></path><path d="M849.8 295.1v361.5c0 102.7-83.6 186.3-186.3 186.3H279.1v42.7h384.4c126.3 0 229.1-102.8 229.1-229.1V295.1h-42.8zM307.9 361.8h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4zM307.9 484.6h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4z" p-id="11501"></path><path d="M620.2 607.4c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.8 9.6 21.4 21.4 21.4h312.3z" p-id="11502"></path></svg>`
@@ -879,14 +917,14 @@ watch(
 )
 
 onMounted(() => {
-  document.addEventListener('click', onDocumentClick)
+  // document.addEventListener('click', onDocumentClick)
   document.addEventListener('click', onCodeCopyClick)
   document.addEventListener('selectionchange', handleSelectionChange)
   window.addEventListener('resize', onResize)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocumentClick)
+  // document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('click', onCodeCopyClick)
   document.removeEventListener('selectionchange', handleSelectionChange)
   window.removeEventListener('resize', onResize)
@@ -1430,6 +1468,57 @@ async function scrollThinkToBottom() {
 .error-card:deep(div) {
   align-items: center;
   display: flex;
+}
+
+.branch-switch-wrapper {
+  opacity: 0.4;
+  width: 100%;
+  background-color: #dde7e67e;
+  border-radius: 24px;
+  border: 1px solid #7c98957e;
+  transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.branch-switch-wrapper:hover {
+  opacity: 1;
+}
+
+.branch-switch-label-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px; 
+  border-radius: 20px;
+  margin: 0px auto;
+  width: fit-content;
+}
+
+.branch-switch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.branch-switch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.branch-page-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  min-width: 32px;
+  text-align: center;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .ai-images-wrapper {

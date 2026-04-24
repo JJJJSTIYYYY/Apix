@@ -15,6 +15,30 @@
       v-if="!props.msg.is_editing"
       @contextmenu.prevent="onContextMenu"
     >
+
+      <div class="branch-switch-wrapper"
+          v-if="(props.msg.pre_node && props.msg.pre_node.length > 0) || (props.msg.next_node && props.msg.next_node.length > 0)">
+        <div 
+          class="branch-switch-label-wrapper"
+        >
+          <button
+            class="branch-switch-btn pre"
+            :disabled="!props.msg.pre_node || props.msg.pre_node.length === 0"
+            @click="handlePreNodeClick"
+          >
+            <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16"><path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="#7C8394" p-id="1148"></path></svg>
+          </button>
+          <div class="branch-page-label">{{ (props.msg.pre_node.length ?? 0) + 1}}{{ ' / ' }}{{ (props.msg.pre_node.length ?? 0) + (props.msg.next_node.length ?? 0) + 1}}</div>
+          <button
+            class="branch-switch-btn next"
+            :disabled="!props.msg.next_node || props.msg.next_node.length === 0"
+            @click="handleNextNodeClick"
+          >
+            <svg t="1777025401907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16"><path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" fill="#7C8394" p-id="1365"></path></svg>
+          </button>
+        </div>
+      </div>
+      
       <div
         v-if="uploadedFiles.length > 0"
         key="files"
@@ -39,6 +63,8 @@
         <div
           key="bubble"
           class="human-bubble selectable"
+          @mousedown="handleMouseDown"
+          @mouseup="handleMouseUp"
         >
           <div class="bubble-content markdown-body" v-html="renderedContent"></div>
         </div>
@@ -58,6 +84,17 @@
           @click.stop
         />
       </transition>
+
+      <msgSelectionBubble
+        v-if="isShowSelectionBubble"
+        :style="{
+          left: bubblePosition.x + 'px',
+          top: bubblePosition.y + 'px'
+        }"
+        @close-bubble="closeSelectionBubble"
+        @copy-value=""
+        @quote-content="handleQuoteContent"
+      />
     </div>
 
     <div 
@@ -88,6 +125,8 @@
 import { nextTick, ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import msgBubbleMenu from './comp/msgBubbleMenu.vue'
 import MarkdownIt from 'markdown-it'
+import msgSelectionBubble from './comp/msgSelectionBubble.vue'
+import { globalSelection } from '../../../store/globalData.js'
 
 const emit = defineEmits<{
   edit: [id: string]
@@ -95,6 +134,8 @@ const emit = defineEmits<{
   selectText: [id: string, role: string]
   selected: [id: string]
   delete: [id: string]
+  quoted: [hid: string, content: string]
+  switchToBranch: [id: string]
 }>()
 
 type UploadedFile = {
@@ -106,6 +147,10 @@ type msgBubData = {
   id: string
   cid: string
   hid: string
+  node_id?: number
+  parent_id?: number
+  pre_node?: str[]
+  next_node?: str[]
   role: 'human'
   content: string
   extra: any
@@ -147,6 +192,14 @@ function toggleSelectFullArea() {
 function toggleSelect() {
   props.msg.selected = !props.msg.selected
   if (props.msg.selected) emit("selected", props.msg.id, )
+}
+
+function handlePreNodeClick() {
+  emit("switchToBranch", props.msg.pre_node?.at(-1))
+}
+
+function handleNextNodeClick() {
+  emit("switchToBranch", props.msg.next_node?.at(0))
 }
 
 function onContextMenu(e: MouseEvent) {
@@ -212,12 +265,12 @@ function deleteItem() {
   emit("delete", props.msg.id, )
 }
 
-function onDocumentClick(e: MouseEvent) {
-  const menuEl = menuRef.value?.$el || menuRef.value
-  if (!menuEl) return
-  if (menuEl === e.target || menuEl.contains(e.target as Node)) return
-  closePopMenu()
-}
+// function onDocumentClick(e: MouseEvent) {
+//   const menuEl = menuRef.value?.$el || menuRef.value
+//   if (!menuEl) return
+//   if (menuEl === e.target || menuEl.contains(e.target as Node)) return
+//   closePopMenu()
+// }
 
 function onWindowResize() {
   closePopMenu()
@@ -226,11 +279,11 @@ function onWindowResize() {
 const reEditInputValue = ref(props.msg.content || '')
 const wrapperRef = ref<HTMLElement | null>(null)
 
-const handleClickOutside = (e: MouseEvent) => {
-  if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
-    props.msg.is_editing = false
-  }
-}
+// const handleClickOutside = (e: MouseEvent) => {
+//   if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
+//     props.msg.is_editing = false
+//   }
+// }
 
 const handleSendMessage = () => {
   if(reEditInputValue.value !== '') {
@@ -240,15 +293,95 @@ const handleSendMessage = () => {
   }
 }
 
+// 选区逻辑
+function handleMouseDown(e: MouseEvent) {
+  globalSelection.id = ''
+  globalSelection.content = ''
+  globalSelection.rect = null
+}
+
+function handleMouseUp(e: MouseEvent) {
+  const selection = window.getSelection()
+
+  if (!selection || selection.isCollapsed) {
+    globalSelection.content = ''
+    globalSelection.id = ''
+    return
+  }
+
+  const text = selection.toString().trim()
+  if (!text) {
+    globalSelection.content = ''
+    globalSelection.id = ''
+    return
+  }
+
+  const range = selection.getRangeAt(0)
+  const container = range.commonAncestorContainer
+
+  const wrapper = e.currentTarget as HTMLElement
+
+  if (!wrapper.contains(container) || props.msg.pending) {
+    globalSelection.content = ''
+    globalSelection.id = ''
+    return
+  }
+
+  const rect = range.getBoundingClientRect()
+
+  globalSelection.content = text
+  globalSelection.id = props.msg.id
+  globalSelection.rect = rect
+}
+
+const isShowSelectionBubble = computed(() => {
+  return (
+    Boolean(globalSelection.content) &&
+    globalSelection.id === props.msg.id
+  )
+})
+
+const bubblePosition = computed(() => {
+  const rect = globalSelection.rect
+  if (!rect) return { x: 0, y: 0 }
+
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top - 16,
+  }
+})
+
+function handleSelectionChange() {
+  const selection = window.getSelection()
+
+  // 如果拖动过程中被清空
+  if (!selection || selection.isCollapsed) {
+    globalSelection.content = ''
+    globalSelection.id = ''
+    globalSelection.rect = null
+  }
+}
+
+function closeSelectionBubble() {
+  window.getSelection()?.removeAllRanges()
+}
+
+function handleQuoteContent() {
+
+  emit("quoted", props.msg.hid, globalSelection.content)
+}
+
 onMounted(() => {
-  document.addEventListener('click', onDocumentClick, true)
-  window.addEventListener('mousedown', handleClickOutside)
+  // document.addEventListener('click', onDocumentClick, true)
+  document.addEventListener('selectionchange', handleSelectionChange)
+  // window.addEventListener('mousedown', handleClickOutside)
   window.addEventListener('resize', onWindowResize)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocumentClick, true)
-  window.removeEventListener('mousedown', handleClickOutside)
+  // document.removeEventListener('click', onDocumentClick, true)
+  document.removeEventListener('selectionchange', handleSelectionChange)
+  // window.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('resize', onWindowResize)
 })
 </script>
@@ -375,6 +508,7 @@ onBeforeUnmount(() => {
   width: 100%;
   max-width: 100%;
   padding: 0px 16px;
+  gap: 12px;
 }
 
 .uploaded-files {
@@ -412,6 +546,57 @@ onBeforeUnmount(() => {
 
 .file-name {
   word-break: break-all;
+}
+
+.branch-switch-wrapper {
+  opacity: 0.4;
+  width: 100%;
+  background-color: #dde7e67e;
+  border-radius: 24px;
+  transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  border: 1px solid #7c98957e;
+}
+
+.branch-switch-wrapper:hover {
+  opacity: 1;
+}
+
+.branch-switch-label-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 20px;
+  margin: 0px auto;
+  width: fit-content;
+}
+
+.branch-switch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.branch-switch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.branch-page-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  min-width: 32px;
+  text-align: center;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .edit-message-wrapper {

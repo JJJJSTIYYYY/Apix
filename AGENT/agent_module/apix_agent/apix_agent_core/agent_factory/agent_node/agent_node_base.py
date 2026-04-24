@@ -20,12 +20,12 @@ class AgentNodeBase(ABC):
         self.tool_set: list[str] = tool_set
 
         self.SYSTEM_ALERT_PROMPT = "[SYSTEM ALERT] Task execution time is too long. Expedite immediately."
-        self.SUMMARY_MEMORY_PREFIX = "Here is the existing compression of this conversation:\n"
+        self.SUMMARY_MEMORY_PREFIX = "Here is the existing compression of this conversation:\n\n"
         self.SUMMARY_INSTRUCTION_PROMPT = (
-            "Compress all preceding messages into the required structured format.\n"
-            "Use the same language as the original conversation for all content.\n"
-            "Do NOT translate or modify the section headers.\n"
-            "Section headers MUST remain exactly as specified in English."
+            "Compress all preceding messages and update the existing compression into the required structured format.\n"
+            "** Use the same language as the original conversation for all content. **\n"
+            "** Do NOT translate or modify the section headers. **\n"
+            "** Section headers MUST remain exactly as specified in English. **"
         )
 
 

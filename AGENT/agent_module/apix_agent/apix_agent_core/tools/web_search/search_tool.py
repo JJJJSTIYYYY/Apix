@@ -93,6 +93,7 @@ async def search_web_by_keywords(
                 "key_word": key_word,
                 "provider": provider,
             },
+            state.get("parent_node_id")
         )
 
         if not results and not images:
@@ -334,6 +335,7 @@ async def search_web_by_urls(
                 "urls": urls,
                 "provider": provider,
             },
+            state.get("parent_node_id")
         )
 
         return Command(update={

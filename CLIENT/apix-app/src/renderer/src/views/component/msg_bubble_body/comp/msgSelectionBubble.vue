@@ -25,23 +25,25 @@ const emit = defineEmits<{
 const wrapperRef = ref<HTMLElement | null>(null)
 
 const handleClickOutside = (e: MouseEvent) => {
+  console.log("handleClickOutside")
   if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
     globalSelection.content = ''
     globalSelection.id = ''
     globalSelection.rect = null
-    emit('close-menu')
+    emit("closeBubble")
   }
 }
 
-onMounted(() => {
-  window.addEventListener('mousedown', handleClickOutside)
-})
+// onMounted(() => {
+//   window.addEventListener('mousedown', handleClickOutside)
+// })
 
-onBeforeUnmount(() => {
-  window.removeEventListener('mousedown', handleClickOutside)
-})
+// onBeforeUnmount(() => {
+//   window.removeEventListener('mousedown', handleClickOutside)
+// })
 
 function onAsk() {
+  console.log("Ask quated: ", globalSelection.content)
   if (globalSelection.content !== '') {
     emit("quoteContent", globalSelection.content)
   }

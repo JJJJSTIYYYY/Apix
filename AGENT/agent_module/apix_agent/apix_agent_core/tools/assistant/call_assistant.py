@@ -161,6 +161,7 @@ async def assign_sub_assistant(
             "agent_role": agent_role,
             "history_id": "sub_" + parent_state.get("history_id", ""),
             "input": input,
+            "re_generate": False,
             "messages": [],
             "current_tool_calls": 0,
             "longterm_memory": "",

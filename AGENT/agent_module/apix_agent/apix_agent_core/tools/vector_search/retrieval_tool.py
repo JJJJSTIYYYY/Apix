@@ -136,6 +136,7 @@ async def search_knowledge_base(
                 "key_word": query,
                 "provider": "Milvus",
             },
+            state.get("parent_node_id")
         )
 
         if not messages:

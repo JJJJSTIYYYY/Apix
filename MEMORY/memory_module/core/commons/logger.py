@@ -154,4 +154,4 @@ def use_case():
     simple_logger.warning("没有时间戳的警告")
 
 
-logger = Logger(name="AppLogger", show_time=True, show_level=True)
+logger = Logger(name="MEMORY_SERVER", show_time=True, show_level=True)

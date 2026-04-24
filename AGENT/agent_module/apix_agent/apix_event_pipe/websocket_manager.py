@@ -40,6 +40,7 @@ class GenerationState:
         "generation_id": "",
         "timestamp": 0
     })
+    parent_node_id: str = field(default='-')
 
     created_at: float = field(default_factory=time.time)
 
@@ -125,6 +126,8 @@ class WebsocketList:
         return ctx
 
     async def create_generation(self, client_id: str, history_id: str, *, append_cache_memory: bool = True, not_active_generation_id = False) -> str:
+        logger.warning("\n############################################\n            NEW GENERATION START\n############################################\n")
+
         ctx = self._get_ctx(client_id)
         new_gen_id = str(uuid4())
 
@@ -166,13 +169,18 @@ class WebsocketList:
                     "generation_id": old_gen.generation_id,
                     "timestamp": ts,
                 })
-
-                await ai_context_manager.append_to_messages(
-                    client_id,
-                    history_id,
-                    interrupted_msg
-                )
-                logger.warning("[create_generation] Append [Conversation Abort] mark to database.")
+                
+                parent_node_id = old_gen.parent_node_id
+                if parent_node_id and parent_node_id != '-':
+                    await ai_context_manager.append_to_messages(
+                        client_id,
+                        history_id,
+                        interrupted_msg,
+                        parent_node_id
+                    )
+                    logger.warning("[create_generation] Append [Conversation Abort] mark to database.")
+                else:
+                    logger.warning("[create_generation] Not allow to [Conversation Abort] mark to database as a root node.")
 
         return new_gen_id
 
@@ -417,6 +425,7 @@ class WebsocketMessageHandler:
             history_id = data.get("history_id")
             platform = data.get("platform", "default")
             message = data.get("messages", {})
+            re_generate = data.get("re_generate", False)
             config = data.get("config", {})
             
             enable_agent_assign = bool(config.get("enable_agent_assign", False))
@@ -443,6 +452,7 @@ class WebsocketMessageHandler:
                 "config": config,
                 "timestamp": timestamp,
                 "input": message,
+                "re_generate": re_generate,
                 "messages": [],
                 "current_tool_calls": [],
                 "longterm_memory": None,
@@ -467,6 +477,14 @@ class WebsocketMessageHandler:
             await self.ws_list.send_ai_stream_start(generation_id, client_id, history_id)
 
             async for achunk in astream:
+                chunk_event = achunk.get("data")
+                action = chunk_event.get("event_name")
+                if action == 'parent_id_return':
+                    content = chunk_event.get("content")
+                    ctx = self.ws_list._get_ctx(client_id)
+                    gen = ctx.generations.get(generation_id)
+                    gen.parent_node_id = content
+
                 if self.ws_list.is_generation_aborted(client_id, generation_id):
                     await astream.aclose()
                     await self.ws_list.send_ai_stream_abort(

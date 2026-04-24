@@ -6,7 +6,7 @@ import platform
 
 OPERATION_SYSTEM = platform.system().lower()
 
-DEBUG = False
+DEBUG = True
 TRACE = True
 CHECK_SERVER_HEALTH = False  # Enable or disable services health checks
 

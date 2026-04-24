@@ -80,9 +80,9 @@ class LlmNodeAdapter:
         if provider not in ['ollama:local', 'ollama', 'openai', 'deepseek', 'moonshot']:
             raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
         if provider == 'deepseek':
-            enable_think = bool(config.get("enable_think", False))
-            if enable_think: model = 'deepseek-reasoner'
-            else: model = 'deepseek-chat'
+            # enable_think = bool(config.get("enable_think", False))
+            # if enable_think: model = 'deepseek-reasoner'
+            # else: model = 'deepseek-chat'
             return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
         else:
             return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
@@ -105,6 +105,12 @@ class LlmNodeAdapter:
                 reasoning=True  -> deepseek-reasoner
                 reasoning=False -> deepseek-chat
 
+        DeepSeek-V4:
+            - DOES NOT support reasoning parameter
+            - We select model by reasoning flag:
+                reasoning=True  -> extra_body={"thinking": {"type": "enabled"}}
+                reasoning=False -> extra_body={"thinking": {"type": "disabled"}}
+
         MoonShot:
             - MoonShot's model can not turn think-mode on or off by reasoning parameter
 
@@ -115,22 +121,18 @@ class LlmNodeAdapter:
         provider = getattr(llm_node, "provider", None)
         model_name = getattr(llm_node, "model_name", None)
         api_key = getattr(llm_node, "api_key", None)
-        config = getattr(llm_node, "config", None)
+        config = getattr(llm_node, "extra_body", {}) or {}
 
         if provider == "deepseek" or (
             model_name and model_name.startswith("deepseek")
         ):
-            target_model = (
-                "deepseek-reasoner" if reasoning else "deepseek-chat"
-            )
-
             # If current model not match → rebuild
-            if model_name != target_model:
+            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
                 llm_node = get_llm_node(
                     provider="deepseek",
-                    model=target_model,
+                    model=model_name,
                     api_key=api_key,
-                    config=config,
+                    config={"enable_think": reasoning},
                 )
 
             async for chunk in llm_node.astream(input):
@@ -173,6 +175,12 @@ class LlmNodeAdapter:
                 reasoning=True  -> deepseek-reasoner
                 reasoning=False -> deepseek-chat
 
+        DeepSeek-V4:
+            - DOES NOT support reasoning parameter
+            - We select model by reasoning flag:
+                reasoning=True  -> extra_body={"thinking": {"type": "enabled"}}
+                reasoning=False -> extra_body={"thinking": {"type": "disabled"}}
+
         MoonShot:
             - MoonShot's model can not turn think-mode on or off by reasoning parameter
 
@@ -183,19 +191,16 @@ class LlmNodeAdapter:
         provider = getattr(llm_node, "provider", None)
         model_name = getattr(llm_node, "model_name", None)
         api_key = getattr(llm_node, "api_key", None)
-        config = getattr(llm_node, "config", None)
+        config = getattr(llm_node, "extra_body", {}) or {}
 
         if provider == "deepseek" or (
             model_name and model_name.startswith("deepseek")
         ):
-            target_model = (
-                "deepseek-reasoner" if reasoning else "deepseek-chat"
-            )
-
-            if model_name != target_model:
+            # If current model not match → rebuild
+            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
                 llm_node = get_llm_node(
                     provider="deepseek",
-                    model=target_model,
+                    model=model_name,
                     api_key=api_key,
                     config=config,
                 )

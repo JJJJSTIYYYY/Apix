@@ -333,6 +333,9 @@ class SubAgentNode(AgentNodeBase):
             or (llm_retry_count > 0 and last_error == "token_exceed")
         )
 
+        # if len(messages) >= threshold:
+        #     context_compress_level = max(context_compress_level, 2)
+
         if not should_trigger:
             return Command(update={})
 
@@ -426,7 +429,7 @@ class SubAgentNode(AgentNodeBase):
 
             if shortterm_memory:
                 summary_prompt.append(
-                    SystemMessage(
+                    HumanMessage(
                         content=self.SUMMARY_MEMORY_PREFIX + shortterm_memory
                     )
                 )

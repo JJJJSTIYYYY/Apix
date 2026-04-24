@@ -504,6 +504,7 @@ async def send_images(
                     state.get("history_id"), 
                     state.get("timestamp"),
                     addtional_info,
+                    state.get("parent_node_id")
                 )
 
                 event_writer.send_event(

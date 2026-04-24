@@ -8,6 +8,7 @@ from apix_agent.commons.type_def import ApixEventEnvelope, MinimalEnvelopeData
 
 
 class StreamEvent(str, Enum):
+    ESSENTIAL_INFO_RETURN = 'essential_info_return'
     LLM_STREAM_START = "llm_stream_start"
     LLM_CHUNK_RETURN = "llm_chunk_return"
     LLM_STREAM_END = "llm_stream_end"

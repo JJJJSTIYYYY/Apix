@@ -14,7 +14,7 @@ from core.commons.logger import logger
 from core.commons.decorator import task_handler
 from core.commons.type_def import BasicInfo, MessageDict, TaskInfo
 from core.commons.id_generator import idgen
-from core.domain.model.longterm_memory_helper import LongtermMemoryMessage, memory_model
+from core.domain.helper.longterm_memory_helper import LongtermMemoryMessage, memory_model
 
 
 class MysqlService:
@@ -83,7 +83,7 @@ class MysqlService:
                 while True:
                     rows = await cursor.fetchall()
                     results.append(rows)
-                    logger.info(f"[MysqlService][_call_procedure] append rows: {rows}")
+                    # logger.info(f"[MysqlService][_call_procedure] append rows: {rows}")
                     if not await cursor.nextset():
                         break
                 index = min(len(results), 2) # Ignore Message OK at the fetchall's tail.
@@ -360,9 +360,10 @@ class MysqlService:
                 "messages": f"fail: {e}",
             }
 
-    @task_handler("mysql.memo.delete_messages")
-    async def delete_messages(self, payload: dict) -> dict:
+    @task_handler("_mysql.memo.delete_messages")
+    async def _delete_messages(self, payload: dict) -> dict:
         """
+        Dprecated.
         Persist a peice of message. Call procedure delete_messages.
         If len of messages list in payload is over one piece, only append the last one.
 
@@ -401,6 +402,68 @@ class MysqlService:
                     continue
                 generation_id = msg["generation_id"]
                 res = await self._call_procedure("delete_messages", (user_uid, conversation_id, generation_id, role))
+                for row in res:
+                    if not isinstance(row, dict):
+                        continue
+                    raw = row.get("info")
+                    if isinstance(raw, str):
+                        try:
+                            parsed = json.loads(raw)
+                        except Exception:
+                            continue
+                    elif isinstance(raw, dict):
+                        parsed = raw
+                    else:
+                        continue
+
+                    msg_info.append(parsed)
+            
+            return {
+                "success": True,
+                "messages": msg_info
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][delete_messages] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.memo.delete_messages")
+    async def delete_messages(self, payload: dict) -> dict:
+        """
+        Persist a peice of message. Call procedure delete_messages.
+        If len of messages list in payload is over one piece, only append the last one.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }} : to indicate which user the data is from.",
+                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
+                "session_id": "{{ sid }} : to indicate which tab the data belong to",
+                "messages": [  # list of message node_id
+                    str, 
+                    ...
+                ]
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list[dict],
+            }
+        """
+        logger.info(f"[MysqlService][delete_messages] enter.")
+        try:
+            user_uid = payload["client_id"]
+            conversation_id = payload["history_id"]
+            messages = payload["messages"]
+            
+            if not messages:
+                raise ValueError("[MysqlService][delete_messages] list is empty")
+                
+            msg_info = []
+            for node_id in messages:
+                res = await self._call_procedure("delete_messages_node", (user_uid, conversation_id, node_id))
                 for row in res:
                     if not isinstance(row, dict):
                         continue

@@ -7,6 +7,7 @@ from core.commons.logger import logger
 
 from core.domain.redis_server import RedisService
 from core.domain.mysql_server import MysqlService
+from core.domain.helper.message_node_helper import AgentNodeHelper
 from core.notification.notice import notice_ai, construct_notice_payload
 from core.commons.decorator import task_handler
 from public import TASK_RUNNING_STATUS, TASK_FINISHING_STATUS
@@ -190,10 +191,14 @@ class DataExecutors:
             # 2. Best-effort backfill Redis
             messages_redis = payload.get("messages")
             messages_redis.update(res.get("messages"))
+            messages_redis["is_deleted"] = False
             payload.update({
                 "messages": messages_redis
             })
             try:
+                logger.info(
+                    f"[DataExecutors][append_message] Redis backfill payload: {payload}"
+                )
                 await self.redis.append_messages(payload)
             except Exception as e:
                 # Redis failure should not break main flow
@@ -273,43 +278,140 @@ class DataExecutors:
                 "messages": f"fail: {e}",
             }
 
+    def _build_visible_messages(
+        self,
+        messages,
+        current_node_id,
+        allow_roles,
+        guess_children: bool = True,
+    ):
+        if not messages:
+            return [], {}
+
+        helper = AgentNodeHelper(messages)
+
+        # -----------------------------
+        # fallback current node
+        # -----------------------------
+        if current_node_id is None or current_node_id not in helper.node_map:
+            last_node = max(helper.nodes, key=lambda x: x["last_cursor"])
+            current_node_id = last_node["node_id"]
+
+        # ✅ 如果当前节点不可见，向上找最近可见节点
+        current_node = helper.find_nearest_visible(current_node_id)
+        if current_node:
+            current_node_id = current_node["node_id"]
+
+        # -----------------------------
+        # build branch
+        # -----------------------------
+        if guess_children:
+            branch = helper.build_branch(current_node_id)
+        else:
+            branch = helper.get_path(current_node_id)
+
+        rows = helper.flatten_branch(branch)
+
+        # -----------------------------
+        # strict cutoff
+        # -----------------------------
+        if not guess_children:
+            node = helper.node_map.get(current_node_id)
+            if node:
+                cutoff = node["last_cursor"]
+                rows = [r for r in rows if r["msg_cursor"] <= cutoff]
+
+        # -----------------------------
+        # ✅ 过滤 deleted（仅展示层）
+        # -----------------------------
+        rows = [r for r in rows if not r["is_deleted"]]
+
+        # -----------------------------
+        # parse json fields
+        # -----------------------------
+        parsed = []
+        for msg in rows:
+            if msg.get("role") not in allow_roles:
+                continue
+
+            extra = msg.get("extra", {})
+            info = msg.get("info", {})
+
+            try:
+                if not isinstance(extra, dict) and extra:
+                    extra = json.loads(extra)
+            except Exception:
+                extra = {}
+
+            try:
+                if not isinstance(info, dict) and info:
+                    info = json.loads(info)
+            except Exception:
+                info = {}
+
+            msg["extra"] = extra
+            msg["info"] = info
+
+            parsed.append(msg)
+
+        # -----------------------------
+        # branches（分支信息）
+        # -----------------------------
+        branches = {}
+
+        if guess_children:
+            visited_parent = set()
+
+            for node in branch:
+                parent_id = node["parent_id"]
+
+                if parent_id in visited_parent:
+                    continue
+
+                visited_parent.add(parent_id)
+
+                siblings = helper.get_children(parent_id)
+
+                # ✅ 只展示“有可见内容”的兄弟节点
+                visible_siblings = [c for c in siblings if c.get("visible")]
+
+                if len(visible_siblings) > 1:
+                    branches[parent_id] = [
+                        {
+                            "node_id": c["node_id"],
+                            "cursor": c["first_cursor"],
+                        }
+                        for c in visible_siblings
+                    ]
+
+        return parsed, branches
+
     @task_handler("get_messages")
     async def get_messages(self, payload: dict) -> dict:
-        """
-        Fetch FULL conversation messages (no cursor).
-
-        Workflow:
-        1. Try fetch FULL messages from Redis
-        2. On Redis miss, fetch FULL messages from MySQL
-        3. Backfill Redis (best effort)
-        4. Return filtered FULL messages
-        """
         try:
             logger.info("[DataExecutors][get_messages] enter.")
 
-            # 1. Try Redis first (FULL messages)
+            current_node_id = payload.get("current_node_id")
+
+            # 1. Redis
             redis_res = await self.redis.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
                 messages = redis_res.get("messages", [])
 
-                # Filter once
-                parsed_messages = []
-                for msg in messages:
-                    if msg.get('role') not in ('info') and not msg.get('is_deleted'):
-                        extra = msg.get('extra', {})
-                        info = msg.get('info', {})
-                        if not isinstance(extra, dict): extra = json.loads(extra) 
-                        if not isinstance(info, dict): info = json.loads(info)
-                        msg['extra'] = extra
-                        msg['info'] = info
-                        parsed_messages.append(msg)
+                parsed_messages, branches = self._build_visible_messages(
+                    messages,
+                    current_node_id,
+                    allow_roles=('human', 'ai', 'system', 'tools'),
+                    guess_children=False
+                )
 
                 redis_res["messages"] = parsed_messages
+                redis_res["branches"] = branches
                 return redis_res
 
-            # 2. Redis miss -> fetch FULL messages from MySQL
+            # 2. MySQL
             mysql_payload = payload.copy()
-            mysql_payload["cursor"] = 1  # keep compatibility with existing DAO
+            mysql_payload["cursor"] = 1
 
             mysql_res = await self.mysql.fetch_messages_after_cursor(mysql_payload)
             if not mysql_res.get("success"):
@@ -319,7 +421,7 @@ class DataExecutors:
             if not messages:
                 return mysql_res
 
-            # 3. Backfill Redis with FULL messages (best effort)
+            # 3. backfill
             try:
                 backfill_payload = payload.copy()
                 backfill_payload["messages"] = messages
@@ -329,19 +431,16 @@ class DataExecutors:
                     f"[DataExecutors][get_messages] Redis backfill failed: {e}"
                 )
 
-            # 4. Filter once
-            parsed_messages = []
-            for msg in messages:
-                if msg.get('role') not in ('info') and not msg.get('is_deleted'):
-                    extra = msg.get('extra', {})
-                    info = msg.get('info', {})
-                    if not isinstance(extra, dict): extra = json.loads(extra) 
-                    if not isinstance(info, dict): info = json.loads(info) 
-                    msg['extra'] = extra
-                    msg['info'] = info
-                    parsed_messages.append(msg)
+            # 4. build branch
+            parsed_messages, branches = self._build_visible_messages(
+                messages,
+                current_node_id,
+                allow_roles=('human', 'ai', 'system', 'tools'),
+                guess_children=False
+            )
 
             mysql_res["messages"] = parsed_messages
+            mysql_res["branches"] = branches
             return mysql_res
 
         except Exception as e:
@@ -355,41 +454,29 @@ class DataExecutors:
 
     @task_handler("get_messages_for_user")
     async def get_messages_for_user(self, payload: dict) -> dict:
-        """
-        Fetch FULL conversation messages (no cursor).
-
-        Workflow:
-        1. Try fetch FULL messages from Redis
-        2. On Redis miss, fetch FULL messages from MySQL
-        3. Backfill Redis (best effort)
-        4. Return filtered FULL messages
-        """
         try:
             logger.info("[DataExecutors][get_messages_for_user] enter.")
 
-            # 1. Try Redis first (FULL messages)
+            current_node_id = payload.get("current_node_id")
+
+            # 1. Redis
             redis_res = await self.redis.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
                 messages = redis_res.get("messages", [])
 
-                # Filter once
-                parsed_messages = []
-                for msg in messages:
-                    if msg.get('role') in ('ai', 'human', 'info') and not msg.get('is_deleted'):
-                        extra = msg.get('extra', {})
-                        info = msg.get('info', {})
-                        if not isinstance(extra, dict): extra = json.loads(extra) 
-                        if not isinstance(info, dict): info = json.loads(info) 
-                        msg['extra'] = extra
-                        msg['info'] = info
-                        parsed_messages.append(msg)
+                parsed_messages, branches = self._build_visible_messages(
+                    messages,
+                    current_node_id,
+                    allow_roles=('human', 'ai', 'info')
+                )
 
                 redis_res["messages"] = parsed_messages
+                redis_res["branches"] = branches
                 return redis_res
 
-            # 2. Redis miss -> fetch FULL messages from MySQL
+            # 2. MySQL
             mysql_payload = payload.copy()
-            mysql_payload["cursor"] = 1  # keep compatibility with existing DAO
+            mysql_payload["cursor"] = 1
 
             mysql_res = await self.mysql.fetch_messages_after_cursor(mysql_payload)
             if not mysql_res.get("success"):
@@ -399,7 +486,7 @@ class DataExecutors:
             if not messages:
                 return mysql_res
 
-            # 3. Backfill Redis with FULL messages (best effort)
+            # 3. backfill
             try:
                 backfill_payload = payload.copy()
                 backfill_payload["messages"] = messages
@@ -409,19 +496,15 @@ class DataExecutors:
                     f"[DataExecutors][get_messages_for_user] Redis backfill failed: {e}"
                 )
 
-            # 4. Filter once
-            parsed_messages = []
-            for msg in messages:
-                if msg.get('role') in ('ai', 'human', 'info') and not msg.get('is_deleted'):
-                    extra = msg.get('extra', {})
-                    info = msg.get('info', {})
-                    if not isinstance(extra, dict): extra = json.loads(extra) 
-                    if not isinstance(info, dict): info = json.loads(info) 
-                    msg['extra'] = extra
-                    msg['info'] = info
-                    parsed_messages.append(msg)
+            # 4. build branch
+            parsed_messages, branches = self._build_visible_messages(
+                messages,
+                current_node_id,
+                allow_roles=('human', 'ai', 'info')
+            )
 
             mysql_res["messages"] = parsed_messages
+            mysql_res["branches"] = branches
             return mysql_res
 
         except Exception as e:

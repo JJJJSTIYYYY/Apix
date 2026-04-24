@@ -6,7 +6,12 @@
 
     <keep-alive>
     <el-main class="main-area">
-      <div class="ai-page-wrapper" :class="{ 'is-history-hide': isHistoryHide }">
+      <div 
+        class="ai-page-wrapper" 
+        :class="{ 'is-history-hide': isHistoryHide }"
+        tabindex="0"
+        @keydown="wrapperHandleKeydown"
+      >
         <ChatHistoryPannel
           style="margin-left: 6%;"
           :histories="historyList"
@@ -42,6 +47,8 @@
                 @select-text="handleSelectText"
                 @selected="selectMessageBubble"
                 @delete="selectMessageBubble"
+                @quoted="handleQuoteShow"
+                @switch-to-branch="handleBranchSwitch"
               />
               <AiMessageBubble 
                 v-else-if="msg.role === 'ai'" 
@@ -52,6 +59,7 @@
                 @selected="selectMessageBubble"
                 @delete="selectMessageBubble"
                 @quoted="handleQuoteShow"
+                @switch-to-branch="handleBranchSwitch"
               />
               <ToolMessageCard v-else-if="msg.role === 'tools' || msg.role === 'system'" :msg="msg" />
             </div>
@@ -291,6 +299,8 @@ interface ChatMessage {
   role: Role
   node_id?: number
   parent_id?: number
+  pre_node?: str[]
+  next_node?: str[]
 
   content?: string | MessageChunk[]
   think?: string | MessageChunk[]
@@ -364,6 +374,7 @@ function appendToolLabel(
   label: ToolLabel,
   guardId?: string
 ) {
+  // field = 'think'
   if (guardId && msg.id !== guardId) return
 
   ensureArrayField(msg, field)
@@ -540,7 +551,7 @@ function mergeHistoryAiMessage(
     ...prevInfo,
     ...info,
     total_tokens: (prevInfo.total_tokens ?? 0) + (info.total_tokens ?? 0),
-    total_duration: info.total_duration/1000,
+    total_duration: Number(info.total_duration),
   }
 
   const prevExtra = msg.extra ?? {}
@@ -615,6 +626,8 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
         role: 'human',
         node_id: r.node_id,
         parent_id: r.parent_id,
+        pre_node: r.pre_node,
+        next_node: r.next_node,
         content: r.content ?? '',
         extra,
         error: false,
@@ -637,6 +650,8 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
           role: 'ai',
           node_id: r.node_id,
           parent_id: r.parent_id,
+          pre_node: r.pre_node,
+          next_node: r.next_node,
           label: '已思考',
           content: r.content ? [r.content] : [],
           think: r.think ? [r.think] : [],
@@ -841,10 +856,10 @@ const handleRegenerate = async (id: string) => {
   }
 
   const targetIndex = list.findIndex(
-    msg => msg.id === id && msg.role === 'human'
+    msg => msg.node_id === id
   )
 
-  if (targetIndex === -1) {
+  if (targetIndex === -1 || list[targetIndex].role !== 'human') {
     ElMessage({
       type: 'warning',
       message: "输入内容缺失或已被删除",
@@ -857,13 +872,13 @@ const handleRegenerate = async (id: string) => {
   const inputs = list[targetIndex].content
   if (!inputs) return
 
-  const remain = list.slice(0, targetIndex)
+  const remain = list.slice(0, targetIndex + 1)
 
   list.splice(0, list.length, ...remain)
   const last_node = list.at(-1)
   const parent_id = last_node?.node_id
 
-  await sendMessage(inputs, parent_id)
+  await sendMessage(inputs, parent_id, true, false)
 }
 
 const selectMode = ref(false)
@@ -1327,7 +1342,17 @@ async function syncHistoryMessages(historyId: string) {
   if (hasPending) return
 
   try {
-    const res = await window.api.getChatMsgs(cid.value, sid.value, historyId)
+    const lastMsg = list.length > 0 ? list[list.length - 1] : null
+    const lastNodeId = lastMsg?.node_id ?? null
+
+    console.log("[syncHistoryMessages] Sync node id is ", lastNodeId)
+
+    const res = await window.api.getChatMsgs(
+      cid.value,
+      sid.value,
+      historyId,
+      lastNodeId
+    )
     const raw = res?.messages
     if (!Array.isArray(raw)) return
 
@@ -1349,7 +1374,7 @@ async function handleSendMessage() {
 // ################################
 // Send message
 // ################################
-async function sendMessage(content:string = '', parent_id: number = 0, pushToList: boolean = true) {
+async function sendMessage(content:string = '', parent_id: string = '', re_generate: boolean = false, pushToList: boolean = true) {
   if (!store.config.modelName
     || store.config.modelName === ''
     || !store.config.modelProvider
@@ -1454,6 +1479,7 @@ async function sendMessage(content:string = '', parent_id: number = 0, pushToLis
       sid.value,
       currentHid,
       messagePayload,
+      re_generate,
       {
         models_provider: store.config.modelProvider,
         model_name: store.config.modelName,
@@ -1519,10 +1545,7 @@ const handleDeleteMessages = async () => {
 
   const del_list = list
     .filter(msg => msg.selected)
-    .map(msg => ({
-      generation_id: msg.id,
-      role: msg.role,
-    }))
+    .map(msg => msg.node_id)
 
   const remain = list.filter(msg => !msg.selected)
 
@@ -1535,10 +1558,12 @@ const handleDeleteMessages = async () => {
     return
   }
 
+
   try {
     await ConfirmDialog.confirm(
-      `确定删除要选中的 ${del_list.length} 条记录吗？<br>` +
-      `⚠︎ 在此之前产生的部分摘要记忆也将删除。`,
+      `确定删除要选中的 ${del_list.length} 条记录吗？<br><br>` +
+      `⚠︎ 此节点中以下内容也将被删除：<br>` +
+      `• 节点中产生的对话摘要<br>• 工具调用信息及结果`,
       '删除确认',
       {
         confirmButtonText: '确定',
@@ -1559,6 +1584,7 @@ const handleDeleteMessages = async () => {
     if (res.success !== true) throw new Error(res.messages || "Delete messages failed.")
 
     list.splice(0, list.length, ...remain)
+    syncHistoryMessages(store.current_history_id)
   } catch (error) {
     ElMessage({
       type: 'warning',
@@ -1589,6 +1615,63 @@ function handleQuoteShow(id: string, content: string) {
   if (id !== store.current_history_id) return
   isQuoteShow.value = true
   quotedText.value = content
+}
+
+async function handleBranchSwitch(branch_id: string) {
+  if (!branch_id) return
+
+  const hid = store.current_history_id
+  if (!hid || hid === '-1') return
+
+  const list = messages.value
+  if (list.at(-1)?.pending === true) {
+    try {
+      ElMessage({
+        type: 'info',
+        message: "等待流式传输完成...",
+        plain: true,
+      })
+      await window.api.stopGeneration(
+        cid.value,
+        sid.value,
+        hid,
+      )
+    } catch (err) {
+      console.error('stopGeneration failed', err)
+      return
+    }
+  }
+
+  try {
+    console.log('[BranchSwitch] switch to:', branch_id)
+
+    const res = await window.api.getChatMsgs(
+      cid.value,
+      sid.value,
+      hid,
+      branch_id
+    )
+
+    const raw = res?.messages
+    if (!Array.isArray(raw)) return
+
+    console.log('[BranchSwitch] raw:', raw)
+
+    const parsed = parseHistoryMessages(raw, hid)
+
+    const targetList = ensureHistoryMessages(hid)
+    targetList.splice(0, targetList.length, ...parsed)
+
+    loadedHistorySet.add(hid)
+
+  } catch (err) {
+    console.error('[BranchSwitch] failed:', err)
+    ElMessage({
+      type: 'error',
+      message: '分支切换失败',
+      plain: true,
+    })
+  }
 }
 
 
@@ -1927,6 +2010,19 @@ const stopGenerating = async () => {
   }
 }
 
+const wrapperHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
+  if (e.isComposing || e.keyCode === 229) {
+    return
+  }
+  console.log("Key down:", e.key)
+  if (e.key === 'Escape') {
+    handleCancel()
+  }
+  else if (e.key === 'Enter') {
+    if (selectMode.value) handleDeleteMessages()
+  }
+}
+
 const msgInputHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
   if (e.isComposing || e.keyCode === 229) {
     return
@@ -2108,6 +2204,10 @@ const setFullInput = () => {
   height: 100%;
   overflow: hidden;
   transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.ai-page-wrapper:focus {
+  outline: none;
 }
 
 .ai-page-wrapper.is-history-hide {

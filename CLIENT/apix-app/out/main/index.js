@@ -222,7 +222,7 @@ const MEMORY_API_BASE = "http://127.0.0.1:5093";
 const TOOLS_API_BASE = "http://127.0.0.1:5092";
 function registerAiIpc() {
   console.log("registerAiIpc...");
-  electron.ipcMain.handle("api:chat", async (event, cid, sid, hid, content, chat_config) => {
+  electron.ipcMain.handle("api:chat", async (event, cid, sid, hid, content, re_generate, chat_config) => {
     let ws2 = initWS(cid);
     try {
       await waitForOpen(ws2);
@@ -241,6 +241,7 @@ function registerAiIpc() {
           history_id: hid,
           platform: "default",
           messages: content,
+          re_generate,
           config: chat_config
         }
       })
@@ -340,7 +341,7 @@ function registerAiIpc() {
       throw err;
     }
   });
-  electron.ipcMain.handle("api:fetch_chat_messages", async (event, cid, sid, hid) => {
+  electron.ipcMain.handle("api:fetch_chat_messages", async (event, cid, sid, hid, branch_id) => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/user/messages`, {
         method: "POST",
@@ -349,20 +350,25 @@ function registerAiIpc() {
         },
         body: JSON.stringify({
           client_id: cid,
-          history_id: hid
+          history_id: hid,
+          current_node_id: branch_id
         })
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "Fetch conversation msgs failed.");
       }
+      let messages = data.messages;
+      const branches = data.branches;
+      messages = attachSiblingLinks(messages, branches);
+      data.messages = messages;
       return data;
     } catch (err) {
       console.error("Fetch conversation msgs error:", err);
       throw err;
     }
   });
-  electron.ipcMain.handle("api:delete_messages", async (event, cid, hid, gen_ids) => {
+  electron.ipcMain.handle("api:delete_messages", async (event, cid, hid, node_ids) => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/memory/delete_messages`, {
         method: "POST",
@@ -372,7 +378,7 @@ function registerAiIpc() {
         body: JSON.stringify({
           client_id: cid,
           history_id: hid,
-          messages: gen_ids ?? []
+          messages: node_ids ?? []
         })
       });
       const data = await res.json();
@@ -452,6 +458,33 @@ function registerAiIpc() {
       throw err;
     }
   });
+}
+function attachSiblingLinks(messages, branches) {
+  if (!messages || !messages.length) return messages;
+  const activeNodeSet = new Set(messages.map((m) => m.node_id));
+  const nodeSiblingLinkMap = /* @__PURE__ */ new Map();
+  for (const parentId in branches) {
+    const siblings = branches[parentId];
+    if (!siblings || siblings.length <= 1) continue;
+    const activeNode = siblings.find((s) => activeNodeSet.has(s.node_id));
+    if (!activeNode) continue;
+    const idx = siblings.findIndex((s) => s.node_id === activeNode.node_id);
+    const pre = siblings.slice(0, idx).map((s) => s.node_id);
+    const next = siblings.slice(idx + 1).map((s) => s.node_id);
+    nodeSiblingLinkMap.set(activeNode.node_id, {
+      pre_node: pre,
+      next_node: next
+    });
+  }
+  for (const msg of messages) {
+    const link = nodeSiblingLinkMap.get(msg.node_id);
+    if (link) {
+      msg.pre_node = link.pre_node;
+      msg.next_node = link.next_node;
+    }
+  }
+  console.log("Attac branch finish: ", messages);
+  return messages;
 }
 function registerClipboardIpc() {
   console.log("registerClipboardIpc...");

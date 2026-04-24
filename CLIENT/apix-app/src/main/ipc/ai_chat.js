@@ -9,7 +9,7 @@ const TOOLS_API_BASE = "http://127.0.0.1:5092"
 // =====================================================
 export function registerAiIpc() {
   console.log('registerAiIpc...')
-  ipcMain.handle('api:chat', async (event, cid, sid, hid, content, chat_config) => {
+  ipcMain.handle('api:chat', async (event, cid, sid, hid, content, re_generate, chat_config) => {
     // Ensure WS is connecting / connected
     let ws = initWS(cid)
     try {
@@ -31,6 +31,7 @@ export function registerAiIpc() {
           history_id: hid,
           platform: 'default',
           messages: content,
+          re_generate: re_generate,
           config: chat_config
         }
       })
@@ -148,7 +149,7 @@ export function registerAiIpc() {
     }
   })
 
-  ipcMain.handle('api:fetch_chat_messages', async (event, cid, sid, hid) => {
+  ipcMain.handle('api:fetch_chat_messages', async (event, cid, sid, hid, branch_id) => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/user/messages`, {
         method: "POST",
@@ -158,6 +159,7 @@ export function registerAiIpc() {
         body: JSON.stringify({
           client_id: cid,
           history_id: hid,
+          current_node_id: branch_id
         }),
       })
 
@@ -166,6 +168,13 @@ export function registerAiIpc() {
         throw new Error(data.detail || "Fetch conversation msgs failed.")
       }
 
+      // console.log(data)
+
+      let messages = data.messages
+      const branches = data.branches
+      messages = attachSiblingLinks(messages, branches)
+      data.messages = messages
+
       return data
     } catch (err) {
       console.error("Fetch conversation msgs error:", err)
@@ -173,7 +182,7 @@ export function registerAiIpc() {
     }
   })
 
-  ipcMain.handle('api:delete_messages', async (event, cid, hid, gen_ids) => {
+  ipcMain.handle('api:delete_messages', async (event, cid, hid, node_ids) => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/memory/delete_messages`, {
         method: "POST",
@@ -183,7 +192,7 @@ export function registerAiIpc() {
         body: JSON.stringify({
           client_id: cid,
           history_id: hid,
-          messages: gen_ids ?? []
+          messages: node_ids ?? []
         }),
       })
 
@@ -274,4 +283,48 @@ export function registerAiIpc() {
       throw err
     }
   })
+}
+
+function attachSiblingLinks(messages, branches) {
+  if (!messages || !messages.length) return messages
+
+  // ✅ 当前路径上的 node（更可靠）
+  const activeNodeSet = new Set(messages.map(m => m.node_id))
+
+  // node_id -> {pre_node, next_node}
+  const nodeSiblingLinkMap = new Map()
+
+  for (const parentId in branches) {
+    const siblings = branches[parentId]
+
+    if (!siblings || siblings.length <= 1) continue
+
+    // ✅ 找当前路径命中的 child
+    const activeNode = siblings.find(s => activeNodeSet.has(s.node_id))
+
+    if (!activeNode) continue
+
+    const idx = siblings.findIndex(s => s.node_id === activeNode.node_id)
+
+    const pre = siblings.slice(0, idx).map(s => s.node_id)
+    const next = siblings.slice(idx + 1).map(s => s.node_id)
+
+    nodeSiblingLinkMap.set(activeNode.node_id, {
+      pre_node: pre,
+      next_node: next,
+    })
+  }
+
+  // 挂到 message
+  for (const msg of messages) {
+    const link = nodeSiblingLinkMap.get(msg.node_id)
+
+    if (link) {
+      msg.pre_node = link.pre_node
+      msg.next_node = link.next_node
+    }
+  }
+
+  console.log("Attac branch finish: ", messages)
+  return messages
 }

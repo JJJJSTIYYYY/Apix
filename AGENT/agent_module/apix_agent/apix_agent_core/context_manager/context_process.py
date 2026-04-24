@@ -33,7 +33,8 @@ class AIContextManager:
         self, 
         client_id: str, 
         history_id: str, 
-        message: dict
+        message: dict,
+        parent_id: str = '-',
     ) -> None:
         """
         Append single message to memory service.
@@ -63,15 +64,13 @@ class AIContextManager:
             if files.get("uploaded_files"):
                 timestamp = message.get("timestamp", 0)
                 generation_id = message.get("generation_id", "")
-                node_id = generation_id[-12:] + "-system"
-                parent_id = message.get("parent_id", "")
                 sys_message = {
                     "role": "system",
                     "content": f"User upload file(s): {str(files.get("uploaded_files"))}",
                     "timestamp": timestamp,
                     "generation_id": generation_id,
-                    "node_id": node_id,
-                    "parent_id": parent_id
+                    "node_id": generation_id[-12:] + "-user",
+                    "parent_id": message.get("parent_id") or parent_id
                 }
                 sys_payload = {
                     "client_id": client_id,
@@ -94,12 +93,14 @@ class AIContextManager:
                 
         generation_id = message.get("generation_id", "")
         role = message.get("role", "")
-        parent_id = message.get("parent_id", "")
 
-        message["node_id"] = generation_id[-12:] + "-" + role
-        if parent_id: message["parent_id"] = parent_id
-        else: message["parent_id"] = generation_id[-12:] + "-human"
-        
+        if role == 'human': 
+            message["node_id"] = generation_id[-12:] + "-user"
+            message["parent_id"] = message.get("parent_id") or parent_id
+        else:
+            message["node_id"] = generation_id[-12:] + "-apix"
+            message["parent_id"] = parent_id
+
         payload = {
             "client_id": client_id,
             "session_id": "",
@@ -147,7 +148,8 @@ class AIContextManager:
         client_id: str,
         history_id: str,
         timestamp: int,
-        additional_info: dict
+        additional_info: dict,
+        parent_id: str = '-'
     ):
         """
         Append decorated message to memory service (LangChain message -> memory dict).
@@ -176,7 +178,7 @@ class AIContextManager:
         if history_id.startswith("sub_"): return
         logger.trace('[context_process.py] [ ] [create_memory] Enter')
         extra = additional_info
-        memory = {
+        message = {
             "role": "info", 
             "content": "", 
             "extra": extra, 
@@ -184,7 +186,7 @@ class AIContextManager:
             "timestamp": timestamp, 
             "generation_id": generation_id
         }
-        await self.append_to_messages(client_id, history_id, memory)
+        await self.append_to_messages(client_id, history_id, message, parent_id)
         
         
     async def update_longterm_memory(self, client_id: str, memorys: dict):
@@ -283,7 +285,8 @@ class AIContextManager:
         client_id: str,
         history_id: str,
         cursor: int = 0,
-    ) -> list[dict]:
+        current_node_id: str = '-',
+    ) -> tuple[list[dict], str]:
         """
         Fetch messages from memory service.
 
@@ -308,6 +311,7 @@ class AIContextManager:
                     "client_id": client_id,
                     "session_id": "",  # history remains
                     "history_id": history_id,
+                    "current_node_id": current_node_id,
                     "cursor": cursor,  # reserved
                 },
             )
@@ -323,7 +327,7 @@ class AIContextManager:
 
         logger.info(f"[fetch_messages] fetched {len(messages)} messages")
 
-        return messages
+        return messages, messages[-1].get('node_id')
         
     async def fetch_summary(
         self,
@@ -589,7 +593,8 @@ class AIContextManager:
         or equals to msg_dict.get("info").get("task_id") when its tool message, but in 
         """
         logger.trace('[context_process.py] [AIContextManager] [create_agent_messages] Enter')
-        logger.info(f"[create_agent_messages] client_messages count: {len(client_messages)}")
+        logger.info(f"[create_agent_messages] client_messages count: {len(client_messages)}, after index: {after_index}")
+        # logger.info(f"[create_agent_messages] client_messages: {client_messages}")
 
         messages = []
         messages_after_index = []
@@ -1517,7 +1522,7 @@ class AIContextManager:
         # 3. Shortterm summary
         if state.get("shortterm_memory"):
             blocks.append(SystemMessage(
-                content="# [RECENT SUMMARY]\n" + (state["shortterm_memory"] or "None")
+                content="# [RECENT SUMMARY / SHORT-TERM MEMORY]\n" + (state["shortterm_memory"] or "None")
             ))
         # 4. Runtime
         if state.get("runtime_prompt"):

@@ -11,8 +11,8 @@ const api = {
   openCacheDir: () => ipcRenderer.invoke('openCacheDir'),
 
   // Send chat request (fire-and-forget, result comes from WS push)
-  chatComplations: (cid, sid, hid, content, chat_config) =>
-    ipcRenderer.invoke('api:chat', cid, sid, hid, content, chat_config),
+  chatComplations: (cid, sid, hid, content, re_generate, chat_config) =>
+    ipcRenderer.invoke('api:chat', cid, sid, hid, content, re_generate, chat_config),
   stopGeneration: (cid, sid, hid) =>
     ipcRenderer.invoke('api:stop', cid, sid, hid),
   newChat: (cid) =>
@@ -21,10 +21,10 @@ const api = {
     ipcRenderer.invoke('api:update_conversation', cid, sid, hid, new_info),
   getChatlist: (cid) =>
     ipcRenderer.invoke('api:fetch_chat_list', cid),
-  getChatMsgs: (cid, sid, hid) =>
-    ipcRenderer.invoke('api:fetch_chat_messages', cid, sid, hid),
-  deleteMsgs: (cid, hid, gen_ids) =>
-    ipcRenderer.invoke('api:delete_messages', cid, hid, gen_ids),
+  getChatMsgs: (cid, sid, hid, branch_id = '-') =>
+    ipcRenderer.invoke('api:fetch_chat_messages', cid, sid, hid, branch_id),
+  deleteMsgs: (cid, hid, node_ids) =>
+    ipcRenderer.invoke('api:delete_messages', cid, hid, node_ids),
   startTask: (tid) =>
     ipcRenderer.invoke('api:start_task', tid),
   killTask: (tname, tid, cid, hid) =>

@@ -99,7 +99,9 @@ class GraphRuntimeContext(TypedDict):
 
 
 class MainAgentState(GraphRuntimeContext):
+    parent_node_id: NotRequired[str]
     input: dict
+    re_generate: bool
     messages: Annotated[list[AnyMessage], operator.add]
     current_tool_calls: list
     longterm_memory: str # Cross-conversation longterm memory

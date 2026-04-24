@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from langchain.messages import AIMessage
+from langchain.messages import AIMessage, AIMessageChunk
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -97,23 +97,23 @@ class PatchedChatDeepSeek(ChatDeepSeek):
         messages = self._convert_input(input_).to_messages()
 
         # Map index -> reasoning_content
-        # DeepSeek requires reasoning_content when tool_calls are present
+        # Now ALWAYS preserve reasoning_content (not only when tool_calls exist)
         reasoning_content_map: dict[int, str] = {}
 
         for i, msg in enumerate(messages):
-            if (
-                isinstance(msg, AIMessage)
-                and (msg.tool_calls or msg.invalid_tool_calls)
-                and (reasoning := msg.additional_kwargs.get("reasoning_content"))
-            ):
-                reasoning_content_map[i] = reasoning
-            elif (
-                isinstance(msg, AIMessage)
-                and (msg.tool_calls or msg.invalid_tool_calls)
-                and not msg.content
-            ):
-                reasoning_content_map[i] = "."
-                logger.warning("[PatchedChatDeepSeek] Empty message with tool calls.")
+            if isinstance(msg, (AIMessage, AIMessageChunk)):
+                reasoning = msg.additional_kwargs.get("reasoning_content")
+
+                # Always store reasoning_content if exists
+                if reasoning:
+                    reasoning_content_map[i] = reasoning
+
+                # Fallback for empty content (keep your original safeguard logic)
+                # elif not msg.content:
+                #     reasoning_content_map[i] = "."
+                #     logger.warning(
+                #         "[PatchedChatDeepSeek] Empty assistant message."
+                #     )
 
         # Call original implementation
         payload = super()._get_request_payload(
@@ -122,13 +122,12 @@ class PatchedChatDeepSeek(ChatDeepSeek):
             **kwargs,
         )
 
-        # Restore reasoning_content into payload assistant messages
+        # Restore reasoning_content into ALL assistant messages
         if "messages" in payload and reasoning_content_map:
             for i, message in enumerate(payload["messages"]):
                 if (
                     i in reasoning_content_map
                     and message.get("role") == "assistant"
-                    and message.get("tool_calls")
                 ):
                     message["reasoning_content"] = reasoning_content_map[i]
 
@@ -167,11 +166,13 @@ def get_deepseek_model(
         api_key: Deepseek API key.
         base_url: Optional base URL (if supported by backend).
     """
+    enable_think = config.get("enable_think", False)
     return PatchedChatDeepSeek(
         model=model,
         api_key=api_key,
         base_url=base_url,
         max_retries=3,
+        extra_body={"thinking": {"type": "enabled" if enable_think else "disabled"}}
     )
 
 
@@ -230,20 +231,20 @@ class PatchedChatMoonshot(ChatOpenAI):
 
         for i, msg in enumerate(messages):
             if (
-                isinstance(msg, AIMessage)
+                isinstance(msg, (AIMessage, AIMessageChunk))
                 and (msg.tool_calls or msg.invalid_tool_calls)
                 and (reasoning := msg.additional_kwargs.get("reasoning_content"))
             ):
                 reasoning_content_map[i] = reasoning
             elif (
-                isinstance(msg, AIMessage)
+                isinstance(msg, (AIMessage, AIMessageChunk))
                 and (msg.tool_calls or msg.invalid_tool_calls)
                 and not msg.content
             ):
                 reasoning_content_map[i] = "."
                 logger.warning("[PatchedChatMoonshot] Empty message with tool calls.")
             if (
-                isinstance(msg, AIMessage)
+                isinstance(msg, (AIMessage, AIMessageChunk))
                 and not msg.content
             ):
                 msg.content = '.'

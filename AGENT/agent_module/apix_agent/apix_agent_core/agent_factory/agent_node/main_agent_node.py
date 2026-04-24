@@ -37,6 +37,7 @@ class MainAgentNode(AgentNodeBase):
         client_id = state.get("client_id")
         history_id = state.get("history_id")
         timestamp = state.get("timestamp")
+        re_generate = state.get("re_generate")
 
         # Config flags
         work_dir = config.get("work_dir", "")
@@ -92,8 +93,23 @@ class MainAgentNode(AgentNodeBase):
             })
 
             # Persist message and fetch full history
-            await ai_context_manager.append_to_messages(client_id, history_id, client_message)
-            client_messages = await ai_context_manager.fetch_messages(client_id, history_id, 0)
+            if not re_generate: 
+                await ai_context_manager.append_to_messages(client_id, history_id, client_message)
+                current_visible_node_id = generation_id + '-user'
+            else: current_visible_node_id = client_message.get("parent_id", '-')
+            client_messages, parent_id = await ai_context_manager.fetch_messages(client_id, history_id, 0, current_visible_node_id)
+
+            event_writer = ApixStreamWriter()
+            target_platform = state.get("platform")
+            event_writer.send_event(
+                event=StreamEvent.ESSENTIAL_INFO_RETURN,
+                target_id=client_id,
+                target_platform=target_platform,
+                data={
+                    "event_name": "parent_id_return",
+                    "content": parent_id or '-'
+                }
+            )
 
             # Memory processing
             longterm_memory_prompt = ""
@@ -120,6 +136,7 @@ class MainAgentNode(AgentNodeBase):
                 keep_tools_message,
                 after_index=after_index
             )
+            logger.info(f"[context_prepare] Prepared message objects: {messages}")
 
             # Return command
             return Command(
@@ -130,6 +147,7 @@ class MainAgentNode(AgentNodeBase):
                     "documents": documents,
                     "longterm_memory": longterm_memory_prompt or "",
                     "shortterm_memory": shortterm_memory_prompt or "",
+                    "parent_node_id": parent_id or "-",
                 }
             )
         else: raise TypeError("Unkonw role when invoke agent.")
@@ -304,6 +322,8 @@ class MainAgentNode(AgentNodeBase):
         context_compress_level = state.get("context_compress_level", 0)
         shortterm_memory = state.get("shortterm_memory", "")
 
+        logger.info(f"[context_summary] Existing shortterm memory:\n{shortterm_memory}")
+
         messages = state.get("messages", [])
 
         # Threshold
@@ -315,6 +335,9 @@ class MainAgentNode(AgentNodeBase):
             len(messages) >= threshold
             or (llm_retry_count > 0 and last_error == "token_exceed")
         )
+
+        # if len(messages) >= threshold:
+        #     context_compress_level = max(context_compress_level, 2)
 
         if not should_trigger:
             return Command(update={})
@@ -403,7 +426,7 @@ class MainAgentNode(AgentNodeBase):
 
             if shortterm_memory:
                 summary_prompt.append(
-                    SystemMessage(
+                    HumanMessage(
                         content=self.SUMMARY_MEMORY_PREFIX + shortterm_memory
                     )
                 )
@@ -769,7 +792,7 @@ class MainAgentNode(AgentNodeBase):
                 fallback_timestamp=timestamp
             )
             await ai_context_manager.append_to_messages(
-                client_id, history_id, client_message
+                client_id, history_id, client_message, state.get("parent_node_id")
             )
             
             event_writer.send_event(
@@ -816,7 +839,7 @@ class MainAgentNode(AgentNodeBase):
                     fallback_timestamp=timestamp
                 )
                 await ai_context_manager.append_to_messages(
-                    client_id, history_id, tool_message
+                    client_id, history_id, tool_message, state.get("parent_node_id")
                 )
             
             event_writer.send_event(
@@ -847,7 +870,7 @@ class MainAgentNode(AgentNodeBase):
             )
 
             await ai_context_manager.append_to_messages(
-                client_id, history_id, client_message
+                client_id, history_id, client_message, state.get("parent_node_id")
             )
             
             event_writer.send_event(

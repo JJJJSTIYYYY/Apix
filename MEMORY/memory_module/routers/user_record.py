@@ -158,6 +158,7 @@ async def get_messages_for_user(req: Request):
         {
             "client_id": str,
             "history_id": str,
+            "current_node_id": str,
         }
 
     Returns:

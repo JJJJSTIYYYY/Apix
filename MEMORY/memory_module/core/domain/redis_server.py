@@ -159,6 +159,9 @@ class RedisService:
 
             # Redis miss → skip silently
             if not await self._memo_redis.exists(key):
+                logger.warning(
+                    f"[RedisService][append_messages] Redis key not exists."
+                )
                 return {
                     "success": True,
                     "messages": "success",

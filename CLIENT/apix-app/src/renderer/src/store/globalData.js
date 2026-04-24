@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export const apix_client_version = '2.0.2'
+export const apix_client_version = '2.0.3'
 
 export const defaultCards = () => [
   { id: '-annotation-preset', title: '注释卡片', type: 'note', level: 'system' },

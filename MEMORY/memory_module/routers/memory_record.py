@@ -91,10 +91,7 @@ async def delete_messages(req: Request):
             "history_id": str,
             "session_id": str,
             "messages": [  # list of message generation_id and role
-                {
-                    "generation_id": str,
-                    "role": str # ai or human
-                }
+                str # node_id
             ]
         }
 
@@ -136,6 +133,7 @@ async def get_messages(req: Request):
             "history_id": str,
             "session_id": str (optional),
             "cursor": int,
+            "current_node_id": str,
             "limit": int (optional)
         }
 
