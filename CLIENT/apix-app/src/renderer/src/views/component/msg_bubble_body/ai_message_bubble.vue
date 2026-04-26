@@ -58,7 +58,7 @@
 
         <button
           class="expend-think-btn"
-          :class="{ breath: msg.label === '思考中...' && !hasError }"
+          :class="{ breath: msg.label === '思考中...' }"
           @click="triggerThinkVisiable"
         >
           <svg
@@ -87,7 +87,7 @@
           >
             <path d="M554.688 377.6A199.232 199.232 0 0 0 673.28 490.24l180.032 64.448-197.12 78.528a213.312 213.312 0 0 0-121.6 125.44l-65.28 180.032-45.184-137.408a305.536 305.536 0 0 0-189.44-193.728L85.312 554.688 193.28 522.24A337.28 337.28 0 0 0 411.776 320l57.536-149.312L554.688 377.6z m-85.376-1.28A418.176 418.176 0 0 1 307.2 554.688 384 384 0 0 1 469.312 714.24a290.176 290.176 0 0 1 157.056-152.32l8.064-3.392a277.76 277.76 0 0 1-152.32-151.488l-12.8-30.72zM896 334.528a34.56 34.56 0 0 0 19.2 19.584l31.168 11.136-34.176 13.632a36.416 36.416 0 0 0-20.864 21.76l-11.52 31.552-7.68-23.872a53.824 53.824 0 0 0-32.896-33.664l-25.984-9.408L832 359.68a59.392 59.392 0 0 0 38.016-35.008l9.792-25.984L896 334.528zM768 141.632a56.896 56.896 0 0 0 32.448 29.888l49.024 17.472-53.76 21.376a58.56 58.56 0 0 0-33.28 34.112l-17.472 49.088L732.544 256a85.312 85.312 0 0 0-49.856-51.648L640 190.272l29.44-7.232A92.736 92.736 0 0 0 729.216 128l15.744-42.688 23.04 56.32z" fill="#1A5EFF" p-id="7537"></path>
           </svg>
-          <div>{{ hasError ? '已停止思考' : msg.label }}</div>
+          <div>{{ msg.label }}</div>
         </button>
 
         <div></div>
@@ -148,7 +148,7 @@
 
       <transition name="fade">
         <div class="todos-block" v-if="msg.todos && msg.todos.length > 0 && isTodosVisiable">
-          <div v-for="item in displayTodos" class="todo-card" :key="`${item.content}-${item.status}`">
+          <div v-for="item in (props.msg.todos ?? [])" class="todo-card" :key="`${item.content}-${item.status}`">
             <TodoCard 
               :content="item.content" 
               :status="item.status" 
@@ -244,25 +244,6 @@
             🔍 查看访问的链接
           </button>
         </div>
-      </div>
-
-      <!-- Error card -->
-      <div class="error-card selectable" v-if="msg.errors && msg.errors?.length > 0">
-        <div>
-          <svg
-            t="1769388840058"
-            class="icon"
-            viewBox="0 0 1024 1024"
-            version="1.1"
-            xmlns="http://www.w3.org/2000/svg"
-            p-id="5640"
-            width="200"
-            height="200"
-          >
-            <path d="M928.894 511.026c0 230.527-187.552 418.077-418.077 418.077s-418.075-187.55-418.075-418.077c0-230.525 187.552-418.077 418.075-418.077s418.077 187.552 418.077 418.077zM850.505 511.026c0-187.298-152.376-339.684-339.687-339.684s-339.686 152.386-339.686 339.684c0 187.3 152.376 339.688 339.687 339.688s339.686-152.389 339.686-339.689zM563.079 354.25l0 156.775c0 28.86-23.399 52.26-52.26 52.26-28.86 0-52.26-23.399-52.26-52.26l0-156.775c0-28.86 23.399-52.26 52.26-52.26 28.86 0 52.26 23.399 52.26 52.26zM563.079 667.804c0 28.863-23.399 52.263-52.26 52.263-28.86 0-52.26-23.399-52.26-52.263 0-28.858 23.399-52.257 52.26-52.257 28.86 0 52.26 23.399 52.26 52.257z" fill="#ffffffc8" p-id="5641"></path>
-          </svg>
-        </div>
-        <div>{{ msg.errors }}</div>
       </div>
 
       <!-- Right button Menu -->
@@ -368,7 +349,6 @@ type MsgBubbleData = {
   info?: InfoTag
   extra?: any
   pending?: boolean
-  errors?: string
   selected?: boolean
 }
 
@@ -501,28 +481,6 @@ const contentRenderItems = computed(() => {
 
 const hasThink = computed(() => thinkRenderItems.value.length > 0)
 const hasContent = computed(() => contentRenderItems.value.length > 0)
-
-const hasError = computed(() => {
-  return !!(props.msg.errors && props.msg.errors.length > 0)
-})
-
-const displayTodos = computed(() => {
-  if (!props.msg.todos) return []
-
-  if (hasError.value) {
-    return props.msg.todos.map((todo) => {
-      if (todo.status === 'in_progress') {
-        return {
-          ...todo,
-          status: 'error' as const,
-        }
-      }
-      return todo
-    })
-  }
-
-  return props.msg.todos
-})
 
 // 选区逻辑
 function handleMouseDown(e: MouseEvent) {
@@ -1224,10 +1182,6 @@ async function scrollThinkToBottom() {
   line-height: 1.6;
   color: rgba(0, 0, 0, 0.657);
 
-  /* background: linear-gradient(90deg, rgba(92, 155, 144, 0.026) 60%, transparent); */
-  /* background: rgba(248, 250, 250, 0.053); */
-  /* backdrop-filter: blur(16px); */
-
   transition: all 0.25s ease;
 }
 
@@ -1444,36 +1398,10 @@ async function scrollThinkToBottom() {
   background-color: #50505012;
 }
 
-.error-card {
-  align-self: center;
-  align-items: center;
-  display: flex;
-  width: 100%;
-  padding: 6px 12px;
-  gap: 6px;
-  border-radius: 12px;
-  font-size: 14px;
-  background-color: #ff101080;
-  border: 1px solid #be131384;
-  color: #000000a2;
-  color: rgba(255, 255, 255, 0.792);
-}
-
-.error-card:deep(svg) {
-  height: 20px;
-  width: 20px;
-  padding-bottom: 2px;
-}
-
-.error-card:deep(div) {
-  align-items: center;
-  display: flex;
-}
-
 .branch-switch-wrapper {
   opacity: 0.4;
   width: 100%;
-  background-color: #dde7e67e;
+  background-color: #d0dedc;
   border-radius: 24px;
   border: 1px solid #7c98957e;
   transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);

@@ -203,6 +203,7 @@ class MysqlService:
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
                 "session_id": "{{ sid }} : to indicate which tab the data belong to",
                 "title": "conversation title",
+                "workspace": "Agent work dir",
             }
 
         Return:
@@ -217,8 +218,9 @@ class MysqlService:
             conversation_uid = self._conversation_id_generator()
             session_id = payload.get("session_id", "")
             title = payload.get("title", "新的聊天...")
+            workspace = payload.get("workspace", None)
 
-            await self._call_procedure("create_conversation", (user_uid, conversation_uid, title, session_id))
+            await self._call_procedure("create_conversation", (user_uid, conversation_uid, title, workspace, session_id))
             return {
                 "success": True,
                 "messages": f"{conversation_uid}",
@@ -240,7 +242,8 @@ class MysqlService:
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
                 "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
                 "session_id": "{{ sid }} : to indicate which tab the data belong to",
-                "title": "conversation title",
+                "title": "Conversation title",
+                "workspace": "Agent work dir",
                 "is_pinned": bool,
                 "is_deleted": bool,
             }
@@ -256,10 +259,11 @@ class MysqlService:
             user_uid = payload["client_id"]
             conversation_uid = payload["history_id"]
             session_id = payload.get("session_id", None)
+            workspace = payload.get("workspace", None)
             title = payload.get("title", None)
             pinned = bool(payload.get("is_pinned", None))
             is_deleted = bool(payload.get("is_deleted", None))
-            await self._call_procedure("update_conversation", (user_uid, conversation_uid, title, session_id, pinned, is_deleted))
+            await self._call_procedure("update_conversation", (user_uid, conversation_uid, title, workspace, session_id, pinned, is_deleted))
             return {
                 "success": True,
                 "messages": f"{conversation_uid}",

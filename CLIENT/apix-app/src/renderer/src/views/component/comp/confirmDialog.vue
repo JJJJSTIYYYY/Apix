@@ -100,7 +100,7 @@ function afterLeave() {
   border-radius: 16px;
   border: 1px solid rgb(255, 255, 255);
   background: rgba(243, 243, 243, 0.637);
-  backdrop-filter: blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
 }
 

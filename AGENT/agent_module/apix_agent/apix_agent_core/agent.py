@@ -3,6 +3,8 @@ from typing import AsyncIterator, Any
 import time
 import asyncio
 
+from langgraph.graph.state import CompiledStateGraph
+
 from apix_agent.apix_agent_core.agent_factory.agent_creator import agent_creator
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.commons.type_def import MainAgentState, SubAgentState, AgentConfigSchema
@@ -81,12 +83,13 @@ class AgentRuningtime:
         This runs in its own asyncio Task so multiple
         sub-agents can run concurrently.
         """
+        agent = None
 
         try:
 
             agent = await agent_creator.create_sub_agent(agent_name, initial_state.get("agent_role"), config)
 
-            if isinstance(agent, str):
+            if not isinstance(agent, CompiledStateGraph):
                 logger.error(f"[sub_agent_worker] Create sub-agent failed: {agent}")
                 return
             
@@ -126,6 +129,8 @@ class AgentRuningtime:
         finally:
             # Remove from running task registry
             self._running_tasks.pop(initial_state["task_id"], None)
+            if agent:
+                agent_creator.done(agent)
 
 
     async def _sub_agent_worker_loop(self):
@@ -202,10 +207,10 @@ class AgentRuningtime:
 
     async def submit_agent_task(
         self,
-        initial_state: MainAgentState | SubAgentState,
-        config: AgentConfigSchema,
-        agent_name: str = None
-    ) -> AsyncIterator[dict[str, Any] | Any]:
+        agent_role: MainAgentState | SubAgentState = None,
+        agent_name: str = None,
+        config: AgentConfigSchema = None,
+    ) -> CompiledStateGraph:
         """
         Start a streaming agent execution.
 
@@ -218,19 +223,25 @@ class AgentRuningtime:
         """
         logger.trace('[agent.py] [AI_Agent] [submit_task] Enter')
 
-        agent = await agent_creator.create_agent(agent_name, initial_state.get("agent_role"), config)
-        if isinstance(agent, str):
+        agent = await agent_creator.create_agent(agent_name, agent_role, config)
+        if not isinstance(agent, CompiledStateGraph):
             raise RuntimeError(
                 f"Get agent error. Please make sure your config correct.\n\nDetail: {agent}"
             )
         logger.info(
             f"[submit_task] Start agent streaming: "
-            f"{initial_state.get('agent_role')} - {initial_state.get('agent_name')}"
+            f"{agent_role} - {agent_name}"
         )
 
-        astream = agent.astream(initial_state, {"recursion_limit": 1024}, stream_mode="custom")
-
-        return astream
+        return agent
+    
+    
+    async def done(self, agent_graph: CompiledStateGraph) -> None:
+        """
+        Mark a graph as done (no longer in active use).
+        """
+        if agent_graph:
+            await agent_creator.done(agent_graph)
     
 
 

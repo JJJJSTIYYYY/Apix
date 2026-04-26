@@ -6,7 +6,7 @@ from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.commons.logger import logger
 from apix_agent.commons.type_def import MainAgentState, SubAgentState
@@ -80,9 +80,9 @@ async def assign_sub_assistant(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -101,7 +101,7 @@ async def assign_sub_assistant(
 
     if not assistant_name or not task_description or not instruction:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -199,7 +199,7 @@ async def assign_sub_assistant(
             raise RuntimeError(f"Failed to assign task to {assistant_name}.")
         
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -226,7 +226,7 @@ async def assign_sub_assistant(
     except Exception as e:
         logger.exception(f'[assign_sub_assistant] Error occurred: {str(e)}')
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -301,9 +301,9 @@ async def query_sub_assistant(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -333,7 +333,7 @@ async def query_sub_assistant(
             results = "No result or logs found."
         
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -360,7 +360,7 @@ async def query_sub_assistant(
     except Exception as e:
         logger.exception(f'[query_sub_assistant] Error occurred: {str(e)}')
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -438,9 +438,9 @@ async def stop_sub_assistant(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -459,7 +459,7 @@ async def stop_sub_assistant(
 
     if not task_ids:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -498,7 +498,7 @@ async def stop_sub_assistant(
         )
         
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -525,7 +525,7 @@ async def stop_sub_assistant(
     except Exception as e:
         logger.exception(f'[stop_sub_assistant] Error occurred: {str(e)}')
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

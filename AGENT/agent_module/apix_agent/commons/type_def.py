@@ -4,6 +4,24 @@ import operator
 from langchain_core.messages import AnyMessage 
 from langchain.agents.middleware.todo import Todo
 
+
+class InvalidToolCalls(Exception):
+    
+    def __init__(self, message="Invalid tool calls detected", errors=None):
+        """        
+        Args:
+            message: error message
+            errors: error object
+        """
+        self.message = message
+        self.errors = errors if errors else []
+        super().__init__(self.message)
+    
+    def __str__(self):
+        error_details = f"Errors: {self.errors}" if self.errors else ""
+        return f"{self.message}{error_details}"
+    
+
 # Role mode in GraphRuntimeContext:
 
 # - agent:
@@ -94,12 +112,13 @@ class GraphRuntimeContext(TypedDict):
     history_id: str
     platform: NotRequired[Literal["default"]]
     generation_id: str
+    node_id: NotRequired[str]
+    parent_node_id: NotRequired[str]
     config: AgentConfigSchema
     timestamp: int
 
 
 class MainAgentState(GraphRuntimeContext):
-    parent_node_id: NotRequired[str]
     input: dict
     re_generate: bool
     messages: Annotated[list[AnyMessage], operator.add]
@@ -110,7 +129,8 @@ class MainAgentState(GraphRuntimeContext):
     runtime_prompt: str # Include todos prompt, workspace prompt, memorandum prompt and so on
     llm_calls: Annotated[int, operator.add] # Total LLM call count across the graph
     llm_retry_count: int
-    error: NotRequired[str]
+    error: NotRequired[str] # Error type
+    error_detail: NotRequired[str] # Error detail
     context_compress_level: int # Level 0: Not compress; Level 1: Drop tool message content; Level 2: Context sumary to summary_exempt_tail_length; 
     context_fold_split_mark: NotRequired[str] # Split by completed | in_progress & pending todos, store with message id
     sandbox: str # Docker container id

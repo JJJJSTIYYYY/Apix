@@ -1,10 +1,12 @@
 import os
 import hashlib
 import asyncio
+import time
 from typing import Dict, Optional
 from uuid import uuid4
 
-from apix_agent.global_config import SANDBOX_DOCKER_IMAGE_NAME
+from apix_agent.global_config import SANDBOX_DOCKER_IMAGE_NAME, CONTIANER_TTL
+from apix_agent.commons.resource_cleaner import resource_cleaner
 
 
 DOCKER_FILE = '''
@@ -47,9 +49,21 @@ class AgentSandboxManager:
     """
 
     def __init__(self):
-        self._containers: Dict[str, str] = {}     # key -> container_id
+        # key -> {
+        #     "container_id": str,
+        #     "expire_at": float,
+        #     "status": "running" | "done"
+        # }
+        self._containers: Dict[str, Dict] = {}
         self._locks: Dict[str, asyncio.Lock] = {} # key -> lock
         self._global_lock = asyncio.Lock()
+
+    def _touch(self, key: str):
+        """
+        Refresh TTL for a container entry
+        """
+        if key in self._containers:
+            self._containers[key]["expire_at"] = time.time() + CONTIANER_TTL
 
     # -------------------------
     # Public API
@@ -74,21 +88,28 @@ class AgentSandboxManager:
 
         async with await self._get_lock(key):
 
-            # Container already exists
-            if key in self._containers:
-                container_id = self._containers[key]
+            entry = self._containers.get(key)
+
+            if entry:
+                container_id = entry["container_id"]
 
                 if await self._container_alive(container_id):
+                    # Mark as running when reused
+                    entry["status"] = "running"
+                    self._touch(key)
                     return container_id
                 else:
-                    # Clean stale container record
                     await self._safe_remove(container_id)
                     del self._containers[key]
 
-            # Create new container
             container_id = await self._create_container(work_dir)
 
-            self._containers[key] = container_id
+            self._containers[key] = {
+                "container_id": container_id,
+                "expire_at": time.time() + CONTIANER_TTL,
+                "status": "running"
+            }
+
             return container_id
         
     async def get_sandbox_container_id(
@@ -101,19 +122,24 @@ class AgentSandboxManager:
         """
         Get sandbox container id if exists, else None.
         """
-
         work_dir = os.path.abspath(work_dir)
         key = self._build_key(client_id, conversation_id, work_dir)
 
         async with await self._get_lock(key):
-            container_id = self._containers.get(key)
-            if container_id and await self._container_alive(container_id):
+
+            entry = self._containers.get(key)
+            if not entry:
+                return None
+
+            container_id = entry["container_id"]
+
+            if await self._container_alive(container_id):
+                entry["status"] = "running"
+                self._touch(key)
                 return container_id
             else:
-                # Clean stale container record
-                if container_id:
-                    await self._safe_remove(container_id)
-                    del self._containers[key]
+                await self._safe_remove(container_id)
+                del self._containers[key]
                 return None
 
     async def destroy_sandbox(
@@ -133,13 +159,42 @@ class AgentSandboxManager:
 
         async with await self._get_lock(key):
 
-            container_id = self._containers.get(key)
+            entry = self._containers.get(key)
+            if not entry:
+                return
+
+            container_id = entry["container_id"]
             if not container_id:
                 return
 
             await self._safe_remove(container_id)
 
             del self._containers[key]
+
+    async def done(
+        self,
+        *,
+        client_id: str,
+        conversation_id: str,
+        work_dir: str,
+    ):
+        """
+        Mark sandbox as done (no longer actively used).
+
+        Behavior:
+            - Changes status from "running" → "done"
+            - Allows cleanup system to reclaim container later
+        """
+        work_dir = os.path.abspath(work_dir)
+        key = self._build_key(client_id, conversation_id, work_dir)
+
+        async with await self._get_lock(key):
+            entry = self._containers.get(key)
+            if not entry:
+                return
+
+            entry["status"] = "done"
+            self._touch(key)
 
     async def cleanup_all(self):
         """
@@ -151,10 +206,48 @@ class AgentSandboxManager:
 
         for key in keys:
             async with await self._get_lock(key):
-                container_id = self._containers.get(key)
-                if container_id:
-                    await self._safe_remove(container_id)
+                entry = self._containers.get(key)
+                if entry:
+                    await self._safe_remove(entry["container_id"])
                     del self._containers[key]
+
+    async def cleanup_expired(self) -> int:
+        """
+        Cleanup expired containers.
+
+        Behavior:
+            - ONLY remove:
+                ✔ expired
+                ✔ status == "done"
+            - NEVER remove running containers
+        """
+        now = time.time()
+        removed = 0
+
+        async with self._global_lock:
+            keys = list(self._containers.keys())
+
+        for key in keys:
+            async with await self._get_lock(key):
+
+                entry = self._containers.get(key)
+                if not entry:
+                    continue
+
+                if entry["status"] == "running":
+                    continue
+
+                if entry["expire_at"] > now:
+                    continue
+
+                container_id = entry["container_id"]
+
+                await self._safe_remove(container_id)
+                del self._containers[key]
+
+                removed += 1
+
+        return removed
 
     async def docker_exec(self, container_id: str, cmd: str) -> str:
         proc = await asyncio.create_subprocess_exec(
@@ -244,3 +337,8 @@ class AgentSandboxManager:
 
 
 agent_sandbox = AgentSandboxManager()
+
+
+@resource_cleaner.auto_clear
+async def clean_sandbox():
+    return await agent_sandbox.cleanup_expired()

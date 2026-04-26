@@ -1,57 +1,53 @@
 <template>
   <transition name="card-slide-fade">
-    <div class="q-card">
-      <div class="q-card-body">
-        {{ history.preview || '暂无对话内容' }}
-      </div>
-
-      <div class="q-card-header">
-        <!-- Left: star + time -->
-        <div class="q-header-left">
+    <div class="q-card-wrapper">
+      <div class="q-card">
+        <!-- Left: preview content -->
+        <div class="q-card-body">
           <transition name="star-pop">
-            <span
-              v-if="history.star"
-              class="q-star-badge"
-            >
-              <svg t="1776881454278" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5294" width="20" height="20"><path d="M210.56 163.456c55.808-47.872 100.672-52.608 184.384-2.432l12.224 7.552 19.648 12.928 10.368 7.104 21.76 15.552 23.36 17.408 25.024 19.2 26.88 21.056 42.368 34.048 5.184-3.968c76.8-57.216 127.552-55.68 190.976 0.64l8.768 8.064 8.192 8 12.736 13.12c61.632 66.112 66.88 112.896-2.56 202.048l-8.704 10.88-19.904 23.552-22.976 25.472-20.608 21.952-29.312 30.208 179.52 179.584a38.4 38.4 0 0 1-48.96 58.752l-5.312-4.416-179.456-179.456-37.696 36.608-21.696 20.416-20.352 18.432-19.008 16.576-22.208 18.048-4.224 3.2-16.384 11.968c-62.336 43.328-103.168 44.8-149.376 12.672l-8.256-6.016-12.096-9.856-12.48-11.264-6.4-6.144-11.008-11.008c-63.424-65.152-70.912-116.096-18.752-191.36l7.488-10.496 4.16-5.504-34.048-42.432-30.848-39.552-18.304-24.192-16.448-22.592-18.112-26.048-3.2-4.928-12.096-19.008c-49.536-81.536-47.936-126.528-5.632-179.584l6.656-8 11.072-12.288 6.016-6.4 14.272-14.08 15.36-14.016z m131.392 54.144c-28.608-14.784-46.912-15.872-64.32-7.168l-5.76 3.2-7.232 5.12-7.424 6.016-11.648 10.88-9.92 9.856-10.88 11.712-6.016 7.36-5.056 7.232c-10.816 17.28-12.288 34.56-0.512 60.928l4.416 9.152 6.976 12.544 4.096 6.72 4.48 7.04 10.304 15.36 12.096 16.96 13.888 18.688 33.536 43.328 30.464 38.272 41.6 51.456a38.4 38.4 0 0 1-0.512 49.28l-7.296 8.576-12.672 15.424-5.44 6.976-9.088 12.544c-19.392 29.056-17.536 44.608 2.176 68.096l5.248 6.08 10.176 10.752 10.24 10.304 7.68 7.296 7.296 6.4 6.912 5.44c18.816 13.568 35.84 15.36 63.104-0.96l7.68-4.928 11.2-8.064 6.016-4.672 12.928-10.624 14.272-12.48 15.68-14.4 36.352-34.816 56-55.488 55.232-55.68 34.752-36.224 20.928-22.976 11.584-13.504 9.856-12.352 4.224-5.76 7.232-10.624c16.512-26.24 16.832-43.264 6.016-61.056l-3.584-5.376-5.632-7.104-6.592-7.424-11.648-12.032-11.392-11.136-10.24-9.152c-25.472-21.504-41.664-22.08-73.984 1.088l-7.744 5.76-14.208 11.392-16.256 13.696a38.4 38.4 0 0 1-43.712 4.352l-5.76-3.84-23.936-19.648-65.536-52.416-43.328-33.536-27.392-20.224-16.128-11.136-17.92-11.52-3.392-2.048-12.48-6.912z" fill="#999999" p-id="5295"></path></svg>
-            </span>
+            <div class="q-card-status">
+              <span
+                v-if="history.star"
+                class="q-star-badge-inline"
+              >
+                <svg t="1777123727784" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9432" width="20" height="20"><path d="M170.666667 138.678857c0-17.67619 14.336-32.01219 32.01219-32.01219h618.642286c17.67619 0 32.01219 14.336 32.01219 32.01219v778.654476L512 768 170.666667 917.333333V138.654476z" p-id="9433" fill="#ccc"></path></svg>
+              </span>
+              <span v-if="history.isGenerating" class="q-label generating">
+                <span class="loading-dots">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+              </span>
+
+              <span v-if="showNewMessage" class="q-label new">
+                新消息
+              </span>
+            </div>
           </transition>
-
-          <span class="q-time">{{ history.time }}</span>
-
-          <span v-if="history.isGenerating" class="q-label generating">
-            <span class="loading-dots">
-              <span></span>
-              <span></span>
-              <span></span>
-            </span>
-          </span>
-
-          <span v-if="showNewMessage" class="q-label new">
-            新消息
-          </span>
+          <span class="q-preview-text">{{ history.preview || '暂无对话内容' }}</span>
         </div>
 
         <!-- Right: actions -->
-        <div class="q-cell-actions">
-          <el-button
-            type="text"
-            size="small"
-            class="q-icon-btn-more"
-            @click.stop="onMoreClick"
-          >
-            <el-icon><More /></el-icon>
-          </el-button>
-
-          <el-button
+        <div class="q-card-actions">
+          <button
             type="text"
             size="small"
             class="q-icon-btn-star"
             @click.stop="onStarClick"
           >
-            <el-icon v-if="history.star"><StarFilled /></el-icon>
-            <el-icon v-else><Star /></el-icon>
-          </el-button>
+            <svg v-if="history.star" t="1777123999522" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10995" width="20" height="20"><path d="M956 398.496q-8-23.488-26.496-39.008t-42.496-19.488l-204.992-31.008-92-195.008q-11.008-24-32.992-36.992Q536.032 64 512.032 64t-44.992 12.992q-22.016 12.992-32.992 36.992l-92 195.008-204.992 31.008q-24 4-42.496 19.488t-26.496 39.008-2.496 47.008 22.496 41.504l151.008 154.016-36 218.016q-6.016 40 20 70.496t66.016 30.496q22.016 0 42.016-11.008l180.992-100 180.992 100q20 11.008 42.016 11.008 40 0 66.016-30.496t20-70.496l-36-218.016 151.008-154.016q16.992-18.016 22.496-41.504t-2.496-47.008z" p-id="10996" fill="#cccccc"></path></svg>
+            <svg v-else t="1777124070437" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3097" width="20" height="20"><path d="M512 136q8.992 0 12.992 8.992l104.992 222.016q3.008 7.008 11.008 8.992l235.008 35.008q8.992 2.016 12 10.496t-4 14.496l-171.008 176q-4.992 4.992-4 12l40.992 247.008q0.992 7.008-3.488 12t-11.488 4.992q-4 0-7.008-2.016l-208.992-115.008q-3.008-2.016-7.008-2.016t-7.008 2.016L296 885.984q-3.008 2.016-7.008 2.016-7.008 0-11.488-4.992t-3.488-12L315.008 624q0.992-7.008-4-12l-171.008-176q-7.008-6.016-4-14.496t12-9.504l235.008-36q8-0.992 11.008-8.992l104.992-222.016q4-8.992 12.992-8.992zM512 64q-24 0-44.992 12.992-22.016 12.992-32.992 36.992l-92 195.008-204.992 31.008q-24 4-42.496 19.488t-26.496 39.008-2.496 47.008 22.496 41.504l151.008 154.016-36 218.016q-6.016 40 20 70.496t66.016 30.496q22.016 0 42.016-11.008l180.992-100 180.992 100q20 11.008 42.016 11.008 40 0 66.016-30.496t20-70.496l-36-218.016 151.008-154.016q16.992-18.016 22.496-41.504t-2.496-47.008-26.496-39.008-42.496-19.488l-204.992-31.008-92-195.008q-11.008-24-32.992-36.992Q536.128 64 512.128 64z" p-id="3098" fill="#cccccc"></path></svg>
+          </button>
+
+          <button
+            type="text"
+            size="small"
+            class="q-icon-btn-more"
+            @click.stop="onMoreClick"
+          >
+            <svg t="1777124236767" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12444" width="20" height="20"><path d="M243.2 512m-83.2 0a1.3 1.3 0 1 0 166.4 0 1.3 1.3 0 1 0-166.4 0Z" p-id="12445" fill="#cccccc"></path><path d="M512 512m-83.2 0a1.3 1.3 0 1 0 166.4 0 1.3 1.3 0 1 0-166.4 0Z" p-id="12446" fill="#cccccc"></path><path d="M780.8 512m-83.2 0a1.3 1.3 0 1 0 166.4 0 1.3 1.3 0 1 0-166.4 0Z" p-id="12447" fill="#cccccc"></path></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -224,107 +220,173 @@ const handleConnectProject = async () => {
     }
   store.setWorkDir(props.history.id, result.filePaths[0])
   store.currentWorkDir=result.filePaths[0]
+
+  try {
+    await window.api.updateConversation(
+      cid.value,
+      props.history.sid ?? "",
+      props.history.id,
+      { workspace: result.filePaths[0] }
+    )
+  } catch (err) {
+    console.log("Set workspace err: "+err)
+  }
 }
 </script>
 
 <style scoped>
-.q-card {
+.q-card-wrapper {
   z-index: 1000;
   width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
   position: relative;
+  max-width: 100%;
+  overflow: hidden;
 }
 
-.q-card-header {
+.q-card {
+  z-index: 1000;
+  width: calc(100% + 42px);
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-width: 0;
-  height: 30px;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 6px 4px;
+  position: relative;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.q-card:hover {
+  width: 100%;
 }
 
 /* ------------------------
-   Left header (star + time)
+   Left: preview content
 ------------------------- */
-.q-header-left {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  margin-left: 3px;
-}
-
-.q-star-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  color: #ffb300e0;
-  margin-top: -1px;
-}
-
 .q-card-body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0px 3px;
+  gap: 6px;
   font-size: 0.85rem;
-  padding-left: 4px;
-  padding-right: 1px;
   line-height: 1.35;
   color: rgba(60, 60, 67, 0.78);
   overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
 }
 
-.q-time {
-  font-size: 11px;
-  color: rgba(60, 60, 67, 0.55);
+.q-preview-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 220px;
+}
+
+.q-card:hover .q-preview-text {
+  width: 170px;
+}
+
+.q-star-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.q-card-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 /* ------------------------
-   Right actions
+   Right: actions
 ------------------------- */
-.q-cell-actions {
-  margin-left: -8px;
-}
-
-.q-cell-actions * {
-  flex: 0 0 auto;
-  transition: opacity 0.18s ease;
-  vertical-align: middle;
+.q-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
   opacity: 0;
-  width: 0 !important;
+  transition: opacity 0.18s ease;
 }
 
-.q-card:hover .q-cell-actions * {
+.q-card:hover .q-card-actions {
   opacity: 1;
   pointer-events: auto;
-  width: 16px !important;
 }
 
-:deep(.q-icon-btn-more.el-button),
-:deep(.q-icon-btn-star.el-button) {
+.q-icon-btn-more,
+.q-icon-btn-star {
   border-radius: 999px;
   padding: 0;
+  width: 20px;
+  height: 20px;
   color: rgba(60, 60, 67, 0.323);
+  background-color: transparent;
+  border: none;
   transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-:deep(.q-icon-btn-star.el-button) {
-  margin-left: 4px;
-}
 
-:deep(.q-icon-btn-more.el-button:hover),
-:deep(.q-icon-btn-star.el-button:hover) {
-  color: rgba(60, 60, 67, 0.564);
-}
-
-:deep(.q-icon-btn-star.el-button:active) {
+.q-icon-btn-star {
   transform: scale(0.8);
+}
+
+/* ------------------------
+   Labels
+------------------------- */
+.q-label {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 加载动画 */
+.loading-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 12px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.q-label.generating {
+  color: #87879f;
+  background: transparent;
+  min-width: 16px;
+}
+
+.q-label.new {
+  color: #1ad0b2;
+  background: #e6faf7;
 }
 
 /* ------------------------
@@ -376,7 +438,7 @@ const handleConnectProject = async () => {
 
 .card-slide-fade-leave-active {
   animation: cardOut 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  position: absolute; /* prevent layout collapse */
+  position: absolute;
   width: 100%;
 }
 
@@ -404,55 +466,5 @@ const handleConnectProject = async () => {
     opacity: 0;
     transform: translateY(4px) scale(0.97);
   }
-}
-
-.q-label {
-  margin-left: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 12px;
-  line-height: 1;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 加载动画 */
-.loading-dots {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 12px;
-}
-
-.loading-dots span {
-  width: 4px;
-  height: 4px;
-  background: currentColor;
-  border-radius: 50%;
-  animation: bounce 1.4s infinite ease-in-out both;
-}
-
-.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
-.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
-
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
-  40% { transform: scale(1); opacity: 1; }
-}
-
-/* 配色微调 - 让加载动画更低调 */
-.q-label.generating {
-  color: #87879f;
-  background: #f5f5f7;
-  min-width: 32px; /* 固定宽度避免跳动 */
-}
-
-.q-label.new {
-  color: #1ad0b2;
-  background: #e6faf7;
 }
 </style>

@@ -10,7 +10,7 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.global_config import FILE_SERVICE_URL
 
 
@@ -48,6 +48,7 @@ async def load_skill(
     - you do not need a skill to compelete current task.
     ## Important Guidelines
     Avoid loading skills unnecessarily, as this may waste time and resources.
+    This tool will automatically inject a system message to show the content of SKILL.md.
 
     Args:
         name (str): The name of the skill to load.
@@ -58,9 +59,9 @@ async def load_skill(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -79,7 +80,7 @@ async def load_skill(
 
     if not container_id:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -103,7 +104,7 @@ async def load_skill(
 
     if not base_path:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -133,7 +134,7 @@ async def load_skill(
 
     if not skill_id:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -200,7 +201,7 @@ async def load_skill(
                 guide = parts[2].lstrip("\n")
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -232,7 +233,7 @@ async def load_skill(
         err = f"Error loading skill '{name}': {type(e)}: {str(e)}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

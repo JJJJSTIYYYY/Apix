@@ -261,7 +261,6 @@ import { NAvatar, NSelect } from 'naive-ui'
 import { InputDialog } from './component/comp/inputDialog'
 import { ConfirmDialog } from './component/comp/confirmDialog.js'
 import { mdDisplayer } from './component/comp/mdDisplayer.js'
-import { globalSelection } from '../store/globalData.js'
 import ollamaIcon from '../assets/icons/llm_providers/ollama.svg'
 import googleIcon from '../assets/icons/llm_providers/google.svg'
 import openaiIcon from '../assets/icons/llm_providers/openai.svg'
@@ -313,7 +312,6 @@ interface ChatMessage {
   images?: any[]
   pending?: boolean
   error?: boolean
-  errors?: any
   desc?: string | null
   status?: string | null
 
@@ -374,7 +372,6 @@ function appendToolLabel(
   label: ToolLabel,
   guardId?: string
 ) {
-  // field = 'think'
   if (guardId && msg.id !== guardId) return
 
   ensureArrayField(msg, field)
@@ -388,17 +385,36 @@ function appendToolLabel(
 
     if (index !== -1) {
       const old = arr[index] as ToolLabel
-      arr[index] = {
-        ...old,
-        ...label,
-        tool_name: label.tool_name || old.tool_name,
-        content:  old.content + '\n\n' + label.content,
+
+      // 原地更新（不要替换对象！）
+      if (label.tool_name) {
+        old.tool_name = label.tool_name
       }
+
+      if (label.status) {
+        old.status = label.status
+      }
+
+      // 防止并发覆盖 + 重复拼接
+      if (label.content) {
+        if (!old.content) {
+          old.content = label.content
+        } else if (!old.content.includes(label.content)) {
+          old.content += '\n\n' + label.content
+        }
+      }
+
       return
     }
   }
 
-  arr.push(label)
+  // 新增时确保是“干净对象”（避免引用污染）
+  arr.push({
+    tool_call_id: label.tool_call_id,
+    tool_name: label.tool_name,
+    content: label.content || '',
+    status: label.status || 'pending',
+  })
 }
 
 function cloneMaybeArray<T>(value: T[] | undefined | null): T[] {
@@ -432,8 +448,8 @@ function appendToolCallsFromExtra(
     const label: ToolLabel = {
       tool_call_id: call.id,
       tool_name: call.name ?? 'unknown_tool',
-      content: '已过期',
-      status: 'outdated',
+      content: '[已过期]',
+      status: 'pending',
     }
 
     appendToolLabel(msg, targetField, label)
@@ -521,9 +537,6 @@ function findLatestIndexById(list: ChatMessage[], id: string, role: Role) {
     if (list[i].id === id && list[i].role === role) {
       return i
     }
-    // if (list[i].role === 'human') {
-    //   break
-    // }
   }
   return -1
 }
@@ -750,7 +763,7 @@ const createChat = async () => {
   if (messages.value.length === 0 && store.current_history_id !== '-1') return
 
   const format_date = formatTime(new Date().toLocaleString())
-  const res = await window.api.newChat(cid.value)
+  const res = await window.api.newChat(cid.value, store.currentWorkDir ?? "")
   const newHid = String(res.messages)
 
   ensureHistoryMessages(newHid)
@@ -798,6 +811,8 @@ const handleDeleteHistory = (history_id: string) => {
 }
 
 const handleEditFinish = async (id: string, newContent: string) => {
+  // Args: generation id (not node id)
+  console.log("Re-edit from node id: ", id)
   if (newContent === '') return
   const list = messages.value
 
@@ -829,12 +844,14 @@ const handleEditFinish = async (id: string, newContent: string) => {
 
   list.splice(0, list.length, ...remain)
   const last_node = list.at(-1)
-  const parent_id = last_node?.node_id
+  const parent_id = last_node?.node_id ?? '-'
 
   await sendMessage(newContent, parent_id)
 }
 
 const handleRegenerate = async (id: string) => {
+  // Args: parent node id (not message id / generation id / node id)
+  console.log("Regenerate from node id: ", id)
   const list = messages.value
 
   if(list.at(-1)?.pending === true) {
@@ -872,6 +889,7 @@ const handleRegenerate = async (id: string) => {
   const inputs = list[targetIndex].content
   if (!inputs) return
 
+  // remains the parent node
   const remain = list.slice(0, targetIndex + 1)
 
   list.splice(0, list.length, ...remain)
@@ -1013,7 +1031,20 @@ const handleConnectProject = async () => {
   }
 
   // console.log('Current history id: ', store.current_history_id)
-  if (store.current_history_id !== '-1') store.setWorkDir(store.current_history_id, result.filePaths[0])
+  if (store.current_history_id !== '-1') {
+    store.setWorkDir(store.current_history_id, result.filePaths[0])
+
+    try {
+      await window.api.updateConversation(
+        cid.value,
+        "",
+        store.current_history_id,
+        { workspace: result.filePaths[0] }
+      )
+    } catch (err) {
+      console.log("Set workspace err: "+err)
+    }
+  }
   store.currentWorkDir = result.filePaths[0]
   store.removeWorkDir('-1')
 }
@@ -1067,6 +1098,7 @@ function handleAsyncToolRtn(payload: any, historyId: string) {
 
 function handleStreamStart(payload: any, historyId: string) {
   const generationId = payload.generation_id
+  const nodeIdData = payload.data?.messages?.content
   if (!generationId) return
 
   const list = ensureHistoryMessages(historyId)
@@ -1087,6 +1119,8 @@ function handleStreamStart(payload: any, historyId: string) {
       id: generationId,
       cid: cid.value,
       hid: historyId,
+      node_id: nodeIdData.node_id ?? '',
+      parent_id: nodeIdData.parent_id ?? '',
       role: 'ai',
       label: '已准备',
       content: [],
@@ -1197,6 +1231,16 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const event_name = payload.data?.messages?.event_name
   const detail = payload.data?.messages?.content
   if (!generationId) return
+
+  const list = ensureHistoryMessages(historyId)
+  const state = ensureGeneratingState(historyId)
+
+  const humanIndex = findLatestIndexByStatus(list, true, 'human')
+
+  if (humanIndex !== -1) {
+    list[humanIndex].error = true
+  }
+
   if (event_name === 'error_occurred') {
     ElMessage({
       type: 'error',
@@ -1204,9 +1248,6 @@ async function handleStreamAbort(payload: any, historyId: string) {
       plain: true,
     })
   }
-
-  const list = ensureHistoryMessages(historyId)
-  const state = ensureGeneratingState(historyId)
 
   state.isGenerating = false
   state.streamStateText = ''
@@ -1275,7 +1316,7 @@ function handleToolChunkRtn(payload: any, historyId: string) {
     const toolLabel: ToolLabel = {
       tool_call_id: toolCallId,
       tool_name: toolName,
-      content: toolContent,
+      content: toolContent || '',
       status,
     }
 
@@ -1332,7 +1373,7 @@ function handleImageChunkRtn(generationId: string, data: any, historyId: string)
   }
 }
 
-async function syncHistoryMessages(historyId: string) {
+async function syncHistoryMessages(historyId: string, force = false) {
   if (!historyId || historyId === '-1') return
   if (loadingHistorySet.has(historyId)) return
 
@@ -1344,6 +1385,11 @@ async function syncHistoryMessages(historyId: string) {
   try {
     const lastMsg = list.length > 0 ? list[list.length - 1] : null
     const lastNodeId = lastMsg?.node_id ?? null
+
+    if (!force && lastMsg && lastMsg.role !== 'ai') {
+      // Only ai message need to sync because of streaming, human message is always complete when it's added to the list
+      return
+    }
 
     console.log("[syncHistoryMessages] Sync node id is ", lastNodeId)
 
@@ -1368,13 +1414,35 @@ async function handleSendMessage() {
   const list = messages.value
   const last_node = list.at(-1)
   const parent_id = last_node?.node_id
+
+  if(list.at(-1)?.pending === true) {
+    try {
+      ElMessage({
+        type: 'info',
+        message: "等待流式传输完成...",
+        plain: true,
+      })
+      await window.api.stopGeneration(
+        cid.value,
+        sid.value,
+        store.current_history_id,
+      )
+    } catch (err) {
+      console.error('Request failed', err)
+      return
+    }
+  }
+
   await sendMessage(inputText.value.trim(), parent_id)
 }
 
 // ################################
-// Send message
+// Send message: 
+// Args:
+// content: message content
+// parent_id: the last confirmed node_id in the current visible message list
 // ################################
-async function sendMessage(content:string = '', parent_id: string = '', re_generate: boolean = false, pushToList: boolean = true) {
+async function sendMessage(content:string = '', parent_id: string = '-', re_generate: boolean = false, pushToList: boolean = true) {
   if (!store.config.modelName
     || store.config.modelName === ''
     || !store.config.modelProvider
@@ -1563,7 +1631,9 @@ const handleDeleteMessages = async () => {
     await ConfirmDialog.confirm(
       `确定删除要选中的 ${del_list.length} 条记录吗？<br><br>` +
       `⚠︎ 此节点中以下内容也将被删除：<br>` +
-      `• 节点中产生的对话摘要<br>• 工具调用信息及结果`,
+      `• 节点中产生的对话摘要<br>• 工具调用信息及结果<br><br>` +
+      `⚠︎ 以下内容不会被删除：<br>` +
+      `• 节点中的其他消息分支<br>• 此分支下的后续消息<br>`,
       '删除确认',
       {
         confirmButtonText: '确定',
@@ -1584,7 +1654,7 @@ const handleDeleteMessages = async () => {
     if (res.success !== true) throw new Error(res.messages || "Delete messages failed.")
 
     list.splice(0, list.length, ...remain)
-    syncHistoryMessages(store.current_history_id)
+    syncHistoryMessages(store.current_history_id, true)
   } catch (error) {
     ElMessage({
       type: 'warning',
@@ -2034,7 +2104,26 @@ const msgInputHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean;
 
   if (e.key === 'Enter') {
     e.preventDefault()
+
     const list = messages.value
+    if(list.at(-1)?.pending === true && inputText.value.trim() !== '') {
+      try {
+        ElMessage({
+          type: 'info',
+          message: "等待流式传输完成...",
+          plain: true,
+        })
+        await window.api.stopGeneration(
+          cid.value,
+          sid.value,
+          store.current_history_id,
+        )
+      } catch (err) {
+        console.error('Request failed', err)
+        return
+      }
+    }
+
     const last_node = list.at(-1)
     const parent_id = last_node?.node_id
     await sendMessage(inputText.value.trim(), parent_id)
@@ -2220,9 +2309,17 @@ const setFullInput = () => {
   transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.ai-history-pannel {
+  background-color: #ffffff00 !important;
+  padding: 0px 16px 18px 16px !important;
+  margin: 0px !important;
+  transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 .ai-history-pannel.is-history-hide {
   width: 40px !important;
   max-width: 40px;
+  background-color: transparent !important;
 }
 
 .chat-wrapper {
@@ -2254,9 +2351,9 @@ const setFullInput = () => {
   border-radius: 24px;
   height: 24px;
   top: 12px;
-  backdrop-filter: blur(3px);
-  background-color: #e7ebebca;
-  border: 1px solid #324c4f81;
+  backdrop-filter: saturate(220%) blur(6px);
+  background-color: #ffffff12;
+  border: 1px solid #324c4f2e;
   color: #19312fe3;
   padding: 0px 12px 0px 0px;
   font-weight: bold;
@@ -2270,6 +2367,7 @@ const setFullInput = () => {
 .work-dir-label.no_work_dir {
   width: 28px;
   height: 16px;
+  backdrop-filter: saturate(330%) blur(6px);
   color: transparent;
   background-color: #d1d1d130;
   border: 1px solid #a6a6a623;
@@ -2304,7 +2402,7 @@ const setFullInput = () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 22px 52px 88px 52px;
+  padding: 12px 52px 88px 52px;
   width: 85%;
   height: calc(100vh - 190px);
   scrollbar-width: none;

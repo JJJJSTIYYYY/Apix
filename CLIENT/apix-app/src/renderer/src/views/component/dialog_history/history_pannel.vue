@@ -411,7 +411,7 @@ const switchFold = async (date: string) => {
 
 const createNewChat = () => emit('create')
 
-// rename / delete（原样保留）
+// rename / delete
 const handleRenameHistory = async (history_id: string, new_title: string) => {
   try {
     await window.api.updateConversation(
@@ -493,11 +493,9 @@ useOverscrollBounce(
 /* Layout */
 .chat-history.q {
   z-index: 99;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 54px);
   display: flex;
   flex-direction: column;
-  padding: 0 6px;
-  padding-right: 16px;
   background: transparent;
   width: 100%;
   max-width: 240px;
@@ -516,10 +514,9 @@ useOverscrollBounce(
   align-items: center;
   justify-content: center;
 
-  background: rgba(232, 238, 237, 0.304);
-  border: 1px solid rgba(255, 255, 255, 0.495);
+  background: rgb(248, 248, 248);
+  border: 1px solid rgba(255, 255, 255, 0.618);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.123),
     0 2px 6px rgba(0, 0, 0, 0.05);
 
   color: rgba(0, 0, 0, 0.78);
@@ -531,7 +528,10 @@ useOverscrollBounce(
     border-color 0.18s ease;
 }
 :deep(.q-primary-btn.el-button:hover) {
-  background: rgba(255, 255, 255, 0.387);
+  color: rgb(255, 255, 255);
+  background-color: #81ddd0;
+  box-shadow: 0 6px 20px rgba(156, 221, 211, 0.6);
+  transform: scale(1.02);
 }
 :deep(.q-primary-btn.el-button:active) {
   transform: translateZ(0) scale(0.92);
@@ -575,13 +575,10 @@ useOverscrollBounce(
 .q-search :deep(.el-input__wrapper) {
   height: 34px;
   border-radius: 999px;
-  background: rgba(228, 228, 228, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgb(248, 248, 248);
+  border: 1px solid rgba(255, 255, 255, 0.618);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.08),
     0 2px 6px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   padding: 0 12px 0 10px;
   transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -633,13 +630,12 @@ useOverscrollBounce(
   width: 100%;
   height: 32px;
   transition: all 0.24s cubic-bezier(0.23, 1, 0.32, 1);
-  background: rgba(228, 228, 228, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.345);
+
+  background: rgb(248, 248, 248);
+  border: 1px solid rgba(255, 255, 255, 0.618);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.06),
-    0 2px 6px rgba(0, 0, 0, 0.03);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);  
+    0 2px 6px rgba(0, 0, 0, 0.05);
+    
   color: #00000065;
 }
 
@@ -652,10 +648,9 @@ useOverscrollBounce(
   align-items: center;
   justify-content: center;
 
-  background: rgba(232, 238, 237, 0.304);
-  border: 1px solid rgba(255, 255, 255, 0.495);
+  background: rgb(248, 248, 248);
+  border: 1px solid rgba(255, 255, 255, 0.618);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.123),
     0 2px 6px rgba(0, 0, 0, 0.05);
 
   color: rgba(0, 0, 0, 0.78);
@@ -669,7 +664,8 @@ useOverscrollBounce(
 
 /* 悬停效果 */
 .create-btn:hover {
-  background-color: #7dd4c7;
+  color: rgb(255, 255, 255);
+  background-color: #81ddd0;
   box-shadow: 0 6px 20px rgba(156, 221, 211, 0.6);
   transform: scale(1.02);
 }
@@ -700,13 +696,12 @@ useOverscrollBounce(
   flex: 1;
   overflow: hidden;
   border-radius: 20px;
-  background: rgba(245, 247, 247, 0.768);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+
+  background: rgb(248, 248, 248);
+  border: 1px solid rgba(255, 255, 255, 0.618);
   box-shadow:
-    0 10px 26px rgba(4, 52, 42, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -3px 1px rgba(255, 242, 247, 0.635);
+    0 2px 6px rgba(0, 0, 0, 0.05);
+    
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   scrollbar-width: none;
 }
@@ -729,10 +724,10 @@ useOverscrollBounce(
 /* ✅ 滑动窗口（高亮块） */
 .q-slider {
   position: absolute;
-  left: 6px;
-  right: 6px;
+  left: 3px;
+  right: 3px;
   top: 0;
-  height: 72px !important;
+  height: 38px !important;
   opacity: 0;
   border-radius: 16px;
   pointer-events: none;
@@ -741,14 +736,11 @@ useOverscrollBounce(
   background: rgb(253, 253, 253);
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.106);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 
   transform: translateY(var(--slider-y, 0px)) scale(var(--slider-scale, 1));
 
   transition:
-    transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1),
-    height 0.3s cubic-bezier(0.34, 1.3, 0.64, 1),
+    transform 0.48s cubic-bezier(0.23, 1, 0.32, 1),
     opacity 0.15s ease;
 }
 
@@ -766,7 +758,7 @@ useOverscrollBounce(
 }
 .q-section-title {
   margin: 3px;
-  padding: 10px 14px;
+  padding: 6px 6px;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.4px;
@@ -791,8 +783,8 @@ useOverscrollBounce(
   z-index: 1;
 
   height: auto;
-  min-height: 74px;
-  padding: 12px 14px;
+  min-height: 36px;
+  padding: 3px 3px;
   margin: 0;
   background: transparent;
   border-radius: 12px;
@@ -808,10 +800,6 @@ useOverscrollBounce(
 .q-menu :deep(.el-menu-item.q-cell.is-active) {
   color: rgba(0, 0, 0, 0.92);
 }
-.q-menu :deep(.el-menu-item.q-cell:not(.is-active):hover) {
-  background: rgba(0, 0, 0, 0.032);
-}
-
 /* Empty */
 .q-empty {
   padding: 46px 12px;

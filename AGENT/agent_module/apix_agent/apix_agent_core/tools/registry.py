@@ -52,7 +52,7 @@ def get_available_tools(permission: str | list[str] = "", filter_by_name: list[s
         "default": [
             write_todos, 
             read_memorandum, 
-            write_memorandum,  
+            update_memorandum,  
             ocr_analysis, 
             send_images
         ],
@@ -86,3 +86,7 @@ def get_available_tools(permission: str | list[str] = "", filter_by_name: list[s
         filter_tools[tool.name] = tool
 
     return list(filter_tools.values())
+
+
+# Tools in this set are not allowed to be called simultaneously in one tool_calls
+conflict_tool_set = {"write_todos", "update_memorandum"}

@@ -175,7 +175,7 @@ const handleSave = () => {
 :deep(.rag-dialog .el-dialog__body) {
   padding: 24px;
   background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
+  backdrop-filter: saturate(180%) blur(10px);
 }
 
 :deep(.rag-dialog .el-dialog__footer) {

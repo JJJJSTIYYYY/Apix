@@ -430,8 +430,6 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   color: #606266;
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(136, 202, 197, 0.3);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: all 0.3s ease;
 }
 
@@ -449,8 +447,6 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   color: #606266;
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(136, 202, 197, 0.3);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: all 0.3s ease;
 }
 

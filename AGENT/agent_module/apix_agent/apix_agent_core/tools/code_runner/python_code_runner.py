@@ -8,7 +8,7 @@ from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 
@@ -56,9 +56,9 @@ async def run_python_code(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -84,7 +84,7 @@ async def run_python_code(
 
     if not container_id or not sandbox_root:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -104,7 +104,7 @@ async def run_python_code(
 
     if not code or not code.strip():
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -134,7 +134,7 @@ async def run_python_code(
 
         if not isinstance(host_script_path, Path):
             event_writer.send_event(
-                event=StreamEvent.TOOL_EXEC_END, 
+                event=AgentStreamEvent.TOOL_EXEC_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
@@ -190,7 +190,7 @@ async def run_python_code(
             output = output[:MAX_OUTPUT] + "\n...[output truncated]"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -230,7 +230,7 @@ async def run_python_code(
     except Exception as e:
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

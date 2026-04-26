@@ -5,7 +5,7 @@ from langchain.messages import ToolMessage
 from langchain.tools import InjectedState, tool, InjectedToolCallId
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.global_config import TASK_SERVER_BASE_URL
 
 
@@ -83,9 +83,9 @@ async def get_test_task(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -114,7 +114,7 @@ async def get_test_task(
         err_msg = f"[ERROR] get_task failed: {str(exc)}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -139,7 +139,7 @@ async def get_test_task(
         err_msg = f"[ERROR] get_task returned failure: {data.get('messages')}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -234,7 +234,7 @@ async def get_test_task(
         )
 
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_END, 
+        event=AgentStreamEvent.TOOL_EXEC_END, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -330,9 +330,9 @@ async def update_test_task(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -349,7 +349,7 @@ async def update_test_task(
         err_msg = "update_test_task failed: no case_id was provided and state.current_test_case_id is missing."
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -388,7 +388,7 @@ async def update_test_task(
         err_msg = f"[ERROR] update_task failed: {str(exc)}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -413,7 +413,7 @@ async def update_test_task(
         err_msg = f"[ERROR] update_task returned failure: {data.get('messages')}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -444,7 +444,7 @@ async def update_test_task(
     )
 
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_END, 
+        event=AgentStreamEvent.TOOL_EXEC_END, 
         target_id=client_id, 
         target_platform=target_platform,
         data={

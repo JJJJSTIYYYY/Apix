@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from enum import Enum
 import time
 import uuid
@@ -7,24 +9,9 @@ from langgraph.config import get_stream_writer
 from apix_agent.commons.type_def import ApixEventEnvelope, MinimalEnvelopeData
 
 
-class StreamEvent(str, Enum):
-    ESSENTIAL_INFO_RETURN = 'essential_info_return'
-    LLM_STREAM_START = "llm_stream_start"
-    LLM_CHUNK_RETURN = "llm_chunk_return"
-    LLM_STREAM_END = "llm_stream_end"
-    LLM_STREAM_ERROR = "llm_stream_error"
-    AI_MESSAGE_RETURN = "ai_message_return"
-    TOOL_MESSAGE_RETURN = "tool_message_return"
-    TOOL_EXEC_START = "tool_exec_start"
-    TOOL_EXEC_MIDDLE = "tool_exec_middle"
-    TOOL_EXEC_END = "tool_exec_end"
-    RUNTIME_WARNING = "runtime_warning"
-    ERROR_OCCURRED = "error_occurred"
-
-
 class ApixStreamWriter:
     """
-    Event sender for LangGraph streaming.
+    Event sender for Apix streaming.
 
     - Single public method: send_event
     - Internally wraps LangGraph writer
@@ -35,14 +22,14 @@ class ApixStreamWriter:
         self,
         trace_id: Optional[str] = None,
     ):
-        self._writer = get_stream_writer()
+        self._writer = None
         self._trace_id = trace_id or str(uuid.uuid4())
 
     # Public API
     def send_event(
         self,
         *,
-        event: StreamEvent,
+        event: Any,
         target_id: str,
         target_platform: str = None,
         data: MinimalEnvelopeData = None,

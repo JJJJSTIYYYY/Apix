@@ -37,7 +37,7 @@ CREATE TABLE conversations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     latest_timestamp BIGINT NOT NULL DEFAULT 0,
 
-    work_dir VARCHAR(255) COMMENT 'Agent work dir',
+    work_space VARCHAR(255) DEFAULT NULL COMMENT 'Agent work dir',
 
     UNIQUE KEY uk_user_conversation (user_uid, conversation_uid),
 
@@ -358,6 +358,7 @@ CREATE PROCEDURE create_conversation (
     IN p_user_uid VARCHAR(64),
     IN p_conversation_uid VARCHAR(64),
     IN p_title VARCHAR(255),
+    IN p_workspace VARCHAR(255),
     IN p_session_id VARCHAR(64)
 )
 BEGIN
@@ -365,6 +366,7 @@ BEGIN
         user_uid,
         conversation_uid,
         title,
+        work_space,
         session_id,
         last_active_at,
         latest_cursor
@@ -373,6 +375,7 @@ BEGIN
         p_user_uid,
         p_conversation_uid,
         COALESCE(p_title, '新的聊天...'),
+        COALESCE(p_workspace, ''),
         COALESCE(p_session_id, ''),
         CURRENT_TIMESTAMP,
         0
@@ -391,6 +394,7 @@ CREATE PROCEDURE update_conversation (
     IN p_user_uid VARCHAR(64),
     IN p_conversation_uid VARCHAR(64),
     IN p_title VARCHAR(255),
+    IN p_workspace VARCHAR(255),
     IN p_session_id VARCHAR(64),
     IN p_is_pinned TINYINT(1),
     IN p_is_deleted TINYINT(1)
@@ -399,6 +403,7 @@ BEGIN
     UPDATE conversations
     SET
         title = IF(p_title IS NULL, title, p_title),
+        work_space = IF(p_workspace IS NULL, work_space, p_workspace),
         session_id = IF(p_session_id IS NULL, session_id, p_session_id),
         is_pinned = IF(p_is_pinned IS NULL, is_pinned, p_is_pinned),
         is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted)
@@ -406,7 +411,7 @@ BEGIN
       AND conversation_uid = p_conversation_uid;
 
     -- Return affected rows so caller knows what happened
-    SELECT ROW_COUNT() AS affected_rows;
+#     SELECT ROW_COUNT() AS affected_rows;
 END$$
 
 DELIMITER ;
@@ -425,6 +430,7 @@ BEGIN
         conversation_uid,
         session_id,
         title,
+        work_space,
         last_active_at,
         created_at,
         latest_cursor,

@@ -69,7 +69,7 @@ export function registerAiIpc() {
     return true
   })
 
-  ipcMain.handle('api:new_chat', async (event, cid) => {
+  ipcMain.handle('api:new_chat', async (event, cid, workspace = "") => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/memory/conversation/create`, {
         method: "POST",
@@ -80,6 +80,7 @@ export function registerAiIpc() {
           client_id: cid,
           session_id: "",
           title: "新的聊天...",
+          workspace: workspace,
         }),
       })
 
@@ -107,6 +108,7 @@ export function registerAiIpc() {
           session_id: sid,
           history_id: hid,
           title: new_info.title ?? null,
+          workspace: new_info.workspace ?? null,
           is_pinned: new_info.star ?? null,
           is_deleted: new_info.deleted ?? null,
         }),

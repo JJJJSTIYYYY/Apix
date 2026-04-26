@@ -5,7 +5,7 @@ from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.tools.web_search.manager import manager
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
@@ -57,9 +57,9 @@ async def search_web_by_keywords(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -100,7 +100,7 @@ async def search_web_by_keywords(
             msg = "No urls and images found, please try other keywords."
 
             event_writer.send_event(
-                event=StreamEvent.TOOL_EXEC_END, 
+                event=AgentStreamEvent.TOOL_EXEC_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
@@ -141,7 +141,7 @@ async def search_web_by_keywords(
         result_text = "\n\n".join(text_lines) + "\n---\n" + "\n\n".join(image_lines)
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -166,7 +166,7 @@ async def search_web_by_keywords(
         error_msg = f"Failed to search web by keyword(s) with error(s): {str(e)}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -228,9 +228,9 @@ async def search_web_by_urls(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -250,7 +250,7 @@ async def search_web_by_urls(
         msg = "Empty url is not accepted."
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -283,7 +283,7 @@ async def search_web_by_urls(
             msg = "No content fetched from the provided URL(s)."
 
             event_writer.send_event(
-                event=StreamEvent.TOOL_EXEC_END, 
+                event=AgentStreamEvent.TOOL_EXEC_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
@@ -313,7 +313,7 @@ async def search_web_by_urls(
         result_text = ("\n---\n\n").join(blocks)
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -350,7 +350,7 @@ async def search_web_by_urls(
         error_msg = f"Failed to search web by url(s) with error(s): {str(e)}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

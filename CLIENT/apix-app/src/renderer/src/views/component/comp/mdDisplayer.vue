@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
   justify-content: center;
 
   background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
   animation: opacityFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 

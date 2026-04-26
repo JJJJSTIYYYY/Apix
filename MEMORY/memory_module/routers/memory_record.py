@@ -350,12 +350,13 @@ async def create_new_conversation(req: Request):
             "client_id": str,
             "session_id": str (optional),
             "title": str (optional),
+            "workspace": str (optional),
         }
 
     Returns:
         {
             "success": bool,
-            "messages": str
+            "messages": str # conversation_uid
         }
     """
     logger.info(f"[API][create_new_conversation] enter.")

@@ -117,7 +117,8 @@ async def update_conversation(req: Request):
             "client_id": "{{ cid }} : to indicate which user the data is from.",
             "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
             "session_id": "{{ sid }} : to indicate which tab the data belong to",
-            "title": "conversation title",
+            "title": "Conversation title",
+            "workspace": "Agent work dir",
             "is_pinned": bool,
             "is_deleted": bool,
         }

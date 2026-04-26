@@ -7,10 +7,10 @@ from langgraph.graph import END
 from langchain_core.messages import AIMessageChunk, ToolMessage, AIMessage
 
 from apix_agent.apix_agent_core.agent_factory.prompt import *
-from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
-from apix_agent.commons.type_def import MainAgentState
+from apix_agent.commons.type_def import MainAgentState, InvalidToolCalls
 from apix_agent.commons.logger import logger
 from apix_agent.commons.common_func import get_date_natural_language
+from apix_agent.apix_agent_core.tools.registry import conflict_tool_set
 
 
 class AgentNodeBase(ABC):
@@ -80,6 +80,25 @@ class AgentNodeBase(ABC):
             return True
 
         return False
+    
+
+    def _ensure_tool_calls(self, tool_calls: list[dict]):
+        if not tool_calls: return
+
+        seen = set()
+        has_error = False
+        for tool in tool_calls:
+            tool_name = tool.get("name", "")
+            if not tool_name:
+                raise InvalidToolCalls("Can not use empty tool name")
+            if tool_name in conflict_tool_set:
+                if tool.get("name") not in seen:
+                    seen.add(tool_name)
+                else:
+                    has_error = True
+
+        if has_error:
+            raise InvalidToolCalls(f"Tool {', '.join(seen)} are not allowed to be called simultaneously in one tool_calls")
 
 
     def should_continue(self, state: MainAgentState):

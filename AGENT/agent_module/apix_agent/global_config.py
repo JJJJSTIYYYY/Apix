@@ -40,7 +40,6 @@ BASE_URL = {       # Base URL for the LLM service
     'moonshot': 'https://api.moonshot.cn',
 }  
 
-GENERATION_TTL_SECONDS = 300  # Clear those finished and aborted generation ctx
 
 MAX_RETRY = 8 # Max retry when llm_call failure, make sure it great than 3
 
@@ -62,8 +61,10 @@ AGENT_SERVICE_ID = str(uuid.uuid4().hex)
 
 LOAD_FORIGN_TOOL = False
 
-GRAPH_CACHE_TTL = 100 * 60          # seconds
-GRAPH_CACHE_CLEAN_INTERVAL = 60   # seconds
+GENERATION_TTL = 300  # Clear those finished and aborted generation ctx, seconds
+CONTIANER_TTL = 6000
+GRAPH_CACHE_TTL = 300
+CACHE_CLEAN_INTERVAL = 150
 
 _ORIGINAL_PROXY_ENV = {
     "HTTP_PROXY": os.environ.get("HTTP_PROXY"),

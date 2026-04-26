@@ -487,7 +487,6 @@ function mergeSkills(messages: any[]) {
 .explain-tag {
   border-top: 6px solid #00a6ff;
   background: color-mix(in oklch, #fbfbfb 40%, transparent);
-  backdrop-filter: blur(3px);
   width: 80%;
   border-radius: 16px;
   text-align: center;

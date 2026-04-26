@@ -11,7 +11,7 @@ from langchain_core.messages import SystemMessage, ToolMessage
 
 import easyocr
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
@@ -164,9 +164,9 @@ async def ocr_analysis(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -191,7 +191,7 @@ async def ocr_analysis(
     if not container_id:
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -216,7 +216,7 @@ async def ocr_analysis(
     if not file_path:
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -312,7 +312,7 @@ async def ocr_analysis(
                     f"Extracted text: {text}"
                 )
                 event_writer.send_event(
-                    event=StreamEvent.TOOL_EXEC_MIDDLE if idx < total else StreamEvent.TOOL_EXEC_END, 
+                    event=AgentStreamEvent.TOOL_EXEC_MIDDLE if idx < total else AgentStreamEvent.TOOL_EXEC_END, 
                     target_id=client_id, 
                     target_platform=target_platform,
                     data={
@@ -334,7 +334,7 @@ async def ocr_analysis(
             })
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -355,7 +355,7 @@ async def ocr_analysis(
 
     except Exception as e:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -395,9 +395,9 @@ async def send_images(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -418,7 +418,7 @@ async def send_images(
     if not container_id:
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -443,7 +443,7 @@ async def send_images(
     if not file_path:
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -508,7 +508,7 @@ async def send_images(
                 )
 
                 event_writer.send_event(
-                    event=StreamEvent.TOOL_EXEC_END, 
+                    event=AgentStreamEvent.TOOL_EXEC_END, 
                     target_id=client_id, 
                     target_platform=target_platform,
                     data={
@@ -532,7 +532,7 @@ async def send_images(
 
     except Exception as e:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

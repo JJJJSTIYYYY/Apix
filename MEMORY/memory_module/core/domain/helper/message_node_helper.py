@@ -12,9 +12,7 @@ class AgentNodeHelper:
 
         self._build()
 
-    # --------------------------------
     # Group rows by node_id
-    # --------------------------------
     def _group_by_node(self):
         groups = OrderedDict()
 
@@ -40,7 +38,6 @@ class AgentNodeHelper:
         else:
             parent_id = first["parent_id"]
 
-        # ✅ 节点是否“有可见内容”
         visible = any(not r.get("is_deleted") for r in rows)
 
         return {
@@ -74,7 +71,6 @@ class AgentNodeHelper:
                 if n["last_cursor"] > self.node_map[n["node_id"]]["last_cursor"]:
                     self.node_map[n["node_id"]] = n
 
-        # ❗先构建原始 children_map（完整树）
         raw_children_map = defaultdict(list)
 
         for n in self.nodes:
@@ -88,16 +84,11 @@ class AgentNodeHelper:
 
         self.children_map = raw_children_map
 
-        # ✅ 再做“删除节点重挂”
         self.children_map = self._relink_deleted_nodes()
 
-    # --------------------------------
     def get_children(self, node_id: str):
         return self.children_map.get(node_id, [])
 
-    # --------------------------------
-    # ✅ 不再因为 deleted 节点断链
-    # --------------------------------
     def get_path(self, node_id: str):
         path = []
         cur = self.node_map.get(node_id)
@@ -108,7 +99,6 @@ class AgentNodeHelper:
 
         return list(reversed(path))
 
-    # --------------------------------
     def extend_path(self, path: List[Dict[str, Any]]):
         if not path:
             return path
@@ -121,7 +111,6 @@ class AgentNodeHelper:
             if not children:
                 break
 
-            # ✅ 优先选“有内容”的节点
             visible_children = [c for c in children if c.get("visible")]
 
             if visible_children:
@@ -134,12 +123,10 @@ class AgentNodeHelper:
 
         return path
 
-    # --------------------------------
     def build_branch(self, current_node_id: str):
         path = self.get_path(current_node_id)
         return self.extend_path(path)
 
-    # --------------------------------
     def flatten_branch(self, branch: List[Dict[str, Any]]):
         rows = []
 
@@ -149,9 +136,6 @@ class AgentNodeHelper:
         rows.sort(key=lambda x: x["msg_cursor"])
         return rows
 
-    # --------------------------------
-    # ✅ 新增：向上找最近可见节点
-    # --------------------------------
     def find_nearest_visible(self, node_id: str):
         cur = self.node_map.get(node_id)
 
@@ -164,9 +148,7 @@ class AgentNodeHelper:
     
     def _relink_deleted_nodes(self):
         """
-        重建 parent-child 关系：
-        - 删除节点不参与结构
-        - 其子节点向上挂到最近可见祖先
+        Rebuild parent-child relationship
         """
 
         new_children_map = defaultdict(list)
@@ -184,7 +166,6 @@ class AgentNodeHelper:
                 continue
 
             if node.get("visible"):
-                # 正常节点：找最近可见父节点
                 parent = self.node_map.get(node["parent_id"])
 
                 if parent and parent.get("visible"):
@@ -197,10 +178,8 @@ class AgentNodeHelper:
                 new_children_map[new_parent_id].append(node)
 
             else:
-                # ❗ deleted 节点：跳过（不进树）
                 continue
 
-        # 排序 children
         for k in new_children_map:
             new_children_map[k].sort(key=lambda x: x["first_cursor"])
 

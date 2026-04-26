@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Tuple
 import base64
 import os
@@ -47,6 +48,46 @@ def append_to_yaml(dir, new_data: dict):
             logger.info("[append_to_yaml] append data to local yaml file successfully.")
     except Exception as e:
         logger.error(f"[append_to_yaml] Error appending to yaml file: {e}")
+        raise
+
+def update_to_yaml(file_path: Path, title: str, content: str) -> dict:
+    """
+    Update or delete a key in yaml file.
+
+    Args:
+        file_path (Path): yaml file path
+        title (str): memo title
+        content (str): memo content, if empty -> delete
+
+    Returns:
+        dict: latest full yaml data
+    """
+    try:
+        # Load existing data
+        if file_path.exists():
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        else:
+            data = {}
+
+        if not content.strip():
+            # Delete
+            if title in data:
+                del data[title]
+        else:
+            # Insert / Update
+            data[title] = content
+
+        # Write back
+        with open(file_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, allow_unicode=True)
+
+        logger.info("[update_to_yaml] yaml updated successfully.")
+
+        return data
+
+    except Exception as e:
+        logger.error(f"[update_to_yaml] Error: {e}")
         raise
 
 # ==========================================================

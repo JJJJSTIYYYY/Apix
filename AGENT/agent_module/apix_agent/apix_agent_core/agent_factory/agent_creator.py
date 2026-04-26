@@ -8,28 +8,38 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
+from apix_agent.commons.resource_cleaner import resource_cleaner
 from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.agent_factory.agent_node import *
 from apix_agent.apix_agent_core.tools.registry import get_available_tools
-from apix_agent.global_config import BASE_DIR, OUTPUT_GRAPH_PNG, GRAPH_CACHE_TTL, GRAPH_CACHE_CLEAN_INTERVAL
+from apix_agent.global_config import BASE_DIR, OUTPUT_GRAPH_PNG, GRAPH_CACHE_TTL
 from apix_agent.commons.type_def import MainAgentState, SubAgentState, AgentConfigSchema
 from apix_agent.commons.logger import logger
 
 
 class AgentCreator:
 
+    _instance = None
+
+    def __new__(cls):
+        # Ensure singleton instance
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
     def __init__(self):
-        # key   -> hash_key
-        # value -> (CompiledStateGraph, expire_timestamp)
-        self.graph_cache: Dict[str, Tuple[CompiledStateGraph, float]] = {}
+        # key -> hash_key
+        # value -> {
+        #     "graph": CompiledStateGraph,
+        #     "expire_at": float,
+        #     "status": Literal["running", "done"]
+        # }
+        self.graph_cache: Dict[str, Dict] = {}
 
         # Lock is still needed because graph_cache is accessed
         # from async context + sync code paths
         self._graph_cache_lock = asyncio.Lock()
-
-        # Async background task (not started here)
-        self._graph_cache_clean_task: asyncio.Task | None = None
 
 
     def _collect_permission(self, config: AgentConfigSchema, permission_level: Literal["main", "sub"]) -> list:
@@ -99,19 +109,20 @@ class AgentCreator:
 
         now = time.time()
 
-        # Cache lookup
         async with self._graph_cache_lock:
             cached = self.graph_cache.get(hash_key)
             if cached:
-                agent_graph, expire_at = cached
+                expire_at = cached["expire_at"]
+
                 if expire_at > now:
-                    # Refresh TTL on hit
-                    self.graph_cache[hash_key] = (
-                        agent_graph,
-                        now + GRAPH_CACHE_TTL,
-                    )
+                    # Mark as running when reused
+                    cached["status"] = "running"
+
+                    # Refresh TTL
+                    cached["expire_at"] = now + GRAPH_CACHE_TTL
+
                     logger.success(f"{log_prefix} Get Agent From Cache (TTL refreshed).")
-                    return agent_graph
+                    return cached["graph"]
 
         # Config extraction
         try:
@@ -209,10 +220,11 @@ class AgentCreator:
 
         # Cache store
         async with self._graph_cache_lock:
-            self.graph_cache[hash_key] = (
-                agent_graph,
-                time.time() + GRAPH_CACHE_TTL,
-            )
+            self.graph_cache[hash_key] = {
+                "graph": agent_graph,
+                "expire_at": time.time() + GRAPH_CACHE_TTL,
+                "status": "running"
+            }
 
         logger.success(f"{log_prefix} Compile Agent Finish.")
         return agent_graph
@@ -251,66 +263,43 @@ class AgentCreator:
             log_prefix="[create_sub_agent]",
         )
     
+
+    async def done(self, agent_graph: CompiledStateGraph) -> None:
+        """
+        Mark a graph as done (no longer in active use).
+
+        Args:
+            agent_graph: Graph instance to mark as done
+
+        Behavior:
+            - Changes status from "running" to "done"
+            - Allows cleaner to reclaim it later
+        """
+        async with self._graph_cache_lock:
+            for entry in self.graph_cache.values():
+                if entry["graph"] is agent_graph:
+                    entry["status"] = "done"
+                    return
     
-    #----------------------------------------------------------
-    # Lifespan
-    #----------------------------------------------------------
 
-    async def start(self):
+    async def _clean_expired_graph_cache(self) -> int:
         """
-        Start background tasks.
-        Safe to call multiple times.
+        Clean expired graph cache entries.
+
+        Behavior:
+            - ONLY remove graphs that:
+                - expired
+                - status == "done"
+            - NEVER remove running graphs
         """
-
-        if self._graph_cache_clean_task is None:
-            self._graph_cache_clean_task = asyncio.create_task(
-                self._graph_cache_clean_loop(),
-                name="graph-cache-cleaner",
-            )
-            logger.info("[graph_cache] Cleaner task started.")
-
-
-    async def stop(self):
-        """
-        Stop background tasks gracefully.
-        """
-
-        # Stop cache cleaner
-        task = self._graph_cache_clean_task
-        if task:
-            self._graph_cache_clean_task = None
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-            logger.info("[graph_cache] Cleaner task stopped.")
-
-
-    async def _graph_cache_clean_loop(self):
-        """
-        Async background loop to periodically clean expired graph cache.
-        This task is expected to be cancelled during shutdown.
-        """
-        try:
-            while True:
-                await asyncio.sleep(GRAPH_CACHE_CLEAN_INTERVAL)
-                await self._clean_expired_graph_cache()
-        except asyncio.CancelledError:
-            # Task is being cancelled during shutdown
-            logger.debug("[graph_cache] Cleaner task cancelled.")
-            raise
-
-
-    async def _clean_expired_graph_cache(self):
         now = time.time()
         removed = 0
 
         async with self._graph_cache_lock:
             expired_keys = [
                 key
-                for key, (_, expire_at) in self.graph_cache.items()
-                if expire_at <= now
+                for key, entry in self.graph_cache.items()
+                if entry["expire_at"] <= now and entry["status"] == "done"
             ]
 
             for key in expired_keys:
@@ -318,10 +307,15 @@ class AgentCreator:
                 removed += 1
 
         if removed:
-            logger.info(
-                f"[graph_cache] Cleaned {removed} expired graph(s)."
-            )
+            logger.info(f"[graph_cache] Cleaned {removed} expired graph(s).")
+
+        return removed
         
         
 
 agent_creator = AgentCreator()
+
+    
+@resource_cleaner.auto_clear
+async def clean_graph():
+    return await agent_creator._clean_expired_graph_cache()

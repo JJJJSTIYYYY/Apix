@@ -10,7 +10,7 @@
 }
 
 .main-area {
-  background: #ffffffa7;
+  background: #f5f5f5ee;
 }
 
 .selectable,
@@ -196,10 +196,6 @@
     rgba(32, 220, 183, 0.75) 50%,
     rgba(72, 209, 204, 0.8) 100%
   ) !important;
-  
-  /* 玻璃拟态效果 */
-  backdrop-filter: blur(8px) saturate(200%);
-  -webkit-backdrop-filter: blur(8px) saturate(200%);
   
   /* 边框 - 半透明白光 */
   border: 1.5px solid rgba(255, 255, 255, 0.4) !important;

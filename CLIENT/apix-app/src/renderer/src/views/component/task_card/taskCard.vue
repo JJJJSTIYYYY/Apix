@@ -145,8 +145,6 @@ const handleTerminate = async () => {
 .task-card {
   display: flex;
   background: color-mix(in oklch, rgb(255, 255, 255) 85%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   border-radius: 16px;
   border: 1px solid rgba(136, 202, 197, 0.3);
   box-shadow:

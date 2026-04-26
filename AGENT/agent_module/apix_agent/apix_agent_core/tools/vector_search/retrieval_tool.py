@@ -6,7 +6,7 @@ from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
@@ -60,9 +60,9 @@ async def search_knowledge_base(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -81,7 +81,7 @@ async def search_knowledge_base(
 
     if not document_ids:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -143,7 +143,7 @@ async def search_knowledge_base(
             msg = "No relevant knowledge base chunks found."
 
             event_writer.send_event(
-                event=StreamEvent.TOOL_EXEC_END, 
+                event=AgentStreamEvent.TOOL_EXEC_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
@@ -183,7 +183,7 @@ async def search_knowledge_base(
         result_text = "\n\n---\n\n".join(text_lines)
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -208,7 +208,7 @@ async def search_knowledge_base(
         error_msg = f"Failed to retrieve knowledge base chunks: {str(e)}"
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

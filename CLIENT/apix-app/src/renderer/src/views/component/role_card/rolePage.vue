@@ -399,8 +399,6 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.08),
     0 2px 6px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   padding: 0 12px 0 10px;
   transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -572,7 +570,6 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 .explain-tag {
   border-top: 6px solid #00a6ff;
   background: color-mix(in oklch, #fbfbfb 40%, transparent);
-  backdrop-filter: blur(3px);
   width: 80%;
   border-radius: 16px;
   text-align: center;

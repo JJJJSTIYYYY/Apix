@@ -290,21 +290,17 @@ class DataExecutors:
 
         helper = AgentNodeHelper(messages)
 
-        # -----------------------------
         # fallback current node
-        # -----------------------------
         if current_node_id is None or current_node_id not in helper.node_map:
             last_node = max(helper.nodes, key=lambda x: x["last_cursor"])
             current_node_id = last_node["node_id"]
 
-        # ✅ 如果当前节点不可见，向上找最近可见节点
+        # If current node is not visible (deleted), find the nearest parent node.
         current_node = helper.find_nearest_visible(current_node_id)
         if current_node:
             current_node_id = current_node["node_id"]
 
-        # -----------------------------
         # build branch
-        # -----------------------------
         if guess_children:
             branch = helper.build_branch(current_node_id)
         else:
@@ -312,23 +308,16 @@ class DataExecutors:
 
         rows = helper.flatten_branch(branch)
 
-        # -----------------------------
         # strict cutoff
-        # -----------------------------
         if not guess_children:
             node = helper.node_map.get(current_node_id)
             if node:
                 cutoff = node["last_cursor"]
                 rows = [r for r in rows if r["msg_cursor"] <= cutoff]
 
-        # -----------------------------
-        # ✅ 过滤 deleted（仅展示层）
-        # -----------------------------
+        # filter deleted for front
         rows = [r for r in rows if not r["is_deleted"]]
 
-        # -----------------------------
-        # parse json fields
-        # -----------------------------
         parsed = []
         for msg in rows:
             if msg.get("role") not in allow_roles:
@@ -354,9 +343,7 @@ class DataExecutors:
 
             parsed.append(msg)
 
-        # -----------------------------
-        # branches（分支信息）
-        # -----------------------------
+        # build branches info
         branches = {}
 
         if guess_children:
@@ -372,7 +359,6 @@ class DataExecutors:
 
                 siblings = helper.get_children(parent_id)
 
-                # ✅ 只展示“有可见内容”的兄弟节点
                 visible_siblings = [c for c in siblings if c.get("visible")]
 
                 if len(visible_siblings) > 1:

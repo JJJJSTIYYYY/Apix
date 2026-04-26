@@ -5,13 +5,13 @@ from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage,
 from langgraph.graph.state import Command
 from langgraph.types import Overwrite
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.apix_agent_core.context_manager.longterm_memory import longterm_memory_manager
-from apix_agent.commons.type_def import MainAgentState
+from apix_agent.commons.type_def import MainAgentState, InvalidToolCalls
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent_factory.agent_node.agent_node_base import AgentNodeBase
 from apix_agent.global_config import MAX_RETRY
@@ -94,15 +94,21 @@ class MainAgentNode(AgentNodeBase):
 
             # Persist message and fetch full history
             if not re_generate: 
+                # For a full generation wtih new user input.
                 await ai_context_manager.append_to_messages(client_id, history_id, client_message)
+                # A new uer message appended in database, update the last confirmed node_id to this message
                 current_visible_node_id = generation_id + '-user'
-            else: current_visible_node_id = client_message.get("parent_id", '-')
+            else: 
+                # For a incomplete generation wtihout user input. (re-generation mode)
+                # parent_id in client_message means the last confirmed node_id
+                current_visible_node_id = client_message.get("parent_id", '-')
+            # Ensure agent message node's parent_id in this generation (normally equals to current_visible_node_id)
             client_messages, parent_id = await ai_context_manager.fetch_messages(client_id, history_id, 0, current_visible_node_id)
 
-            event_writer = ApixStreamWriter()
+            event_writer = AgentStreamWriter()
             target_platform = state.get("platform")
             event_writer.send_event(
-                event=StreamEvent.ESSENTIAL_INFO_RETURN,
+                event=AgentStreamEvent.ESSENTIAL_INFO_RETURN,
                 target_id=client_id,
                 target_platform=target_platform,
                 data={
@@ -470,11 +476,11 @@ class MainAgentNode(AgentNodeBase):
                 }
             )
 
-        event_writer = ApixStreamWriter()
+        event_writer = AgentStreamWriter()
         client_id = state.get("client_id")
         target_platform = state.get("platform")
         event_writer.send_event(
-            event=StreamEvent.RUNTIME_WARNING,
+            event=AgentStreamEvent.RUNTIME_WARNING,
             target_id=client_id,
             target_platform=target_platform,
             data={
@@ -541,7 +547,7 @@ class MainAgentNode(AgentNodeBase):
         loaded_skills_cache = state.get("loaded_skills_cache")
 
         # Runtime
-        event_writer = ApixStreamWriter()
+        event_writer = AgentStreamWriter()
         messages = state["messages"]
 
         logger.info(
@@ -622,6 +628,8 @@ class MainAgentNode(AgentNodeBase):
         )
         if need_alert:
             llm_input = llm_input + [SystemMessage(self.SYSTEM_ALERT_PROMPT)]
+        if state.get("error_detail"):
+            llm_input = llm_input + [SystemMessage(f"CRITICAL WARN: {state.get("error_detail")}. If you are trying to do that, stop immediately any way!")]
 
         # Start streaming
         chunk_iterator = LlmNodeAdapter.astream(
@@ -631,7 +639,7 @@ class MainAgentNode(AgentNodeBase):
         )
 
         event_writer.send_event(
-            event=StreamEvent.LLM_STREAM_START, 
+            event=AgentStreamEvent.LLM_STREAM_START, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -655,12 +663,12 @@ class MainAgentNode(AgentNodeBase):
                     if chunk.additional_kwargs else None
                 )
                 content = chunk.text
-                tool_calls = chunk.tool_calls
+                tool_calls = chunk.tool_calls or chunk.tool_call_chunks
 
                 # Streaming output
                 if think:
                     event_writer.send_event(
-                        event=StreamEvent.LLM_CHUNK_RETURN, 
+                        event=AgentStreamEvent.LLM_CHUNK_RETURN, 
                         target_id=client_id, 
                         target_platform=target_platform,
                         data={
@@ -670,7 +678,7 @@ class MainAgentNode(AgentNodeBase):
                     )
                 elif content:
                     event_writer.send_event(
-                        event=StreamEvent.LLM_CHUNK_RETURN, 
+                        event=AgentStreamEvent.LLM_CHUNK_RETURN, 
                         target_id=client_id, 
                         target_platform=target_platform,
                         data={
@@ -680,7 +688,7 @@ class MainAgentNode(AgentNodeBase):
                     )
                 if tool_calls:
                     event_writer.send_event(
-                        event=StreamEvent.LLM_CHUNK_RETURN, 
+                        event=AgentStreamEvent.LLM_CHUNK_RETURN, 
                         target_id=client_id, 
                         target_platform=target_platform,
                         data={
@@ -688,6 +696,22 @@ class MainAgentNode(AgentNodeBase):
                             "content": tool_calls
                         }
                     )
+            
+            self._ensure_tool_calls(ai_msg_chunk.tool_calls)
+
+        except InvalidToolCalls as e:
+            llm_retry_count = state.get("llm_retry_count", 0) + 1
+            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            if llm_retry_count < MAX_RETRY:
+                return Command(
+                    update={
+                        "llm_retry_count": llm_retry_count,
+                        "error": "others",
+                        "error_detail": e.message
+                    },
+                )
+            else:
+                raise e
 
         except BadRequestError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
@@ -721,7 +745,7 @@ class MainAgentNode(AgentNodeBase):
 
         # End streaming
         event_writer.send_event(
-            event=StreamEvent.LLM_STREAM_END, 
+            event=AgentStreamEvent.LLM_STREAM_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -745,6 +769,7 @@ class MainAgentNode(AgentNodeBase):
                 "llm_retry_count": 0,
                 "context_compress_level": 0 if state.get("context_compress_level", 0) <= 2 else 3,
                 "error": "",
+                "error_detail": "",
                 "loaded_skills_cache": new_skills_cache,
             }
         )
@@ -773,7 +798,7 @@ class MainAgentNode(AgentNodeBase):
         model_name = config.get("model_name")
         model_provider = config.get("models_provider")
 
-        event_writer = ApixStreamWriter()
+        event_writer = AgentStreamWriter()
 
         current_tool_calls = []
 
@@ -796,7 +821,7 @@ class MainAgentNode(AgentNodeBase):
             )
             
             event_writer.send_event(
-                event=StreamEvent.LLM_STREAM_END, 
+                event=AgentStreamEvent.LLM_STREAM_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
@@ -843,7 +868,7 @@ class MainAgentNode(AgentNodeBase):
                 )
             
             event_writer.send_event(
-                event=StreamEvent.LLM_STREAM_END, 
+                event=AgentStreamEvent.LLM_STREAM_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
@@ -874,7 +899,7 @@ class MainAgentNode(AgentNodeBase):
             )
             
             event_writer.send_event(
-                event=StreamEvent.LLM_STREAM_END, 
+                event=AgentStreamEvent.LLM_STREAM_END, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={

@@ -15,8 +15,8 @@ const api = {
     ipcRenderer.invoke('api:chat', cid, sid, hid, content, re_generate, chat_config),
   stopGeneration: (cid, sid, hid) =>
     ipcRenderer.invoke('api:stop', cid, sid, hid),
-  newChat: (cid) =>
-    ipcRenderer.invoke('api:new_chat', cid),
+  newChat: (cid, workspace = "") =>
+    ipcRenderer.invoke('api:new_chat', cid, workspace),
   updateConversation: (cid, sid, hid, new_info) =>
     ipcRenderer.invoke('api:update_conversation', cid, sid, hid, new_info),
   getChatlist: (cid) =>

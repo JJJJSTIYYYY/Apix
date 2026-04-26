@@ -11,10 +11,18 @@ from apix_agent.global_config import BASE_DIR
 
 class TeamTaskManager:
 
+    _instance = None
+
+    def __new__(cls):
+        # Ensure singleton instance
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
         self.TASK_RESULT_TTL = 3600
-        self.task_queue: asyncio.Queue = None
-        self.stop_request_queue: asyncio.Queue = None
+        self.task_queue: asyncio.Queue = asyncio.Queue()
+        self.stop_request_queue: asyncio.Queue = asyncio.Queue()
         self.task_state_store: dict[Tuple[str, str], SubAgentState] = {}
 
         self._state_lock = asyncio.Lock()
@@ -210,22 +218,6 @@ class TeamTaskManager:
 
         # logger.debug(f"[update_task_state_store] Current task_state_store: {self.task_state_store}")
         # TODO: inform the gateway to call main agent if task finish
-
-
-    # ------------------------------------------------------------------
-    # lifecycle
-    # ------------------------------------------------------------------
-
-    async def start(self) -> None:
-        if self.task_queue is None:
-            self.task_queue = asyncio.Queue()
-
-        if self.stop_request_queue is None:
-            self.stop_request_queue = asyncio.Queue()
-
-    async def stop(self) -> None:
-        self.task_queue = None
-        self.stop_request_queue = None
 
 
 task_manager = TeamTaskManager()

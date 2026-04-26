@@ -7,62 +7,53 @@ from langchain.messages import ToolMessage
 from langchain.tools import InjectedState, tool, InjectedToolCallId
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.commons.file_content_reader import load_from_yaml, append_to_yaml
+from apix_agent.commons.file_content_reader import load_from_yaml, update_to_yaml
 from apix_agent.global_config import BASE_DIR
 
 
 WRITE_MEMO_TOOL_DESCRIPTION = """
-Use this tool to record important decisions, conclusions, assumptions, or strategic reasoning that should persist during the current work session.
-This tool is NOT for task tracking or step management. Use the todo tool for organizing actions.
+Use this tool to record your important decisions, observations, conclusions or other important information during the current work session.
+This tool helps you record previous information so that you can review them later if you forget.
 ## When to Use This Tool
 Use this tool in these scenarios:
-1. After making an important design or architectural decision
+1. When you are making an important decision
 2. When defining constraints, rules, or policies that must be remembered
-3. When identifying key assumptions that affect future reasoning
-4. When summarizing a strategic conclusion that should not be forgotten
-5. When you want to externalize reasoning that may influence future steps
+3. When you make a tool call, the summary or conclusion of the call result that must be remembered
+4. When summarizing a important conclusion or observations that must be remembered
+5. When you observe that a memo in your memorandum is outdated and should be deleted (Use a same title and empty content for delete)
 ## When NOT to Use This Tool
 Do NOT use this tool when:
 1. You are listing tasks or tracking progress (use the todo tool instead)
-2. The information is trivial or short-lived
-3. The reasoning is obvious and unlikely to impact future decisions
-4. The task can be completed immediately without future implications
-5. You are simply answering a question
+2. You haven't yet reached any valuable or strategic information
+3. You are simply answering a question
 ## Important Guidelines
-- Record only high-value, decision-level information.
-- Be concise but precise.
+- Record only high-value, decision-level, conclusion-related information.
 - Do not restate the entire conversation.
 - Focus on what must be remembered for correct future behavior.
 - Avoid duplicating todo content.
-This tool is for decision memory, not action management.
 """
 
 READ_MEMO_TOOL_DESCRIPTION = """
-Use this tool to retrieve previously recorded strategic decisions, assumptions, or constraints for the current work session.
-This tool helps you maintain reasoning consistency across steps.
+Use this tool to retrieve previously recorded strategic decisions, observations, conclusions or other information for the current work session.
+This tool helps you recall important past information and maintain consistency.
 ## When to Use This Tool
 Use this tool in these scenarios:
-1. When you need to remember the user's request, determine the real objective
-2. Before making a new design or architectural decision
-3. When you need to check previously defined constraints or policies
-4. If you suspect earlier decisions may affect your current reasoning
-5. When resuming work after multiple steps and you want to ensure alignment
-6. Before modifying an existing plan that may have prior assumptions
+1. Before making a decision that may conflict with previously recorded conclusions
+2. When you need to verify existing constraints, rules, or policies
+3. When a choice depends on previously established observations or conclusions
+4. When you suspect a similar decision has already been made and should not be re-derived
+5. When correctness depends on aligning with prior decisions or tool result summaries
 ## When NOT to Use This Tool
 Do NOT use this tool when:
-1. You are looking for task progress (use the todo tool instead)
-2. The task is trivial and unlikely to depend on prior decisions
+1. The current step is independent and does not rely on prior decisions
+2. You are simply answering a question that does not depend on past decisions
 3. You have just written the memo and already remember its content
-4. You are simply answering a question that does not depend on past decisions
-5. You are trying to retrieve general conversation history
+4. You are trying to retrieve general conversation history
 ## Important Guidelines
-- Use this tool proactively when reasoning consistency matters.
-- Avoid unnecessary repeated reads.
-- Only consult it when prior strategic decisions may influence correctness.
-- Treat retrieved content as high-priority reasoning context.
-This tool restores decision memory, not task state or full conversation history.
+- Do not use it as a substitute for conversation history or planning context.
+- Avoid unnecessary reads, only use it when prior information affect correctness.
 """
 
 
@@ -76,9 +67,9 @@ async def write_todos(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -103,7 +94,7 @@ async def write_todos(
         )
 
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_END, 
+        event=AgentStreamEvent.TOOL_EXEC_END, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -128,32 +119,32 @@ async def write_todos(
 
 
 @tool(description=WRITE_MEMO_TOOL_DESCRIPTION)
-async def write_memorandum(
+async def update_memorandum(
     title: str,
     content: str,
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
     """
-    Write or Overwrite a memorandum after important decisions, conclusions,
-    assumptions, or strategic reasoning that should persist during
-    the current work session.
+    Write / Overwrite or delete a memorandum.
 
     Args:
-        title (str): The title of the memorandum, should be concise and indicative of the content.
-        content (str): The detailed content of the memorandum, recording the important information to be remembered.
+        title (str): Memorandum title (must not be empty)
+        content (str): Memorandum content (empty means delete)
     """
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
+
+    # Start event
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
+        event=AgentStreamEvent.TOOL_EXEC_START,
+        target_id=client_id,
         target_platform=target_platform,
         data={
             "event_name": "tool_exec_chunk_rtn",
-            "tool_name": "write_memorandum",
+            "tool_name": "update_memorandum",
             "tool_call_id": tool_call_id,
             "content": "Update memorandum",
             "chunk_position": "start",
@@ -161,25 +152,27 @@ async def write_memorandum(
         }
     )
 
-    if not content.strip() or not title.strip():
+    # Title must not be empty (content CAN be empty -> delete)
+    if not title.strip():
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
+            target_id=client_id,
             target_platform=target_platform,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "write_memorandum",
+                "tool_name": "update_memorandum",
                 "tool_call_id": tool_call_id,
-                "content": "Empty title or content",
+                "content": "Empty title",
                 "chunk_position": "end",
                 "status": "fail",
             }
         )
+
         return Command(
             update={
                 "messages": [
                     ToolMessage(
-                        "Error: Title and content cannot be empty.",
+                        "Error: Title cannot be empty.",
                         tool_call_id=tool_call_id,
                     )
                 ]
@@ -187,31 +180,34 @@ async def write_memorandum(
         )
 
     history_id = state.get("history_id")
+
     if not client_id or not history_id:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
+            target_id=client_id,
             target_platform=target_platform,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "write_memorandum",
+                "tool_name": "update_memorandum",
                 "tool_call_id": tool_call_id,
-                "content": "Error occurred",
+                "content": "Missing state keys",
                 "chunk_position": "end",
                 "status": "fail",
             }
         )
+
         return Command(
             update={
                 "messages": [
                     ToolMessage(
                         "[SYSTEM LEVEL] Error: Essential key not found in state.",
-                        tool_call_id=tool_call_id
+                        tool_call_id=tool_call_id,
                     )
                 ]
             }
         )
 
+    # Build file path
     memo_dir = Path(BASE_DIR) / "memo"
     memo_dir.mkdir(parents=True, exist_ok=True)
 
@@ -219,20 +215,35 @@ async def write_memorandum(
     memo_filename = hashlib.sha256(hash_input).hexdigest()
     memo_path = memo_dir / f"{memo_filename}.yaml"
 
-
     try:
-        append_to_yaml(memo_path, {title: content})
-        current_memos = state.get("memorandum", []) + [title]
+        # Detect previous existence (for action type)
+        previous_titles = set(state.get("memorandum") or [])
+        existed_before = title in previous_titles
 
+        # Update YAML
+        updated_data = update_to_yaml(memo_path, title, content)
+
+        # Always rebuild from YAML (single source of truth)
+        current_memos = list(updated_data.keys())
+
+        # Determine action
+        if not content.strip():
+            action = "deleted"
+        elif existed_before:
+            action = "updated"
+        else:
+            action = "created"
+
+        # End event
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
+            target_id=client_id,
             target_platform=target_platform,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "write_memorandum",
+                "tool_name": "update_memorandum",
                 "tool_call_id": tool_call_id,
-                "content": "Finish",
+                "content": action,
                 "chunk_position": "end",
                 "status": "success",
             }
@@ -242,7 +253,7 @@ async def write_memorandum(
             update={
                 "messages": [
                     ToolMessage(
-                        f"Memorandum appended successfully. Current memo titles: {current_memos}.",
+                        f"Memorandum {action} successfully. \n\n* Current memo titles in your memorandum: {current_memos}.",
                         tool_call_id=tool_call_id,
                     )
                 ],
@@ -252,23 +263,24 @@ async def write_memorandum(
 
     except Exception as e:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
+            target_id=client_id,
             target_platform=target_platform,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "write_memorandum",
+                "tool_name": "update_memorandum",
                 "tool_call_id": tool_call_id,
                 "content": f"Error occurred {str(e)}",
                 "chunk_position": "end",
                 "status": "fail",
             }
         )
+
         return Command(
             update={
                 "messages": [
                     ToolMessage(
-                        f"Failed to write memorandum: {str(e)}",
+                        f"Failed to update memorandum: {str(e)}",
                         tool_call_id=tool_call_id,
                     )
                 ]
@@ -291,9 +303,9 @@ async def read_memorandum(
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
-    event_writer = ApixStreamWriter()
+    event_writer = AgentStreamWriter()
     event_writer.send_event(
-        event=StreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START, 
         target_id=client_id, 
         target_platform=target_platform,
         data={
@@ -309,7 +321,7 @@ async def read_memorandum(
     history_id = state.get("history_id")
     if not client_id or not history_id:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -336,7 +348,7 @@ async def read_memorandum(
 
     if not memo_path.exists():
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -371,7 +383,7 @@ async def read_memorandum(
             contents.append(content.strip() if content else f"No content found for title: {t}.")
 
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={
@@ -396,7 +408,7 @@ async def read_memorandum(
 
     except Exception as e:
         event_writer.send_event(
-            event=StreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
             target_platform=target_platform,
             data={

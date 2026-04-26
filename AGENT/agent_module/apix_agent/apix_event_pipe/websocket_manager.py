@@ -7,11 +7,13 @@ from uuid import uuid4
 from fastapi import WebSocket
 import traceback
 
+from apix_agent.commons.resource_cleaner import resource_cleaner
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
+from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
 from apix_agent.commons.type_def import MainAgentState, MinimalEnvelopeData
-from apix_agent.global_config import GENERATION_TTL_SECONDS
+from apix_agent.global_config import GENERATION_TTL
 from apix_agent.commons.type_def import ApixEventEnvelope
 
 
@@ -70,32 +72,6 @@ class WebsocketList:
 
     def __init__(self):
         self._connections: Dict[str, UserSocketContext] = {}
-
-        self._ttl_seconds = GENERATION_TTL_SECONDS
-        self._cleanup_interval = 30  # run every 30s
-        self._cleanup_task = None
-
-    async def start(self):
-        """
-        Start background cleanup task.
-        Must be called after event loop is running (e.g. FastAPI lifespan).
-        """
-        if self._cleanup_task is None:
-            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-            logger.info("[WebsocketList] cleanup task started")
-
-    async def stop(self):
-        """
-        Gracefully stop background cleanup task.
-        """
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
-            self._cleanup_task = None
-            logger.info("[WebsocketList] cleanup task stopped")
 
     async def register(self, websocket: WebSocket, client_id: str):
         old_ctx = self._connections.get(client_id)
@@ -201,30 +177,27 @@ class WebsocketList:
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
         return (not gen) or gen.status != "running"
-    
-    async def _cleanup_loop(self):
-        """
-        Background task: periodically cleanup expired generations.
-        """
-        while True:
-            try:
-                await asyncio.sleep(self._cleanup_interval)
-                await self._cleanup_expired_generations()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"[cleanup_loop error] {e}")
 
-    async def _cleanup_expired_generations(self):
+    async def _clean_expired_generations(self) -> int:
         """
-        Remove finished/aborted generations after TTL.
+        Clean expired generations across all clients.
+
+        Returns:
+            Total number of removed generations
+
+        Behavior:
+            - Removes finished/aborted generations older than TTL
+            - Safe to call periodically by external scheduler
         """
         if not self._connections:
-            return
+            return 0
 
         now = time.time()
+        total_removed = 0
 
         for client_id, ctx in list(self._connections.items()):
+            if not ctx.generations:
+                continue
             async with ctx.ctx_lock:
 
                 to_delete = []
@@ -235,7 +208,7 @@ class WebsocketList:
 
                     age = now - gen.created_at
 
-                    if age > self._ttl_seconds:
+                    if age > GENERATION_TTL:
                         to_delete.append(gen_id)
 
                 for gen_id in to_delete:
@@ -247,9 +220,14 @@ class WebsocketList:
                         pass
 
                 if to_delete:
-                    logger.debug(
-                        f"[cleanup] client={client_id}, removed={len(to_delete)} generations"
+                    removed = len(to_delete)
+                    total_removed += removed
+
+                    logger.info(
+                        f"[generation_cache] client={client_id}, removed={removed} generation(s)"
                     )
+
+        return total_removed
 
     # =========================
     # Send helpers
@@ -312,7 +290,7 @@ class WebsocketList:
 
         await self._safe_send(ctx, payload)
 
-    async def send_ai_stream_start(self, generation_id, client_id, history_id, platform='default'):
+    async def send_ai_stream_start(self, generation_id, client_id, history_id, platform='default', *, node_id = '', parent_id = ''):
         ctx = self._get_ctx(client_id)
         gen = ctx.generations.get(generation_id)
         if not gen or gen.status != "running":
@@ -320,7 +298,10 @@ class WebsocketList:
 
         event: MinimalEnvelopeData = {
             "event_name": "msg_stream_start",
-            "content": None
+            "content": {
+                "node_id": node_id,
+                "parent_id": parent_id
+            }
         }
 
         payload = {
@@ -417,6 +398,8 @@ class WebsocketMessageHandler:
 
         client_id = None
         history_id = None
+        agent = None
+        work_dir = ''
 
         try:
             data = payload.get("data") or {}
@@ -427,6 +410,7 @@ class WebsocketMessageHandler:
             message = data.get("messages", {})
             re_generate = data.get("re_generate", False)
             config = data.get("config", {})
+            work_dir = config.get("work_dir", "")
             
             enable_agent_assign = bool(config.get("enable_agent_assign", False))
             enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
@@ -447,6 +431,7 @@ class WebsocketMessageHandler:
                 "client_id": client_id,
                 "session_id": session_id,
                 "history_id": history_id,
+                "node_id": generation_id[-12:] + "-apix",
                 "platform": platform,
                 "generation_id": generation_id,
                 "config": config,
@@ -472,9 +457,8 @@ class WebsocketMessageHandler:
                 "error": "",
             }
 
-            astream = await ai_agent.submit_agent_task(initial_state, config, "MAIN")
-
-            await self.ws_list.send_ai_stream_start(generation_id, client_id, history_id)
+            agent = await ai_agent.submit_agent_task(agent_role, "APIX", config)
+            astream = agent.astream(initial_state, {"recursion_limit": 1024}, stream_mode="custom")
 
             async for achunk in astream:
                 chunk_event = achunk.get("data")
@@ -484,6 +468,14 @@ class WebsocketMessageHandler:
                     ctx = self.ws_list._get_ctx(client_id)
                     gen = ctx.generations.get(generation_id)
                     gen.parent_node_id = content
+                    # Getting the parent node id means a agent stream start.
+                    await self.ws_list.send_ai_stream_start(
+                        generation_id, 
+                        client_id, 
+                        history_id, 
+                        node_id=generation_id[-12:] + "-apix",
+                        parent_id=content
+                    )
 
                 if self.ws_list.is_generation_aborted(client_id, generation_id):
                     await astream.aclose()
@@ -512,6 +504,15 @@ class WebsocketMessageHandler:
                 content=f"{e.__class__.__name__}: {str(e)}"
             )
 
+        finally:
+            await ai_agent.done(agent)
+            await agent_sandbox.done(client_id=client_id, conversation_id=history_id, work_dir=work_dir)
+
 
 websocket_list = WebsocketList()
 ws_msg_handler = WebsocketMessageHandler(websocket_list)
+
+
+@resource_cleaner.auto_clear
+async def clean_ws():
+    return await websocket_list._clean_expired_generations()

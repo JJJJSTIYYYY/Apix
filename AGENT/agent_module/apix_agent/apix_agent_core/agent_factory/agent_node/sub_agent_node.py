@@ -7,15 +7,14 @@ from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage,
 from langgraph.graph import END
 from langgraph.graph.state import Command
 from langgraph.types import Overwrite
-from langgraph.config import get_stream_writer
 
-from apix_agent.apix_event_pipe.stream_writer import ApixStreamWriter, StreamEvent
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.apix_agent_core.context_manager.generating_cache import generating_cache
-from apix_agent.commons.type_def import SubAgentState
+from apix_agent.commons.type_def import InvalidToolCalls, SubAgentState
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent_factory.agent_node.agent_node_base import AgentNodeBase
 from apix_agent.global_config import MAX_RETRY
@@ -599,6 +598,8 @@ class SubAgentNode(AgentNodeBase):
         )
         if need_alert:
             llm_input = llm_input + [SystemMessage(self.SYSTEM_ALERT_PROMPT)]
+        if state.get("error_detail"):
+            llm_input = llm_input + [SystemMessage(f"WARN: {state.get("error_detail")}")]
 
         # Start streaming
         chunk_iterator = LlmNodeAdapter.astream(
@@ -612,6 +613,22 @@ class SubAgentNode(AgentNodeBase):
             ai_msg_chunk = AIMessageChunk(content="")
             async for chunk in chunk_iterator:
                 ai_msg_chunk = ai_msg_chunk + chunk
+            
+            self._ensure_tool_calls(ai_msg_chunk.tool_calls)
+
+        except InvalidToolCalls as e:
+            llm_retry_count = state.get("llm_retry_count", 0) + 1
+            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            if llm_retry_count < MAX_RETRY:
+                return Command(
+                    update={
+                        "llm_retry_count": llm_retry_count,
+                        "error": "others",
+                        "error_detail": e.message
+                    },
+                )
+            else:
+                raise e
 
         except BadRequestError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
@@ -656,6 +673,7 @@ class SubAgentNode(AgentNodeBase):
                 "llm_retry_count": 0,
                 "context_compress_level": 0 if state.get("context_compress_level", 0) <= 2 else 3,
                 "error": "",
+                "error_detail": "",
                 "loaded_skills_cache": new_skills_cache,
             }
         )
@@ -688,7 +706,7 @@ class SubAgentNode(AgentNodeBase):
         model_provider = config.get("models_provider")
 
         current_tool_calls = []
-        event_writer = ApixStreamWriter()
+        event_writer = AgentStreamWriter()
 
         # Case 1: AIMessage (may contain tool calls)
         if isinstance(last_message, (AIMessage, AIMessageChunk)):
@@ -698,7 +716,7 @@ class SubAgentNode(AgentNodeBase):
             # Yield delta content output
             delta_outputs = last_message.content or ""
             event_writer.send_event(
-                event=StreamEvent.AI_MESSAGE_RETURN, 
+                event=AgentStreamEvent.AI_MESSAGE_RETURN, 
                 target_id=client_id, 
                 target_platform=target_platform,
                 data={
