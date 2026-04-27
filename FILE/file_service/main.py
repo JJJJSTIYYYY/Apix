@@ -15,7 +15,7 @@ def auto_load(app: FastAPI):
     # 扫描 routers 包下的所有 .py 模块
     for _, module_name, _ in pkgutil.iter_modules(pkg_path):
         full_name = f"routers.{module_name}"
-        print(f"[auto_load] ✅ 加载模块: {full_name}")
+        print(f"[auto_load] Load module: {full_name}")
 
         module = importlib.import_module(full_name)
 
@@ -24,7 +24,7 @@ def auto_load(app: FastAPI):
             obj = getattr(module, attr)
             if isinstance(obj, APIRouter):
                 app.include_router(obj)
-                print(f"✔ 已注册路由: {full_name}.{attr}")
+                print(f"✔ Router register: {full_name}.{attr}")
 
 async def lifespan(app: FastAPI):
     auto_load(app)
