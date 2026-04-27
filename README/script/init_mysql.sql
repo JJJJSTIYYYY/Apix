@@ -333,6 +333,45 @@ CREATE TABLE task_info (
 
 
 
+-- Stored Procedure: create_user
+DROP PROCEDURE IF EXISTS create_user;
+DELIMITER $$
+
+CREATE PROCEDURE create_user (
+    IN p_user_uid VARCHAR(64),
+    IN p_username VARCHAR(64),
+    IN p_password VARCHAR(255)
+)
+BEGIN
+    INSERT INTO users
+    SET
+        user_uid = p_user_uid,
+        username = p_username,
+        password = p_password;
+END$$
+
+DELIMITER ;
+
+
+
+-- Stored Procedure: verify_user
+DROP PROCEDURE IF EXISTS verify_user;
+DELIMITER $$
+
+CREATE PROCEDURE verify_user (
+    IN p_username VARCHAR(64),
+    IN p_password VARCHAR(255)
+)
+BEGIN
+    SELECT user_uid, username
+    FROM users
+    WHERE username=p_username AND password=p_password;
+END$$
+
+DELIMITER ;
+
+
+
 -- Stored Procedure: ensure_user_exists
 DROP PROCEDURE IF EXISTS ensure_user_exists;
 DELIMITER $$

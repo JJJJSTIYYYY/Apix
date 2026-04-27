@@ -184,12 +184,6 @@ uv run main.py
 ```
 
 ```bash
-cd ./LOGIN_REGISTER/login_register_module
-uv sync
-uv run main.py
-```
-
-```bash
 cd ./TASK/task_flow_module
 uv sync
 uv run main.py

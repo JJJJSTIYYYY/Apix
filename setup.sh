@@ -127,7 +127,6 @@ modules=(
   "MEMORY/memory_module"
   "FILE/file_service"
   "TOOLS/tools_module"
-  "LOGIN_REGISTER/login_register_module"
   "TASK/task_flow_module"
 )
 
