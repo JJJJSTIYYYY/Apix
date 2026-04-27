@@ -302,7 +302,6 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
-  font-family: 'SF Mono', Monaco, monospace;
   min-width: 20px;
   text-align: center;
 }
@@ -501,7 +500,6 @@ onMounted(() => {
 }
 
 .info-value.mono {
-  font-family: 'SF Mono', Monaco, monospace;
   font-size: 12px;
   background: rgba(136, 202, 197, 0.08);
   padding: 4px 8px;
@@ -524,7 +522,6 @@ onMounted(() => {
 }
 
 .code-block code {
-  font-family: 'SF Mono', Monaco, monospace;
   font-size: 12px;
   line-height: 1.6;
   color: #e6e6e6;
@@ -546,7 +543,6 @@ onMounted(() => {
   padding: 12px 16px;
   background: rgba(103, 194, 58, 0.08);
   border-radius: 8px;
-  font-family: 'SF Mono', Monaco, monospace;
   font-size: 12px;
   line-height: 1.6;
   color: #606266;

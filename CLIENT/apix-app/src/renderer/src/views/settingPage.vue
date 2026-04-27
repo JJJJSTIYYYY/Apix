@@ -1729,7 +1729,6 @@ span.el-popper__arrow {
         font-weight: 800;
         letter-spacing: 2px;
         margin: 0;
-        font-family: 'You Yuan', monospace;
         color: transparent;
         -webkit-text-stroke: 2px rgb(136, 202, 197);
         text-stroke: 2px rgb(136, 202, 197);
@@ -1751,7 +1750,6 @@ span.el-popper__arrow {
         color: rgb(136, 202, 197);
         font-weight: 600;
         letter-spacing: 0.5px;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
     /* 简化分隔线 */
@@ -1824,7 +1822,6 @@ span.el-popper__arrow {
         border-radius: 8px;
         font-size: 11px;
         color: #9ab;
-        font-family: 'Courier New', monospace;
         font-weight: 500;
         letter-spacing: 0.5px;
         transition: all 0.2s ease;

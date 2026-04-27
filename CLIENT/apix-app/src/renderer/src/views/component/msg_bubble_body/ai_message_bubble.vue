@@ -1404,7 +1404,6 @@ async function scrollThinkToBottom() {
   background-color: #d0dedc;
   border-radius: 24px;
   border: 1px solid #7c98957e;
-  transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .branch-switch-wrapper:hover {

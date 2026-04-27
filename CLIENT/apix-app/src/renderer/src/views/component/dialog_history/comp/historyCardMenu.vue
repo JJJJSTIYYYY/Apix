@@ -106,7 +106,6 @@ const connectProject = async () => {
   cursor: pointer;
   transition: all 0.12s ease;
   text-align: left;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   letter-spacing: 0.01em;
 }
 

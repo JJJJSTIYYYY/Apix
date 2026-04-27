@@ -113,7 +113,7 @@
         >
         </textarea>
         <button class="send-button" type="primary" @click="handleSendMessage">
-          <svg t="1776519512558" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11362" width="26" height="26"><path d="M481.834667 183.168a42.666667 42.666667 0 0 1 60.330666 0l298.666667 298.666667a42.666667 42.666667 0 0 1-60.330667 60.330666L554.666667 316.330667V810.666667a42.666667 42.666667 0 1 1-85.333334 0V316.330667l-225.834666 225.834666a42.666667 42.666667 0 0 1-60.330667-60.330666l298.666667-298.666667z" fill="#ffffff" p-id="11363"></path></svg>
+          <svg t="1777266449849" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9749" width="24" height="24"><path class="confirm-icon-path" d="M512 76.8C271.36 76.8 76.8 271.36 76.8 512s194.56 435.2 435.2 435.2 435.2-194.56 435.2-435.2S752.64 76.8 512 76.8z m0 768c-184.32 0-332.8-148.48-332.8-332.8S327.68 179.2 512 179.2s332.8 148.48 332.8 332.8-148.48 332.8-332.8 332.8z" p-id="9750" fill="#ffffff"></path></svg>
         </button>
       </div>
     </div>
@@ -279,11 +279,11 @@ function onWindowResize() {
 const reEditInputValue = ref(props.msg.content || '')
 const wrapperRef = ref<HTMLElement | null>(null)
 
-// const handleClickOutside = (e: MouseEvent) => {
-//   if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
-//     props.msg.is_editing = false
-//   }
-// }
+const handleClickOutside = (e: MouseEvent) => {
+  if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
+    props.msg.is_editing = false
+  }
+}
 
 const handleSendMessage = () => {
   if(reEditInputValue.value !== '') {
@@ -374,14 +374,14 @@ function handleQuoteContent() {
 onMounted(() => {
   // document.addEventListener('click', onDocumentClick, true)
   document.addEventListener('selectionchange', handleSelectionChange)
-  // window.addEventListener('mousedown', handleClickOutside)
+  window.addEventListener('mousedown', handleClickOutside)
   window.addEventListener('resize', onWindowResize)
 })
 
 onBeforeUnmount(() => {
   // document.removeEventListener('click', onDocumentClick, true)
   document.removeEventListener('selectionchange', handleSelectionChange)
-  // window.removeEventListener('mousedown', handleClickOutside)
+  window.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('resize', onWindowResize)
 })
 </script>
@@ -551,9 +551,8 @@ onBeforeUnmount(() => {
 .branch-switch-wrapper {
   opacity: 0.4;
   width: 100%;
-  background-color: #dde7e67e;
+  background-color: #d0dedc;
   border-radius: 24px;
-  transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
   border: 1px solid #7c98957e;
 }
 
@@ -664,16 +663,13 @@ onBeforeUnmount(() => {
   right: 12px;
   bottom: 12px;
 
-  transition: 
-    transform 0.18s ease,
-    box-shadow 0.25s ease,
-    background 0.35s ease;
+  transition: all 0.35s ease;
 }
 
 .send-button:hover {
   transform: scale(1.08);
   box-shadow: 0 4px 14px rgb(255, 255, 255);
-  background: #579f9d;
+  background: #60aca9;
 }
 
 /* 点击效果：轻微缩小 + 暗色反馈 */

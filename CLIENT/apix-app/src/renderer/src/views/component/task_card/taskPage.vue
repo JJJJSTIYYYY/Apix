@@ -478,7 +478,6 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 .stat-value {
   font-size: 24px;
   font-weight: 700;
-  font-family: 'SF Mono', Monaco, monospace;
 }
 
 .stat-label {

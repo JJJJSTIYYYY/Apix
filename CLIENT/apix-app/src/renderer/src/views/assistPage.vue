@@ -2337,7 +2337,6 @@ const setFullInput = () => {
   align-items: center;
   font-size: 32px;
   color: #324f4c;
-  font-family: "Microsoft YaHei";
   white-space: nowrap;
 }
 

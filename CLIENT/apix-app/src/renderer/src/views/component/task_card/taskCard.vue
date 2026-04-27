@@ -226,7 +226,6 @@ const handleTerminate = async () => {
   align-items: center;
   gap: 6px;
   color: #909399;
-  font-family: 'SF Mono', Monaco, monospace;
 }
 
 .id-text {
@@ -379,7 +378,6 @@ const handleTerminate = async () => {
   gap: 4px;
   font-size: 12px;
   color: #909399;
-  font-family: 'SF Mono', Monaco, monospace;
 }
 
 .duration-info .el-icon {

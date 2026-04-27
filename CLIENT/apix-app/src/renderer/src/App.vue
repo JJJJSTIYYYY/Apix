@@ -310,6 +310,7 @@ html, body {
 
 body, * {
   user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif, "Microsoft YaHei";
   -webkit-user-select: none; /* Chromium 内核 */
   --n-tab-border-color: rgb(247, 247, 250);
   --el-input-focus-border: #02decc8d;

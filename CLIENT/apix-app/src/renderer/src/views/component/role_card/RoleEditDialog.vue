@@ -267,7 +267,6 @@ const handleSave = () => {
   font-size: 14px;
   line-height: 1.6;
   transition: all 0.2s ease;
-  font-family: inherit;
 }
 
 .role-textarea :deep(.el-textarea__inner:hover) {
