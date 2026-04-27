@@ -1,6 +1,15 @@
-from fastapi import APIRouter, Request
+import hashlib
+import base64
+import random
+from typing import Optional
+
+from fastapi import APIRouter, Request, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+
+from pydantic import BaseModel
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 
 from core.domain.data_server_manager import data_server_manager as dsm
 from core.commons.logger import logger
@@ -20,8 +29,126 @@ All endpoints follow the same execution pattern:
 These endpoints DO NOT contain business logic.
 """
 
+# ==============================
+# Symmetric encryption config
+# ==============================
+# NOTE:
+# The key must be exactly the same as the one used on the client side.
+# 16 / 24 / 32 bytes for AES-128 / 192 / 256
+AES_KEY = b"0123456789abcdef"  # example key, replace in production
+AES_IV = b"abcdef9876543210"   # example IV, replace in production
 
-@router.post("/memory/user/ensure")
+
+# ==============================
+# Models
+# ==============================
+class RegisterRequest(BaseModel):
+    username: str
+    password: str  # encrypted password from client
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str  # encrypted password from client
+
+
+# ==============================
+# Utility functions
+# ==============================
+
+def decrypt_password(encrypted_password: str) -> str:
+    """
+    Decrypt password from client using AES-CBC.
+    The input is assumed to be base64 encoded.
+    """
+    try:
+        cipher = AES.new(AES_KEY, AES.MODE_CBC, AES_IV)
+        encrypted_bytes = base64.b64decode(encrypted_password)
+        decrypted = cipher.decrypt(encrypted_bytes)
+        return unpad(decrypted, AES.block_size).decode("utf-8")
+    except Exception:
+        # Intentionally vague to avoid leaking crypto details
+        raise HTTPException(status_code=400, detail="Invalid encrypted password")
+
+
+def sha256_hash(raw_password: str) -> str:
+    """
+    Hash plaintext password using SHA256.
+    """
+    return hashlib.sha256(raw_password.encode("utf-8")).hexdigest()
+
+
+@router.post("/auth/register")
+async def register(req: RegisterRequest):
+    """
+    Register a new user.
+
+    Flow:
+    1. Generate random 9-digit user_uid
+    2. Decrypt password
+    3. SHA256 hash
+    4. Store into database
+    5. Return generated user_uid
+    """
+    logger.info(f"[API][register] enter.")
+    # Decrypt and hash password
+    plain_password = decrypt_password(req.password)
+    password_hash = sha256_hash(plain_password)
+    user_uid = str(random.randint(100_000_000, 999_999_999))
+
+    payload = {
+        "client_id": user_uid,
+        "username": req.username,
+        "password": password_hash
+    }
+
+    query_id = await dsm.submit_query(
+        action="create_a_user",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/auth/login")
+async def login(req: LoginRequest):
+    """
+    User login.
+
+    Flow:
+    1. Decrypt password
+    2. SHA256 hash
+    3. Compare with stored hash
+    """
+    logger.info(f"[API][login] enter.")
+    plain_password = decrypt_password(req.password)
+    password_hash = sha256_hash(plain_password)
+
+    payload = {
+        "username": req.username,
+        "password": password_hash
+    }
+
+    query_id = await dsm.submit_query(
+        action="verify_user",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+@router.post("/auth/ensure_user")
 async def ensure_user_exists(req: Request):
     """
     Ensure user exists in system.
@@ -33,7 +160,6 @@ async def ensure_user_exists(req: Request):
     Request Body (JSON):
         {
             "client_id": str,
-            "username": str (optional)
         }
 
     Returns:

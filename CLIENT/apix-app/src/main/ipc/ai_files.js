@@ -3,10 +3,7 @@ import fs from 'fs'
 import axios from 'axios'
 import FormData from 'form-data'
 
-const AI_API_BASE = "http://localhost:5091"
 const FILE_API_BASE = "http://localhost:5094"
-const MEMORY_API_BASE = "http://localhost:5093"
-const TOOLS_API_BASE = "http://localhost:5092"
 
 // =====================================================
 //                      Ai config

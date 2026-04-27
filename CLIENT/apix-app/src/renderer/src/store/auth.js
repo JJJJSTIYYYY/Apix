@@ -56,10 +56,12 @@ export const useAuthStore = defineStore("auth", () => {
         window.api.initWebsocket(res.messages.uid)
       }
 
-      return res.messages.msg
+      loading.value = false
+      return true
     } finally {
       loading.value = false
     }
+    return false
   }
 
   /**
@@ -79,7 +81,29 @@ export const useAuthStore = defineStore("auth", () => {
         })
       }
 
-      return res.messages.msg
+      loading.value = false
+      return true
+    } finally {
+      loading.value = false
+    }
+    return false
+  }
+
+  const ensure = async (user_uid) => {
+    loading.value = true
+    try {
+      const res = await window.api.auth.ensure(user_uid)
+
+      if (!res.success) {
+        user.value = null
+        localStorage.removeItem(STORAGE_KEY)
+        console.warn("User ensure failed:", res.messages)
+        loading.value = false
+        return false
+      }
+      console.log("User ensure success:", res.messages)
+      loading.value = false
+      return true
     } finally {
       loading.value = false
     }
@@ -92,5 +116,6 @@ export const useAuthStore = defineStore("auth", () => {
     register,
     restore,
     logout,
+    ensure,
   }
 })

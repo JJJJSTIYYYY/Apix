@@ -84,9 +84,10 @@ const api = {
   auth: {
     login: (username, password) =>
       ipcRenderer.invoke("auth:login", { username, password }),
-
     register: (username, password) =>
       ipcRenderer.invoke("auth:register", { username, password }),
+    ensure: (client_id) =>
+      ipcRenderer.invoke("auth:ensure_user", client_id)
   },
 
   closeWebsocket: () =>

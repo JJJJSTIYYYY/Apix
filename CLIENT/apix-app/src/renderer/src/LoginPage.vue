@@ -95,11 +95,11 @@ import { registerDynamicRoutes } from '@router/index'
 const router = useRouter()
 const authStore = useAuthStore()
 
-onMounted(() => {
+onMounted(async () => {
   registerDynamicRoutes()
   authStore.restore()
 
-  if (authStore.user) {
+  if (authStore.user && await authStore.ensure(authStore.user.user_uid)) {
     // Already logged in → skip login page
     router.replace("/home")
   }
@@ -210,14 +210,19 @@ const onSubmit = async () => {
   try {
     if (isLogin.value) {
       const res = await authStore.login(form.username, form.password)
-      showToast(res)
 
       // Redirect to homepage after successful login
-      if(!res.includes("登录失败")) router.replace("/home")
+      if(res) {
+        showToast("登陆成功")
+        router.replace("/home")
+      }
     } else {
       const res = await authStore.register(form.username, form.password)
       showToast(res)
-      if(!res.includes("注册失败")) switchMode("login")
+      if(res) {
+        showToast("注册成功")
+        switchMode("login")
+      }
     }
   } catch (e) {
     showToast(e?.message || "Operation failed")

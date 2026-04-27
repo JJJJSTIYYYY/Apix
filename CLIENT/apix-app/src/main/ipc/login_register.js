@@ -2,7 +2,7 @@
 import { ipcMain } from "electron"
 import crypto from "crypto"
 
-const API_BASE = "http://127.0.0.1:8000"
+const API_BASE = "http://127.0.0.1:5093"
 
 // AES-128-CBC config must match server
 const AES_KEY = Buffer.from("0123456789abcdef")
@@ -77,6 +77,33 @@ export function registerLogreIpc() {
       return data
     } catch (err) {
       console.error("Register error:", err)
+      throw err
+    }
+  })
+
+  /**
+   * Ensuer user handler
+   */
+  ipcMain.handle("auth:ensure_user", async (_, client_id) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/ensure_user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: client_id
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.detail || "Ensure failed")
+      }
+
+      return data
+    } catch (err) {
+      console.error("Ensure error:", err)
       throw err
     }
   })

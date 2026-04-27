@@ -44,7 +44,8 @@ const api = {
   copyToClipboard: (payload) => electron.ipcRenderer.invoke("api:copyToClipboard", payload),
   auth: {
     login: (username, password) => electron.ipcRenderer.invoke("auth:login", { username, password }),
-    register: (username, password) => electron.ipcRenderer.invoke("auth:register", { username, password })
+    register: (username, password) => electron.ipcRenderer.invoke("auth:register", { username, password }),
+    ensure: (client_id) => electron.ipcRenderer.invoke("auth:ensure_user", client_id)
   },
   closeWebsocket: () => electron.ipcRenderer.invoke("api:closeWebsocket"),
   initWebsocket: (clientId) => electron.ipcRenderer.invoke("api:initWebsocket", clientId),

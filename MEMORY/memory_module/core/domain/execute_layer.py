@@ -57,14 +57,62 @@ class DataExecutors:
 
         return handlers
         
-    @task_handler("ensure_user_exists")
-    async def ensure_user_exists(self, payload: dict) -> dict:
+    @task_handler("create_a_user")
+    async def create_a_user(self, payload: dict) -> dict:
         """
         Ensure user exists in persistent storage.
 
         Workflow:
         - Insert user if not exists
         - Update user info if exists
+
+        Redis is NOT involved.
+        """
+        try:
+            logger.info("[DataExecutors][create_a_user] enter.")
+            res = await self.mysql.ensure_user_exists(payload, exist=False)
+            if not res.get("success"):
+                return res
+            
+            return await self.mysql.create_a_user(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][create_a_user] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("verify_user")
+    async def verify_user(self, payload: dict) -> dict:
+        """
+        Ensure user exists in persistent storage.
+
+        Workflow:
+        - Insert user if not exists
+        - Update user info if exists
+
+        Redis is NOT involved.
+        """
+        try:
+            logger.info("[DataExecutors][verify_user] enter.")
+            return await self.mysql.verify_user(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][verify_user] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("ensure_user_exists")
+    async def ensure_user_exists(self, payload: dict) -> dict:
+        """
+        Ensure user exists in persistent storage.
 
         Redis is NOT involved.
         """

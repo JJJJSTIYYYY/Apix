@@ -1,9 +1,6 @@
 import { ipcMain } from 'electron'
 
 const AI_API_BASE = "http://localhost:5091"
-const FILE_API_BASE = "http://localhost:5094"
-const MEMORY_API_BASE = "http://127.0.0.1:5093"
-const TOOLS_API_BASE = "http://127.0.0.1:5092"
 // =====================================================
 //                      Ai task
 // =====================================================

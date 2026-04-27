@@ -123,8 +123,91 @@ class MysqlService:
     # Action of Memo Mysql (Dialog Memory)
     # --------------------------------------------------
 
+    @task_handler("mysql.user.create_a_user")
+    async def create_a_user(self, payload: dict) -> dict:
+        """
+        Ensure user account exists. Call procedure ensure_user_exists.
+        If user not exist, raise RuntimeError.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": str, # user_uid
+                "username": str,
+                "password": str, # encrypted
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or "success",
+            }
+        """
+        logger.info(f"[MysqlService][create_a_user] enter.")
+        try:
+            user_uid = payload["client_id"]
+            username = payload["username"]
+            password = payload["password"]
+            await self._call_procedure("create_user", (user_uid, username, password))
+            return {
+                "success": True,
+                "messages": {
+                    "msg": "success",
+                    "uid": user_uid
+                },
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][create_a_user] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": {
+                    "msg": f"{type(e).__name__}: {e}",
+                    "uid": None
+                },
+            }
+
+    @task_handler("mysql.user.verify_user")
+    async def verify_user(self, payload: dict) -> dict:
+        """
+        Ensure user account exists. Call procedure ensure_user_exists.
+        If user not exist, raise RuntimeError.
+
+        Args:
+            payload: Dict, the format is {
+                "username": str,
+                "password": str, # encrypted
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or "success",
+            }
+        """
+        logger.info(f"[MysqlService][verify_user] enter.")
+        try:
+            username = payload["username"]
+            password = payload["password"]
+            res = await self._call_procedure("verify_user", (username, password))
+            if(len(res) != 1): raise Exception("User do not exist or wrong password.")
+            return {
+                "success": True,
+                "messages": {
+                    "msg": "success",
+                    "uid": res[0].get("user_uid")
+                },
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][verify_user] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": {
+                    "msg": f"{type(e).__name__}: {e}",
+                    "uid": None
+                },
+            }
+
     @task_handler("mysql.user.ensure_user_exists")
-    async def ensure_user_exists(self, payload: dict) -> dict:
+    async def ensure_user_exists(self, payload: dict, exist: bool = True) -> dict:
         """
         Ensure user account exists. Call procedure ensure_user_exists.
         If user not exist, raise RuntimeError.
@@ -133,6 +216,7 @@ class MysqlService:
             payload: Dict, the format is {
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
             }
+            exist: ensure exist if ture, else ensure not exist.
 
         Return:
             dict, the format is {
@@ -144,7 +228,8 @@ class MysqlService:
         try:
             user_uid = payload["client_id"]
             res = await self._call_procedure("ensure_user_exists", (user_uid,))
-            if(len(res) == 0): raise RuntimeError("[MysqlService][ensure_user_exists] User do not exist.")
+            if exist and len(res) == 0: raise Exception("User do not exist.")
+            elif not exist and len(res) > 0: raise Exception("User has already exist.")
             return {
                 "success": True,
                 "messages": "success",

@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.135.3",
     "httpx>=0.28.1",
     "pandas>=3.0.2",
+    "pycryptodome>=3.23.0",
     "redis>=7.4.0",
     "ulid>=1.1",
     "uvicorn>=0.44.0",
