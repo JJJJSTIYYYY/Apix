@@ -242,7 +242,61 @@ class WorkspaceGitManager:
                     nodes[p]["children"].append(node["id"])
 
         return nodes
+    
+    async def get_commit_history(self, repo_path: str, limit: int = 50):
+        log_format = "%H|%ct|%s"
+
+        output = await self._run_git(repo_path, [
+            "log",
+            f"-n {limit}",
+            f"--pretty=format:{log_format}"
+        ])
+
+        commits = []
+        if not output:
+            return commits
+
+        for line in output.split("\n"):
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                continue
+
+            commit_id, timestamp, message = parts
+            commits.append({
+                "commit_id": commit_id,
+                "timestamp": int(timestamp),
+                "message": message
+            })
+
+        return commits
 
 
-# Global singleton instance
+    async def get_reflog(self, repo_path: str, limit: int = 50):
+        log_format = "%H|%ct|%gs"
+
+        output = await self._run_git(repo_path, [
+            "reflog",
+            f"-n {limit}",
+            f"--pretty=format:{log_format}"
+        ])
+
+        logs = []
+        if not output:
+            return logs
+
+        for line in output.split("\n"):
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                continue
+
+            commit_id, timestamp, message = parts
+            logs.append({
+                "commit_id": commit_id,
+                "timestamp": int(timestamp),
+                "message": message
+            })
+
+        return logs
+
+
 workspace_git_manager = WorkspaceGitManager()

@@ -40,6 +40,7 @@ const api = {
   updateDocumentsDesc: (cid, document_id, desc) => electron.ipcRenderer.invoke("api:update_document_description", cid, document_id, desc),
   deleteDocument: (cid, document_id) => electron.ipcRenderer.invoke("api:delete_document", cid, document_id),
   openImageTemp: (base64, fileName) => electron.ipcRenderer.invoke("openImageTemp", base64, fileName),
+  createTempFileFromBase64: (base64, fileName) => electron.ipcRenderer.invoke("createTempFileFromBase64", base64, fileName),
   // Clipboard helper
   copyToClipboard: (payload) => electron.ipcRenderer.invoke("api:copyToClipboard", payload),
   auth: {

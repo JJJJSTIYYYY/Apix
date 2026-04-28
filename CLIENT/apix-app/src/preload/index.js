@@ -76,6 +76,8 @@ const api = {
 
   openImageTemp: (base64, fileName) =>
     ipcRenderer.invoke('openImageTemp', base64, fileName),
+  createTempFileFromBase64: (base64, fileName) =>
+    ipcRenderer.invoke('createTempFileFromBase64', base64, fileName),
   
   // Clipboard helper
   copyToClipboard: (payload) =>

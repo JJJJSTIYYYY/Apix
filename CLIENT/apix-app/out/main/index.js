@@ -203,7 +203,7 @@ function registerFileIpc() {
   });
   electron.ipcMain.handle("openImageTemp", async (_, base64, fileName) => {
     try {
-      const tempDir = path.join(os.tmpdir(), "apix-images");
+      const tempDir = path.join(os.tmpdir(), "apix-temp");
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
@@ -214,6 +214,55 @@ function registerFileIpc() {
     } catch (err) {
       console.error("openImageTemp error:", err);
       return { success: false, error: String(err) };
+    }
+  });
+  electron.ipcMain.handle("createTempFileFromBase64", async (_, base64, fileName) => {
+    try {
+      const tempDir = path.join(os.tmpdir(), "apix-temp");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      const filePath = path.join(tempDir, fileName);
+      fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
+      return filePath;
+    } catch (err) {
+      console.error("createTempFileFromBase64 error:", err);
+      return null;
+    }
+  });
+  electron.ipcMain.handle("cleanTempDir", async (_, maxAgeMs = 24 * 60 * 60 * 1e3) => {
+    try {
+      const tempDir = path.join(os.tmpdir(), "apix-temp");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+        return { success: true, removed: 0 };
+      }
+      const files = fs.readdirSync(tempDir);
+      let removedCount = 0;
+      for (const file of files) {
+        const filePath = path.join(tempDir, file);
+        try {
+          const stat = fs.statSync(filePath);
+          if (!stat.isFile()) continue;
+          const age = Date.now() - stat.mtimeMs;
+          if (age > maxAgeMs) {
+            fs.unlinkSync(filePath);
+            removedCount++;
+          }
+        } catch (err) {
+          console.warn("[cleanTempDir] skip:", filePath, err);
+        }
+      }
+      return {
+        success: true,
+        removed: removedCount
+      };
+    } catch (err) {
+      console.error("[cleanTempDir] error:", err);
+      return {
+        success: false,
+        error: String(err)
+      };
     }
   });
 }
@@ -681,6 +730,11 @@ function registerAiFilesIpc() {
       const form = new FormData();
       form.append("client_id", cid);
       for (const file of files) {
+        const stat = fs.statSync(file.path);
+        if (!stat.isFile()) {
+          console.warn("[upload_files] skip non-file:", file.path);
+          continue;
+        }
         form.append(
           "files",
           fs.createReadStream(file.path),
@@ -1108,6 +1162,8 @@ const baseWindowOptions = {
   icon,
   webPreferences: {
     preload: path.join(__dirname, "../preload/index.js"),
+    nodeIntegration: true,
+    contextIsolation: false,
     sandbox: false
   }
 };

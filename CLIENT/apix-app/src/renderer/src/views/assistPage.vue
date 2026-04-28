@@ -23,7 +23,25 @@
           @delete="handleDeleteHistory"
           @hide="handleHideHistory"
         />
-        <div class="chat-wrapper">
+        <div 
+          class="chat-wrapper"
+          @dragover.prevent
+          @dragenter="onDragEnter"
+          @dragleave="onDragLeave"
+          @drop="onDrop"
+          @paste="onPaste"
+        >
+          <Transition name="opacity">
+            <div
+              v-if="showDropLayer"
+              class="drop-layer"
+            >
+              <div class="drop-hint">
+                <svg t="1777403606882" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10817" width="48" height="48"><path d="M810.666667 938.666667H213.333333c-72.533333 0-128-55.466667-128-128v-170.666667c0-25.6 17.066667-42.666667 42.666667-42.666667s42.666667 17.066667 42.666667 42.666667v170.666667c0 25.6 17.066667 42.666667 42.666666 42.666666h597.333334c25.6 0 42.666667-17.066667 42.666666-42.666666v-170.666667c0-25.6 17.066667-42.666667 42.666667-42.666667s42.666667 17.066667 42.666667 42.666667v170.666667c0 72.533333-55.466667 128-128 128zM725.333333 384c-12.8 0-21.333333-4.266667-29.866666-12.8L512 187.733333 328.533333 371.2c-17.066667 17.066667-42.666667 17.066667-59.733333 0s-17.066667-42.666667 0-59.733333l213.333333-213.333334c17.066667-17.066667 42.666667-17.066667 59.733334 0l213.333333 213.333334c17.066667 17.066667 17.066667 42.666667 0 59.733333-8.533333 8.533333-17.066667 12.8-29.866667 12.8z" p-id="10818" fill="#666666"></path><path d="M512 682.666667c-25.6 0-42.666667-17.066667-42.666667-42.666667V128c0-25.6 17.066667-42.666667 42.666667-42.666667s42.666667 17.066667 42.666667 42.666667v512c0 25.6-17.066667 42.666667-42.666667 42.666667z" p-id="10819" fill="#666666"></path></svg>
+                <div> 释放以上传文件 </div>
+              </div>
+            </div>
+          </Transition>
           <div 
             class="work-dir-label" 
             :class="{no_work_dir: show_work_dir===''}"
@@ -1021,6 +1039,150 @@ function handleWsMessage(payload: any) {
   const handler = actionMap[payload.action]
   if (handler) {
     handler(payload, historyId)
+  }
+}
+
+const showDropLayer = ref(false)
+let dragEnterCounter = 0
+
+function onDragEnter(e: DragEvent) {
+  e.preventDefault()
+  dragEnterCounter++
+  showDropLayer.value = true
+  console.log('Drag enter, counter:', dragEnterCounter)
+}
+
+function onDragLeave(e: DragEvent) {
+  e.preventDefault()
+  dragEnterCounter--
+  if (dragEnterCounter === 0) {
+    showDropLayer.value = false
+  }
+  console.log('Drag leave, counter:', dragEnterCounter)
+}
+
+async function onDrop(e: DragEvent) {
+  if (isUploading.value) return
+
+  const { webUtils } = require('electron')
+  e.preventDefault()
+
+  dragEnterCounter = 0
+  showDropLayer.value = false
+
+  const files = Array.from(e.dataTransfer?.files || [])
+  if (files.length === 0) return
+
+  const path_list = files
+    .map(f => {
+      try {
+        return webUtils.getPathForFile(f)
+      } catch (e) {
+        console.warn('getPathForFile failed:', e)
+        return null
+      }
+    })
+    .filter(Boolean) as string[]
+
+  console.log('Drop files:', path_list)
+
+  if (path_list.length === 0) return
+
+  try {
+    await handleFilePaths(path_list)
+  } catch (err) {
+    console.error('drop upload failed:', err)
+    ElMessage({
+      type: 'error',
+      message: '上传失败' + String(err),
+      plain: true,
+    })
+  }
+}
+
+async function onPaste(e: ClipboardEvent) {
+  if (isUploading.value) return
+
+  const { webUtils, clipboard, nativeImage } = require('electron')
+
+  const items = Array.from(e.clipboardData?.items || [])
+  console.log('Clipboard items:', items)
+
+  let handled = false
+  const pathList: string[] = []
+
+  // 优先走标准 clipboardData
+  for (const item of items) {
+    if (item.kind !== 'file') continue
+
+    handled = true
+    
+    const file = item.getAsFile()
+    if (!file) continue
+    console.log('Processing clipboard item:', item)
+
+    try {
+      const filePath = webUtils.getPathForFile(file)
+      if (filePath) {
+        pathList.push(filePath)
+        continue
+      }
+    } catch {}
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+
+      const tempPath = await window.api.createTempFileFromBase64(base64, file.name || `paste_${Date.now()}.png`)
+
+      if (tempPath) {
+        pathList.push(tempPath)
+      }
+    } catch (err) {
+      console.error('createTempFileFromBase64 failed:', err)
+    }
+  }
+
+  // fallback：Electron clipboard
+  if (!handled) {
+    try {
+      const image = clipboard.readImage()
+
+      if (!image.isEmpty()) {
+        e.preventDefault()
+
+        const buffer = image.toPNG()
+        const base64 = buffer.toString('base64')
+
+        const tempPath = await window.api.createTempFileFromBase64({
+          base64,
+          fileName: `paste_${Date.now()}.png`,
+        })
+
+        if (tempPath) {
+          console.log('Clipboard image fallback success:', tempPath)
+          pathList.push(tempPath)
+        }
+      }
+    } catch (err) {
+      console.error('clipboard fallback failed:', err)
+    }
+  }
+
+  if (pathList.length === 0) return
+
+  // 只要处理了文件，就阻止默认文本粘贴
+  e.preventDefault()
+
+  try {
+    await handleFilePaths(pathList)
+  } catch (err) {
+    console.error('paste upload failed:', err)
+    ElMessage({
+      type: 'error',
+      message: '上传失败' + String(err),
+      plain: true,
+    })
   }
 }
 
@@ -2183,76 +2345,8 @@ const selectFile = async () => {
     const result = await window.api.openFileDialog("file")
     if (result.canceled || result.filePaths.length === 0) return
 
-    isUploading.value = true
+    await handleFilePaths(result.filePaths)
 
-    const existingNames = new Set(selectedFiles.value.map(f => f.name))
-
-    const newFiles: TagsItem[] = result.filePaths.map((filePath: string) => {
-      const originalName = filePath.split(/[/\\]/).pop() || filePath
-      const uniqueName = makeUniqueFileName(originalName, existingNames)
-      existingNames.add(uniqueName)
-
-      return {
-        name: uniqueName,
-        path: filePath,
-        type: 'info',
-      }
-    })
-
-    const startIndex = selectedFiles.value.length
-    selectedFiles.value.push(...newFiles)
-
-    const uploadTasks = newFiles.map((_, offset) => {
-      const index = startIndex + offset
-      const tag = selectedFiles.value[index]
-
-      const plainFile = {
-        name: tag.name,
-        path: tag.path,
-      }
-
-      return window.api
-        .uploadAiFiles(cid.value, [plainFile])
-        .then((res: {
-          success: boolean
-          messages: Array<{ file_id: string; file_name: string }>
-        }) => {
-          if (!res.success) {
-            throw new Error('upload failed')
-          }
-
-          if (!Array.isArray(res.messages)) {
-            throw new Error('invalid response format')
-          }
-
-          const matched = res.messages.find(r => r.file_name === tag.name)
-          if (!matched?.file_id) {
-            throw new Error('file_id not returned')
-          }
-
-          selectedFiles.value[index] = {
-            ...tag,
-            id: matched.file_id,
-            type: 'success',
-          }
-        })
-        .catch(err => {
-          console.error(`Upload failed: ${tag.name}`, err)
-
-          selectedFiles.value[index] = {
-            ...tag,
-            type: 'danger',
-          }
-        })
-    })
-
-    await Promise.allSettled(uploadTasks)
-
-    ElMessage({
-      type: 'success',
-      message: '文件上传完成',
-      plain: true,
-    })
   } catch (err) {
     console.error('selectFile failed:', err)
     ElMessage({
@@ -2260,9 +2354,84 @@ const selectFile = async () => {
       message: '文件上传失败' + String(err),
       plain: true,
     })
-  } finally {
-    isUploading.value = false
   }
+}
+
+async function handleFilePaths(filePaths: string[]) {
+  if (!filePaths || filePaths.length === 0) return
+
+  isUploading.value = true
+
+  const existingNames = new Set(selectedFiles.value.map(f => f.name))
+
+  const newFiles: TagsItem[] = filePaths.map((filePath: string) => {
+    const originalName = filePath.split(/[/\\]/).pop() || filePath
+    const uniqueName = makeUniqueFileName(originalName, existingNames)
+    existingNames.add(uniqueName)
+
+    return {
+      name: uniqueName,
+      path: filePath,
+      type: 'info',
+    }
+  })
+
+  const startIndex = selectedFiles.value.length
+  selectedFiles.value.push(...newFiles)
+
+  const uploadTasks = newFiles.map((_, offset) => {
+    const index = startIndex + offset
+    const tag = selectedFiles.value[index]
+
+    const plainFile = {
+      name: tag.name,
+      path: tag.path,
+    }
+
+    return window.api
+      .uploadAiFiles(cid.value, [plainFile])
+      .then((res: {
+        success: boolean
+        messages: Array<{ file_id: string; file_name: string }>
+      }) => {
+        if (!res.success) {
+          throw new Error('upload failed')
+        }
+
+        if (!Array.isArray(res.messages)) {
+          throw new Error('invalid response format')
+        }
+
+        const matched = res.messages.find(r => r.file_name === tag.name)
+        if (!matched?.file_id) {
+          throw new Error('file_id not returned')
+        }
+
+        selectedFiles.value[index] = {
+          ...tag,
+          id: matched.file_id,
+          type: 'success',
+        }
+      })
+      .catch(err => {
+        console.error(`Upload failed: ${tag.name}`, err)
+
+        selectedFiles.value[index] = {
+          ...tag,
+          type: 'danger',
+        }
+      })
+  })
+
+  await Promise.allSettled(uploadTasks)
+
+  ElMessage({
+    type: 'success',
+    message: '文件上传完成',
+    plain: true,
+  })
+
+  isUploading.value = false
 }
 
 // ################################
@@ -2331,6 +2500,32 @@ const setFullInput = () => {
   justify-content: center;
 }
 
+.drop-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* background-color: #ffffff00; */
+  backdrop-filter: saturate(200%) blur(12px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  font-size: 24px;
+  color: #666666;
+  font-weight: bold;
+}
+
+.drop-hint {
+  padding-bottom: 100px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap:12px;
+}
+
 .hello-div {
   display: flex;
   justify-content: center;  /* 水平居中 */
@@ -2359,7 +2554,7 @@ const setFullInput = () => {
   overflow: hidden;
   white-space: nowrap;
   display: block;
-  z-index: 99999;
+  z-index: 9998;
   transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -2611,6 +2806,26 @@ const setFullInput = () => {
   transform: translateY(0) scale(1);
 }
 
+/* Enter & leave active */
+.opacity-enter-active,
+.opacity-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+/* Initial & final state */
+.opacity-enter-from,
+.opacity-leave-to {
+  opacity: 0;
+}
+
+/* Stable visible state */
+.opacity-enter-to,
+.opacity-leave-from {
+  opacity: 1;
+}
+
 .stop-btn-wrapper {
   border-radius: 16px;
   bottom: 20px;
@@ -2776,7 +2991,7 @@ const setFullInput = () => {
   height: 38px;
   font-size: 20px;
   border-radius: 100px;
-  background: #76827f;
+  background: #6dc3c0;
   color: whitesmoke;
   border: none;
   cursor: pointer;
@@ -2798,13 +3013,13 @@ const setFullInput = () => {
 .send-button:hover {
   transform: scale(1.08);
   box-shadow: 0 4px 14px rgb(255, 255, 255);
-  background: rgb(105, 115, 114);
+  background: #60aca9;;
 }
 
 /* 点击效果：轻微缩小 + 暗色反馈 */
 .send-button:active {
   transform: scale(0.95);
-  background: rgb(82, 90, 90);
+  background: #519794;
   box-shadow: 0 2px 8px rgba(255, 255, 255, 0.908);
 }
 

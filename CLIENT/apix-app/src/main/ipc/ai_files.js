@@ -49,6 +49,14 @@ export function registerAiFilesIpc() {
 
       // Files: same field name MUST be "files"
       for (const file of files) {
+        const stat = fs.statSync(file.path)
+
+        // Skip directories
+        if (!stat.isFile()) {
+          console.warn('[upload_files] skip non-file:', file.path)
+          continue
+        }
+        
         form.append(
           'files',
           fs.createReadStream(file.path),

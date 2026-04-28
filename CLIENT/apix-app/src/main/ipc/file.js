@@ -98,7 +98,7 @@ export function registerFileIpc() {
   ipcMain.handle('openImageTemp', async (_, base64, fileName) => {
     try {
       // Create temp file path
-      const tempDir = path.join(os.tmpdir(), 'apix-images')
+      const tempDir = path.join(os.tmpdir(), 'apix-temp')
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true })
       }
@@ -115,6 +115,76 @@ export function registerFileIpc() {
     } catch (err) {
       console.error('openImageTemp error:', err)
       return { success: false, error: String(err) }
+    }
+  })
+
+  ipcMain.handle('createTempFileFromBase64', async (_, base64, fileName) => {
+    try {
+      // Create temp file path
+      const tempDir = path.join(os.tmpdir(), 'apix-temp')
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+
+      const filePath = path.join(tempDir, fileName)
+
+      // Write base64 to file
+      fs.writeFileSync(filePath, Buffer.from(base64, 'base64'))
+
+      return filePath
+
+    } catch (err) {
+      console.error('createTempFileFromBase64 error:', err)
+
+      return null
+    }
+  })
+
+  ipcMain.handle('cleanTempDir', async (_, maxAgeMs = 24 * 60 * 60 * 1000) => {
+    try {
+      const tempDir = path.join(os.tmpdir(), 'apix-temp')
+
+      // Ensure dir exists
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+        return { success: true, removed: 0 }
+      }
+
+      const files = fs.readdirSync(tempDir)
+      let removedCount = 0
+
+      for (const file of files) {
+        const filePath = path.join(tempDir, file)
+
+        try {
+          const stat = fs.statSync(filePath)
+
+          // Skip directories
+          if (!stat.isFile()) continue
+
+          // Check age
+          const age = Date.now() - stat.mtimeMs
+
+          if (age > maxAgeMs) {
+            fs.unlinkSync(filePath)
+            removedCount++
+          }
+        } catch (err) {
+          console.warn('[cleanTempDir] skip:', filePath, err)
+        }
+      }
+
+      return {
+        success: true,
+        removed: removedCount,
+      }
+
+    } catch (err) {
+      console.error('[cleanTempDir] error:', err)
+      return {
+        success: false,
+        error: String(err),
+      }
     }
   })
 }

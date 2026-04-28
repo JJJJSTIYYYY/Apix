@@ -102,7 +102,6 @@ import type { ElScrollbar } from 'element-plus'
 import { ElMessage } from 'element-plus'
 
 import HistoryCard, { type ChatHistory } from './history_card.vue'
-import { useOverscrollBounce } from '../../../../src/components/useOverscrollBounce.js'
 import { ConfirmDialog } from '../comp/confirmDialog.js'
 import { useAuthStore } from '../../../store/auth'
 
@@ -462,21 +461,6 @@ const handleDeleteHistory = async (history_id: string) => {
     ElMessage({ type: 'error', message: '删除失败', plain: true })
   }
 }
-
-// overscroll
-const scrollInnerRef = ref(null)
-
-useOverscrollBounce(
-  () => getWrapEl(),
-  scrollInnerRef,
-  {
-    maxBounce: 30,
-    damping: 0.35,
-    springK: 400,
-    springC: 20,
-    idleMs: 40,
-  }
-)
 </script>
 
 <style scoped>
