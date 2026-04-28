@@ -563,7 +563,8 @@ class AIContextManager:
         client_messages: list[dict],
         remain_tool_message: bool = True,
         *,
-        after_index: str | int = None
+        after_index: str | int = None,
+        reasoning: bool = False
     ) -> list[AnyMessage]:
         """
         Create agent messages list (dict list -> LangChain message objects).
@@ -664,8 +665,11 @@ class AIContextManager:
                     msg.tool_calls = tool_calls
                     if not content and not think and tool_calls:
                         called_tools = [call.get("name") for call in (tool_calls or []) if isinstance(call, dict)]
-                        content = 'Call tools: ' + ", ".join(called_tools)
-                        additional_kwargs["reasoning_content"] = content
+                        inject_content = 'Call tools: ' + ", ".join(called_tools)
+                        content = ''
+                        additional_kwargs = {}
+                        if not reasoning: content = inject_content
+                        else: additional_kwargs["reasoning_content"] = inject_content
                         msg = AIMessage(
                             content=content,
                             additional_kwargs=additional_kwargs,
@@ -982,7 +986,7 @@ class AIContextManager:
                 messages.append(msg)
 
             elif isinstance(input_msg, SystemMessage):
-                system_msgs.append(copy.copy(msg))
+                system_msgs.append(copy.copy(input_msg))
 
         logger.info(f"[filter_agent_messages] The latest message id is {index}")
         return system_msgs, messages, index

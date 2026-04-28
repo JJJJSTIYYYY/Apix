@@ -207,7 +207,7 @@ async def ocr_analysis(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured. Please call configure_sandbox first.",
+                    "Error: Sandbox not configured. Please info the user to configure it.",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -434,7 +434,7 @@ async def send_images(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured. Please call configure_sandbox first.",
+                    "Error: Sandbox not configured. Please info the user to configure it.",
                     tool_call_id=tool_call_id
                 )
             ]

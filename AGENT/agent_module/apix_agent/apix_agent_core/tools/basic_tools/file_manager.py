@@ -166,7 +166,10 @@ async def fetch_files(
 
         return Command(update={
             "messages": [
-                ToolMessage("Sandbox not configured.", tool_call_id=tool_call_id)
+                ToolMessage(
+                    "Error: Sandbox not configured. Please info the user to configure it.", 
+                    tool_call_id=tool_call_id
+                )
             ]
         })
 
@@ -421,7 +424,7 @@ async def read_workspace_file(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured.",
+                    "Error: Sandbox not configured. Please info the user to configure it",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -556,7 +559,7 @@ async def write_workspace_file(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured.",
+                    "Error: Sandbox not configured. Please info the user to configure it.",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -692,7 +695,7 @@ async def delete_workspace_file(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured.",
+                    "Error: Sandbox not configured. Please info the user to configure it",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -829,7 +832,7 @@ async def move_workspace_file(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured.",
+                    "Error: Sandbox not configured. Please info the user to configure it",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -973,7 +976,7 @@ async def list_workspace_files(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured.",
+                    "Error: Sandbox not configured. Please info the user to configure it",
                     tool_call_id=tool_call_id
                 )
             ]

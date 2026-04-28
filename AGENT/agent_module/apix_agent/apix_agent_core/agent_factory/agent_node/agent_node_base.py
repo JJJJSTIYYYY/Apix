@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import asyncio
+import copy
 
 from langchain.chat_models import BaseChatModel
 from langgraph.graph.state import Command
@@ -7,7 +8,7 @@ from langgraph.graph import END
 from langchain_core.messages import AIMessageChunk, ToolMessage, AIMessage
 
 from apix_agent.apix_agent_core.agent_factory.prompt import *
-from apix_agent.commons.type_def import MainAgentState, InvalidToolCalls
+from apix_agent.commons.type_def import MainAgentState, ConflictToolCalls
 from apix_agent.commons.logger import logger
 from apix_agent.commons.common_func import get_date_natural_language
 from apix_agent.apix_agent_core.tools.registry import conflict_tool_set
@@ -82,23 +83,39 @@ class AgentNodeBase(ABC):
         return False
     
 
-    def _ensure_tool_calls(self, tool_calls: list[dict]):
-        if not tool_calls: return
+    def _ensure_agent_message(self, agent_message: AIMessage | AIMessageChunk, reasoning: bool = False) -> AIMessage | AIMessageChunk:
+        agent_message = copy.deepcopy(agent_message)
+        tool_calls = agent_message.tool_calls
+        content = agent_message.content
+        think = agent_message.additional_kwargs.get('reasoning_content')
+        fallback_content = "Continue."
+        if tool_calls: 
+            fallback_content = fallback_content + " Call tools: "
+            seen = set()
+            tool_names = set()
+            has_error = False
+            for tool in tool_calls:
+                tool_name = tool.get("name", "")
+                tool_names.add(tool_name)
+                if not tool_name:
+                    raise ConflictToolCalls("Can not use empty tool name")
+                if tool_name in conflict_tool_set:
+                    if tool.get("name") not in seen:
+                        seen.add(tool_name)
+                    else:
+                        has_error = True
+            fallback_content = fallback_content + ', '.join(tool_names) + '.'
 
-        seen = set()
-        has_error = False
-        for tool in tool_calls:
-            tool_name = tool.get("name", "")
-            if not tool_name:
-                raise InvalidToolCalls("Can not use empty tool name")
-            if tool_name in conflict_tool_set:
-                if tool.get("name") not in seen:
-                    seen.add(tool_name)
-                else:
-                    has_error = True
+            if has_error:
+                raise ConflictToolCalls(f"Tool {', '.join(seen)} are not allowed to be called simultaneously in one tool_calls")
+            
+        if not content and not think:
+            if reasoning: 
+                agent_message.additional_kwargs['reasoning_content'] = fallback_content
+            else:
+                agent_message.content = fallback_content
 
-        if has_error:
-            raise InvalidToolCalls(f"Tool {', '.join(seen)} are not allowed to be called simultaneously in one tool_calls")
+        return agent_message
 
 
     def should_continue(self, state: MainAgentState):

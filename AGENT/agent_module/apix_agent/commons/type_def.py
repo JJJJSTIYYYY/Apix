@@ -5,7 +5,7 @@ from langchain_core.messages import AnyMessage
 from langchain.agents.middleware.todo import Todo
 
 
-class InvalidToolCalls(Exception):
+class ConflictToolCalls(Exception):
     
     def __init__(self, message="Invalid tool calls detected", errors=None):
         """        

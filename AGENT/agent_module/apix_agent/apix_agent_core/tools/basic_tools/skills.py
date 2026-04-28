@@ -16,13 +16,12 @@ from apix_agent.global_config import FILE_SERVICE_URL
 
 @tool
 async def load_skill(
-    name: str,
+    name: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
     """
-    Load the guide for a skill.
-    The sandbox must be configured before use this tool.
+    Load the guide for one or more skill.
 
     Skills provide reusable capabilities that help you accomplish tasks.
     Each skill contains documentation (SKILL.md) that explains:
@@ -56,6 +55,11 @@ async def load_skill(
     Returns:
         str: The skill guide (SKILL.md content) if successful, or an error message if loading fails.
     """
+    if isinstance(name, str):
+        skill_names = [name]
+    else:
+        skill_names = name
+
     client_id = state.get("client_id")
     target_platform = state.get("platform")
 
@@ -68,7 +72,7 @@ async def load_skill(
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "load_skill",
             "tool_call_id": tool_call_id,
-            "content": name,
+            "content": str(skill_names),
             "chunk_position": "start",
             "status": "success",
         }
@@ -92,11 +96,11 @@ async def load_skill(
                 "status": "fail",
             }
         )
-        
+
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured. Please call configure_sandbox first.",
+                    "Error: Sandbox not configured. Please info the user to configure it.",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -120,19 +124,23 @@ async def load_skill(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: No work_dir configured by user.",
+                    "Error: No work_dir configured by user. Please info the user to configure it.",
                     tool_call_id=tool_call_id
                 )
             ]
         })
 
     skills = state.get("skills") or []
-    skill_id = None
-    for skill in skills:
-        if skill['skill_name'] == name:
-            skill_id = skill['skill_id']
 
-    if not skill_id:
+    name_to_id = {
+        s["skill_name"]: s["skill_id"]
+        for s in skills
+    }
+
+    invalid = [n for n in skill_names if n not in name_to_id]
+    if invalid:
+        skill_names_available = list(name_to_id.keys())
+
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
             target_id=client_id, 
@@ -141,116 +149,129 @@ async def load_skill(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "load_skill",
                 "tool_call_id": tool_call_id,
-                "content": f"Error: Skill: {name} is not available.",
+                "content": f"Error: Skill: {invalid} is not available.",
                 "chunk_position": "end",
                 "status": "fail",
             }
         )
-        
-        skill_names = [item['skill_name'] for item in skills]
+
         return Command(update={
             "messages": [
                 ToolMessage(
-                    f"Error: Skill: {name} is not available.\nAvailable skills: {str(skill_names)}",
+                    f"Error: Skill: {invalid} is not available.\nAvailable skills: {skill_names_available}",
                     tool_call_id=tool_call_id
                 )
             ]
         })
 
-    try:
+    skill_dir = Path(base_path) / "SKILL"
+    skill_dir.mkdir(parents=True, exist_ok=True)
 
-        skill_dir = Path(base_path) / "SKILL"
-        skill_dir.mkdir(parents=True, exist_ok=True)
+    semaphore = asyncio.Semaphore(5)
+
+    async def load_one(name: str):
+
+        skill_id = name_to_id[name]
+
         skill_root = skill_dir / name
         skill_md_path = skill_root / "SKILL.md"
 
-        if not skill_md_path.exists():
+        try:
+            if not skill_md_path.exists():
 
-            client_id = state["client_id"]
+                async with semaphore:
 
-            url = f"{FILE_SERVICE_URL}/file/skills/fetch_skill"
+                    url = f"{FILE_SERVICE_URL}/file/skills/fetch_skill"
 
-            async with httpx.AsyncClient(timeout=120) as client:
-                resp = await client.get(
-                    url,
-                    params={
-                        "skill_id": skill_id,
-                        "client_id": client_id
-                    }
-                )
+                    async with httpx.AsyncClient(timeout=120) as client:
+                        resp = await client.get(
+                            url,
+                            params={
+                                "skill_id": skill_id,
+                                "client_id": client_id
+                            }
+                        )
 
-            if resp.status_code != 200:
-                raise RuntimeError(
-                    f"Failed to download skill package: {resp.text}"
-                )
+                    if resp.status_code != 200:
+                        raise RuntimeError(
+                            f"Failed to download skill package: {resp.text}"
+                        )
 
-            zip_bytes = resp.content
+                    zip_bytes = resp.content
 
-            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-                await asyncio.to_thread(zf.extractall, skill_dir)
+                    def extract():
+                        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                            zf.extractall(skill_dir)
 
-        if not skill_md_path.exists():
-            skill_md_path = next(skill_root.rglob("SKILL.md"))
-        if not skill_md_path:
-            raise RuntimeError("SKILL.md not found")
+                    await asyncio.to_thread(extract)
 
-        guide = skill_md_path.read_text(encoding="utf-8")
-        if guide.startswith("---"):
-            parts = guide.split("---", 2)
-            if len(parts) >= 3:
-                guide = parts[2].lstrip("\n")
+            if not skill_md_path.exists():
+                skill_md_path = next(skill_root.rglob("SKILL.md"))
 
-        event_writer.send_event(
-            event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
-            data={
-                "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "load_skill",
-                "tool_call_id": tool_call_id,
-                "content": f"Skill '{name}' loaded.",
-                "chunk_position": "end",
-                "status": "success",
+            guide = skill_md_path.read_text(encoding="utf-8")
+
+            if guide.startswith("---"):
+                parts = guide.split("---", 2)
+                if len(parts) >= 3:
+                    guide = parts[2].lstrip("\n")
+
+            return {
+                "status": "ok",
+                "name": name,
+                "guide": guide
             }
-        )
-        content = f"Skill `{name}` Load Success."
 
-        loaded_skills_cache = state.get("loaded_skills_cache", []) or []
-        loaded_skills_cache.append((name, False, guide + f"\n\n## Skill Relevant Files in Directory `/workspace/SKILL/{name}`"))
-
-        return Command(update={
-            "messages": [
-                ToolMessage(
-                    content,
-                    tool_call_id=tool_call_id
-                )
-            ],
-            "loaded_skills_cache": loaded_skills_cache
-        })
-
-    except Exception as e:
-
-        err = f"Error loading skill '{name}': {type(e)}: {str(e)}"
-
-        event_writer.send_event(
-            event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
-            data={
-                "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "load_skill",
-                "tool_call_id": tool_call_id,
-                "content": err,
-                "chunk_position": "end",
-                "status": "fail",
+        except Exception as e:
+            return {
+                "status": "error",
+                "name": name,
+                "error": f"{type(e)}: {str(e)}"
             }
-        )
 
-        return Command(update={
-            "messages": [
-                ToolMessage(
-                    err,
-                    tool_call_id=tool_call_id
-                )
-            ]
-        })
+    results = await asyncio.gather(
+        *(load_one(n) for n in skill_names),
+        return_exceptions=False
+    )
+
+    loaded_skills_cache = state.get("loaded_skills_cache", []) or []
+
+    success = []
+    failed = []
+
+    for r in results:
+        if r["status"] == "ok":
+            success.append(r["name"])
+            loaded_skills_cache.append((
+                r["name"],
+                False,
+                r["guide"] + f"\n\n## Skill Relevant Files in Directory `/workspace/SKILL/{r['name']}`"
+            ))
+        else:
+            failed.append(f"{r['name']}: {r['error']}")
+
+    event_writer.send_event(
+        event=AgentStreamEvent.TOOL_EXEC_END, 
+        target_id=client_id, 
+        target_platform=target_platform,
+        data={
+            "event_name": "tool_exec_chunk_rtn",
+            "tool_name": "load_skill",
+            "tool_call_id": tool_call_id,
+            "content": f"{len(success)} success, {len(failed)} failed",
+            "chunk_position": "end",
+            "status": "success" if success else "fail",
+        }
+    )
+
+    msg = ""
+    if success:
+        msg += f"Loaded skills: {success}\n"
+    if failed:
+        msg += "\nFailed:\n" + "\n".join(failed)
+
+    return Command(update={
+        "messages": [
+            ToolMessage(msg.strip(), tool_call_id=tool_call_id)
+        ],
+        "loaded_skills_cache": loaded_skills_cache
+    })

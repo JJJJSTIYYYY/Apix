@@ -7,6 +7,7 @@ from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 
 from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.global_config import TOOLS_MAX_OUTPUT_LENGTH
 
 
 @tool
@@ -16,8 +17,7 @@ async def run_workspace_command(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
     """
-    Execute a shell command inside Docker sandbox (/workspace).
-    The sandbox must be configured before use this tool.
+    Execute a shell command inside the sandbox (/workspace).
 
     Args: 
         command (str): The shell command to execute. 
@@ -85,7 +85,7 @@ async def run_workspace_command(
         return Command(update={
             "messages": [
                 ToolMessage(
-                    "Error: Sandbox not configured. Please call configure_sandbox first.",
+                    "Error: Sandbox not configured. Please info the user to configure it.",
                     tool_call_id=tool_call_id
                 )
             ]
@@ -133,9 +133,8 @@ async def run_workspace_command(
 
         output = stdout.decode() + stderr.decode()
 
-        MAX_OUTPUT = 4000
-        if len(output) > MAX_OUTPUT:
-            output = output[:MAX_OUTPUT//2] + "\n\n...[output truncated]...\n\n" + output[-MAX_OUTPUT//2:]
+        if len(output) > TOOLS_MAX_OUTPUT_LENGTH:
+            output = output[:TOOLS_MAX_OUTPUT_LENGTH//2] + "\n\n...[output truncated]...\n\n" + output[-TOOLS_MAX_OUTPUT_LENGTH//2:]
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 

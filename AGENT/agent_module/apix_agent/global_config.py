@@ -16,6 +16,8 @@ BASE_DIR = "../model_running_time/" # Download cache dir
 
 SANDBOX_DOCKER_IMAGE_NAME = "agent-sandbox:latest" # Sandbox image name.
 
+TOOLS_MAX_OUTPUT_LENGTH = 32000
+
 BASE_URL = {       # Base URL for the LLM service
     # Ollama
     'ollama:local': 'http://localhost:11434',  # Local

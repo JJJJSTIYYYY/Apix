@@ -11,6 +11,7 @@ from langgraph.types import Command
 from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
+from apix_agent.global_config import TOOLS_MAX_OUTPUT_LENGTH
 
 
 @tool
@@ -98,7 +99,7 @@ async def run_python_code(
         )
         return Command(update={
             "messages": [
-                ToolMessage("Error: Sandbox configure failed.", tool_call_id=tool_call_id)
+                ToolMessage("Error: Sandbox configure failed. Please info the user to configure it.", tool_call_id=tool_call_id)
             ]
         })
 
@@ -185,9 +186,8 @@ async def run_python_code(
         if not output:
             output = "Python code executed successfully (no output)."
 
-        MAX_OUTPUT = 8000
-        if len(output) > MAX_OUTPUT:
-            output = output[:MAX_OUTPUT] + "\n...[output truncated]"
+        if len(output) > TOOLS_MAX_OUTPUT_LENGTH:
+            output = output[:TOOLS_MAX_OUTPUT_LENGTH] + "\n...[output truncated]"
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 

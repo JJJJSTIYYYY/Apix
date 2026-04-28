@@ -89,4 +89,4 @@ def get_available_tools(permission: str | list[str] = "", filter_by_name: list[s
 
 
 # Tools in this set are not allowed to be called simultaneously in one tool_calls
-conflict_tool_set = {"write_todos", "update_memorandum"}
+conflict_tool_set = {"write_todos", "update_memorandum", "load_skill"}
