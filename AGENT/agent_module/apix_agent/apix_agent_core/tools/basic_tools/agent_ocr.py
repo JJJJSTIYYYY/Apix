@@ -196,7 +196,7 @@ async def ocr_analysis(
             target_platform=target_platform,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "ocr_analysis",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -221,7 +221,7 @@ async def ocr_analysis(
             target_platform=target_platform,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "ocr_analysis",
                 "tool_call_id": tool_call_id,
                 "content": "No file_path provided",
                 "chunk_position": "end",

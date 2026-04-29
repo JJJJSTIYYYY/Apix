@@ -209,7 +209,8 @@ async def fetch_conversation_list(req: Request):
                     "last_active_at": str,
                     "created_at": str,
                     "latest_cursor": int,
-                    "is_pinned": int (tinny_int)
+                    "is_pinned": bool,
+                    "has_new_message": bool
                 },
                 ...
             ]
@@ -247,6 +248,7 @@ async def update_conversation(req: Request):
             "workspace": "Agent work dir",
             "is_pinned": bool,
             "is_deleted": bool,
+            "has_new_message": bool
         }
 
     Returns:

@@ -357,7 +357,8 @@ function registerAiIpc() {
           title: new_info.title ?? null,
           workspace: new_info.workspace ?? null,
           is_pinned: new_info.star ?? null,
-          is_deleted: new_info.deleted ?? null
+          is_deleted: new_info.deleted ?? null,
+          has_new_message: new_info.has_new_message ?? null
         })
       });
       const data = await res.json();

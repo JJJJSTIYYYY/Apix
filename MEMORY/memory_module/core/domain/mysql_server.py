@@ -331,6 +331,7 @@ class MysqlService:
                 "workspace": "Agent work dir",
                 "is_pinned": bool,
                 "is_deleted": bool,
+                "has_new_message": bool
             }
 
         Return:
@@ -348,7 +349,8 @@ class MysqlService:
             title = payload.get("title", None)
             pinned = bool(payload.get("is_pinned", None))
             is_deleted = bool(payload.get("is_deleted", None))
-            await self._call_procedure("update_conversation", (user_uid, conversation_uid, title, workspace, session_id, pinned, is_deleted))
+            has_new_message = bool(payload.get("has_new_message", None))
+            await self._call_procedure("update_conversation", (user_uid, conversation_uid, title, workspace, session_id, pinned, is_deleted, has_new_message))
             return {
                 "success": True,
                 "messages": f"{conversation_uid}",

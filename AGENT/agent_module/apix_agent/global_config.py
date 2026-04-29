@@ -51,8 +51,6 @@ AGENT_SERVICE_URL = "http://localhost:5091"  # Apix service URL
 
 TOOLS_SERVICE_URL = "http://localhost:5092"  # Tools service URL
 
-MEMORY_SERVICE_URL = "ws://localhost:5093"  # Memory service URL, websocket url
-
 MEMORY_SERVICE_BASE_URL = "http://localhost:5093"
 
 FILE_SERVICE_URL = "http://localhost:5094"
@@ -63,10 +61,10 @@ AGENT_SERVICE_ID = str(uuid.uuid4().hex)
 
 LOAD_FORIGN_TOOL = False
 
-GENERATION_TTL = 300  # Clear those finished and aborted generation ctx, seconds
+GENERATION_TTL = 600  # Clear those finished and aborted generation ctx, seconds
 CONTIANER_TTL = 6000
-GRAPH_CACHE_TTL = 300
-CACHE_CLEAN_INTERVAL = 150
+GRAPH_CACHE_TTL = 600
+CACHE_CLEAN_INTERVAL = 300
 
 _ORIGINAL_PROXY_ENV = {
     "HTTP_PROXY": os.environ.get("HTTP_PROXY"),

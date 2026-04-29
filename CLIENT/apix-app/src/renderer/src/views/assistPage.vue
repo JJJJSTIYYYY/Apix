@@ -545,6 +545,8 @@ async function get_conversation_list(cidValue: string) {
       tokens: raw_chat.latest_cursor,
       star: raw_chat.is_pinned,
       createTime: raw_chat.create_at,
+      isGenerating: false,
+      hasNewMessage: raw_chat.has_new_message,
     })
   }
   return chat_list
@@ -753,6 +755,17 @@ const handleSelectHistory = async (id: string | number) => {
   const index = historyList.value.findIndex(c => String(c.id) === store.current_history_id)
   if (index !== -1) {
     historyList.value[index].hasNewMessage = false
+
+    try {
+      await window.api.updateConversation(
+        cid.value,
+        "",
+        nextHid,
+        { has_new_message: false }
+      )
+    } catch (err) {
+      console.log("[handleSelectHistory] Update conversation error: " + err)
+    }
   }
 
   nextTick(scrollToBottom)
