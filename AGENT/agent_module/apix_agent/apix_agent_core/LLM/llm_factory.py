@@ -29,6 +29,10 @@ def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfig
         from .llm_creator import get_moonshot_model
         moonshot_model = get_moonshot_model(model, api_key, BASE_URL.get(provider)+'/v1', config)
         return moonshot_model
+    elif provider == "xiaomimimo":
+        from .llm_creator import get_xiaomi_model
+        openai_model = get_xiaomi_model(model, api_key, BASE_URL.get(provider)+'/v1', config)
+        return openai_model
     elif provider == "google":
         raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
         from .llm_creator import get_google_model

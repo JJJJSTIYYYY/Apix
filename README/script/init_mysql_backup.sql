@@ -30,6 +30,7 @@ CREATE TABLE conversations (
 
     last_active_at TIMESTAMP NOT NULL COMMENT 'Last message time',
     latest_cursor BIGINT NOT NULL DEFAULT 0 COMMENT 'Latest message id, Monotonic message cursor for this conversation',
+    has_new_message BOOLEAN DEFAULT FALSE,
 
     is_pinned BOOLEAN DEFAULT FALSE,
     is_deleted BOOLEAN DEFAULT FALSE,
@@ -436,7 +437,8 @@ CREATE PROCEDURE update_conversation (
     IN p_workspace VARCHAR(255),
     IN p_session_id VARCHAR(64),
     IN p_is_pinned TINYINT(1),
-    IN p_is_deleted TINYINT(1)
+    IN p_is_deleted TINYINT(1),
+    IN p_new_message BOOLEAN
 )
 BEGIN
     UPDATE conversations
@@ -445,7 +447,8 @@ BEGIN
         work_space = IF(p_workspace IS NULL, work_space, p_workspace),
         session_id = IF(p_session_id IS NULL, session_id, p_session_id),
         is_pinned = IF(p_is_pinned IS NULL, is_pinned, p_is_pinned),
-        is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted)
+        is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted),
+        has_new_message = IF(p_new_message IS NULL, has_new_message, p_new_message)
     WHERE user_uid = p_user_uid
       AND conversation_uid = p_conversation_uid;
 
@@ -473,7 +476,8 @@ BEGIN
         last_active_at,
         created_at,
         latest_cursor,
-        is_pinned
+        is_pinned,
+        has_new_message
     FROM conversations
     WHERE user_uid = p_user_uid
         AND is_deleted != TRUE
@@ -906,7 +910,8 @@ BEGIN
             IFNULL(latest_timestamp, p_msg_timestamp),
             p_msg_timestamp
         ),
-        last_active_at = CURRENT_TIMESTAMP
+        last_active_at = CURRENT_TIMESTAMP,
+        has_new_message = IF(p_role = 'human', FALSE, TRUE)
     WHERE id = v_conversation_id;
 
     -- 5. Return result

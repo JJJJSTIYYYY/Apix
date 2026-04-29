@@ -40,6 +40,9 @@ BASE_URL = {       # Base URL for the LLM service
 
     # Moonshot (月之暗面)
     'moonshot': 'https://api.moonshot.cn',
+
+    # XiaomiMIMO
+    'xiaomimimo': 'https://api.xiaomimimo.com',
 }  
 
 

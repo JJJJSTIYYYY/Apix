@@ -56,25 +56,6 @@ async def get_models_list(request_data: Request):
             logger.error(f"[get_models_list][ollama]: {e}")
 
     # --------------------
-    # OpenAI
-    # --------------------
-    elif model_provider == "openai":
-        try:
-            response = httpx.get(
-                f"{BASE_URL.get(model_provider)}/v1/models",
-                headers={"Authorization": f"Bearer {api_key}"}
-            )
-            response.raise_for_status()
-
-            for model in response.json().get("data", []):
-                # OpenAI model id is stored in "id"
-                raw_models_name_list.append(model.get("id"))
-
-        except Exception as e:
-            raw_models_name_list.append(f'Error occurred: {e}')
-            logger.error(f"[get_models_list][openai]: {e}")
-
-    # --------------------
     # Google Gemini
     # --------------------
     elif model_provider == "google":
@@ -88,9 +69,9 @@ async def get_models_list(request_data: Request):
 
     # --------------------
     # OpenAI-compatible providers
-    # (Qwen / DeepSeek)
+    # (Qwen / DeepSeek / XiaomiMIMO)
     # --------------------
-    elif model_provider in ("qwen", "deepseek", "moonshot"):
+    elif model_provider in ("openai", "qwen", "deepseek", "moonshot", "xiaomimimo"):
         try:
 
             response = httpx.get(

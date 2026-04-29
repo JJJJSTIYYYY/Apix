@@ -77,15 +77,16 @@ class LlmNodeAdapter:
         """
         To adapt different model provider.
         """
-        if provider not in ['ollama:local', 'ollama', 'openai', 'deepseek', 'moonshot']:
+        if provider not in ['ollama:local', 'ollama', 'openai', 'deepseek', 'moonshot', 'xiaomimimo']:
             raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
-        if provider == 'deepseek':
-            # enable_think = bool(config.get("enable_think", False))
-            # if enable_think: model = 'deepseek-reasoner'
-            # else: model = 'deepseek-chat'
-            return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
-        else:
-            return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
+        # if provider == 'deepseek':
+        #     # enable_think = bool(config.get("enable_think", False))
+        #     # if enable_think: model = 'deepseek-reasoner'
+        #     # else: model = 'deepseek-chat'
+        #     return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
+        # else:
+        #     return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
+        return get_llm_node(provider=provider, model=model, api_key=api_key, config=config)
 
         
     @classmethod
@@ -138,6 +139,22 @@ class LlmNodeAdapter:
             async for chunk in llm_node.astream(input):
                 yield chunk
             return
+
+        if provider == "xiaomimimo" or (
+            model_name and model_name.startswith("mimo")
+        ):
+            # If current model not match → rebuild
+            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
+                llm_node = get_llm_node(
+                    provider="xiaomimimo",
+                    model=model_name,
+                    api_key=api_key,
+                    config={"enable_think": reasoning},
+                )
+
+            async for chunk in llm_node.astream(input):
+                yield chunk
+            return
         
         if provider == "moonshot" or (
             model_name and model_name.startswith(("moonshot", "kimi"))
@@ -165,7 +182,7 @@ class LlmNodeAdapter:
         *,
         input,
         reasoning: bool = False,
-    ) -> AIMessage:
+    ):
         """
         Unified non-stream invoke interface.
 
@@ -202,7 +219,21 @@ class LlmNodeAdapter:
                     provider="deepseek",
                     model=model_name,
                     api_key=api_key,
-                    config=config,
+                    config={"enable_think": reasoning},
+                )
+
+            return await llm_node.ainvoke(input)
+
+        if provider == "xiaomimimo" or (
+            model_name and model_name.startswith("mimo")
+        ):
+            # If current model not match → rebuild
+            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
+                llm_node = get_llm_node(
+                    provider="xiaomimimo",
+                    model=model_name,
+                    api_key=api_key,
+                    config={"enable_think": reasoning},
                 )
 
             return await llm_node.ainvoke(input)

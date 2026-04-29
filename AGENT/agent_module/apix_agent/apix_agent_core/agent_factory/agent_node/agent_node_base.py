@@ -8,7 +8,7 @@ from langgraph.graph import END
 from langchain_core.messages import AIMessageChunk, ToolMessage, AIMessage
 
 from apix_agent.apix_agent_core.agent_factory.prompt import *
-from apix_agent.commons.type_def import MainAgentState, ConflictToolCalls
+from apix_agent.commons.type_def import InvalidOutputsError, MainAgentState, ConflictToolCalls
 from apix_agent.commons.logger import logger
 from apix_agent.commons.common_func import get_date_natural_language
 from apix_agent.apix_agent_core.tools.registry import conflict_tool_set
@@ -109,11 +109,13 @@ class AgentNodeBase(ABC):
             if has_error:
                 raise ConflictToolCalls(f"Tool {', '.join(seen)} are not allowed to be called simultaneously in one tool_calls")
             
-        if not content and not think:
+        if not content and not think and tool_calls: 
             if reasoning: 
                 agent_message.additional_kwargs['reasoning_content'] = fallback_content
             else:
                 agent_message.content = fallback_content
+        elif not content and not think and not tool_calls: 
+            raise InvalidOutputsError("Empty ai message detected")
 
         return agent_message
 

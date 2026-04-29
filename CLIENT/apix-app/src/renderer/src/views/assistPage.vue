@@ -285,6 +285,7 @@ import openaiIcon from '../assets/icons/llm_providers/openai.svg'
 import deepseekIcon from '../assets/icons/llm_providers/deepseek.svg'
 import moonshotIcon from '../assets/icons/llm_providers/moonshot.svg'
 import qwenIcon from '../assets/icons/llm_providers/qwen.svg'
+import xiaomiIcon from '../assets/icons/llm_providers/xiaomimimo.svg'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()
@@ -1398,6 +1399,19 @@ async function handleStreamEnd(payload: any, historyId: string) {
     if (store.current_history_id !== historyId) {
       historyList.value[hIndex].hasNewMessage = true
     }
+    else {
+      historyList.value[hIndex].hasNewMessage = false
+      try {
+        await window.api.updateConversation(
+          cid.value,
+          "",
+          historyId,
+          { has_new_message: false }
+        )
+      } catch (err) {
+        console.log("[handleSelectHistory] Update conversation error: " + err)
+      }
+    }
   }
 }
 
@@ -1441,6 +1455,19 @@ async function handleStreamAbort(payload: any, historyId: string) {
     historyList.value[hIndex].isGenerating = false
     if (store.current_history_id !== historyId) {
       historyList.value[hIndex].hasNewMessage = true
+    }
+    else {
+      historyList.value[hIndex].hasNewMessage = false
+      try {
+        await window.api.updateConversation(
+          cid.value,
+          "",
+          historyId,
+          { has_new_message: false }
+        )
+      } catch (err) {
+        console.log("[handleSelectHistory] Update conversation error: " + err)
+      }
     }
   }
 }
@@ -2024,6 +2051,7 @@ const modelPoviderOptions = [
   { label: 'DeepSeek', value: 'deepseek', icon: deepseekIcon },
   { label: '通义千问', value: 'qwen', icon: qwenIcon },
   { label: '月之暗面', value: 'moonshot', icon: moonshotIcon },
+  { label: '小米MiMO', value: 'xiaomimimo', icon: xiaomiIcon },
 ]
 
 const renderSingleSelectTag = ({ option }: any) => {

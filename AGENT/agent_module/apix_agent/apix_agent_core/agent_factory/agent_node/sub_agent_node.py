@@ -14,7 +14,7 @@ from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.apix_agent_core.context_manager.generating_cache import generating_cache
-from apix_agent.commons.type_def import ConflictToolCalls, SubAgentState
+from apix_agent.commons.type_def import ConflictToolCalls, InvalidOutputsError, SubAgentState
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent_factory.agent_node.agent_node_base import AgentNodeBase
 from apix_agent.global_config import MAX_RETRY
@@ -507,6 +507,19 @@ class SubAgentNode(AgentNodeBase):
                         "llm_retry_count": llm_retry_count,
                         "error": "others",
                         "error_detail": e.message
+                    },
+                )
+            else:
+                raise e
+
+        except InvalidOutputsError as e:
+            llm_retry_count = state.get("llm_retry_count", 0) + 1
+            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            if llm_retry_count < MAX_RETRY:
+                return Command(
+                    update={
+                        "llm_retry_count": llm_retry_count,
+                        "error": "others"
                     },
                 )
             else:
