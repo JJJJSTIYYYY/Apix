@@ -33,7 +33,11 @@
           </el-header>
 
           <el-main class="main-window">
-            <router-view></router-view>
+            <router-view v-slot="{ Component }">
+              <keep-alive>
+                <component :is="Component" />
+              </keep-alive>
+            </router-view>
           </el-main>
         </el-container>
       </div>
@@ -79,7 +83,6 @@ function playSpin() {
     return
   }
   el.classList.remove('spin')
-  // 强制回流以重触发 CSS 动画
   void (el as HTMLElement).offsetWidth
   el.classList.add('spin')
   const handler = () => {
@@ -112,32 +115,6 @@ async function showAppInfo() {
   overflow: hidden;
 }
 
-/* 点阵背景层 */
-.app-wrapper::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-
-  /* === 点阵参数 === */
-  --dot-size: 1px;     /* 点大小 */
-  --dot-gap: 24px;     /* 点间距 */
-  --dot-color: rgba(119, 166, 157, 0.041);
-
-  background-image:
-    radial-gradient(
-      circle,
-      var(--dot-color) var(--dot-size),
-      transparent calc(var(--dot-size) + 1px)
-    );
-
-  background-size: var(--dot-gap) var(--dot-gap);
-  background-position: center;
-
-  pointer-events: none; /* 不影响点击 / 拖拽 */
-}
-
-/* 确保内容在点阵之上 */
 .app-wrapper > * {
   position: relative;
   z-index: 1;

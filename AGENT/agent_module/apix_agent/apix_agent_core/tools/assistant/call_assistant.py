@@ -77,14 +77,13 @@ async def assign_sub_assistant(
     """
 
     assistant_name = agent_identity
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "assign_sub_assistant",
@@ -102,8 +101,7 @@ async def assign_sub_assistant(
     if not assistant_name or not task_description or not instruction:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_call_id": tool_call_id,
@@ -200,8 +198,7 @@ async def assign_sub_assistant(
         
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "assign_sub_assistant",
@@ -227,8 +224,7 @@ async def assign_sub_assistant(
         logger.exception(f'[assign_sub_assistant] Error occurred: {str(e)}')
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "assign_sub_assistant",
@@ -298,14 +294,13 @@ async def query_sub_assistant(
     that means the sub-agent is generating the final response. Please continue waiting before completed.
     """
 
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "query_sub_assistant",
@@ -334,8 +329,7 @@ async def query_sub_assistant(
         
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "query_sub_assistant",
@@ -361,8 +355,7 @@ async def query_sub_assistant(
         logger.exception(f'[query_sub_assistant] Error occurred: {str(e)}')
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "query_sub_assistant",
@@ -435,14 +428,13 @@ async def stop_sub_assistant(
     Stopping a task does not guarantee immediate termination.
     The task system will attempt to stop the task gracefully.
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "stop_sub_assistant",
@@ -460,8 +452,7 @@ async def stop_sub_assistant(
     if not task_ids:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "stop_sub_assistant",
@@ -499,8 +490,7 @@ async def stop_sub_assistant(
         
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "stop_sub_assistant",
@@ -526,8 +516,7 @@ async def stop_sub_assistant(
         logger.exception(f'[stop_sub_assistant] Error occurred: {str(e)}')
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "stop_sub_assistant",

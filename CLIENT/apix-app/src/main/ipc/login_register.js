@@ -2,7 +2,7 @@
 import { ipcMain } from "electron"
 import crypto from "crypto"
 
-const API_BASE = "http://127.0.0.1:5093"
+import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // AES-128-CBC config must match server
 const AES_KEY = Buffer.from("0123456789abcdef")
@@ -30,7 +30,7 @@ export function registerLogreIpc() {
    */
   ipcMain.handle("auth:login", async (_, payload) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetch(`${MEMORY_API_BASE}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,7 +58,7 @@ export function registerLogreIpc() {
    */
   ipcMain.handle("auth:register", async (_, payload) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
+      const res = await fetch(`${MEMORY_API_BASE}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -86,7 +86,7 @@ export function registerLogreIpc() {
    */
   ipcMain.handle("auth:ensure_user", async (_, client_id) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/ensure_user`, {
+      const res = await fetch(`${MEMORY_API_BASE}/auth/ensure_user`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

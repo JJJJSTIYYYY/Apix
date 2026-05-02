@@ -3,6 +3,7 @@ import inspect
 import json
 import time
 from typing import Callable, Dict
+from uuid import uuid4
 from core.commons.logger import logger
 
 from core.domain.redis_server import RedisService
@@ -1070,6 +1071,113 @@ class DataExecutors:
         except Exception as e:
             logger.exception(
                 f"[DataExecutors][insert_shortterm_memory] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    # --------------------------------------------------
+    # LLM Provider
+    # --------------------------------------------------
+    @task_handler("create_llm_provider")
+    async def create_llm_provider(self, payload: dict) -> dict:
+        """
+        Insert a llm provider meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][create_llm_provider] enter.")
+            provider_id = str(uuid4().hex)
+            payload["provider_id"] = provider_id
+
+            return await self.mysql.create_llm_provider(payload)
+        
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][create_llm_provider] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("get_llm_providers")
+    async def get_llm_providers(self, payload: dict) -> dict:
+        """
+        Get all llm provider meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_llm_providers] enter.")
+
+            mysql_res = await self.mysql.get_llm_providers(payload)
+            if not mysql_res.get("success"):
+                return mysql_res
+            
+            parsed = []
+            providers = mysql_res.get("messages", []) or []
+            for p in providers:
+                model_list = p.get("model_list", []) or []
+                if not isinstance(model_list, list):
+                    p["model_list"] = json.loads(model_list)
+                parsed.append(p)
+            
+            mysql_res["messages"] = parsed
+            return mysql_res
+        
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_llm_providers] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("get_llm_provider_by_id")
+    async def get_llm_provider_by_id(self, payload: dict) -> dict:
+        """
+        Get a llm provider meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_llm_provider_by_id] enter.")
+
+            mysql_res = await self.mysql.get_llm_provider_by_id(payload)
+            if not mysql_res.get("success"):
+                return mysql_res
+            
+            parsed = []
+            providers = mysql_res.get("messages", []) or []
+            for p in providers:
+                model_list = p.get("model_list", []) or []
+                if not isinstance(model_list, list):
+                    p["model_list"] = json.loads(model_list)
+                parsed.append(p)
+            
+            mysql_res["messages"] = parsed
+            return mysql_res
+        
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_llm_provider_by_id] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("update_llm_provider")
+    async def update_llm_provider(self, payload: dict) -> dict:
+        """
+        Update a llm provider meta in database, include is_deleted status.
+        """
+        try:
+            logger.info("[DataExecutors][update_llm_provider] enter.")
+
+            return await self.mysql.update_llm_provider(payload)
+        
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][update_llm_provider] error: {e}"
             )
             return {
                 "success": False,

@@ -4,7 +4,6 @@
       <HomePage />
     </el-aside>
 
-    <keep-alive>
     <el-main class="main-area">
       <div 
         class="ai-page-wrapper" 
@@ -259,12 +258,11 @@
         </div>
       </div>
     </el-main>
-    </keep-alive>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, reactive, watch, onMounted, onBeforeUnmount, h, computed, toRaw } from 'vue'
+import { ref, nextTick, reactive, watch, onActivated, onMounted, onBeforeUnmount, h, computed, toRaw } from 'vue'
 import type { TagProps } from 'element-plus'
 import HomePage from './homePage.vue'
 import HumanMessageBubble from './component/msg_bubble_body/human_message_bubble.vue'
@@ -286,6 +284,7 @@ import deepseekIcon from '../assets/icons/llm_providers/deepseek.svg'
 import moonshotIcon from '../assets/icons/llm_providers/moonshot.svg'
 import qwenIcon from '../assets/icons/llm_providers/qwen.svg'
 import xiaomiIcon from '../assets/icons/llm_providers/xiaomimimo.svg'
+import customIcon from '../assets/icons/llm_providers/custom.svg'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()
@@ -512,6 +511,26 @@ function ensureGeneratingState(hid: string): GeneratingState {
     }) as GeneratingState
   }
   return generatingState[hid]
+}
+
+function ensureAiMessage(list: ChatMessage[], historyId: string, generationId: string) {
+  let index = findLatestIndexById(list, generationId, 'ai')
+  if (index === -1) {
+    list.push({
+      id: generationId,
+      cid: cid.value,
+      hid: historyId,
+      role: 'ai',
+      label: '已准备',
+      content: [],
+      think: [],
+      info: null,
+      pending: true,
+      lastField: undefined,
+    })
+    index = list.length - 1
+  }
+  return index
 }
 
 const isGenerating = computed(() => {
@@ -1026,11 +1045,22 @@ const handleHideHistory = (toHide: boolean) => {
   isHistoryHide.value = toHide
 }
 
+// const actionMap: Record<string, (payload: any, historyId: string) => void> = {
+//   msg_stream_start: handleStreamStart,
+//   think_chunk_rtn: handleThinkChunkRtn,
+//   content_chunk_rtn: handleContentChunkRtn,
+//   info_chunk_rtn: handleInfoChunkRtn,
+//   msg_stream_end: handleStreamEnd,
+//   msg_stream_abort: handleStreamAbort,
+//   async_tool_return: handleAsyncToolRtn,
+//   tool_exec_chunk_rtn: handleToolChunkRtn,
+//   token_limit_warning: handleWarning,
+// }
+
 const actionMap: Record<string, (payload: any, historyId: string) => void> = {
   msg_stream_start: handleStreamStart,
   think_chunk_rtn: handleThinkChunkRtn,
   content_chunk_rtn: handleContentChunkRtn,
-  info_chunk_rtn: handleInfoChunkRtn,
   msg_stream_end: handleStreamEnd,
   msg_stream_abort: handleStreamAbort,
   async_tool_return: handleAsyncToolRtn,
@@ -1050,225 +1080,13 @@ function handleWsMessage(payload: any) {
     historyList.value[index].isGenerating = true
   }
 
-  const handler = actionMap[payload.action]
+  const event_name = payload.data?.messages?.event_name
+  const handler = actionMap[event_name]
   if (handler) {
     handler(payload, historyId)
   }
-}
-
-const showDropLayer = ref(false)
-let dragEnterCounter = 0
-
-function onDragEnter(e: DragEvent) {
-  e.preventDefault()
-  dragEnterCounter++
-  showDropLayer.value = true
-  console.log('Drag enter, counter:', dragEnterCounter)
-}
-
-function onDragLeave(e: DragEvent) {
-  e.preventDefault()
-  dragEnterCounter--
-  if (dragEnterCounter === 0) {
-    showDropLayer.value = false
-  }
-  console.log('Drag leave, counter:', dragEnterCounter)
-}
-
-async function onDrop(e: DragEvent) {
-  if (isUploading.value) return
-
-  const { webUtils } = require('electron')
-  e.preventDefault()
-
-  dragEnterCounter = 0
-  showDropLayer.value = false
-
-  const files = Array.from(e.dataTransfer?.files || [])
-  if (files.length === 0) return
-
-  const path_list = files
-    .map(f => {
-      try {
-        return webUtils.getPathForFile(f)
-      } catch (e) {
-        console.warn('getPathForFile failed:', e)
-        return null
-      }
-    })
-    .filter(Boolean) as string[]
-
-  console.log('Drop files:', path_list)
-
-  if (path_list.length === 0) return
-
-  try {
-    await handleFilePaths(path_list)
-  } catch (err) {
-    console.error('drop upload failed:', err)
-    ElMessage({
-      type: 'error',
-      message: '上传失败' + String(err),
-      plain: true,
-    })
-  }
-}
-
-async function onPaste(e: ClipboardEvent) {
-  if (isUploading.value) return
-
-  const { webUtils, clipboard, nativeImage } = require('electron')
-
-  const items = Array.from(e.clipboardData?.items || [])
-  console.log('Clipboard items:', items)
-
-  let handled = false
-  const pathList: string[] = []
-
-  // 优先走标准 clipboardData
-  for (const item of items) {
-    if (item.kind !== 'file') continue
-
-    handled = true
-    
-    const file = item.getAsFile()
-    if (!file) continue
-    console.log('Processing clipboard item:', item)
-
-    try {
-      const filePath = webUtils.getPathForFile(file)
-      if (filePath) {
-        pathList.push(filePath)
-        continue
-      }
-    } catch {}
-
-    try {
-      const buffer = await file.arrayBuffer()
-      const base64 = Buffer.from(buffer).toString('base64')
-
-      const tempPath = await window.api.createTempFileFromBase64(base64, file.name || `paste_${Date.now()}.png`)
-
-      if (tempPath) {
-        pathList.push(tempPath)
-      }
-    } catch (err) {
-      console.error('createTempFileFromBase64 failed:', err)
-    }
-  }
-
-  // fallback：Electron clipboard
-  if (!handled) {
-    try {
-      const image = clipboard.readImage()
-
-      if (!image.isEmpty()) {
-        e.preventDefault()
-
-        const buffer = image.toPNG()
-        const base64 = buffer.toString('base64')
-
-        const tempPath = await window.api.createTempFileFromBase64({
-          base64,
-          fileName: `paste_${Date.now()}.png`,
-        })
-
-        if (tempPath) {
-          console.log('Clipboard image fallback success:', tempPath)
-          pathList.push(tempPath)
-        }
-      }
-    } catch (err) {
-      console.error('clipboard fallback failed:', err)
-    }
-  }
-
-  if (pathList.length === 0) return
-
-  // 只要处理了文件，就阻止默认文本粘贴
-  e.preventDefault()
-
-  try {
-    await handleFilePaths(pathList)
-  } catch (err) {
-    console.error('paste upload failed:', err)
-    ElMessage({
-      type: 'error',
-      message: '上传失败' + String(err),
-      plain: true,
-    })
-  }
-}
-
-const handleConnectProject = async () => {
-  const result = await window.api.openFileDialog("folder")
-  if (result.canceled || result.filePaths.length === 0) {
-    return
-  }
-
-  // console.log('Current history id: ', store.current_history_id)
-  if (store.current_history_id !== '-1') {
-    store.setWorkDir(store.current_history_id, result.filePaths[0])
-
-    try {
-      await window.api.updateConversation(
-        cid.value,
-        "",
-        store.current_history_id,
-        { workspace: result.filePaths[0] }
-      )
-    } catch (err) {
-      console.log("Set workspace err: "+err)
-    }
-  }
-  store.currentWorkDir = result.filePaths[0]
-  store.removeWorkDir('-1')
-}
-
-function ensureAiMessage(list: ChatMessage[], historyId: string, generationId: string) {
-  let index = findLatestIndexById(list, generationId, 'ai')
-  if (index === -1) {
-    list.push({
-      id: generationId,
-      cid: cid.value,
-      hid: historyId,
-      role: 'ai',
-      label: '已准备',
-      content: [],
-      think: [],
-      info: null,
-      pending: true,
-      lastField: undefined,
-    })
-    index = list.length - 1
-  }
-  return index
-}
-
-function handleAsyncToolRtn(payload: any, historyId: string) {
-  const toolMsg = payload.data?.messages
-  const taskId = payload.data?.task_id
-  if (!toolMsg || !taskId) return
-
-  const list = ensureHistoryMessages(historyId)
-  const index = findLatestIndexById(list, taskId, 'system')
-
-  if (index !== -1) {
-    list[index].content = toolMsg.info?.tool_name ?? null
-    list[index].desc = toolMsg.info?.desc ?? null
-    list[index].status = toolMsg.info?.status ?? null
-    list[index].pending = false
-  } else {
-    list.push({
-      id: taskId,
-      cid: cid.value,
-      hid: historyId,
-      role: 'system',
-      content: toolMsg.info?.tool_name ?? null,
-      desc: toolMsg.info?.desc ?? null,
-      status: toolMsg.info?.status ?? null,
-      pending: false,
-    })
+  else {
+    // console.error('No handler for event: ', event_name)
   }
 }
 
@@ -1358,22 +1176,6 @@ function handleContentChunkRtn(payload: any, historyId: string) {
   }
 }
 
-function handleInfoChunkRtn(payload: any, historyId: string) {
-  const deltaInfo = payload.data?.messages?.content
-  const generationId = payload.generation_id
-  if (!deltaInfo || !generationId) return
-
-  const list = ensureHistoryMessages(historyId)
-  const state = ensureGeneratingState(historyId)
-  const index = ensureAiMessage(list, historyId, generationId)
-
-  state.isGenerating = true
-
-  if (list[index].pending === true) {
-    
-  }
-}
-
 async function handleStreamEnd(payload: any, historyId: string) {
   const generationId = payload.generation_id
   if (!generationId) return
@@ -1424,13 +1226,7 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const list = ensureHistoryMessages(historyId)
   const state = ensureGeneratingState(historyId)
 
-  const humanIndex = findLatestIndexByStatus(list, true, 'human')
-
-  if (humanIndex !== -1) {
-    list[humanIndex].error = true
-  }
-
-  if (event_name === 'error_occurred') {
+  if (detail && detail !== '') {
     ElMessage({
       type: 'error',
       message: detail,
@@ -1472,23 +1268,31 @@ async function handleStreamAbort(payload: any, historyId: string) {
   }
 }
 
-const isWarningShow = ref(false)
-const WarningContent = ref('')
+function handleAsyncToolRtn(payload: any, historyId: string) {
+  const toolMsg = payload.data?.messages
+  const taskId = payload.data?.task_id
+  if (!toolMsg || !taskId) return
 
-function handleWarning(payload: any, historyId: string) {
-  const generationId = payload.generation_id
-  if (!generationId) return
+  const list = ensureHistoryMessages(historyId)
+  const index = findLatestIndexById(list, taskId, 'system')
 
-  if (payload.action === 'token_limit_warning') {
-    WarningContent.value = '当前选择的模型上下文窗口过小，请及时更换。'
+  if (index !== -1) {
+    list[index].content = toolMsg.info?.tool_name ?? null
+    list[index].desc = toolMsg.info?.desc ?? null
+    list[index].status = toolMsg.info?.status ?? null
+    list[index].pending = false
+  } else {
+    list.push({
+      id: taskId,
+      cid: cid.value,
+      hid: historyId,
+      role: 'system',
+      content: toolMsg.info?.tool_name ?? null,
+      desc: toolMsg.info?.desc ?? null,
+      status: toolMsg.info?.status ?? null,
+      pending: false,
+    })
   }
-
-  isWarningShow.value = true
-}
-
-function handleWarningClose() {
-  WarningContent.value = ''
-  isWarningShow.value = false
 }
 
 function handleToolChunkRtn(payload: any, historyId: string) {
@@ -1532,6 +1336,27 @@ function handleToolChunkRtn(payload: any, historyId: string) {
   else if (toolName === 'write_todos') {
     handleTodoChunkRtn(generationId, toolData, historyId)
   }
+}
+
+const isWarningShow = ref(false)
+const WarningContent = ref('')
+
+function handleWarning(payload: any, historyId: string) {
+  const generationId = payload.generation_id
+  if (!generationId) return
+
+  const event_name = payload.data?.messages?.event_name
+  if (event_name === 'token_limit_warning') {
+    console.warn('Token limit warning received for generationId: ', generationId)
+    WarningContent.value = '当前选择的模型上下文窗口过小，请及时更换。'
+  }
+
+  isWarningShow.value = true
+}
+
+function handleWarningClose() {
+  WarningContent.value = ''
+  isWarningShow.value = false
 }
 
 function handleTodoChunkRtn(generationId: string, data: any, historyId: string) {
@@ -1754,10 +1579,12 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         models_provider: store.config.modelProvider,
         model_name: store.config.modelName,
         api_key: store.config.apiKey,
+        custom_provider_id: store.config.activeProvider.provider_id,
+
         enable_think: store.config.deepThink,
         work_dir: store.currentWorkDir,
-
         llm_calls_warning_threshold: store.config.tokenLimit,
+
         async_tools_invoke: store.config.toolsInvokeAi,
         link_provider: store.config.linkProvider,
         link_api_key: store.config.linkApiKey,
@@ -1950,6 +1777,10 @@ async function handleBranchSwitch(branch_id: string) {
 // ################################
 // Lifecycle
 // ################################
+onActivated(async () => {
+  console.log("Current custom provider config", store.config.activeProvider)
+})
+
 onMounted(async () => {
   try {
     unsubscribeWs = window.api.onWsMessage((payload: any) => {
@@ -2042,8 +1873,11 @@ function formatTime(timeStr: string) {
 // Chat configuration
 // ################################
 const show_work_dir = computed(() => store.currentWorkDir)
+const customProviderLabel = computed(() => {
+  return store.config.activeProvider.name ? `自定义（${store.config.activeProvider.name}）` : '自定义（未配置）'
+})
 
-const modelPoviderOptions = [
+const modelPoviderOptions = computed(() => [
   { label: 'Ollama:local', value: 'ollama:local', icon: ollamaIcon },
   { label: 'Ollama', value: 'ollama', icon: ollamaIcon },
   { label: 'OpenAI', value: 'openai', icon: openaiIcon },
@@ -2052,7 +1886,8 @@ const modelPoviderOptions = [
   { label: '通义千问', value: 'qwen', icon: qwenIcon },
   { label: '月之暗面', value: 'moonshot', icon: moonshotIcon },
   { label: '小米MiMO', value: 'xiaomimimo', icon: xiaomiIcon },
-]
+  { label: customProviderLabel.value, value: 'custom', icon: customIcon },
+])
 
 const renderSingleSelectTag = ({ option }: any) => {
   return h(
@@ -2096,47 +1931,77 @@ const errorServer = ref(true)
 const modelSelectOptions = ref<any[]>([])
 let latestRequestId = 0
 
+async function fetchModels(provider: string, apiKey: string) {
+  if (!provider) return
+
+  const requestId = ++latestRequestId
+
+  try {
+    const models = await window.api.getModelsList(
+      provider,
+      apiKey,
+      provider === 'custom'
+        ? { custom_provider_id: store.config.activeProvider.provider_id }
+        : {}
+    )
+
+    if (requestId !== latestRequestId) return
+
+    modelSelectOptions.value = models.map((name: string) => ({
+      label: name,
+      value: name,
+    }))
+
+    errorServer.value = false
+    ensureValidModel()
+  } catch (err) {
+    if (requestId !== latestRequestId) return
+
+    errorServer.value = true
+    modelSelectOptions.value = [{
+      label: 'Server Error: Please make sure ai service is accessable.',
+      value: '',
+    }]
+
+    ensureValidModel()
+    console.error('getModelsList failed:', err)
+  }
+}
+
+const activeCustomProviderKey = computed(() => {
+  return store.config.activeProvider.api_key || ''
+})
+
+watch(
+  () => activeCustomProviderKey.value,
+  (newValue, oldValue) => {
+    if (newValue === oldValue) return
+
+    store.config.apiKey = newValue
+  },
+  { deep: true }
+)
+
 watch(
   () => store.config.modelProvider,
   async (newProvider, oldProvider) => {
     if (newProvider === oldProvider) return
 
     store.saveAppConfig('modelProvider', newProvider)
-    store.config.apiKey = store.apiKeyCache[store.config.modelProvider] ?? ''
+
+    let cachedKey = ''
+
+    if (newProvider === 'custom') cachedKey = activeCustomProviderKey.value
+    else cachedKey = store.apiKeyCache[newProvider] ?? ''
+    const apiKeyChanged = store.config.apiKey !== cachedKey
+
+    store.config.apiKey = cachedKey
 
     store.saveAppConfig('modelName', '')
-    modelSelectOptions.value.length = 0
+    modelSelectOptions.value = []
 
-    if (!newProvider) return
-
-    const requestId = ++latestRequestId
-
-    try {
-      const models = await window.api.getModelsList(
-        newProvider,
-        store.config.apiKey
-      )
-
-      if (requestId !== latestRequestId) return
-
-      modelSelectOptions.value.push(
-        ...models.map((name: string) => ({
-          label: name,
-          value: name,
-        }))
-      )
-      errorServer.value = false
-      ensureValidModel()
-    } catch (err) {
-      if (requestId !== latestRequestId) return
-
-      errorServer.value = true
-      modelSelectOptions.value = [{
-        label: 'Server Error: Please make sure ai service is accessable.',
-        value: '',
-      }]
-      ensureValidModel()
-      console.error('getModelsList failed:', err)
+    if (!apiKeyChanged) {
+      await fetchModels(newProvider, store.config.apiKey)
     }
   },
   { immediate: true }
@@ -2175,7 +2040,17 @@ const editApiKey = async () => {
     .then(value => {
       store.config.apiKey = value
       if (store.config.modelProvider) {
-        store.setApiKeyCache(store.config.modelProvider, value)
+        if (store.config.modelProvider === 'custom') {
+          store.saveAppConfig('activeProvider', {
+            ...store.config.activeProvider,
+            api_key: value,
+          })
+          const activeProviderInList = store.providers.find(p => p.provider_id === store.config.activeProvider.provider_id)
+          if (activeProviderInList) {
+            activeProviderInList.api_key = value
+          }
+        }
+        else store.setApiKeyCache(store.config.modelProvider, value)
       }
     })
     .catch(() => {})
@@ -2187,34 +2062,9 @@ watch(
     if (newkey === oldkey) return
 
     store.saveAppConfig('apiKey', newkey)
-    modelSelectOptions.value.length = 0
+    modelSelectOptions.value = []
 
-    const requestId = ++latestRequestId
-
-    try {
-      const models = await window.api.getModelsList(store.config.modelProvider, newkey)
-      if (requestId !== latestRequestId) return
-
-      modelSelectOptions.value.push(
-        ...models.map((name: string) => ({
-          label: name,
-          value: name,
-        }))
-      )
-
-      errorServer.value = false
-      ensureValidModel()
-    } catch (err) {
-      if (requestId !== latestRequestId) return
-
-      errorServer.value = true
-      modelSelectOptions.value = [{
-        label: 'Server Error: Please make sure ai service is accessable.',
-        value: '',
-      }]
-      ensureValidModel()
-      console.error('getModelsList failed:', err)
-    }
+    await fetchModels(store.config.modelProvider, newkey)
   }
 )
 
@@ -2222,9 +2072,6 @@ const setDeepThink = () => {
   store.saveAppConfig('deepThink', !store.config.deepThink)
 }
 
-// ################################
-// Greeting / typing effect
-// ################################
 const fullText = ref('  “嗨！今天从哪里开始？”')
 
 function getRandomGreeting(): string {
@@ -2283,11 +2130,179 @@ const stopGenerating = async () => {
   }
 }
 
+const showDropLayer = ref(false)
+let dragEnterCounter = 0
+
+function onDragEnter(e: DragEvent) {
+  e.preventDefault()
+  dragEnterCounter++
+  showDropLayer.value = true
+  console.log('Drag enter, counter:', dragEnterCounter)
+}
+
+function onDragLeave(e: DragEvent) {
+  e.preventDefault()
+  dragEnterCounter--
+  if (dragEnterCounter === 0) {
+    showDropLayer.value = false
+  }
+  console.log('Drag leave, counter:', dragEnterCounter)
+}
+
+async function onDrop(e: DragEvent) {
+  if (isUploading.value) return
+
+  const { webUtils } = require('electron')
+  e.preventDefault()
+
+  dragEnterCounter = 0
+  showDropLayer.value = false
+
+  const files = Array.from(e.dataTransfer?.files || [])
+  if (files.length === 0) return
+
+  const path_list = files
+    .map(f => {
+      try {
+        return webUtils.getPathForFile(f)
+      } catch (e) {
+        console.warn('getPathForFile failed:', e)
+        return null
+      }
+    })
+    .filter(Boolean) as string[]
+
+  console.log('Drop files:', path_list)
+
+  if (path_list.length === 0) return
+
+  try {
+    await handleFilePaths(path_list)
+  } catch (err) {
+    console.error('drop upload failed:', err)
+    ElMessage({
+      type: 'error',
+      message: '上传失败' + String(err),
+      plain: true,
+    })
+  }
+}
+
+async function onPaste(e: ClipboardEvent) {
+  if (isUploading.value) return
+
+  const { webUtils, clipboard, nativeImage } = require('electron')
+
+  const items = Array.from(e.clipboardData?.items || [])
+  console.log('Clipboard items:', items)
+
+  let handled = false
+  const pathList: string[] = []
+
+  // 优先走标准 clipboardData
+  for (const item of items) {
+    if (item.kind !== 'file') continue
+
+    handled = true
+    
+    const file = item.getAsFile()
+    if (!file) continue
+    console.log('Processing clipboard item:', item)
+
+    try {
+      const filePath = webUtils.getPathForFile(file)
+      if (filePath) {
+        pathList.push(filePath)
+        continue
+      }
+    } catch {}
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+
+      const tempPath = await window.api.createTempFileFromBase64(base64, file.name || `paste_${Date.now()}.png`)
+
+      if (tempPath) {
+        pathList.push(tempPath)
+      }
+    } catch (err) {
+      console.error('createTempFileFromBase64 failed:', err)
+    }
+  }
+
+  // fallback：Electron clipboard
+  if (!handled) {
+    try {
+      const image = clipboard.readImage()
+
+      if (!image.isEmpty()) {
+        e.preventDefault()
+
+        const buffer = image.toPNG()
+        const base64 = buffer.toString('base64')
+
+        const tempPath = await window.api.createTempFileFromBase64({
+          base64,
+          fileName: `paste_${Date.now()}.png`,
+        })
+
+        if (tempPath) {
+          console.log('Clipboard image fallback success:', tempPath)
+          pathList.push(tempPath)
+        }
+      }
+    } catch (err) {
+      console.error('clipboard fallback failed:', err)
+    }
+  }
+
+  if (pathList.length === 0) return
+
+  e.preventDefault()
+
+  try {
+    await handleFilePaths(pathList)
+  } catch (err) {
+    console.error('paste upload failed:', err)
+    ElMessage({
+      type: 'error',
+      message: '上传失败' + String(err),
+      plain: true,
+    })
+  }
+}
+
+const handleConnectProject = async () => {
+  const result = await window.api.openFileDialog("folder")
+  if (result.canceled || result.filePaths.length === 0) {
+    return
+  }
+
+  // console.log('Current history id: ', store.current_history_id)
+  if (store.current_history_id !== '-1') {
+    store.setWorkDir(store.current_history_id, result.filePaths[0])
+
+    try {
+      await window.api.updateConversation(
+        cid.value,
+        "",
+        store.current_history_id,
+        { workspace: result.filePaths[0] }
+      )
+    } catch (err) {
+      console.log("Set workspace err: "+err)
+    }
+  }
+  store.currentWorkDir = result.filePaths[0]
+  store.removeWorkDir('-1')
+}
+
 const wrapperHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
   if (e.isComposing || e.keyCode === 229) {
     return
   }
-  console.log("Key down:", e.key)
+  // console.log("Key down:", e.key)
   if (e.key === 'Escape') {
     handleCancel()
   }

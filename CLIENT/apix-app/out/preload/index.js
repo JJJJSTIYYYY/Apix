@@ -22,9 +22,13 @@ const api = {
   getAiTaskList: (clear) => electron.ipcRenderer.invoke("api:get_ai_task_list", clear),
   terminateAiTask: (history_id, task_id) => electron.ipcRenderer.invoke("api:stop_task", history_id, task_id),
   // Config AI
-  getModelsList: (model_provider, api_key) => electron.ipcRenderer.invoke("api:get_models_list", model_provider, api_key),
+  getModelsList: (model_provider, api_key, config = {}) => electron.ipcRenderer.invoke("api:get_models_list", model_provider, api_key, config),
   setProxy: (http_proxy, https_proxy, no_proxy) => electron.ipcRenderer.invoke("api:set_proxy", http_proxy, https_proxy, no_proxy),
   clearVisionCache: () => electron.ipcRenderer.invoke("api:clear_vision_cache"),
+  createLlmProvider: (cid, provider_meta) => electron.ipcRenderer.invoke("api:create_llm_provider", cid, provider_meta),
+  getLlmProviders: (cid) => electron.ipcRenderer.invoke("api:get_llm_providers", cid),
+  updateLlmProvider: (provider_id, cid, new_meta) => electron.ipcRenderer.invoke("api:update_llm_provider", provider_id, cid, new_meta),
+  autoFetchModelList: (endpoint, api_key) => electron.ipcRenderer.invoke("api:auto_fetch_model_list", endpoint, api_key),
   // AI files
   loadResource: (cid, file_id) => electron.ipcRenderer.invoke("api:load_resource", cid, file_id),
   getEmbedList: (model_provider, api_key) => electron.ipcRenderer.invoke("api:get_embed_list", model_provider, api_key),

@@ -485,7 +485,8 @@ class MysqlService:
                         "package_size": int,
                         "is_active": bool,
                         "upload_at": str,
-                    }
+                    },
+                    ...
                 ]
             }
         """

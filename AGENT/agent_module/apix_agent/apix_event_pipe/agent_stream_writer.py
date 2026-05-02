@@ -4,7 +4,7 @@ import uuid
 from typing import Any, Optional
 from langgraph.config import get_stream_writer
 
-from apix_agent.commons.type_def import ApixEventEnvelope, MinimalEnvelopeData
+from apix_agent.commons.type_def import ApixEventEnvelope, MinimalEnvelopeData, ApixEventEnvelopeTarget
 # from apix_agent.apix_event_pipe.apix_stream_writer import ApixStreamWriter
 
 
@@ -34,20 +34,19 @@ class AgentStreamWriter:
 
     def __init__(
         self,
-        trace_id: Optional[str] = None,
+        generation_id: Optional[str] = None,
     ):
         self._writer = get_stream_writer()
-        self._trace_id = trace_id or str(uuid.uuid4())
+        self._generation_id = generation_id or str(uuid.uuid4())
 
     # Public API
     def send_event(
         self,
         *,
         event: AgentStreamEvent,
-        target_id: str,
-        target_platform: str = None,
+        target: ApixEventEnvelopeTarget,
         data: MinimalEnvelopeData = None,
-        trace_id: Optional[str] = None,
+        generation_id: Optional[str] = None,
         timestamp: Optional[float] = None,
     ):
         """
@@ -56,18 +55,15 @@ class AgentStreamWriter:
         :param event: event name
         :param target: event target
         :param data: payload
-        :param trace_id: optional override
+        :param generation_id: optional override
         :param timestamp: optional override
         """
 
         envelope: ApixEventEnvelope = {
             "event": event.value,
-            "target": {
-                "id": target_id,
-                "platform": target_platform or 'default'
-            },
+            "target": target,
             "data": data,
-            "trace_id": trace_id or self._trace_id,
+            "generation_id": generation_id or self._generation_id,
             "timestamp": timestamp or time.time(),
         }
 

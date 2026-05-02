@@ -4,7 +4,7 @@
     :title="isEdit ? '编辑角色卡' : '新建角色卡'"
     width="520px"
     destroy-on-close
-    class="role-dialog"
+    class="role-dialog selectable"
     :close-on-click-modal="false"
   >
     <div class="form-wrapper">
@@ -26,7 +26,7 @@
         <el-input
           v-model="localDefinition"
           type="textarea"
-          :rows="6"
+          :rows="12"
           placeholder="请输入角色行为定义"
           class="role-textarea"
           resize="none"

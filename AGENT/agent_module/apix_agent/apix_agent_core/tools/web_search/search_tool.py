@@ -54,14 +54,13 @@ async def search_web_by_keywords(
 
     logger.trace('[search_tool.py] [tool] [search_web_by_keywords] Enter')
 
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "search_web_by_keywords",
@@ -101,8 +100,7 @@ async def search_web_by_keywords(
 
             event_writer.send_event(
                 event=AgentStreamEvent.TOOL_EXEC_END, 
-                target_id=client_id, 
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "tool_exec_chunk_rtn",
                     "tool_name": "search_web_by_keywords",
@@ -142,8 +140,7 @@ async def search_web_by_keywords(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "search_web_by_keywords",
@@ -167,8 +164,7 @@ async def search_web_by_keywords(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "search_web_by_keywords",
@@ -225,14 +221,13 @@ async def search_web_by_urls(
 
     logger.trace('[search_tool.py] [tool] [search_web_by_urls] Enter')
 
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "search_web_by_urls",
@@ -251,8 +246,7 @@ async def search_web_by_urls(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "search_web_by_urls",
@@ -284,8 +278,7 @@ async def search_web_by_urls(
 
             event_writer.send_event(
                 event=AgentStreamEvent.TOOL_EXEC_END, 
-                target_id=client_id, 
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "tool_exec_chunk_rtn",
                     "tool_name": "search_web_by_urls",
@@ -314,8 +307,7 @@ async def search_web_by_urls(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "search_web_by_urls",
@@ -351,8 +343,7 @@ async def search_web_by_urls(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "search_web_by_urls",

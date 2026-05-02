@@ -61,13 +61,13 @@ async def load_skill(
         skill_names = name
 
     client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "load_skill",
@@ -85,8 +85,7 @@ async def load_skill(
     if not container_id:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "load_skill",
@@ -109,8 +108,7 @@ async def load_skill(
     if not base_path:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "load_skill",
@@ -143,8 +141,7 @@ async def load_skill(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "load_skill",
@@ -251,8 +248,7 @@ async def load_skill(
 
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_END, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "load_skill",

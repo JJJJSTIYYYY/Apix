@@ -295,6 +295,7 @@ const handleSendMessage = () => {
 
 const reSendMsg = () => {
   emit("editFinish", props.msg.id, props.msg.content)
+  props.msg.error = false
   props.msg.is_editing = false
 }
 

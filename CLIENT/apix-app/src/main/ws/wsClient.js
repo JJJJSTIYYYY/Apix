@@ -1,6 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron'
 const WebSocket = require('ws')
 
+import { WS_AI_API_BASE, AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+
 let ws = null
 
 /* ------------------------
@@ -40,7 +42,7 @@ export function initWS(clientId) {
   manuallyClosed = false
   console.log('[WS] trying to connect...')
 
-  ws = new WebSocket(`ws://localhost:5091/ws/${clientId}`)
+  ws = new WebSocket(`${WS_AI_API_BASE}/ws/default/${clientId}`)
 
   ws.on('open', () => {
     console.log('[WS] connected')

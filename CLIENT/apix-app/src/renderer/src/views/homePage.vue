@@ -83,7 +83,7 @@ onBeforeUnmount(() => {
 
 </script>
 
-<style>
+<style scoped>
 .el-menu-vertical {
   left: calc(var(--apix-left-side-bar-width, 64px) - 64px);
   transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
@@ -95,7 +95,7 @@ onBeforeUnmount(() => {
 }
 
 .el-menu-vertical {
-  background: #ffffff00;
+  background: #00000000;
   width: 64px;
   min-height: 400px;
   border-radius: 0 0 5px 0; /* 左上 右上 左下 右下 */
@@ -105,7 +105,7 @@ onBeforeUnmount(() => {
 }
 
 .el-menu {
-  background-color: rgba(255, 255, 255, 0);
+  background-color: transparent;
   padding: 2px;
   padding-left: 4px;
 }
@@ -117,14 +117,9 @@ onBeforeUnmount(() => {
               box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.menu-item:hover {
-  background-color: #fafafa; /* 浅灰背景 */
-  background: rgba(255, 255, 255, 0.347);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow:
-    0 3px 10px rgba(31, 38, 135, 0.15), /* 柔和外阴影 */
-    inset 0 1px 2px rgba(255, 255, 255, 0.1), /* 内部微亮 */
-    inset 0 -1px 2px rgba(0, 0, 0, 0.08);      /* 内部微暗 */
+.el-menu-item:hover {
+  color: rgb(0, 217, 195);
+  background-color: transparent;
 }
 
 .menu-buttom-item {
@@ -156,40 +151,23 @@ onBeforeUnmount(() => {
   transform: rotate(180deg);
 }
 
-/* 按钮 */
-.menu-btn {
-  background-color: transparent;
-  color: #515151;
-  border: none;
-  margin-left: 16px;
-  border-radius: 50%; /* 圆形按钮 */
-  transition: background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-              transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-              box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.menu-btn:hover {
-  background-color: #f5f5f5;
-  color: #444444;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.10);
-  border: none;
-  
-    /* 弱化的玻璃背景 */
-  background: rgba(255, 255, 255, 0.347);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow:
-    0 3px 10px rgba(31, 38, 135, 0.15), /* 柔和外阴影 */
-    inset 0 1px 2px rgba(255, 255, 255, 0.1), /* 内部微亮 */
-    inset 0 -1px 2px rgba(0, 0, 0, 0.08);      /* 内部微暗 */
-}
-
 .text-label {
   width: 0px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.el-menu-item {
+  border-radius: 12px;
+}
+
 .el-menu-item.is-active {
   color: rgb(0, 173, 155);
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 231, 208, 0.2) 0%, 
+    rgba(0, 231, 208, 0.08) 20%, 
+    rgba(0, 231, 208, 0) 60% 
+  );
 }
 </style>
 

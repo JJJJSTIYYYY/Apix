@@ -1,5 +1,5 @@
 <template>
-  <div class="task-card" :class="{ 'is-completed': status === 'completed', 'is-failed': status === 'failed' }">
+  <div class="task-card selectable" :class="{ 'is-completed': status === 'completed', 'is-failed': status === 'failed' }">
     <!-- 左侧状态指示条 -->
     <div class="status-indicator" :class="statusClass"></div>
     

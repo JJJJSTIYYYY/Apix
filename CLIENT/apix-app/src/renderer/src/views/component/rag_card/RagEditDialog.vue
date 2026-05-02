@@ -4,7 +4,7 @@
     title="编辑文档描述"
     width="520px"
     destroy-on-close
-    class="rag-dialog"
+    class="rag-dialog selectable"
     :close-on-click-modal="false"
   >
     <div class="form-wrapper">

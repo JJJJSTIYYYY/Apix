@@ -43,6 +43,7 @@ pnpm-debug.log*
 ## Runtime / Data
 # AGENT
 AGENT/model_running_time/
+AGENT/apix_running_time/
 AGENT/agent_module/data/
 # MEMORY
 MEMORY/memory_module/data/

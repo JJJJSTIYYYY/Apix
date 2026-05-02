@@ -100,14 +100,13 @@ async def fetch_files(
     - Only download files that are necessary for the current objective.
     - Avoid redundant downloads of the same file.
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "fetch_files",
@@ -122,11 +121,10 @@ async def fetch_files(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "fetch_files",
                 "tool_call_id": tool_call_id,
                 "content": "No file_id provided",
                 "chunk_position": "end",
@@ -152,11 +150,10 @@ async def fetch_files(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "fetch_files",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -180,11 +177,10 @@ async def fetch_files(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "fetch_files",
                 "tool_call_id": tool_call_id,
                 "content": "work_dir not found",
                 "chunk_position": "end",
@@ -298,8 +294,7 @@ async def fetch_files(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "fetch_files",
@@ -332,8 +327,7 @@ async def fetch_files(
 
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_END, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target, 
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "fetch_files",
@@ -380,14 +374,13 @@ async def read_workspace_file(
         File content with line numbers.
         Content format: [line_count_prefix] line_content
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target, 
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "read_workspace_file",
@@ -409,11 +402,10 @@ async def read_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "read_workspace_file",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -458,8 +450,7 @@ async def read_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_workspace_file",
@@ -480,8 +471,7 @@ async def read_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_workspace_file",
@@ -518,14 +508,13 @@ async def write_workspace_file(
     Returns:
         Success or error message
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target, 
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "write_workspace_file",
@@ -544,11 +533,10 @@ async def write_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "write_workspace_file",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -598,8 +586,7 @@ async def write_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "write_workspace_file",
@@ -620,8 +607,7 @@ async def write_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "write_workspace_file",
@@ -654,14 +640,13 @@ async def delete_workspace_file(
     Returns:
         Success or error message
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target, 
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "delete_workspace_file",
@@ -680,11 +665,10 @@ async def delete_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "delete_workspace_file",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -727,8 +711,7 @@ async def delete_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "delete_workspace_file",
@@ -749,8 +732,7 @@ async def delete_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "delete_workspace_file",
@@ -791,14 +773,13 @@ async def move_workspace_file(
     Returns:
         Success or error message
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target, 
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "move_workspace_file",
@@ -817,11 +798,10 @@ async def move_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "move_workspace_file",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -874,8 +854,7 @@ async def move_workspace_file(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "move_workspace_file",
@@ -895,8 +874,7 @@ async def move_workspace_file(
     except Exception as e:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "move_workspace_file",
@@ -925,21 +903,20 @@ async def list_workspace_files(
     List files and directories inside workspace.
 
     Args:
-        path: Sub directory inside workspace (None means root)
+        path: Sub directory inside workspace, make sure the path start with '/workspace' (None means root)
         recursively_scan: Whether to recursively scan subdirectories (None means false)
 
     Returns:
         A tree-formatted directory listing of files and folders.
         The result is limited to a maximum of 500 items and a depth of 6 levels.
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target, 
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "list_workspace_files",
@@ -961,11 +938,10 @@ async def list_workspace_files(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target, 
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "send_images",
+                "tool_name": "list_workspace_files",
                 "tool_call_id": tool_call_id,
                 "content": "Sandbox not configutrd",
                 "chunk_position": "end",
@@ -983,21 +959,20 @@ async def list_workspace_files(
         })
 
     try:
-
         if not path:
-            target = Path(sandbox_root)
+            fs_target = Path(sandbox_root)
         else:
-            target = file_system.get_file_path_in_host(
+            fs_target = file_system.get_file_path_in_host(
                 file_path=path,
                 container_workdir="/workspace",
                 host_root=sandbox_root,
                 must_exist=False
             )
 
-        if not target.exists():
+        if not fs_target.exists():
             raise Exception("Directory not found")
 
-        if not target.is_dir():
+        if not fs_target.is_dir():
             raise Exception("Target is not a directory")
 
         MAX_FILES = 500
@@ -1016,9 +991,7 @@ async def list_workspace_files(
         lines = []
         count = 0
 
-        # -------------------------------------------------
         # Recursive tree scan (stable order for AI agents)
-        # -------------------------------------------------
         def scan_dir(current: Path, depth: int):
             nonlocal count
 
@@ -1063,14 +1036,13 @@ async def list_workspace_files(
                         raise Exception("Too many files")
 
         # Start scan
-        scan_dir(target, 0)
+        scan_dir(fs_target, 0)
 
         result = "\n".join(lines) if lines else "(empty directory)"
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "list_workspace_files",
@@ -1091,8 +1063,7 @@ async def list_workspace_files(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "list_workspace_files",

@@ -3,7 +3,7 @@ import fs from 'fs'
 import axios from 'axios'
 import FormData from 'form-data'
 
-const FILE_API_BASE = "http://localhost:5094"
+import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // =====================================================
 //                      Ai config
@@ -56,7 +56,7 @@ export function registerAiFilesIpc() {
           console.warn('[upload_files] skip non-file:', file.path)
           continue
         }
-        
+
         form.append(
           'files',
           fs.createReadStream(file.path),

@@ -5,6 +5,7 @@ import time
 from typing import Dict, Optional
 from uuid import uuid4
 
+from apix_agent.commons.auto_init import auto_init
 from apix_agent.global_config import SANDBOX_DOCKER_IMAGE_NAME, CONTIANER_TTL
 from apix_agent.commons.resource_cleaner import resource_cleaner
 
@@ -342,3 +343,8 @@ agent_sandbox = AgentSandboxManager()
 @resource_cleaner.auto_clear
 async def clean_sandbox():
     return await agent_sandbox.cleanup_expired()
+
+
+@auto_init.auto_stop
+async def clear_docker_container():
+    await agent_sandbox.cleanup_all()
