@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 
-const AI_API_BASE = "http://localhost:5091"
+import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+
 // =====================================================
 //                      Ai task
 // =====================================================

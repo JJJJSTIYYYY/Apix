@@ -5,6 +5,7 @@ import asyncio
 
 from langgraph.graph.state import CompiledStateGraph
 
+from apix_agent.commons.auto_init import auto_init
 from apix_agent.apix_agent_core.agent_factory.agent_creator import agent_creator
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.commons.type_def import MainAgentState, SubAgentState, AgentConfigSchema
@@ -17,6 +18,8 @@ class AgentRuningtime:
         self._sub_agent_worker_task: asyncio.Task | None = None
         self._sub_agent_stop_task: asyncio.Task | None = None
         self._running_tasks: dict[str, asyncio.Task] = {}
+
+        self.agent_config: dict = {}
     
     #-----------------------------------------------------------------------
     # Lifespan
@@ -246,3 +249,12 @@ class AgentRuningtime:
 
 
 ai_agent = AgentRuningtime()
+
+@auto_init.auto_start
+async def start_ai_agent_runingtime():
+    await ai_agent.start()
+
+
+@auto_init.auto_stop
+async def stop_ai_agent_runingtime():
+    await ai_agent.stop()

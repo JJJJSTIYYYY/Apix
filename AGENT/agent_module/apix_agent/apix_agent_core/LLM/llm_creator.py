@@ -48,6 +48,7 @@ def get_openai_model(
         api_key: API key for authentication.
         base_url: OpenAI-compatible base URL.
     """
+    # enable_think = config.get("enable_think", False)
     return ChatOpenAI(
         model=model,
         api_key=api_key,
@@ -108,13 +109,8 @@ class PatchedChatDeepSeek(ChatDeepSeek):
                 # Always store reasoning_content if exists
                 if reasoning:
                     reasoning_content_map[i] = reasoning
-
-                # Fallback for empty content (keep your original safeguard logic)
-                # elif not msg.content:
-                #     reasoning_content_map[i] = "."
-                #     logger.warning(
-                #         "[PatchedChatDeepSeek] Empty assistant message."
-                #     )
+                elif self.extra_body.get("thinking", {}).get("type", "enabled") != 'disabled':
+                    reasoning_content_map[i] = 'Continue.'
 
         # Call original implementation
         payload = super()._get_request_payload(

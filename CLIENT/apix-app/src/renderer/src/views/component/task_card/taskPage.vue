@@ -22,30 +22,10 @@
       </div>
     </div>
 
-    <div class="main-wrapper selectable">
-      <h1 style="width: 100%; text-align: center; font-size: 20px; color: #303133;">
-        后台任务管理
+    <div class="main-wrapper">
+      <h1 class="data-page-title">
+        后台子代理任务视图
       </h1>
-
-      <!-- 统计信息 -->
-      <div class="stats-wrapper">
-        <div class="stat-item">
-          <div class="stat-value" :style="{ color: 'rgb(136, 202, 197)' }">{{ taskStats.total }}</div>
-          <div class="stat-label">总任务</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value status-running-text">{{ taskStats.running }}</div>
-          <div class="stat-label">运行中</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value status-pending-text">{{ taskStats.pending }}</div>
-          <div class="stat-label">等待中</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value status-completed-text">{{ taskStats.completed }}</div>
-          <div class="stat-label">已完成</div>
-        </div>
-      </div>
 
       <!-- 搜索 -->
       <div class="search-wrapper">
@@ -78,6 +58,26 @@
           >
             On
           </button>
+        </div>
+      </div>
+
+      <!-- 统计信息 -->
+      <div class="stats-wrapper">
+        <div class="stat-item">
+          <div class="stat-value" :style="{ color: 'rgb(136, 202, 197)' }">{{ taskStats.total }}</div>
+          <div class="stat-label">总任务</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value status-running-text">{{ taskStats.running }}</div>
+          <div class="stat-label">运行中</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value status-pending-text">{{ taskStats.pending }}</div>
+          <div class="stat-label">等待中</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value status-completed-text">{{ taskStats.completed }}</div>
+          <div class="stat-label">已完成</div>
         </div>
       </div>
 
@@ -390,18 +390,32 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 <style scoped>
 .task-page-wrapper {
   position: relative;
+  background-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
+    0 0px 26px rgba(218, 218, 218, 0.206),
+    0 0px 6px rgba(218, 218, 218, 0.09);
+  border-radius: 24px;
+  margin: 12px 12px 12px 0;
 }
 
 .main-wrapper {
   position: relative;
   justify-content: center;
   width: 1050px;
-  height: calc(100vh - 52px) !important;
+  height: calc(100vh - 76px) !important;
   left: calc((100% - 1090px) / 2);
   padding: 10px 20px;
   overflow-y: scroll;
   border-radius: 16px;
   align-items: center;
+}
+
+.data-page-title {
+  padding-left: 6px;
+  font-size: 24px;
+  color: rgb(82, 108, 106);
+  margin-bottom: 0px;
 }
 
 /* 底部操作栏 */
@@ -461,11 +475,21 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   display: flex;
   justify-content: center;
   gap: 32px;
-  margin: 20px 0;
+  margin: 20px 12px;
   padding: 16px;
-  background: rgba(136, 202, 197, 0.08);
-  border-radius: 16px;
-  border: 1px solid rgba(136, 202, 197, 0.15);
+  background: rgba(136, 202, 196, 0.189);
+  border-radius: 24px;
+  box-shadow: 
+    0 0px 26px rgba(218, 218, 218, 0.206),
+    0 0px 6px rgba(218, 218, 218, 0.09);
+  transition: all 0.3s ease;
+}
+
+.stats-wrapper:hover {
+  transform: scale(1.01);
+  box-shadow: 
+    0 0px 36px rgba(218, 218, 218, 0.3),
+    0 0px 12px rgba(218, 218, 218, 0.15);
 }
 
 .stat-item {
@@ -499,50 +523,34 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   color: #67c23a;
 }
 
-/* 搜索框 */
+
 .search-wrapper {
   width: 100%; 
   display: flex; 
-  justify-content: center; 
   margin: 16px 0;
+  gap: 12px;
+  align-items: center;
 }
 
 .search-wrapper :deep(.el-input) {
+  height: 32px !important;
   flex: 1;
   min-width: 0;
+  transform-origin: left center;
+  transform: scale(1);
   transform-origin: center;
-  transition: transform 0.22s cubic-bezier(0.34, 3.5, 0.64, 1);
-}
-
-.search-wrapper.is-focused :deep(.el-input) {
-  transform: scale(0.97);
-}
-
-.search-wrapper :deep(.el-input:hover) {
-  transform: scale(1.02);
+  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
 }
 
 .search-wrapper :deep(.el-input__wrapper) {
-  height: 40px;
-  border-radius: 999px;
-  background: rgba(228, 228, 228, 0.22);
-  border: 1px solid rgba(136, 202, 197, 0.2);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 0 16px 0 12px;
+  height: 32px !important;
+  background: transparent;
+  border: none;
+  border-radius: 0px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: none;
+  padding: 0 12px 0 10px;
   transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.search-wrapper.is-focused :deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.536);
-  border-color: rgba(136, 202, 197, 0.6);
-  box-shadow:
-    0 10px 26px rgba(136, 202, 197, 0.1),
-    0 2px 6px rgba(0, 0, 0, 0.05);
-  z-index: 99;
 }
 
 /* 任务列表容器 */

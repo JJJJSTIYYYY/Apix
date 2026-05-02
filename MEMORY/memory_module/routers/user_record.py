@@ -319,3 +319,167 @@ async def get_messages_for_user(req: Request):
         content=resp,
         status_code=200,
     )
+
+
+
+@router.post("/provider/create_llm_provider")
+async def create_llm_provider(req: Request):
+    """
+    Insert a provider's meta in database.
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+            "provider_name": str,
+            "type": str,
+            "endpoint": str,
+            "model_list": str,
+            "description": str,
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": {
+                "provider_id": str
+            }
+        }
+    """
+    logger.info(f"[API][create_llm_provider] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="create_llm_provider",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/provider/get_llm_providers")
+async def get_llm_providers(req: Request):
+    """
+    Fetch all providers meta for user.
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "provider_id": str,
+                    "provider_name": str,
+                    "type": str,
+                    "endpoint": str,
+                    "model_list": list,
+                    "description": str,
+                    "created_at": str
+                },
+                ...
+            ]
+        }
+    """
+    logger.info(f"[API][get_llm_providers] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_llm_providers",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/provider/get_llm_provider_by_id")
+async def get_llm_provider_by_id(req: Request):
+    """
+    Fetch a provider meta by provider_id. 
+
+    Request Body (JSON):
+        {
+            "provider_id": str
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "provider_id": str,
+                    "provider_name": str,
+                    "type": str,
+                    "endpoint": str,
+                    "model_list": list,
+                    "description": str,
+                    "created_at": str
+                },
+                ...
+            ]
+        }
+    """
+    logger.info(f"[API][get_llm_provider_by_id] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_llm_provider_by_id",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/provider/update_llm_provider")
+async def update_llm_provider(req: Request):
+    """
+    Update or delete a provider's meta.
+
+    Request Body (JSON):
+        {
+            "provider_id": str,
+            "client_id": str,
+            "provider_name": str, # Optional
+            "type": str, # Optional
+            "endpoint": str, # Optional
+            "model_list": str, # Optional
+            "description": str, # Optional
+            "is_deleted": bool, # Optional
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": str
+        }
+    """
+    logger.info(f"[API][update_llm_provider] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="update_llm_provider",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )

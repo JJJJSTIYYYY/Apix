@@ -1,5 +1,5 @@
 <template>
-  <div class="role-card">
+  <div class="role-card selectable">
     <!-- Header - 保持不动 -->
     <div class="role-header">
       <el-switch

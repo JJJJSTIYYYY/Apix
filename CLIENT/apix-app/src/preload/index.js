@@ -39,12 +39,20 @@ const api = {
     ipcRenderer.invoke('api:stop_task', history_id, task_id),
 
   // Config AI
-  getModelsList: (model_provider, api_key) =>
-    ipcRenderer.invoke('api:get_models_list', model_provider, api_key),
+  getModelsList: (model_provider, api_key, config = {}) =>
+    ipcRenderer.invoke('api:get_models_list', model_provider, api_key, config),
   setProxy: (http_proxy, https_proxy, no_proxy) =>
     ipcRenderer.invoke('api:set_proxy', http_proxy, https_proxy, no_proxy),
   clearVisionCache: () =>
     ipcRenderer.invoke('api:clear_vision_cache'),
+  createLlmProvider: (cid, provider_meta) =>
+    ipcRenderer.invoke('api:create_llm_provider', cid, provider_meta),
+  getLlmProviders: (cid) =>
+    ipcRenderer.invoke('api:get_llm_providers', cid),
+  updateLlmProvider: (provider_id, cid, new_meta) =>
+    ipcRenderer.invoke('api:update_llm_provider', provider_id, cid, new_meta),
+  autoFetchModelList: (endpoint, api_key) =>
+    ipcRenderer.invoke('api:auto_fetch_model_list', endpoint, api_key),
   
   // AI files
   loadResource: (cid, file_id) =>

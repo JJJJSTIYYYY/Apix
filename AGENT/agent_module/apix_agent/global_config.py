@@ -12,7 +12,7 @@ CHECK_SERVER_HEALTH = False  # Enable or disable services health checks
 
 OUTPUT_GRAPH_PNG = False  # Whether to output the agent graph as a PNG file
 
-BASE_DIR = "../model_running_time/" # Download cache dir
+BASE_DIR = "../apix_running_time/" # Download cache dir
 
 SANDBOX_DOCKER_IMAGE_NAME = "agent-sandbox:latest" # Sandbox image name.
 
@@ -24,25 +24,25 @@ BASE_URL = {       # Base URL for the LLM service
     'ollama': 'https://ollama.com',  # Cloud
     
     # OpenAI
-    'openai': 'https://api.openai.com',
+    'openai': 'https://api.openai.com/v1',
     
     # Google (Gemini)
     'google': 'https://generativelanguage.googleapis.com',
     
     # Qwen (通义千问)
-    'qwen': 'https://dashscope.aliyuncs.com',
+    'qwen': 'https://dashscope.aliyuncs.com/v1',
     
     # Qianfan (百度千帆)
-    'qianfan': 'https://qianfan.baidubce.com',
+    'qianfan': 'https://qianfan.baidubce.com/v1',
     
     # DeepSeek
-    'deepseek': 'https://api.deepseek.com',
+    'deepseek': 'https://api.deepseek.com/v1',
 
     # Moonshot (月之暗面)
-    'moonshot': 'https://api.moonshot.cn',
+    'moonshot': 'https://api.moonshot.cn/v1',
 
     # XiaomiMIMO
-    'xiaomimimo': 'https://api.xiaomimimo.com',
+    'xiaomimimo': 'https://api.xiaomimimo.com/v1',
 }  
 
 

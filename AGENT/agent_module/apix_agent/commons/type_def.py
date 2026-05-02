@@ -5,6 +5,40 @@ from langchain_core.messages import AnyMessage
 from langchain.agents.middleware.todo import Todo
 
 
+class ProviderNoFound(Exception):
+    
+    def __init__(self, message="Custom provider not found.", provider=None):
+        """        
+        Args:
+            message: error message
+            errors: error object
+        """
+        self.message = message
+        self.errors = provider if provider else ''
+        super().__init__(self.message)
+    
+    def __str__(self):
+        error_details = f"Errors: {self.errors}" if self.errors else ""
+        return f"{self.message}{error_details}"
+
+
+class PlatformNotRegister(Exception):
+    
+    def __init__(self, message="Platform not register error.", platform=None):
+        """        
+        Args:
+            message: error message
+            errors: error object
+        """
+        self.message = message
+        self.errors = platform if platform else ''
+        super().__init__(self.message)
+    
+    def __str__(self):
+        error_details = f"Errors: {self.errors}" if self.errors else ""
+        return f"{self.message}{error_details}"
+
+
 class ConflictToolCalls(Exception):
     
     def __init__(self, message="Invalid tool calls detected", errors=None):
@@ -62,6 +96,13 @@ class InvalidOutputsError(Exception):
 #   and has no permission to assign sub-agents. It acts as a task executor in an agent team.
 
 
+
+class ApixEventEnvelopeTarget(TypedDict):
+    id: str
+    platform: str
+    conversation_id: str
+
+
 class RoleSchema(TypedDict):
     name: str
     definition: str
@@ -76,6 +117,7 @@ class AgentConfigSchema(TypedDict):
     models_provider: str
     model_name: str
     api_key: str
+    custom_provider_id: NotRequired[str]
 
     enable_think: bool
     llm_calls_warning_threshold: int
@@ -121,13 +163,28 @@ class AgentConfigSchema(TypedDict):
     higher_role_prompt_permission: bool  # If true, the role prompt will insert into system prompt.
 
 
+class ApixPayloadSchema(TypedDict):
+    client_id: str
+    session_id: str
+    history_id: str
+    platform: str
+    messages: dict
+    re_generate: bool
+    config: AgentConfigSchema
+
+
+class ApixEntryDataSchema(TypedDict):
+    action: str
+    data: ApixPayloadSchema
+
+
 class GraphRuntimeContext(TypedDict):
     agent_name: str
     agent_role: Literal["team_leader", "team_worker", "main_agent", "sub_agent", "agent"]
     client_id: str
     session_id: NotRequired[str]
     history_id: str
-    platform: NotRequired[Literal["default"]]
+    target: ApixEventEnvelopeTarget
     generation_id: str
     node_id: NotRequired[str]
     parent_node_id: NotRequired[str]
@@ -158,7 +215,6 @@ class MainAgentState(GraphRuntimeContext):
     documents: list # Include available documents name and description
 
 
-
 class SubAgentState(MainAgentState):
     final_goal: str
     task_id: str
@@ -170,12 +226,6 @@ class SubAgentState(MainAgentState):
     errors: Annotated[str, operator.add]
 
 
-
-class ApixEventEnvelopeTarget(TypedDict):
-    id: str
-    platform: str
-
-
 class MinimalEnvelopeData(TypedDict, total=False):
     event_name: Required[str]
     content: Required[Any]
@@ -184,6 +234,6 @@ class MinimalEnvelopeData(TypedDict, total=False):
 class ApixEventEnvelope(TypedDict):
     event: str
     target: ApixEventEnvelopeTarget
+    generation_id: str
     data: MinimalEnvelopeData          # main payload
-    trace_id: str
     timestamp: float

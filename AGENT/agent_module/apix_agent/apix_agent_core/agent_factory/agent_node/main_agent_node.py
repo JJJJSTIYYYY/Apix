@@ -106,12 +106,11 @@ class MainAgentNode(AgentNodeBase):
             # Ensure agent message node's parent_id in this generation (normally equals to current_visible_node_id)
             client_messages, parent_id = await ai_context_manager.fetch_messages(client_id, history_id, 0, current_visible_node_id)
 
-            event_writer = AgentStreamWriter()
-            target_platform = state.get("platform")
+            event_writer = AgentStreamWriter(generation_id)
+            target = state.get("target")
             event_writer.send_event(
                 event=AgentStreamEvent.ESSENTIAL_INFO_RETURN,
-                target_id=client_id,
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "parent_id_return",
                     "content": parent_id or '-'
@@ -179,6 +178,7 @@ class MainAgentNode(AgentNodeBase):
         logger.trace('[agent.py] [AgentNode] [context_summary] Enter')
 
         # Config
+        generation_id = state.get("generation_id")
         config = state.get("config", {})
         enable_shortterm_memory = config.get("enable_shortterm_memory")
         summary_trigger_threshold = config.get("summary_trigger_threshold")
@@ -338,13 +338,11 @@ class MainAgentNode(AgentNodeBase):
                 }
             )
 
-        event_writer = AgentStreamWriter()
-        client_id = state.get("client_id")
-        target_platform = state.get("platform")
+        event_writer = AgentStreamWriter(generation_id)
+        target = state.get("target")
         event_writer.send_event(
             event=AgentStreamEvent.RUNTIME_WARNING,
-            target_id=client_id,
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "token_limit_warning",
                 "content": "The currently selected model is too small to load the full context."
@@ -397,7 +395,8 @@ class MainAgentNode(AgentNodeBase):
         # Basic config
         agent_role = state.get("agent_role")
         client_id = state.get("client_id")
-        target_platform = state.get("platform")
+        target = state.get("target")
+        generation_id = state.get("generation_id")
         config = state.get("config", {})
         llm_calls_warning_threshold = config.get("llm_calls_warning_threshold")
 
@@ -409,7 +408,7 @@ class MainAgentNode(AgentNodeBase):
         loaded_skills_cache = state.get("loaded_skills_cache")
 
         # Runtime
-        event_writer = AgentStreamWriter()
+        event_writer = AgentStreamWriter(generation_id)
         messages = state["messages"]
 
         logger.info(
@@ -502,8 +501,7 @@ class MainAgentNode(AgentNodeBase):
 
         event_writer.send_event(
             event=AgentStreamEvent.LLM_STREAM_START, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "node_stream_start",
                 "content": "[Start LLM Response (single node)]"
@@ -511,12 +509,12 @@ class MainAgentNode(AgentNodeBase):
         )
 
         ai_msg_chunk = AIMessageChunk(content="")
+        chunk_num = 0
 
         # Stream loop
         try:
             async for chunk in chunk_iterator:
-                print('.', end="")  # debug output
-
+                chunk_num = chunk_num + 1
                 ai_msg_chunk = ai_msg_chunk + chunk
 
                 # Extract fields safely
@@ -531,8 +529,7 @@ class MainAgentNode(AgentNodeBase):
                 if think:
                     event_writer.send_event(
                         event=AgentStreamEvent.LLM_CHUNK_RETURN, 
-                        target_id=client_id, 
-                        target_platform=target_platform,
+                        target=target,
                         data={
                             "event_name": "think_chunk_rtn",
                             "content": think
@@ -541,8 +538,7 @@ class MainAgentNode(AgentNodeBase):
                 elif content:
                     event_writer.send_event(
                         event=AgentStreamEvent.LLM_CHUNK_RETURN, 
-                        target_id=client_id, 
-                        target_platform=target_platform,
+                        target=target,
                         data={
                             "event_name": "content_chunk_rtn",
                             "content": content
@@ -551,8 +547,7 @@ class MainAgentNode(AgentNodeBase):
                 if tool_calls:
                     event_writer.send_event(
                         event=AgentStreamEvent.LLM_CHUNK_RETURN, 
-                        target_id=client_id, 
-                        target_platform=target_platform,
+                        target=target,
                         data={
                             "event_name": "tool_chunk_rtn",
                             "content": tool_calls
@@ -616,13 +611,12 @@ class MainAgentNode(AgentNodeBase):
             else:
                 raise e
 
-        print('\n')
+        logger.info(f"[llm_call] Generate chunks num: {chunk_num}")
 
         # End streaming
         event_writer.send_event(
             event=AgentStreamEvent.LLM_STREAM_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "node_stream_end",
                 "content": "[Finish LLM Response] (single node)"
@@ -665,7 +659,7 @@ class MainAgentNode(AgentNodeBase):
 
         generation_id = state.get("generation_id")
         client_id = state.get("client_id")
-        target_platform = state.get("platform")
+        target = state.get("target")
         history_id = state.get("history_id")
         timestamp = state.get("timestamp")
 
@@ -673,7 +667,7 @@ class MainAgentNode(AgentNodeBase):
         model_name = config.get("model_name")
         model_provider = config.get("models_provider")
 
-        event_writer = AgentStreamWriter()
+        event_writer = AgentStreamWriter(generation_id)
 
         current_tool_calls = []
 
@@ -697,8 +691,7 @@ class MainAgentNode(AgentNodeBase):
             
             event_writer.send_event(
                 event=AgentStreamEvent.LLM_STREAM_END, 
-                target_id=client_id, 
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "messages_persist_end",
                     "content": ""
@@ -744,8 +737,7 @@ class MainAgentNode(AgentNodeBase):
             
             event_writer.send_event(
                 event=AgentStreamEvent.LLM_STREAM_END, 
-                target_id=client_id, 
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "messages_persist_end",
                     "content": ""
@@ -775,8 +767,7 @@ class MainAgentNode(AgentNodeBase):
             
             event_writer.send_event(
                 event=AgentStreamEvent.LLM_STREAM_END, 
-                target_id=client_id, 
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "messages_persist_end",
                     "content": ""

@@ -1,36 +1,38 @@
 <template>
   <div class="skill-page-wrapper">
-    <div class="ab-bar">
-      <div class="ab-bar-btns">
-        <el-button
-          type="primary"
-          class="upload-btn"
-          @click="uploadSkill"
-        >
-          上传技能包
-          <el-icon class="el-icon--right"><Upload /></el-icon>
-        </el-button>
-      </div>
-    </div>
+    <div class="main-wrapper">
 
-    <div class="main-wrapper selectable">
+      <div class="title-wrapper">
+        <h1 class="data-page-title">
+          Agent 技能包
+        </h1>
 
-      <h1 style="width: 100%; text-align: center; font-size: 20px;">
-        Agent 技能包
-      </h1>
+        <div class="btn-wrapper">
+          <div class="ab-bar-btns">
+            <el-button
+              type="primary"
+              class="upload-btn"
+              @click="uploadSkill"
+            >
+              上传技能包
+              <el-icon class="el-icon--right"><Upload /></el-icon>
+            </el-button>
+          </div>
+        </div>
 
-      <!-- Search -->
-      <div class="search-wrapper">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="Search skills by name / description"
-          clearable
-          style="max-width: 420px;"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
+        <!-- Search -->
+        <div class="search-wrapper">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="Search skills by name / description"
+            clearable
+            style="max-width: 420px;"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </div>
       </div>
 
       <!-- Skill grid -->
@@ -357,13 +359,36 @@ function mergeSkills(messages: any[]) {
 <style scoped>
 .skill-page-wrapper {
   position: relative;
+  background-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
+    0 0px 26px rgba(218, 218, 218, 0.206),
+    0 0px 6px rgba(218, 218, 218, 0.09);
+  border-radius: 24px;
+  margin: 12px 12px 12px 0;
+}
+
+.title-wrapper {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px 12px;
+  border-radius: 24px;
+}
+
+.data-page-title {
+  padding-left: 6px;
+  font-size: 24px;
+  color: rgb(82, 108, 106);
+  margin-bottom: 0px;
 }
 
 .main-wrapper {
   position: relative;
   justify-content: center;
   width: 1050px;
-  height: calc(100vh - 52px) !important;
+  height: calc(100vh - 76px) !important;
   left: calc((100% - 1090px) / 2);
   padding: 10px 20px;
   overflow-y: scroll;
@@ -371,21 +396,63 @@ function mergeSkills(messages: any[]) {
   align-items: center;
 }
 
-.ab-bar {
-  width: 100%;
-  position: absolute;
-  bottom: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 999;
+.model-select {
+  font-size: 12px !important;
+  font-weight: bold !important;
+  width: 180px !important;
+  height: 32px !important;
+  border: none !important;
+  border-radius: 12px !important;
+  color: white !important;
+  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  overflow: hidden;
 }
 
-.ab-bar-btns {
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-  z-index: 999;
+.model-select:deep(.n-base-selection__border) {
+  opacity: 0;
+}
+
+.model-select:deep(.n-base-selection__state-border) {
+  opacity: 0;
+}
+
+.model-select:hover {
+  background-color: rgb(147, 195, 196) !important;
+}
+
+.model-select:active {
+  transform: scale(0.98);
+}
+
+.model-select:deep(*) {
+  color: white !important;
+  align-items: center;
+  background: transparent !important;
+}
+
+.model-select:not(.errorServer):deep(.n-base-selection) {
+  background: rgb(158, 207, 208) !important;
+}
+
+.model-select.errorServer:deep(.n-base-selection) {
+  background: #f35555ee !important;
+}
+
+.model-select:deep(.n-base-selection-label) {
+  height: 32px !important;
+  position: relative;
+  color: white !important;
+  background-color: transparent !important;
+}
+
+.model-select:deep(.n-base-selection-input) {
+  padding: 6px 8px !important;
+}
+
+.model-select:deep(.n-base-selection-placeholder__inner) {
+  color: rgba(255, 255, 255, 0.731) !important;
+  font-weight: 500;
+  font-size: 14px;
 }
 
 .upload-btn {
@@ -393,87 +460,65 @@ function mergeSkills(messages: any[]) {
   height: 32px;
   font-size: 14px;
   font-weight: bold;
-  border-radius: 32px;
+  border-radius: 12px;
   color: #ffffff;
-
-  -webkit-backdrop-filter: saturate(500%) blur(16px);
-  backdrop-filter: saturate(500%) blur(16px);
-
-  background: color-mix(in oklch, #00a6ff 40%, transparent);
-
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background: rgb(158, 207, 208);
   transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-
-  box-shadow:
-    0 14px 30px rgba(0, 166, 255, 0.13),
-    0 6px 14px rgba(4, 52, 42, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.02);
-
   border: none;
 }
 
 .upload-btn:hover {
-  transform: scale(1.05);
+  background-color: rgb(147, 195, 196);
 }
 
 .upload-btn:active {
-  transform: scale(1.02);
+  transform: scale(0.98);
+}
+
+.btn-wrapper {
+  width: 100%; 
+  display: flex; 
+  margin: 16px 0 0 0;
+  gap: 12px;
 }
 
 .search-wrapper {
   width: 100%; 
   display: flex; 
-  justify-content: center; 
   margin: 16px 0;
+  gap: 12px;
 }
 
 .search-wrapper :deep(.el-input) {
+  height: 32px !important;
   flex: 1;
   min-width: 0;
   transform-origin: left center;
   transform: scale(1);
   transform-origin: center;
-  transition: transform 0.22s cubic-bezier(0.34, 3.5, 0.64, 1);
-}
-
-.search-wrapper.is-focused :deep(.el-input) {
-  transform: scale(0.97);
-  transform-origin: center;
-}
-
-.search-wrapper :deep(.el-input:hover) {
-  transform: scale(1.02);
-  transform-origin: center;
-  transition: transform 0.22s ease;
+  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
 }
 
 .search-wrapper :deep(.el-input__wrapper) {
-  height: 34px;
-  border-radius: 999px;
-  background: rgba(228, 228, 228, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  height: 32px !important;
+  background: transparent;
+  border: none;
+  border-radius: 0px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   padding: 0 12px 0 10px;
   transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.search-wrapper.is-focused :deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.536);
-  border-color: rgba(255, 255, 255, 0.76);
-  z-index: 99;
-}
-
 /* ---------- Grid layout ---------- */
 .skill-grid {
+  border-top: 4px solid rgba(0, 0, 0, 0.08);
+  margin-top: 20px; 
+  padding-top: 32px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 20px;
-  min-height: 600px;
 }
 
 /* ---------- Explain tag ---------- */
@@ -491,6 +536,7 @@ function mergeSkills(messages: any[]) {
   border-radius: 16px;
   text-align: center;
   align-self: center;
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Scrollbar cleanup */

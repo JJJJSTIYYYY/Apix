@@ -350,7 +350,10 @@ class MysqlService:
             pinned = bool(payload.get("is_pinned", None))
             is_deleted = bool(payload.get("is_deleted", None))
             has_new_message = bool(payload.get("has_new_message", None))
-            await self._call_procedure("update_conversation", (user_uid, conversation_uid, title, workspace, session_id, pinned, is_deleted, has_new_message))
+            await self._call_procedure(
+                "update_conversation", 
+                (user_uid, conversation_uid, title, workspace, session_id, pinned, is_deleted, has_new_message)
+            )
             return {
                 "success": True,
                 "messages": f"{conversation_uid}",
@@ -433,7 +436,10 @@ class MysqlService:
             if not timestamp:
                 raise ValueError("[MysqlService][append_message] message timestamp is empty")
                 
-            result = await self._call_procedure("append_message", (user_uid, conversation_id, role, content, think, extra, info, generation_id, node_id, parent_id, timestamp))
+            result = await self._call_procedure(
+                "append_message", 
+                (user_uid, conversation_id, role, content, think, extra, info, generation_id, node_id, parent_id, timestamp)
+            )
             cursor =  result[0].get("msg_cursor", -1)
             created_at = result[0].get("created_at")
             if cursor == -1: raise ValueError("Invalid cursor the database returned.")
@@ -689,7 +695,10 @@ class MysqlService:
             mime_type = payload.get("mime_type", '')
             user_uid = payload["client_id"]
             conversation_uid = payload.get("history_id", '')
-            rows = await self._call_procedure("insert_file_info", (file_id, file_name, file_path, mime_type, user_uid, conversation_uid))
+            rows = await self._call_procedure(
+                "insert_file_info", 
+                (file_id, file_name, file_path, mime_type, user_uid, conversation_uid)
+            )
             return {
                 "success": True,
                 "messages": rows,
@@ -1312,6 +1321,193 @@ class MysqlService:
             }
         except Exception as e:
             logger.exception(f"[MysqlService][delete_shortterm_memory] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    # --------------------------------------------------
+    # Custom Provider 
+    # --------------------------------------------------
+
+    @task_handler("mysql.provider.create_llm_provider")
+    async def create_llm_provider(self, payload: dict) -> dict:
+        """
+        Insert a llm provider meta in database. Call procedure create_llm_provider.
+
+        Args:
+            payload: Dict, the format is {
+                "provider_id": str, # provider's unique id (uuid4)
+                "client_id": str, # to indicate which user the data is from
+                "provider_name": str, # provider's name, not null
+                "type": str, # provider's protocol, default openai
+                "endpoint": str, # provider's endpoint, not null
+                "model_list": str, # provider's model list, not null
+                "description": str, # description for provider, default null
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or dict {"provider_id": str},
+            }
+        """
+        logger.info(f"[MysqlService][create_llm_provider] enter.")
+        try:
+            provider_id = payload["provider_id"]
+            user_uid = payload["client_id"]
+            provider_name = payload["provider_name"]
+            provider_type = (payload.get("type", "openai") or "openai").lower()
+            endpoint = payload["endpoint"]
+            model_list = payload["model_list"]
+            description = payload.get("description")
+            await self._call_procedure(
+                "create_llm_provider", 
+                (provider_id, user_uid, provider_name, provider_type, endpoint, json.dumps(model_list), description)
+            )
+            return {
+                "success": True,
+                "messages": {
+                    "provider_id": provider_id
+                },
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][create_llm_provider] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.provider.get_llm_providers")
+    async def get_llm_providers(self, payload: dict) -> dict:
+        """
+        Get all llm provider meta in database. Call procedure get_llm_providers.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": str, # to indicate which user the request from
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list [
+                    {
+                        "provider_id": str,
+                        "provider_name": str,
+                        "type": str,
+                        "endpoint": str,
+                        "model_list": list,
+                        "description": str,
+                        "created_at": str
+                    },
+                    ...
+                ],
+            }
+        """
+        logger.info(f"[MysqlService][get_llm_providers] enter.")
+        try:
+            user_uid = payload["client_id"]
+            rows = await self._call_procedure("get_llm_providers", (user_uid, ))
+            return {
+                "success": True,
+                "messages": rows,
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][get_llm_providers] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.provider.get_llm_provider_by_id")
+    async def get_llm_provider_by_id(self, payload: dict) -> dict:
+        """
+        Get a llm provider meta in database. Call procedure get_llm_provider_by_id.
+
+        Args:
+            payload: Dict, the format is {
+                "provider_id": str, # provider's unique id (uuid4)
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list [
+                    {
+                        "provider_id": str,
+                        "provider_name": str,
+                        "type": str,
+                        "endpoint": str,
+                        "model_list": list,
+                        "description": str,
+                        "created_at": str
+                    }
+                ],
+            }
+        """
+        logger.info(f"[MysqlService][get_llm_provider_by_id] enter.")
+        try:
+            provider_id = payload["provider_id"]
+            rows = await self._call_procedure("get_llm_provider_by_id", (provider_id, ))
+            return {
+                "success": True,
+                "messages": rows,
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][get_llm_provider_by_id] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.provider.update_llm_provider")
+    async def update_llm_provider(self, payload: dict) -> dict:
+        """
+        Update a llm provider meta in database, include is_deleted status. Call procedure update_llm_provider.
+
+        Args:
+            payload: Dict, the format is {
+                "provider_id": str, # provider's unique id (uuid4)
+                "client_id": str, # to indicate which user the data is from
+                "provider_name": str, # Optional, provider's name
+                "type": str, # Optional, provider's protocol
+                "endpoint": str, # Optional, provider's endpoint
+                "model_list": str, # Optional, provider's model list
+                "description": str, # Optional, description for provider
+                "is_deleted": bool, # Optional, delete if true
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or "success",
+            }
+        """
+        logger.info(f"[MysqlService][update_llm_provider] enter.")
+        try:
+            provider_id = payload["provider_id"]
+            user_uid = payload["client_id"]
+            provider_name = payload.get("provider_name")
+            provider_type = payload.get("type")
+            if isinstance(provider_type, str):
+                provider_type = provider_type.lower()
+            endpoint = payload.get("endpoint")
+            model_list = payload.get("model_list")
+            if isinstance(model_list, list):
+                model_list = json.dumps(model_list)
+            description = payload.get("description")
+            is_deleted = payload.get("is_deleted")
+            await self._call_procedure(
+                "update_llm_provider", 
+                (provider_id, user_uid, provider_name, provider_type, endpoint, model_list, description, is_deleted)
+            )
+            return {
+                "success": True,
+                "messages": 'success',
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][update_llm_provider] ❌ Error: {type(e).__name__}: {e}")
             return {
                 "success": False,
                 "messages": f"fail: {e}",

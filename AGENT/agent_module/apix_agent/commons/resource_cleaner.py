@@ -3,6 +3,8 @@ import time
 from typing import Callable, List, Awaitable, Union, Optional
 from functools import wraps
 
+
+from apix_agent.commons.auto_init import auto_init
 from apix_agent.commons.logger import logger
 from apix_agent.global_config import CACHE_CLEAN_INTERVAL
 
@@ -157,3 +159,13 @@ class ResourceCleaner:
 
 # Global singleton
 resource_cleaner = ResourceCleaner()
+
+
+@auto_init.auto_start
+async def start_resource_cleaner():
+    await resource_cleaner.start(CACHE_CLEAN_INTERVAL)
+
+
+@auto_init.auto_stop
+async def stop_resource_cleaner():
+    await resource_cleaner.stop()
