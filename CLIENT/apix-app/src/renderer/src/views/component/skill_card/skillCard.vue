@@ -1,5 +1,5 @@
 <template>
-  <div class="skill-card">
+  <div class="skill-card selectable">
 
     <!-- Header - 保持不动 -->
     <div class="skill-header">

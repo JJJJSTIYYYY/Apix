@@ -14,7 +14,7 @@
           >
             <el-menu-item index="1">
               <el-icon><Cpu /></el-icon>
-              <span>后台任务</span>
+              <span>后台代理</span>
             </el-menu-item>
             <el-menu-item index="2">
               <el-icon><Timer /></el-icon>
@@ -75,16 +75,54 @@ const handleSelect = (key: string) => {
 }
 
 .menu-aside {
-  width: 130px; 
+  width: 150px; 
   align-self: start; 
-  height: 100%; 
+  height: calc(100% - 24px); 
   padding: 16px 3px;
+  margin: 12px;
+  border-radius: 24px;
+  background-color: rgba(255, 255, 255, 0.5);
   box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
     0 0px 26px rgba(218, 218, 218, 0.206),
     0 0px 6px rgba(218, 218, 218, 0.09);
+  transition: all 0.28s ease;
+}
+
+.menu-aside:hover {
+  box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
+    0 0px 26px rgba(218, 218, 218, 0.452),
+    0 0px 6px rgba(218, 218, 218, 0.237);
+  transform: scale(1.01);
+}
+
+.el-menu {
+  background-color: rgba(255, 255, 255, 0);
+  padding: 2px;
+  padding-left: 4px;
 }
 
 .el-menu-vertical-data {
   height: 100%;
+}
+
+.el-menu-item {
+  border-radius: 16px;
+}
+
+.el-menu-item:hover {
+  background: rgba(0, 173, 156, 0.142);
+}
+
+.el-menu-item.is-active {
+  color: rgb(0, 173, 155);
+  /* 核心：中心到四周减淡的圆形泛光背景 */
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 231, 208, 0.2) 0%,      /* 中心最亮 */
+    rgba(0, 231, 208, 0.08) 10%,    /* 中间过渡 */
+    rgba(0, 231, 208, 0) 30%        /* 边缘完全透明 */
+  );
 }
 </style>

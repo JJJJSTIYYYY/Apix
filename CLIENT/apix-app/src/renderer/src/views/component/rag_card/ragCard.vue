@@ -1,5 +1,5 @@
 <template>
-  <div class="rag-card">
+  <div class="rag-card selectable">
 
     <!-- Header -->
     <div class="rag-header">

@@ -5,12 +5,12 @@
 }
 
 ::selection {
-  background-color: rgb(133, 186, 188);  /* 选取背景色 */
-  color: #ffffff;              /* 选取文字颜色 */
+  background-color: rgb(133, 186, 188);
+  color: #ffffff;
 }
 
 .main-area {
-  background: #f5f5f5ee;
+  background: #f5f5f5fb;
 }
 
 .selectable,

@@ -10,20 +10,53 @@ from apix_agent.commons.logger import logger
 # ==========================================================
 
 def load_from_yaml(dir, key=None) -> dict | str:
+    """
+    Load yaml file and optionally return a specific key.
+
+    Args:
+        dir (str): Path to yaml file.
+        key (str, optional): Specific key to retrieve from yaml content.
+            If provided, return config[key], otherwise return full config.
+
+    Returns:
+        dict | str:
+            - Full yaml data (dict) if key is None
+            - Value of the specified key if key is provided (may be None if key not found)
+
+    Raises:
+        Exception: If file reading or yaml parsing fails.
+    """
     config = None
     try:
-        with open(dir, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-            logger.info("[load_from_yaml] load config from yaml file successfully.")
-        if key:
+        if os.path.exists(dir):
+            with open(dir, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+                logger.info("[load_from_yaml] load config from yaml file successfully.")
+        else:
+            config = {}
+        if key is not None:
             return config.get(key)
+    
     except Exception as e:
         logger.error(f"[load_from_yaml] Error loading yaml file: {e}")
         raise
-    # logger.info(f"[load_from_yaml] Load config from {dir}: {config}")
     return config
 
+
 def write_to_yaml(dir, data: dict):
+    """
+    Write data to yaml file (overwrite mode).
+
+    Args:
+        dir (str): Path to yaml file.
+        data (dict): Data to be written into yaml.
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If file writing fails.
+    """
     try:
         with open(dir, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, allow_unicode=True)
@@ -32,7 +65,27 @@ def write_to_yaml(dir, data: dict):
         logger.error(f"[write_to_yaml] Error writing to yaml file: {e}")
         raise
 
+
 def append_to_yaml(dir, new_data: dict):
+    """
+    Append (merge) data into yaml file.
+
+    If file exists:
+        - Load existing yaml data
+        - Merge with new_data using dict.update()
+    If file does not exist:
+        - Create a new yaml file with new_data
+
+    Args:
+        dir (str): Path to yaml file.
+        new_data (dict): New data to merge into existing yaml.
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If file read/write or yaml parsing fails.
+    """
     try:
         if os.path.exists(dir):
             with open(dir, "r", encoding="utf-8") as f:

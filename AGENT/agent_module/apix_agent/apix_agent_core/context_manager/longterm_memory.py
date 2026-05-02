@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import redis.asyncio as redis
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, AIMessageChunk, AnyMessage
 
+from apix_agent.commons.auto_init import auto_init
 from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.apix_agent_core.LLM import llm_factory as lf
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
@@ -342,6 +343,16 @@ class LongtermMemoryManager:
 
 
 longterm_memory_manager = LongtermMemoryManager()
+
+
+@auto_init.auto_start
+async def start_longterm_memory_manager():
+    await longterm_memory_manager.start()
+
+
+@auto_init.auto_stop
+async def stop_longterm_memory_manager():
+    await longterm_memory_manager.stop()
 
 
 

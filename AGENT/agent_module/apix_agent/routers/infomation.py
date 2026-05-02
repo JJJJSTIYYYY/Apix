@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.commons.logger import logger
-from apix_agent.global_config import BASE_URL
+from apix_agent.global_config import BASE_URL, MEMORY_SERVICE_BASE_URL
 
 router = APIRouter(tags=["infomation"])
 
@@ -33,7 +33,7 @@ async def get_models_list(request_data: Request):
         body = await request_data.json()
         model_provider = body.get("model_provider")
         api_key = body.get("api_key")
-        config = body.get("config")
+        config = body.get("config", {}) or {}
     except Exception as e:
         logger.error(f"[get_models_list]: Invalid request body: {e}")
         return JSONResponse(content={"messages": ['Error occurred']}, status_code=400)
@@ -75,7 +75,7 @@ async def get_models_list(request_data: Request):
         try:
 
             response = httpx.get(
-                f"{BASE_URL.get(model_provider)}/v1/models",
+                f"{BASE_URL.get(model_provider)}/models",
                 headers={"Authorization": f"Bearer {api_key}"}
             )
             response.raise_for_status()
@@ -87,13 +87,38 @@ async def get_models_list(request_data: Request):
             raw_models_name_list.append(f'Error occurred: {e}')
             logger.error(f"[get_models_list] [{model_provider}]: {e}")
 
+    elif model_provider == "custom":
+        provider_id = None
+        try:
+            logger.info(f"[get_models_list]: Custom provider config: {config}")
+            provider_id = config.get("custom_provider_id")
+            response = httpx.post(
+                f"{MEMORY_SERVICE_BASE_URL}/provider/get_llm_provider_by_id",
+                json={
+                    "provider_id": provider_id,
+                },
+            )
+            response.raise_for_status()
+            provider_metas = response.json().get("messages", []) or []
+            logger.info(f"[get_models_list]: Custom provider meta: {provider_metas}")
+            if provider_metas:
+                provider_meta = provider_metas[0]
+            else:
+                provider_meta = {}
+            raw_models_name_list = provider_meta.get("model_list", []) or []
+
+        except Exception as e:
+            raw_models_name_list.append(f'Error occurred: {e}')
+            logger.error(f"[get_models_list] [{model_provider}] provider_id={provider_id}: {e}")
+
     else:
         logger.error(f"[get_models_list]: Unsupported model_provider: {model_provider}")
 
-    models_name_list = []
-    for model_name in raw_models_name_list:
-        if 'embed' not in model_name:
-            models_name_list.append(model_name)
+    models_name_list = sorted({
+        model_name
+        for model_name in raw_models_name_list
+        if 'embed' not in model_name.lower() and 'tts' not in model_name.lower()
+    })
 
     return JSONResponse(
         content={"messages": models_name_list},

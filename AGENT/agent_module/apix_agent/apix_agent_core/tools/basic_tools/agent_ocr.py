@@ -161,14 +161,13 @@ async def ocr_analysis(
     - If structured output is required, explicitly specify the expected format.
     - Do not assume the content of an image without analysis.
     """
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "ocr_analysis",
@@ -192,8 +191,7 @@ async def ocr_analysis(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "ocr_analysis",
@@ -217,8 +215,7 @@ async def ocr_analysis(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "ocr_analysis",
@@ -313,8 +310,7 @@ async def ocr_analysis(
                 )
                 event_writer.send_event(
                     event=AgentStreamEvent.TOOL_EXEC_MIDDLE if idx < total else AgentStreamEvent.TOOL_EXEC_END, 
-                    target_id=client_id, 
-                    target_platform=target_platform,
+                    target=target,
                     data={
                         "event_name": "tool_exec_chunk_rtn",
                         "tool_name": "ocr_analysis",
@@ -335,8 +331,7 @@ async def ocr_analysis(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "ocr_analysis",
@@ -356,8 +351,7 @@ async def ocr_analysis(
     except Exception as e:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "ocr_analysis",
@@ -393,13 +387,13 @@ async def send_images(
         str: The OCR result produced by EasyOCR or the image analysis result produced by a vision sub-model.
     """
     client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "send_images",
@@ -419,8 +413,7 @@ async def send_images(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "send_images",
@@ -444,8 +437,7 @@ async def send_images(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "send_images",
@@ -482,9 +474,6 @@ async def send_images(
             })
 
         if not state.get("task_id", None):
-            client_id = state.get("client_id")
-            if not client_id:
-                raise Exception("Unknow client_id")
             
             file_meta = await file_system.insert_files_to_file_service(
                 client_id=client_id,
@@ -509,8 +498,7 @@ async def send_images(
 
                 event_writer.send_event(
                     event=AgentStreamEvent.TOOL_EXEC_END, 
-                    target_id=client_id, 
-                    target_platform=target_platform,
+                    target=target,
                     data={
                         "event_name": "tool_exec_chunk_rtn",
                         "tool_name": "send_images",
@@ -533,8 +521,7 @@ async def send_images(
     except Exception as e:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "send_images",

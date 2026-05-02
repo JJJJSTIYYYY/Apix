@@ -2,8 +2,8 @@ import { ipcMain } from 'electron'
 import { initWS, waitForOpen } from '../ws/wsClient'
 const WebSocket = require('ws')
 
-const MEMORY_API_BASE = "http://127.0.0.1:5093"
-const TOOLS_API_BASE = "http://127.0.0.1:5092"
+import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+
 // =====================================================
 //                      Ai chat
 // =====================================================

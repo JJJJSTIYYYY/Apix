@@ -4,134 +4,132 @@
       <HomePage />
     </el-aside>
 
-    <keep-alive>
-      <transition name="fade" mode="out-in">
-        <el-main
-          v-if="showPage"
-          ref="page"
-          class="main-area"
-          :style="{
-            height: pageHeight + 'px',
-          }"
-        >
-          <div class="app-layout" style="height: 100%;">
-            <!-- 左边拖拽面板 -->
-            <div
-              class="left-panel"
+    <transition name="fade" mode="out-in">
+      <el-main
+        v-if="showPage"
+        ref="page"
+        class="main-area"
+        :style="{
+          height: pageHeight + 'px',
+        }"
+      >
+        <div class="app-layout" style="height: 100%;">
+          <!-- 左边拖拽面板 -->
+          <div
+            class="left-panel"
+            :style="{
+              height: '100%',
+              width: '20%',
+              padding: '0px',
+              color: '#666666'
+            }"
+          >
+            <h3 style="display: table; margin: 0 auto; opacity: 0.65; padding: 12px 0 0 0;">任务卡</h3>
+
+            <el-scrollbar
+              class="left-card-container"
+              :max-height="pageHeight"
               :style="{
                 height: '100%',
-                width: '20%',
-                padding: '0px',
-                color: '#666666'
+                minWidth: '80%',
+                maxWidth: '80%',
+                display: 'block',
+                margin: '0 auto',
               }"
             >
-              <h3 style="display: table; margin: 0 auto; opacity: 0.65;">任务卡</h3>
-
-              <el-scrollbar
-                class="left-card-container"
-                :max-height="pageHeight"
-                :style="{
-                  height: '100%',
-                  minWidth: '80%',
-                  maxWidth: '80%',
-                  display: 'block',
-                  margin: '0 auto',
-                }"
+              <div
+                v-for="card in cards"
+                :key="card.id"
+                class="draggable-card"
+                draggable="true"
+                @dragstart="onLeftDragStart(card)"
               >
-                <div
-                  v-for="card in cards"
-                  :key="card.id"
-                  class="draggable-card"
-                  draggable="true"
-                  @dragstart="onLeftDragStart(card)"
+                {{ card.title }}
+
+                <button
+                  type="primary"
+                  class="no-drag fixed-left-card-delete"
+                  @click="removeLeftCard(card.id)"
+                  @mousedown.stop
+                  @dragstart.stop
                 >
-                  {{ card.title }}
-
-                  <button
-                    type="primary"
-                    class="no-drag fixed-left-card-delete"
-                    @click="removeLeftCard(card.id)"
-                    @mousedown.stop
-                    @dragstart.stop
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </button>
-                </div>
-              </el-scrollbar>
-            </div>
-
-            <!-- 右边标签页（case列表）窗口 -->
-            <div
-              class="right-panel"
-              :style="{ height: '100%', maxWidth: '100%', minWidth: '140px', width: '100%' }"
-            >
-              <n-tabs
-                v-model:value="activeTab"
-                type="card"
-                size="small"
-                class="ntabs"
-                closable
-                addable
-                scrollable
-                tab-style="min-width: 40px;"
-                :style="{ height: '100%' }"
-                @close="closeTab"
-                @add="addTab"
-                @update:value="changeTab"
-              >
-                <n-tab-pane
-                  v-for="tab in tabs"
-                  :key="tab.tabKey"
-                  class="NTabSpane"
-                  :name="tab.tabKey"
-                  :tab="tab.title"
-                  :style="{ height: pageHeight - 100 + 'px' }"
-                >
-                  <el-scrollbar
-                    class="right-card-container"
-                    :style="{ overflow: 'auto' }"
-                  >
-                    <TabCardList
-                      :items="tab.items ?? []"
-                      :tab_key="tab.tabKey"
-                    />
-                  </el-scrollbar>
-
-                  <div class="bottom-btn-wrap">
-                    <el-button
-                      type="primary"
-                      round
-                      class="submit-btn fixed-submit"
-                      @click="submitCase(tab)"
-                    >
-                      提交
-                    </el-button>
-
-                    <el-button
-                      type="primary"
-                      text
-                      class="commom-btn"
-                      @click="unfoldAllCards(tab)"
-                    >
-                      全部展开
-                    </el-button>
-
-                    <el-button
-                      type="primary"
-                      text
-                      class="commom-btn"
-                      @click="foldAllCards(tab)"
-                    >
-                      全部折叠
-                    </el-button>
-                  </div>
-                </n-tab-pane>
-              </n-tabs>
-            </div>
+                  <el-icon><Delete /></el-icon>
+                </button>
+              </div>
+            </el-scrollbar>
           </div>
-        </el-main>
-      </transition>
-    </keep-alive>
+
+          <!-- 右边标签页（case列表）窗口 -->
+          <div
+            class="right-panel"
+            :style="{ height: '100%', maxWidth: '100%', minWidth: '140px', width: '100%' }"
+          >
+            <n-tabs
+              v-model:value="activeTab"
+              type="card"
+              size="small"
+              class="ntabs"
+              closable
+              addable
+              scrollable
+              tab-style="min-width: 40px;"
+              :style="{ height: '100%' }"
+              @close="closeTab"
+              @add="addTab"
+              @update:value="changeTab"
+            >
+              <n-tab-pane
+                v-for="tab in tabs"
+                :key="tab.tabKey"
+                class="NTabSpane"
+                :name="tab.tabKey"
+                :tab="tab.title"
+                :style="{ height: pageHeight - 100 + 'px' }"
+              >
+                <el-scrollbar
+                  class="right-card-container"
+                  :style="{ overflow: 'auto' }"
+                >
+                  <TabCardList
+                    :items="tab.items ?? []"
+                    :tab_key="tab.tabKey"
+                  />
+                </el-scrollbar>
+
+                <div class="bottom-btn-wrap">
+                  <el-button
+                    type="primary"
+                    round
+                    class="submit-btn fixed-submit"
+                    @click="submitCase(tab)"
+                  >
+                    提交
+                  </el-button>
+
+                  <el-button
+                    type="primary"
+                    text
+                    class="commom-btn"
+                    @click="unfoldAllCards(tab)"
+                  >
+                    全部展开
+                  </el-button>
+
+                  <el-button
+                    type="primary"
+                    text
+                    class="commom-btn"
+                    @click="foldAllCards(tab)"
+                  >
+                    全部折叠
+                  </el-button>
+                </div>
+              </n-tab-pane>
+            </n-tabs>
+          </div>
+        </div>
+      </el-main>
+    </transition>
   </el-container>
 </template>
 
@@ -488,28 +486,34 @@ function foldAllCards(tab: TabItem) {
 
 /* 左边拖拽面板 */
 .left-panel {
-  background: rgba(255, 255, 255, 0.887);
-  border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
-  /* box-shadow: 0 2px 6px rgba(97, 133, 124, 0.1); */
+  background-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
+    0 0px 26px rgba(218, 218, 218, 0.206),
+    0 0px 6px rgba(218, 218, 218, 0.09);
+  border-radius: 24px;
   max-width: 170px;
 }
 
 /* 右边标签页窗口 */
 .right-panel {
   position: relative;
-  background: rgba(255, 255, 255, 0.887);
-  border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
-  /* box-shadow: 0 2px 6px rgba(97, 133, 124, 0.243); */
+  background-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
+    0 0px 26px rgba(218, 218, 218, 0.206),
+    0 0px 6px rgba(218, 218, 218, 0.09);
+  border-radius: 24px;
 }
 
 .no-drag {
@@ -630,6 +634,7 @@ function foldAllCards(tab: TabItem) {
 
 .left-card-container {
   padding: 15px;
+  padding-top: 0;
   background-color: transparent;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }

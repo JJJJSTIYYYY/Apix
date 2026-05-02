@@ -591,8 +591,7 @@ class SubAgentNode(AgentNodeBase):
         agent_name = state.get("agent_name")
         task_id = state.get("task_id")
         generation_id = state.get("generation_id")
-        client_id = state.get("client_id")
-        target_platform = state.get("platform")
+        target = state.get("target")
         history_id = state.get("history_id")
         timestamp = state.get("timestamp")
 
@@ -601,7 +600,7 @@ class SubAgentNode(AgentNodeBase):
         model_provider = config.get("models_provider")
 
         current_tool_calls = []
-        event_writer = AgentStreamWriter()
+        event_writer = AgentStreamWriter(generation_id)
 
         # Case 1: AIMessage (may contain tool calls)
         if isinstance(last_message, (AIMessage, AIMessageChunk)):
@@ -612,8 +611,7 @@ class SubAgentNode(AgentNodeBase):
             delta_outputs = last_message.content or ""
             event_writer.send_event(
                 event=AgentStreamEvent.AI_MESSAGE_RETURN, 
-                target_id=client_id, 
-                target_platform=target_platform,
+                target=target,
                 data={
                     "event_name": "output_chunk_rtn",
                     "content": state["outputs"] + delta_outputs

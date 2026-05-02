@@ -4,827 +4,825 @@
       <HomePage />
     </el-aside>
 
-    <keep-alive>
-      <transition name="fade" mode="out-in">
-        <el-main
-          v-if="showPage"
-          ref="page"
-          class="main-area"
-          :style="{ 
-            height: pageHeight + 'px',
-          }"
-        >
-          <div class="title-tag-wrapper">
-            <div style="width: 100%; max-width: 1000px; margin-bottom: 40px;">
-              <div class="apix-banner">
-                <div class="corner-accent"></div>
+    <transition name="fade" mode="out-in">
+      <el-main
+        v-if="showPage"
+        ref="page"
+        class="main-area"
+        :style="{ 
+          height: pageHeight + 'px',
+        }"
+      >
+        <div class="title-tag-wrapper">
+          <div style="width: 100%; max-width: 1000px; margin-bottom: 40px;">
+            <div class="apix-banner">
+              <div class="corner-accent"></div>
+              
+              <div class="banner-content">
+                <div class="banner-logo">
+                  <svg class="icon" viewBox="0 0 1024 1024">
+                    <path d="M717.12 274H762c82.842 0 150 67.158 150 150v200c0 82.842-67.158 150-150 150H262c-82.842 0-150-67.158-150-150V424c0-82.842 67.158-150 150-150h44.88l-18.268-109.602c-4.086-24.514 12.476-47.7 36.99-51.786 24.514-4.086 47.7 12.476 51.786 36.99l20 120c0.246 1.472 0.416 2.94 0.516 4.398h228.192c0.1-1.46 0.27-2.926 0.516-4.398l20-120c4.086-24.514 27.272-41.076 51.786-36.99 24.514 4.086 41.076 27.272 36.99 51.786L717.12 274z"/>
+                  </svg>
+                </div>
                 
-                <div class="banner-content">
-                  <div class="banner-logo">
-                    <svg class="icon" viewBox="0 0 1024 1024">
-                      <path d="M717.12 274H762c82.842 0 150 67.158 150 150v200c0 82.842-67.158 150-150 150H262c-82.842 0-150-67.158-150-150V424c0-82.842 67.158-150 150-150h44.88l-18.268-109.602c-4.086-24.514 12.476-47.7 36.99-51.786 24.514-4.086 47.7 12.476 51.786 36.99l20 120c0.246 1.472 0.416 2.94 0.516 4.398h228.192c0.1-1.46 0.27-2.926 0.516-4.398l20-120c4.086-24.514 27.272-41.076 51.786-36.99 24.514 4.086 41.076 27.272 36.99 51.786L717.12 274z"/>
-                    </svg>
+                <div class="banner-text">
+                  <div class="banner-title-wrapper">
+                    <h1 class="banner-title">APIX</h1>
+                    <span class="version-tag">{{ apix_client_version }}</span>
                   </div>
                   
-                  <div class="banner-text">
-                    <div class="banner-title-wrapper">
-                      <h1 class="banner-title">APIX</h1>
-                      <span class="version-tag">{{ apix_client_version }}</span>
-                    </div>
+                  <div class="divider"></div>
+                  
+                  <p class="banner-subtitle">
+                    一款<strong>兼容多引擎</strong>的 Agent 平台，支持处理 
+                    <strong>网页制作</strong>、<strong>代码编写</strong>、<strong>文档处理</strong>、<strong>海报设计</strong> 等复杂任务
+                  </p>
+                  
+                  <div class="banner-meta">
+                    <a class="dev-badge" href="https://github.com/JJJJSTIYYYY/Apix">Github</a>
                     
-                    <div class="divider"></div>
-                    
-                    <p class="banner-subtitle">
-                      一款<strong>兼容多引擎</strong>的 Agent 平台，支持处理 
-                      <strong>网页制作</strong>、<strong>代码编写</strong>、<strong>文档处理</strong>、<strong>海报设计</strong> 等复杂任务
-                    </p>
-                    
-                    <div class="banner-meta">
-                      <a class="dev-badge" href="https://github.com/JJJJSTIYYYY/Apix">Github</a>
-                      
-                      <div class="engine-tags">
-                        <span class="engine-tag">Ollama</span>
-                        <span class="engine-tag">OpenAI</span>
-                        <span class="engine-tag">DeepSeek</span>
-                        <span class="engine-tag">MoonShot</span>
-                        <span class="engine-tag">更多引擎等待兼容...</span>
-                      </div>
+                    <div class="engine-tags">
+                      <span class="engine-tag">Ollama</span>
+                      <span class="engine-tag">OpenAI</span>
+                      <span class="engine-tag">DeepSeek</span>
+                      <span class="engine-tag">MoonShot</span>
+                      <span class="engine-tag">更多引擎等待兼容...</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <div
-            class="app-layout"
+        </div>
+        <div
+          class="app-layout"
+        >
+          <!-- 组1: 界面设置 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">界面设置</span>
+            </div>
+            <!-- Brightness -->
+            <div class="setting-card">
+              <div class="setting-title">背景亮度</div>
+              <div class="setting-control">
+                <el-slider
+                  v-model="store.config.lightValue"
+                  :min="0"
+                  :max="100"
+                  @change="changeLightValue"
+                />
+                <span class="setting-value">{{ store.config.lightValue }}%</span>
+              </div>
+            </div>
+
+            <!-- Transparency -->
+            <div class="setting-card">
+              <div class="setting-title">背景透明度</div>
+              <div class="setting-control"> 
+                <el-slider
+                  v-model="store.config.transparencyValue"
+                  :min="0"
+                  :max="100"
+                  @change="changeTransparencyValue"
+                />
+                <span class="setting-value">{{ store.config.transparencyValue }}%</span>
+              </div>
+            </div>
+        
+            <div class="setting-card">
+              <div class="setting-title">在AI消息中显示工具调用标签</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  开启后实时显示AI当前正在调用的工具名称。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.showToolLabels }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.showToolLabels }"
+                    @click="switchMode('showToolLabels', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.showToolLabels }"
+                    @click="switchMode('showToolLabels', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 组2: 数据管理 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">数据管理</span>
+            </div>
+            <!-- Reset -->
+            <div class="setting-card">
+              <div class="setting-title">重载预设卡片</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  恢复预设卡片到初始状态，已修改或新增的卡片不会被删除。
+                </div>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="resetPresetCard"
+                  class="confirm-button"
+                >
+                  恢复
+                </el-button>
+              </div>
+            </div>
+
+            <!-- Clear cache -->
+            <div class="setting-card">
+              <div class="setting-title">打开缓存文件夹</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  打开保存卡片以及任务的文件夹位置。
+                </div>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="openCacheDir"
+                  class="confirm-button"
+                >
+                  打开
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 组3: 网络代理 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">网络代理</span>
+            </div>
+            <!-- Port -->
+            <div class="setting-card">
+              <div class="setting-title">为AI服务设置全局网络代理</div>
+              <div class="setting-control">
+                <el-input
+                  placeholder="http://expmale.com:7890 ,http://expmale.com:7890 "
+                  v-model="store.config.httpProxyUrl"
+                  class="line-input"
+                >
+                </el-input>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="setNetProxy"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">全局代理排除以下地址</div>
+              <div class="setting-control">
+                <el-input
+                  placeholder="localhost,127.0.0.1,expmale.com"
+                  v-model="store.config.excludeUrl"
+                  class="line-input"
+                >
+                </el-input>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="setNetProxy"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 组4: AI设置 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">能力设置</span>
+              <button class="group-setting">按工具名放行</button>
+            </div>
+            <div class="setting-card">
+              <div class="setting-title">允许 Agent 操作文件</div>
+              <div class="setting-control">
+                <div class="setting-info">允许Agent对工作区文件进行修改，包括读取用户上传文件、查看工作区目录、新建或<strong>删改</strong>工作区文件。</div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.fileOpration }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.fileOpration }"
+                    @click="switchMode('fileOpration', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.fileOpration }"
+                    @click="switchMode('fileOpration', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-card">
+              <div class="setting-title">允许 Agent 执行命令</div>
+              <div class="setting-control">
+                <div class="setting-info">开放命令行权限给Agent，允许Agent在沙箱内执行命令。</div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.commandOpration }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.commandOpration }"
+                    @click="switchMode('commandOpration', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.commandOpration }"
+                    @click="switchMode('commandOpration', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-card">
+              <div class="setting-title">允许 Agent 浏览网页</div>
+              <div class="setting-control">
+                <div class="setting-info" :class="{ danger_info: store.config.webSearch && store.config.knowledgeRetrieval}">
+                  允许Agent使用网络搜索工具在互联网上搜索信息。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.webSearch }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.webSearch }"
+                    @click="switchMode('webSearch', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.webSearch }"
+                    @click="switchMode('webSearch', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-card">
+              <div class="setting-title">允许 Agent 访问知识库</div>
+              <div class="setting-control">
+                <div class="setting-info" :class="{ danger_info: store.config.webSearch && store.config.knowledgeRetrieval }">
+                  允许Agent使用知识库检索工具在知识库中搜索信息。与网络搜索能力同时开启时，会降低模型知识库检索表现。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.knowledgeRetrieval }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.knowledgeRetrieval }"
+                    @click="switchMode('knowledgeRetrieval', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.knowledgeRetrieval }"
+                    @click="switchMode('knowledgeRetrieval', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-card">
+              <div class="setting-title">允许 Agent 使用技能包</div>
+              <div class="setting-control">
+                <div class="setting-info">允许Agent加载技能包，获取技能包扩展。</div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.skillLoad }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.skillLoad }"
+                    @click="switchMode('skillLoad', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.skillLoad }"
+                    @click="switchMode('skillLoad', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">启用模型视觉输入</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  开启后，图片将发送给模型进行理解，而不使用OCR工具提取文字。系统会自动检测模型是否具备视觉处理能力。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.visionOn }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.visionOn }"
+                    @click="switchMode('visionOn', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.visionOn }"
+                    @click="switchMode('visionOn', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">启用 Agent 子代理   <span class="setting-label">Beta</span></div>
+              <div class="setting-control">
+                <div class="setting-info" :class="{ danger_info: store.config.agentAssign }">
+                  开启智能体子代理模式，提供异步任务处理能力，不推荐在个人PC本地部署时开启。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.agentAssign }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.agentAssign }"
+                    @click="switchMode('agentAssign', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.agentAssign }"
+                    @click="switchMode('agentAssign', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">启用 Agent-Term 蜂群模式   <span class="setting-label">Beta</span></div>
+              <div class="setting-control">
+                <div class="setting-info" :class="{ danger_info: store.config.agentSwarm }">
+                  开启多智能体协作模式，不推荐在个人PC本地部署时开启。开启此项默认将 <strong>Agent 子代理</strong> 视为已开启。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.agentSwarm }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.agentSwarm }"
+                    @click="switchMode('agentSwarm', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.agentSwarm }"
+                    @click="switchMode('agentSwarm', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 组4: AI设置 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">记忆设置</span>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">开启长期记忆</div>
+              <div class="setting-control">
+                <div class="setting-info"  :class="{ danger_info: store.config.longtermMemory }">
+                  不推荐在个人PC本地部署时开启, 算力不足时可能导致Agent运行缓慢。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.longtermMemory }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.longtermMemory }"
+                    @click="switchMode('longtermMemory', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.longtermMemory }"
+                    @click="switchMode('longtermMemory', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">当上下文达到窗口大小限制时自动总结上下文</div>
+              <div class="setting-control">
+                <div class="setting-info">需同步设置上下文总结触发阈值与保留的窗口长度</div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.shorttermMemory }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.shorttermMemory }"
+                    @click="switchMode('shorttermMemory', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.shorttermMemory }"
+                    @click="switchMode('shorttermMemory', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div v-if="store.config.shorttermMemory" class="setting-title">上下文总结触发阈值</div>
+              <div v-else class="setting-title">上下文截断触发阈值</div>
+              <div class="setting-control">
+                <div class="setting-info">过小的触发阈值可能导致Agent陷入死循环，最小生效值为16</div>
+                <el-input-number 
+                  v-model="summaryMessages"
+                  controls-position="right" 
+                  class="number-input"
+                />
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeMessageSummary"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div v-if="store.config.shorttermMemory" class="setting-title">总结时保留的上下文长度</div>
+              <div v-else class="setting-title">截断时保留的上下文长度</div>
+              <div class="setting-control">
+                <div class="setting-info">过小的保留长度可能导致Agent陷入死循环，最小生效值为4</div>
+                <el-input-number 
+                  v-model="keepMessages"
+                  controls-position="right" 
+                  class="number-input"
+                />
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeKeepNotSummary"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 组5: 联网搜索配置 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">联网搜索</span>
+            </div>
+            <!-- Online search -->
+            <div class="setting-card">
+              <div class="setting-title">配置关键词搜索引擎</div>
+              <div class="setting-control">
+                <el-select v-model="linkProvider" placeholder="Auto" class="select-input">
+                  <el-option
+                    v-for="item in linkProviderOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                    :disabled="item.disabled"
+                  />
+                </el-select>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeLinkProvider"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">配置关键词搜索引擎API-Key</div>
+              <div class="setting-control">
+                <el-input
+                  v-model="linkApiKey"
+                  type="password"
+                  placeholder="Your API key"
+                  show-password
+                  class="line-input"
+                />
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeLinkApiKey"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">配置网页内容搜索引擎</div>
+              <div class="setting-control">
+                <el-select v-model="contentPovider" placeholder="Auto" class="select-input">
+                  <el-option
+                    v-for="item in contentPoviderOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeContentPovider"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">配置网页内容搜索API-Key</div>
+              <div class="setting-control">
+                <el-input
+                  v-model="contentApiKey"
+                  type="password"
+                  placeholder="Your API key"
+                  show-password
+                  class="line-input"
+                />
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeContentApiKey"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">配置AI联网搜索内容过滤规则</div>
+              <div class="setting-control">
+                <el-select v-model="webContentFilter" placeholder="规则过滤 (默认)" class="select-input">
+                  <el-option
+                    v-for="item in webContentFilterOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeWebContentFilter"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">允许的域名关键字</div>
+              <div class="setting-control">
+                <el-input
+                  placeholder="选择一个配置文件或直接输入 e.g: wiki,github,arxiv"
+                  v-model="store.config.excludeWebUrl"
+                  class="line-input"
+                >
+                </el-input>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click=""
+                  class="confirm-button"
+                >
+                  打开
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 组6: 功能开关 -->
+          <div class="setting-group">
+            <div class="group-divider">
+              <span class="group-label">其他设置</span>
+            </div>
+            <div class="setting-card">
+              <div class="setting-title">单轮生成中LLM调用轮次预警值</div>
+              <div class="setting-control">
+                <div class="setting-info">超出阈值时将提醒Agent加快处理进度</div>
+                <el-input-number 
+                  v-model="tokenLimit"
+                  controls-position="right" 
+                  class="number-input"
+                />
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="storeTokenLimit"
+                  class="confirm-button"
+                >
+                  保存
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">异步工具返回时唤醒AI</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  异步工具返回结果时主动唤醒AI (若AI正在生成, 将会打断)。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.toolsInvokeAi }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.toolsInvokeAi }"
+                    @click="switchMode('toolsInvokeAi', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.toolsInvokeAi }"
+                    @click="switchMode('toolsInvokeAi', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">将过去的工具返回内容写入提示词</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  工具的返回结果通常会携带大量的文本信息，极大增加Token消耗，如果是本地模型，将同时增加GPU的计算负担。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.remainToolsCache }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.remainToolsCache }"
+                    @click="switchMode('remainToolsCache', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.remainToolsCache }"
+                    @click="switchMode('remainToolsCache', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">重置模型能力缓存</div>
+              <div class="setting-control">
+                <div class="setting-info">
+                  重置服务器对于模型能力的缓存信息，如果您发现支持视觉输入的模型错误的使用了OCR工具提取文字，可尝试此功能。
+                </div>
+                <el-button
+                  type="primary"
+                  off
+                  size="default"
+                  @click="clearVisionCache()"
+                  class="confirm-button"
+                >
+                  重置
+                </el-button>
+              </div>
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-title">开启纯对话模式</div>
+              <div class="setting-control">
+                <div class="setting-info" :class="{ danger_info: store.config.pureChat }">
+                  开启此选项将禁用Agent全部工具（含生成计划、多模态、联网搜索、文件操作等），适用于无工具调用能力的模型。
+                </div>
+                <div class="mode-switch">
+                  <div class="slider" :class="{ right: store.config.pureChat }" />
+
+                  <button
+                    class="off-select"
+                    :class="{ active: !store.config.pureChat }"
+                    @click="switchMode('pureChat', 'off')"
+                  >
+                    Off
+                  </button>
+
+                  <button
+                    class="on-select"
+                    :class="{ active: store.config.pureChat }"
+                    @click="switchMode('pureChat', 'on')"
+                  >
+                    On
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Logout -->
+        <div class="logout-btn-wrapper">
+          <el-button
+            type="danger"
+            off
+            @click="onLogout"
           >
-            <!-- 组1: 界面设置 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">界面设置</span>
-              </div>
-              <!-- Brightness -->
-              <div class="setting-card">
-                <div class="setting-title">背景亮度</div>
-                <div class="setting-control">
-                  <el-slider
-                    v-model="store.config.lightValue"
-                    :min="0"
-                    :max="100"
-                    @change="changeLightValue"
-                  />
-                  <span class="setting-value">{{ store.config.lightValue }}%</span>
-                </div>
-              </div>
-
-              <!-- Transparency -->
-              <div class="setting-card">
-                <div class="setting-title">背景透明度</div>
-                <div class="setting-control"> 
-                  <el-slider
-                    v-model="store.config.transparencyValue"
-                    :min="0"
-                    :max="100"
-                    @change="changeTransparencyValue"
-                  />
-                  <span class="setting-value">{{ store.config.transparencyValue }}%</span>
-                </div>
-              </div>
-          
-              <div class="setting-card">
-                <div class="setting-title">在AI消息中显示工具调用标签</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    开启后实时显示AI当前正在调用的工具名称。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.showToolLabels }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.showToolLabels }"
-                      @click="switchMode('showToolLabels', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.showToolLabels }"
-                      @click="switchMode('showToolLabels', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 组2: 数据管理 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">数据管理</span>
-              </div>
-              <!-- Reset -->
-              <div class="setting-card">
-                <div class="setting-title">重载预设卡片</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    恢复预设卡片到初始状态，已修改或新增的卡片不会被删除。
-                  </div>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="resetPresetCard"
-                    class="confirm-button"
-                  >
-                    恢复
-                  </el-button>
-                </div>
-              </div>
-
-              <!-- Clear cache -->
-              <div class="setting-card">
-                <div class="setting-title">打开缓存文件夹</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    打开保存卡片以及任务的文件夹位置。
-                  </div>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="openCacheDir"
-                    class="confirm-button"
-                  >
-                    打开
-                  </el-button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 组3: 网络代理 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">网络代理</span>
-              </div>
-              <!-- Port -->
-              <div class="setting-card">
-                <div class="setting-title">为AI服务设置全局网络代理</div>
-                <div class="setting-control">
-                  <el-input
-                    placeholder="http://expmale.com:7890 ,http://expmale.com:7890 "
-                    v-model="store.config.httpProxyUrl"
-                    class="line-input"
-                  >
-                  </el-input>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="setNetProxy"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">全局代理排除以下地址</div>
-                <div class="setting-control">
-                  <el-input
-                    placeholder="localhost,127.0.0.1,expmale.com"
-                    v-model="store.config.excludeUrl"
-                    class="line-input"
-                  >
-                  </el-input>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="setNetProxy"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 组4: AI设置 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">能力设置</span>
-                <button class="group-setting">按工具名放行</button>
-              </div>
-              <div class="setting-card">
-                <div class="setting-title">允许 Agent 操作文件</div>
-                <div class="setting-control">
-                  <div class="setting-info">允许Agent对工作区文件进行修改，包括读取用户上传文件、查看工作区目录、新建或<strong>删改</strong>工作区文件。</div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.fileOpration }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.fileOpration }"
-                      @click="switchMode('fileOpration', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.fileOpration }"
-                      @click="switchMode('fileOpration', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="setting-card">
-                <div class="setting-title">允许 Agent 执行命令</div>
-                <div class="setting-control">
-                  <div class="setting-info">开放命令行权限给Agent，允许Agent在沙箱内执行命令。</div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.commandOpration }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.commandOpration }"
-                      @click="switchMode('commandOpration', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.commandOpration }"
-                      @click="switchMode('commandOpration', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="setting-card">
-                <div class="setting-title">允许 Agent 浏览网页</div>
-                <div class="setting-control">
-                  <div class="setting-info" :class="{ danger_info: store.config.webSearch && store.config.knowledgeRetrieval}">
-                    允许Agent使用网络搜索工具在互联网上搜索信息。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.webSearch }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.webSearch }"
-                      @click="switchMode('webSearch', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.webSearch }"
-                      @click="switchMode('webSearch', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="setting-card">
-                <div class="setting-title">允许 Agent 访问知识库</div>
-                <div class="setting-control">
-                  <div class="setting-info" :class="{ danger_info: store.config.webSearch && store.config.knowledgeRetrieval }">
-                    允许Agent使用知识库检索工具在知识库中搜索信息。与网络搜索能力同时开启时，会降低模型知识库检索表现。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.knowledgeRetrieval }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.knowledgeRetrieval }"
-                      @click="switchMode('knowledgeRetrieval', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.knowledgeRetrieval }"
-                      @click="switchMode('knowledgeRetrieval', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="setting-card">
-                <div class="setting-title">允许 Agent 使用技能包</div>
-                <div class="setting-control">
-                  <div class="setting-info">允许Agent加载技能包，获取技能包扩展。</div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.skillLoad }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.skillLoad }"
-                      @click="switchMode('skillLoad', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.skillLoad }"
-                      @click="switchMode('skillLoad', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">启用模型视觉输入</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    开启后，图片将发送给模型进行理解，而不使用OCR工具提取文字。系统会自动检测模型是否具备视觉处理能力。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.visionOn }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.visionOn }"
-                      @click="switchMode('visionOn', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.visionOn }"
-                      @click="switchMode('visionOn', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">启用 Agent 子代理   <span class="setting-label">Beta</span></div>
-                <div class="setting-control">
-                  <div class="setting-info" :class="{ danger_info: store.config.agentAssign }">
-                    开启智能体子代理模式，提供异步任务处理能力，不推荐在个人PC本地部署时开启。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.agentAssign }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.agentAssign }"
-                      @click="switchMode('agentAssign', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.agentAssign }"
-                      @click="switchMode('agentAssign', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">启用 Agent-Term 蜂群模式   <span class="setting-label">Beta</span></div>
-                <div class="setting-control">
-                  <div class="setting-info" :class="{ danger_info: store.config.agentSwarm }">
-                    开启多智能体协作模式，不推荐在个人PC本地部署时开启。开启此项默认将 <strong>Agent 子代理</strong> 视为已开启。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.agentSwarm }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.agentSwarm }"
-                      @click="switchMode('agentSwarm', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.agentSwarm }"
-                      @click="switchMode('agentSwarm', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 组4: AI设置 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">记忆设置</span>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">开启长期记忆</div>
-                <div class="setting-control">
-                  <div class="setting-info"  :class="{ danger_info: store.config.longtermMemory }">
-                    不推荐在个人PC本地部署时开启, 算力不足时可能导致Agent运行缓慢。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.longtermMemory }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.longtermMemory }"
-                      @click="switchMode('longtermMemory', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.longtermMemory }"
-                      @click="switchMode('longtermMemory', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">当上下文达到窗口大小限制时自动总结上下文</div>
-                <div class="setting-control">
-                  <div class="setting-info">需同步设置上下文总结触发阈值与保留的窗口长度</div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.shorttermMemory }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.shorttermMemory }"
-                      @click="switchMode('shorttermMemory', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.shorttermMemory }"
-                      @click="switchMode('shorttermMemory', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div v-if="store.config.shorttermMemory" class="setting-title">上下文总结触发阈值</div>
-                <div v-else class="setting-title">上下文截断触发阈值</div>
-                <div class="setting-control">
-                  <div class="setting-info">过小的触发阈值可能导致Agent陷入死循环，最小生效值为16</div>
-                  <el-input-number 
-                    v-model="summaryMessages"
-                    controls-position="right" 
-                    class="number-input"
-                  />
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeMessageSummary"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div v-if="store.config.shorttermMemory" class="setting-title">总结时保留的上下文长度</div>
-                <div v-else class="setting-title">截断时保留的上下文长度</div>
-                <div class="setting-control">
-                  <div class="setting-info">过小的保留长度可能导致Agent陷入死循环，最小生效值为4</div>
-                  <el-input-number 
-                    v-model="keepMessages"
-                    controls-position="right" 
-                    class="number-input"
-                  />
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeKeepNotSummary"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 组5: 联网搜索配置 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">联网搜索</span>
-              </div>
-              <!-- Online search -->
-              <div class="setting-card">
-                <div class="setting-title">配置关键词搜索引擎</div>
-                <div class="setting-control">
-                  <el-select v-model="linkProvider" placeholder="Auto" class="select-input">
-                    <el-option
-                      v-for="item in linkProviderOptions"
-                      :key="item.value"
-                      :label="item.label"
-                      :value="item.value"
-                      :disabled="item.disabled"
-                    />
-                  </el-select>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeLinkProvider"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">配置关键词搜索引擎API-Key</div>
-                <div class="setting-control">
-                  <el-input
-                    v-model="linkApiKey"
-                    type="password"
-                    placeholder="Your API key"
-                    show-password
-                    class="line-input"
-                  />
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeLinkApiKey"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">配置网页内容搜索引擎</div>
-                <div class="setting-control">
-                  <el-select v-model="contentPovider" placeholder="Auto" class="select-input">
-                    <el-option
-                      v-for="item in contentPoviderOptions"
-                      :key="item.value"
-                      :label="item.label"
-                      :value="item.value"
-                    />
-                  </el-select>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeContentPovider"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">配置网页内容搜索API-Key</div>
-                <div class="setting-control">
-                  <el-input
-                    v-model="contentApiKey"
-                    type="password"
-                    placeholder="Your API key"
-                    show-password
-                    class="line-input"
-                  />
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeContentApiKey"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">配置AI联网搜索内容过滤规则</div>
-                <div class="setting-control">
-                  <el-select v-model="webContentFilter" placeholder="规则过滤 (默认)" class="select-input">
-                    <el-option
-                      v-for="item in webContentFilterOptions"
-                      :key="item.value"
-                      :label="item.label"
-                      :value="item.value"
-                    />
-                  </el-select>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeWebContentFilter"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">允许的域名关键字</div>
-                <div class="setting-control">
-                  <el-input
-                    placeholder="选择一个配置文件或直接输入 e.g: wiki,github,arxiv"
-                    v-model="store.config.excludeWebUrl"
-                    class="line-input"
-                  >
-                  </el-input>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click=""
-                    class="confirm-button"
-                  >
-                    打开
-                  </el-button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 组6: 功能开关 -->
-            <div class="setting-group">
-              <div class="group-divider">
-                <span class="group-label">其他设置</span>
-              </div>
-              <div class="setting-card">
-                <div class="setting-title">单轮生成中LLM调用轮次预警值</div>
-                <div class="setting-control">
-                  <div class="setting-info">超出阈值时将提醒Agent加快处理进度</div>
-                  <el-input-number 
-                    v-model="tokenLimit"
-                    controls-position="right" 
-                    class="number-input"
-                  />
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="storeTokenLimit"
-                    class="confirm-button"
-                  >
-                    保存
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">异步工具返回时唤醒AI</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    异步工具返回结果时主动唤醒AI (若AI正在生成, 将会打断)。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.toolsInvokeAi }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.toolsInvokeAi }"
-                      @click="switchMode('toolsInvokeAi', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.toolsInvokeAi }"
-                      @click="switchMode('toolsInvokeAi', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">将过去的工具返回内容写入提示词</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    工具的返回结果通常会携带大量的文本信息，极大增加Token消耗，如果是本地模型，将同时增加GPU的计算负担。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.remainToolsCache }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.remainToolsCache }"
-                      @click="switchMode('remainToolsCache', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.remainToolsCache }"
-                      @click="switchMode('remainToolsCache', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">重置模型能力缓存</div>
-                <div class="setting-control">
-                  <div class="setting-info">
-                    重置服务器对于模型能力的缓存信息，如果您发现支持视觉输入的模型错误的使用了OCR工具提取文字，可尝试此功能。
-                  </div>
-                  <el-button
-                    type="primary"
-                    off
-                    size="default"
-                    @click="clearVisionCache()"
-                    class="confirm-button"
-                  >
-                    重置
-                  </el-button>
-                </div>
-              </div>
-
-              <div class="setting-card">
-                <div class="setting-title">开启纯对话模式</div>
-                <div class="setting-control">
-                  <div class="setting-info" :class="{ danger_info: store.config.pureChat }">
-                    开启此选项将禁用Agent全部工具（含生成计划、多模态、联网搜索、文件操作等），适用于无工具调用能力的模型。
-                  </div>
-                  <div class="mode-switch">
-                    <div class="slider" :class="{ right: store.config.pureChat }" />
-
-                    <button
-                      class="off-select"
-                      :class="{ active: !store.config.pureChat }"
-                      @click="switchMode('pureChat', 'off')"
-                    >
-                      Off
-                    </button>
-
-                    <button
-                      class="on-select"
-                      :class="{ active: store.config.pureChat }"
-                      @click="switchMode('pureChat', 'on')"
-                    >
-                      On
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Logout -->
-          <div class="logout-btn-wrapper">
-            <el-button
-              type="danger"
-              off
-              @click="onLogout"
-            >
-              Logout {{ username }}
-            </el-button>
-          </div>
-        </el-main>
-      </transition>
-    </keep-alive>
+            Logout {{ username }}
+          </el-button>
+        </div>
+      </el-main>
+    </transition>
   </el-container>
 </template>
 

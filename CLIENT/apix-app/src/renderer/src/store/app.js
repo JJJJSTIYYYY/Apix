@@ -53,6 +53,11 @@ const DEFAULT_CONFIG = {
   testExpertMode: false,
   higherRolePromptPermission: false,
   autoRefreshTask: false,
+  activeProvider: {
+    provider_id: '',
+    name: '',
+    api_key: '',
+  }
 }
 
 
@@ -73,6 +78,7 @@ export const useAppCacheData = defineStore("app", {
     work_dir: {}, // {hid: work_dir}
     apiKeyCache: {}, // {provider: api_key}
     role_prompts: [], // {id, roleName, roleDefinition, enabled}
+    providers: [], // {provider_id, provider_name, api_key, enabled}
   }),
 
   actions: {
@@ -86,6 +92,7 @@ export const useAppCacheData = defineStore("app", {
         this.restoreWorkDir()
         this.restoreRolePrompts()
         this.restoreApiKeyCache()
+        this.restoreLocalProvidersCache()
 
         const cards = await this.readCards()
         const tabs = await this.readTabs()
@@ -186,6 +193,28 @@ export const useAppCacheData = defineStore("app", {
       }
     },
 
+    restoreLocalProvidersCache() {
+      try {
+        const raw = localStorage.getItem("providers")
+
+        if (!raw) {
+          this.providers = []
+          return
+        }
+
+        const parsed = JSON.parse(raw)
+
+        if (Array.isArray(parsed)) {
+          this.providers = parsed
+        } else {
+          this.providers = []
+        }
+      } catch (e) {
+        console.error("restoreLocalProvidersCache failed:", e)
+        this.providers = []
+      }
+    },
+
     persistWorkDir() {
       try {
         localStorage.setItem(
@@ -216,6 +245,17 @@ export const useAppCacheData = defineStore("app", {
         )
       } catch (e) {
         console.error("persistRolePrompts failed:", e)
+      }
+    },
+
+    persistLocalProviders() {
+      try {
+        localStorage.setItem(
+          "providers",
+          JSON.stringify(toRaw(this.providers))
+        )
+      } catch (e) {
+        console.error("persistLocalProviders failed:", e)
       }
     },
 

@@ -64,14 +64,13 @@ async def write_todos(
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
     """Create and manage a structured task list for your current work session."""
-    client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "write_todos",
@@ -95,8 +94,7 @@ async def write_todos(
 
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_END, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "write_todos",
@@ -133,15 +131,15 @@ async def update_memorandum(
         content (str): Memorandum content (empty means delete)
     """
     client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
 
     # Start event
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START,
-        target_id=client_id,
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "update_memorandum",
@@ -156,8 +154,7 @@ async def update_memorandum(
     if not title.strip():
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END,
-            target_id=client_id,
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "update_memorandum",
@@ -184,8 +181,7 @@ async def update_memorandum(
     if not client_id or not history_id:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END,
-            target_id=client_id,
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "update_memorandum",
@@ -237,8 +233,7 @@ async def update_memorandum(
         # End event
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END,
-            target_id=client_id,
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "update_memorandum",
@@ -264,8 +259,7 @@ async def update_memorandum(
     except Exception as e:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END,
-            target_id=client_id,
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "update_memorandum",
@@ -301,13 +295,13 @@ async def read_memorandum(
         title (list[str]): Titles of memoranda in the `Current Memorandum Title List` to read.
     """
     client_id = state.get("client_id")
-    target_platform = state.get("platform")
+    target = state.get("target")
+    generation_id = state.get("generation_id")
 
-    event_writer = AgentStreamWriter()
+    event_writer = AgentStreamWriter(generation_id)
     event_writer.send_event(
         event=AgentStreamEvent.TOOL_EXEC_START, 
-        target_id=client_id, 
-        target_platform=target_platform,
+        target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
             "tool_name": "read_memorandum",
@@ -322,8 +316,7 @@ async def read_memorandum(
     if not client_id or not history_id:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_memorandum",
@@ -349,8 +342,7 @@ async def read_memorandum(
     if not memo_path.exists():
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_memorandum",
@@ -384,8 +376,7 @@ async def read_memorandum(
 
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_memorandum",
@@ -409,8 +400,7 @@ async def read_memorandum(
     except Exception as e:
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
-            target_id=client_id, 
-            target_platform=target_platform,
+            target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_memorandum",

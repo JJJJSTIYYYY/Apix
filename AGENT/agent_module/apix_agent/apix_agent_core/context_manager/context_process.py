@@ -648,7 +648,7 @@ class AIContextManager:
                 if think.endswith(suffix):
                     think = think[:-len(suffix)]
                 tool_calls = extra.get("tool_calls")
-                if not content and not remain_tool_message:
+                if (not content and not think) and not remain_tool_message:
                     continue  # Skip empty AI message
                 additional_kwargs = {}
                 additional_kwargs["reasoning_content"] = think
