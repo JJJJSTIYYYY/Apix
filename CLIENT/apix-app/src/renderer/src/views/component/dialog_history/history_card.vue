@@ -3,7 +3,7 @@
     <div class="q-card-wrapper">
       <div class="q-card">
         <!-- Left: preview content -->
-        <div class="q-card-body">
+        <div class="q-card-body" :class="{'is_active': store.current_history_id === history.id}">
           <transition name="star-pop">
             <div class="q-card-status">
               <span
@@ -252,7 +252,7 @@ const handleConnectProject = async () => {
   justify-content: space-between;
   gap: 8px;
   box-sizing: border-box;
-  padding: 6px 4px;
+  padding: 2px 4px;
   position: relative;
   border-radius: 6px;
   transition: background-color 0.2s ease;
@@ -274,15 +274,21 @@ const handleConnectProject = async () => {
   gap: 6px;
   font-size: 0.85rem;
   line-height: 1.35;
-  color: rgba(60, 60, 67, 0.78);
+  color: var(--apix-secondary-dark-color);
   overflow: hidden;
+}
+.q-card-body.is_active {
+  color: var(--apix-default-dark-color);
+}
+.q-card-body:hover:not(.is_active) {
+  color: var(--apix-default-dark-color);
 }
 
 .q-preview-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  width: 220px;
+  width: 230px;
 }
 
 .q-card:hover .q-preview-text {
@@ -385,8 +391,8 @@ const handleConnectProject = async () => {
 }
 
 .q-label.new {
-  color: #1ad0b2;
-  background: #e6faf7;
+  color: var(--apix-primary-color);
+  background: var(--apix-primary-light);
 }
 
 /* ------------------------

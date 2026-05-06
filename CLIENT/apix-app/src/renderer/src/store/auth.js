@@ -55,7 +55,10 @@ export const useAuthStore = defineStore("auth", () => {
         })
         window.api.initWebsocket(res.messages.uid)
       }
-
+      else {
+        console.log("before throw")
+        throw new Error('登录失败: ' + res.messages)
+      }
       loading.value = false
       return true
     } finally {
@@ -72,13 +75,17 @@ export const useAuthStore = defineStore("auth", () => {
     loading.value = true
     try {
       const res = await window.api.auth.register(username, password)
-
+      console.log(res)
       if (res.success) {
         // Persist user immediately after registration
         persist({
           username,
           user_uid: res.messages.uid
         })
+      }
+      else {
+        console.log("before throw")
+        throw new Error('注册失败: ' + res.messages)
       }
 
       loading.value = false
@@ -93,7 +100,7 @@ export const useAuthStore = defineStore("auth", () => {
     loading.value = true
     try {
       const res = await window.api.auth.ensure(user_uid)
-
+      console.log(res)
       if (!res.success) {
         user.value = null
         localStorage.removeItem(STORAGE_KEY)

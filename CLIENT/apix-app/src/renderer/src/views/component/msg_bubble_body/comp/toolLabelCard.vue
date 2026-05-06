@@ -47,6 +47,7 @@ defineProps<{
 
 <style scoped>
 .tool-chip {
+  margin-left: 12px !important;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -62,7 +63,6 @@ defineProps<{
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: none;
   
-  transition: all 0.2s ease;
   cursor: default;
   max-width: 160px;
 }
@@ -87,21 +87,21 @@ defineProps<{
 
 /* Completed */
 .tool-chip.is-completed {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.25);
+  color: var(--apix-success-color);
+  border-color: var(--apix-success-color);
 }
 
 /* Error */
 .tool-chip.is-error {
-  color: #dc2626;
-  border-color: rgba(220, 38, 38, 0.25);
-  background: rgba(220, 38, 38, 0.04);
+  color: var(--apix-danger-color);
+  border-color: var(--apix-danger-color);
+  background: color-mix(in srgb, var(--apix-danger-color) 20%, transparent);
 }
 
 /* Outdated */
 .tool-chip.is-outdated {
-  color: #a8a29e;
-  border-color: rgba(168, 162, 158, 0.2);
+  color: #78716c;
+  border-color: rgba(120, 113, 108, 0.2);
   font-style: italic;
 }
 

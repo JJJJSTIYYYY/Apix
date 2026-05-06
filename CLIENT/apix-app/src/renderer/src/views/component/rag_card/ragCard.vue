@@ -234,21 +234,19 @@ const handleEdit = () => {
   display: flex;
   flex-direction: column;
 
-  background: rgb(245, 247, 247);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: var(--apix-panel-layer-2-background);
+  border: 1px solid var(--apix-default-light-color);
 
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.166);
+  box-shadow: var(--apix-shadow-layer-2);
 
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.4s cubic-bezier(0.34, 2, 0.64, 1);
 }
 
 .rag-card:hover {
   transform: translateY(-1px);
 
-  box-shadow:
-    0 10px 26px rgba(4, 52, 42, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--apix-panel-layer-2-background);
+  box-shadow: var(--apix-shadow-layer-3);
 }
 
 /* Header */
@@ -288,7 +286,7 @@ const handleEdit = () => {
   height: 28px;
   border-radius: 6px;
 
-  background: linear-gradient(135deg, #6ba6ff 0%, #8bc6ff 100%);
+  background: linear-gradient(135deg, #739FDB 0%, #94B8E8 100%);
 
   display: flex;
   align-items: center;
@@ -301,7 +299,7 @@ const handleEdit = () => {
 .rag-title {
   font-size: 15px;
   font-weight: 600;
-  color: #2f3a3a;
+  color: var(--apix-default-dark-color);
 
   overflow: hidden;
   text-overflow: ellipsis;
@@ -317,7 +315,7 @@ const handleEdit = () => {
   font-size: 13px;
   line-height: 1.6;
   height: 3lh;
-  color: #586666;
+  color: var(--apix-tertiary-dark-color);
 
   overflow: hidden;
   text-overflow: ellipsis;
@@ -337,7 +335,7 @@ const handleEdit = () => {
 
   padding-top: 10px;
 
-  border-top: 1px solid rgba(0,0,0,0.06);
+  border-top: 1px solid var(--apix-default-light-color);
 }
 
 .footer-tag {
@@ -348,8 +346,8 @@ const handleEdit = () => {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
-  background: rgba(0, 0, 0, 0.04);
-  color: #6b7280;
+  background: var(--apix-default-light-color);
+  color: var(--apix-secondary-dark-color);
   overflow: hidden;
   max-width: 100%;
   transition: all 0.2s ease;
@@ -567,6 +565,7 @@ const handleEdit = () => {
   border-radius: 6px;
   width: 26px;
   height: 26px;
+  color: var(--apix-default-dark-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -574,12 +573,12 @@ const handleEdit = () => {
 }
 
 .icon-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--apix-default-light-color);
 }
 
 .delete-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background-color: color-mix(in srgb, var(--apix-danger-color) 15%, transparent);
+  color: var(--apix-danger-color);
   transform: rotate(4deg);
 }
 </style>

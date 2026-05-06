@@ -130,7 +130,7 @@ class MysqlService:
         logger.info(f"[MysqlService][ensure_user_exists] enter.")
         try:
             user_uid = payload["client_id"]
-            res = await self._call_procedure("ensure_user_exists", (user_uid,))
+            res = await self._call_procedure("ensure_user_exists", (user_uid, None))
             if(len(res) == 0): raise RuntimeError("[MysqlService][ensure_user_exists] User do not exist.")
             return {
                 "success": True,

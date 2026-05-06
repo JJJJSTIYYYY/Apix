@@ -12,6 +12,7 @@
     ></div>
     <div 
       class="human-message-wrapper"
+      :class="{ is_selecting: is_selecting }"
       v-if="!props.msg.is_editing"
       @contextmenu.prevent="onContextMenu"
     >
@@ -394,28 +395,47 @@ onBeforeUnmount(() => {
 
 
 <style scoped>
+/* ==================== 公共变量（与 AI 气泡完全统一） ==================== */
 .message-wrapper {
-  width: 100%;
+  --msg-transition: background 0.6s var(--apix-cubic-bezier);
+  --select-box-border: var(--apix-tertiary-light-color);
+  --select-box-hover-border: var(--apix-border-error);
+  --select-box-checked-bg: var(--apix-danger-color);
+  --select-box-checked-border: var(--apix-danger-color);
+  --branch-bg: var(--apix-default-light-color);
+  --branch-border: var(--apix-lightest-color);
+  --branch-hover-border: var(--apix-default-light-color);
+  --branch-label-color: var(--apix-default-dark-color);
+  --bubble-radius: var(--apix-panel-border-radius);
+  --content-color: var(--apix-secondary-dark-color);
+  --content-hover-color: var(--apix-default-dark-color);
+}
+
+/* ==================== 布局 ==================== */
+.message-wrapper {
+  width: 60vw;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 6px;
-  padding: 12px;
-  border-radius: 18px;
-  align-items: center;
+  padding: 12px 0px;
+  border-radius: var(--bubble-radius);
   background: transparent;
-  transition: background 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  transition: var(--msg-transition);
 }
 
 .message-wrapper.selected {
-  background: #e3dfdf7a;
+  background: var(--apix-default-light-color);
 }
 
+/* ==================== 多选复选框 ==================== */
 .message-select-box {
   z-index: 999;
-  border: 2px solid #bababa;
+  border: 2px solid var(--select-box-border);
   border-radius: 6px;
   width: 16px;
+  min-width: 16px;
+  margin-left: 3px;
   height: 16px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -423,12 +443,12 @@ onBeforeUnmount(() => {
 }
 
 .message-select-box:hover {
-  border-color: rgb(255, 131, 131);
+  border-color: var(--select-box-hover-border);
 }
 
 .message-select-box.checked {
-  background-color: #f35050;
-  border-color: #ea4444;
+  background-color: var(--select-box-checked-bg);
+  border-color: var(--select-box-checked-border);
 }
 
 .message-select-box.checked::after {
@@ -438,74 +458,12 @@ onBeforeUnmount(() => {
   top: 0px;
   width: 5px;
   height: 10px;
-  border: solid white;
+  border: solid var(--apix-lightest-color);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
-.human-bubble {
-  padding: 8px 16px;
-  font-size: 16px;
-  overflow: hidden;
-  border-radius: 16px 16px 6px 16px;
-  line-height: 1.6;
-  word-break: break-word;
-  border: 1px solid #d2eeeda2;
-  border-width: 0px 3px 2px 0px;
-  transition: all 0.25s ease;
-  background: #c0d1d2c9;
-  color: #000000dc;
-}
-
-.human-bubble-content-wrapper {
-  max-width: 85%;
-  display: flex;
-  flex-direction: row;
-  /* animation: opacityFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1); */
-}
-
-.send-state-tag {
-  position: relative;
-  margin-right: 24px;
-  display: flex;
-  align-items: center;
-}
-
-.send-state-tag:deep(.icon) {
-  position: absolute;
-  bottom: 1px;
-  width: 16px;
-  height: 16px;
-}
-
-.rotate-icon {
-  animation: rotate 1s linear infinite;
-}
-@keyframes rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.bubble-content {
-  background-color: transparent;
-}
-
-.scale-fade-enter-active {
-  animation: scaleFadeIn .25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.scale-fade-leave-active {
-  animation: scaleFadeOut .2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes scaleFadeIn {
-  0% { opacity: 0; transform: scale(0.9) translateY(6px); }
-  60% { opacity: 1; transform: scale(1.03) translateY(0); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes scaleFadeOut {
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
-}
-
+/* ==================== 人类消息气泡容器 ==================== */
 .human-message-wrapper {
   position: relative;
   display: flex;
@@ -517,6 +475,11 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.human-message-wrapper.is_selecting {
+  padding: 0px 3px 0px 0px !important;
+}
+
+/* ==================== 上传文件列表 ==================== */
 .uploaded-files {
   margin-top: 6px;
   padding: 6px 10px;
@@ -533,8 +496,8 @@ onBeforeUnmount(() => {
   align-self: end;
   gap: 6px;
   font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.617);
-  background-color: #cad3d45a;
+  color: var(--apix-secondary-dark-color);
+  background-color: var(--apix-panel-base-layer-background);
   padding: 3px 6px;
   border-radius: 8px 8px 3px 8px;
 }
@@ -545,7 +508,7 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.file-icon:deep(.icon) {
+.file-icon :deep(.icon) {
   width: 16px;
   height: 16px;
 }
@@ -554,23 +517,80 @@ onBeforeUnmount(() => {
   word-break: break-all;
 }
 
+/* ==================== 人类消息气泡 ==================== */
+.human-bubble {
+  padding: 8px 16px;
+  font-size: 16px !important;
+  overflow: hidden;
+  border-radius: 16px 16px 6px 16px;
+  line-height: 1.6;
+  word-break: break-word;
+  border: 0px;
+  background-color: var(--apix-default-light-color);
+}
+
+.human-bubble-content-wrapper {
+  max-width: 85%;
+  display: flex;
+  flex-direction: row;
+  font-size: 16px !important;
+}
+
+.human-bubble-content-wrapper:deep(*) {
+  font-size: 16px !important;
+}
+
+.send-state-tag {
+  position: relative;
+  margin-right: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.send-state-tag :deep(.icon) {
+  position: absolute;
+  bottom: 1px;
+  width: 16px;
+  height: 16px;
+}
+
+.rotate-icon {
+  animation: rotate 1s linear infinite;
+}
+@keyframes rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.bubble-content {
+  color: var(--content-color);
+  background-color: transparent;
+  transition: color 0.2s var(--apix-cubic-bezier);
+}
+
+.human-bubble:hover .bubble-content {
+  color: var(--content-hover-color);
+}
+
+/* ==================== 分支切换器（与 AI 气泡统一） ==================== */
 .branch-switch-wrapper {
   opacity: 0.4;
-  width: 100%;
-  background-color: #d0dedc;
+  width: calc(60vw - 34px);
+  background-color: var(--branch-bg);
   border-radius: 24px;
-  border: 1px solid #7c98957e;
+  border: 1px solid var(--branch-border);
 }
 
 .branch-switch-wrapper:hover {
   opacity: 1;
+  border: 1px solid var(--branch-hover-border);
 }
 
 .branch-switch-label-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 4px 0px;
   border-radius: 20px;
   margin: 0px auto;
   width: fit-content;
@@ -597,13 +617,14 @@ onBeforeUnmount(() => {
 .branch-page-label {
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: var(--branch-label-color);
   min-width: 32px;
   text-align: center;
   user-select: none;
   font-variant-numeric: tabular-nums;
 }
 
+/* ==================== 编辑模式 ==================== */
 .edit-message-wrapper {
   position: relative;
   display: flex;
@@ -619,38 +640,26 @@ onBeforeUnmount(() => {
   flex-direction: column;
   width: 92%;
   min-height: 160px;
-  animation: opacityFadeIn .6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes opacityFadeIn {
-  0% { 
-    opacity: 0.3; 
-    transform: scale(0.8); 
-  }
-  100% { 
-    opacity: 1; 
-    transform: scale(1); 
-  }
+  animation: opacityFadeIn 0.6s var(--apix-cubic-bezier);
 }
 
 .cd-input {
-  border: 1.5px solid #909d9dc9;
-  border-radius: 32px;
+  border: 1.5px solid var(--apix-tertiary-light-color);
+  border-radius: var(--apix-panel-border-radius);
   min-height: 160px;
-  border-radius: 32px;
   padding: 16px 16px;
   font-size: 16px;
   outline: none;
-  color: #2f3d3cdc;
-  background-color: rgba(255, 255, 255, 0.199);
+  background-color: var(--apix-panel-layer-1-background);
+  color: var(--content-color);
   resize: none;
-  transition: all 0.3s ease;
+  transition: all 0.3s var(--apix-cubic-bezier);
   scrollbar-width: none;
 }
 
 .cd-input:focus {
-  background-color: rgba(255, 255, 255, 0.414);
-  box-shadow: inset 0 0 0 1px #909d9dc9;
+  background-color: var(--apix-panel-layer-2-background);
+  box-shadow: inset 0 0 0 1px var(--apix-tertiary-light-color);
 }
 
 .send-button {
@@ -659,72 +668,106 @@ onBeforeUnmount(() => {
   height: 36px;
   font-size: 20px;
   border-radius: 100px;
-  background: #60aca9;
-  color: whitesmoke;
+  background: var(--apix-primary-color);
+  color: var(--apix-primary-text);
   border: none;
   cursor: pointer;
-
   display: flex;
   align-items: center;
-  right: 12px;
-  bottom: 12px;
-
-  transition: all 0.35s ease;
+  right: 10px;
+  bottom: 10px;
+  transition: all 0.35s var(--apix-cubic-bezier);
 }
 
 .send-button:hover {
   transform: scale(1.08);
-  box-shadow: 0 4px 14px rgb(255, 255, 255);
-  background: #60aca9;
+  box-shadow: var(--apix-shadow-layer-1);
+  background: var(--apix-primary-hover);
 }
 
-/* 点击效果：轻微缩小 + 暗色反馈 */
 .send-button:active {
   transform: scale(0.95);
-  background: #519794;
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.908);
+  background: var(--apix-common-button-active);
+  box-shadow: var(--apix-shadow-layer-2);
+}
+
+/* ==================== 动画（与 AI 气泡统一） ==================== */
+.scale-fade-enter-active {
+  animation: scaleFadeIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.scale-fade-leave-active {
+  animation: scaleFadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scaleFadeIn {
+  0% { opacity: 0; transform: scale(0.9) translateY(6px); }
+  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes scaleFadeOut {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
+}
+
+@keyframes opacityFadeIn {
+  0% { opacity: 0.2; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
 }
 </style>
 
 <style scoped>
+/* ==================== Markdown 通用表格/代码块增强 ==================== */
 .markdown-body:deep(table) {
-  border-radius: 12px !important;
-  background-color: rgba(255, 255, 255, 0.431) !important;
-  box-shadow: 
-    inset 0 1px 0 1px var(--borderColor-default),  /* 顶部边框 */
-    inset 1px 0 0 1px var(--borderColor-default), /* 右侧边框 */
-    inset 0 -1px 0 1px var(--borderColor-default), /* 底部边框 */
-    inset -1px 0 0 1px var(--borderColor-default); /* 左侧边框 */
+  position: relative;
+  /* margin: auto; */
+  /* margin-bottom: 12px; */
+  /* border-radius: var(--apix-panel-border-radius) !important; */
+  background-color: var(--apix-panel-layer-2-background) !important;
+  /* box-shadow: inset 0 0 0 1px var(--apix-tertiary-dark-color); */
+  /* border: 1px solid var(--apix-tertiary-dark-color); */
 }
 .markdown-body:deep(thead) {
-  background-color: rgba(178, 194, 199, 0.256) !important;
+  width: auto;
+  background-color: var(--apix-default-light-color) !important;
 }
 .markdown-body:deep(th) {
-  background-color: rgba(255, 255, 255, 0) !important;
+  width: auto;
+  background-color: transparent !important;
+  border: 1px solid var(--apix-tertiary-light-color);
 }
 .markdown-body:deep(tbody) {
-  background-color: rgba(255, 255, 255, 0) !important;
+  width: auto !important;
+  background-color: transparent !important;
 }
 .markdown-body:deep(tr) {
-  background-color: rgba(255, 255, 255, 0) !important;
+  width: auto;
+  background-color: transparent !important;
 }
 .markdown-body:deep(td) {
-  background-color: rgba(234, 234, 234, 0) !important;
+  width: auto;
+  background-color: transparent !important;
+  border: 1px solid var(--apix-tertiary-light-color);
 }
 
 .markdown-body:deep(pre) {
-  padding: 0px;
-  margin-bottom: 0px;
-  margin-top: 14px;
-  margin-bottom: 14px;
   scrollbar-width: none;
-  border-radius: 24px !important;
+  background-color: var(--apix-panel-layer-2-background);
+  /* border-radius: var(--apix-panel-border-radius); */
+  padding: 16px;
+  /* margin-bottom: 0; */
 }
 
 .markdown-body:deep(blockquote) {
-  margin: 16px 3px;
-  padding: 0 1em;
-  color: #59636eb6;
-  border-left: .2em solid #5490914b;
+  border-left: .25em solid var(--apix-border-hover);
+  color: var(--apix-tertiary-dark-color);
+}
+
+.markdown-body:deep(hr) {
+  background-color: var(--apix-border-hover);
+  opacity: 0.6;
+}
+
+.markdown-body:deep(h2) {
+  border-bottom: 1px solid color-mix(in srgb, var(--apix-border-hover) 50%, transparent);
 }
 </style>

@@ -1,9 +1,10 @@
 import { defineStore } from "pinia"
 import { toRaw, isRef, unref, ref } from 'vue'
+import { setHighlightTheme } from './globalData'
 
 const DEFAULT_CONFIG = {
   // ----- app ui -----
-  theme: 'light',
+  dark_theme: false,
   lightValue: 95,
   transparencyValue: 90,
   backgroundImage: '',
@@ -131,6 +132,15 @@ export const useAppCacheData = defineStore("app", {
           this.config[key] = value
         }
       })
+      
+      if (this.config.dark_theme) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        setHighlightTheme(true)
+      }
+      else {
+        document.documentElement.setAttribute('data-theme', 'light')
+        setHighlightTheme(false)
+      }
     },
 
     restoreWorkDir() {
@@ -357,11 +367,6 @@ export const useAppCacheData = defineStore("app", {
       } catch (e) {
         console.error("saveAppConfig failed:", e)
       }
-    },
-
-    toggleTheme() {
-      const next = this.config.theme === 'light' ? 'dark' : 'light'
-      this.saveAppConfig('theme', next)
     },
 
     // ----------------

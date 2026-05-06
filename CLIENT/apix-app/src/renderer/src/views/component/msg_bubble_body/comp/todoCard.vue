@@ -49,37 +49,37 @@ const computedStatus = computed(() => {
   border-radius: 6px;
   font-size: 14px;
   line-height: 20px;
-  color: #1a1a1a;
+  color: var(--apix-darkest-color);
   transition: background-color 0.15s ease;
 }
 
 .task-row:hover {
-  background-color: #f5f5f5;
+  background-color: var(--apix-panel-layer-1-background);
 }
 
 /* 完成状态 */
 .task-row--completed {
-  color: #6b7280b4;
+  color: var(--apix-secondary-dark-color);
 }
 
 .task-row--completed .task-row__content {
   text-decoration: line-through;
-  text-decoration-color: #2c2d2e82;
+  text-decoration-color: var(--apix-darkest-color);
 }
 
 /* 错误状态 */
 .task-row--error {
-  color: #dc2626;
-  background-color: #fef2f2;
+  color: var(--apix-danger-hover);
+  background-color: var(--apix-danger-light);
 }
 
 .task-row--error:hover {
-  background-color: #fee2e2;
+  background-color: var(--apix-danger-light);
 }
 
 /* 等待状态 */
 .task-row--pending {
-  color: #6b7280;
+  color: var(--apix-secondary-dark-color);
 }
 
 /* 状态指示器 */
@@ -96,7 +96,7 @@ const computedStatus = computed(() => {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  box-sizing: border-box; /* 关键修复：border 不再增加尺寸 */
+  box-sizing: border-box;
   border: 1.5px solid currentColor;
   display: flex;
   align-items: center;
@@ -106,29 +106,29 @@ const computedStatus = computed(() => {
 
 /* 各状态样式 */
 .indicator--pending {
-  border-color: #d1d5db;
+  border-color: var(--apix-secondary-light-color);
 }
 
 .indicator--in_progress {
-  border-color: #3b82f6;
+  border-color: var(--apix-info-hover);
   border-top-color: transparent;
 }
 
 .indicator--completed {
-  background-color: #10b981;
-  border-color: #10b981;
+  background-color: var(--apix-success-color);
+  border-color: var(--apix-success-color);
   color: white;
 }
 
 .indicator--error {
-  background-color: #dc2626;
-  border-color: #dc2626;
+  background-color: var(--apix-danger-hover);
+  border-color: var(--apix-danger-hover);
   color: white;
 }
 
 /* 加载动画 */
 .indicator--spinning {
-  border-color: #3b82f6;
+  border-color: var(--apix-info-hover);
   border-top-color: transparent;
   animation: spin 0.6s linear infinite;
 }

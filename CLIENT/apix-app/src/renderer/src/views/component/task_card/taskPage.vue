@@ -1,79 +1,91 @@
 <template>
   <div class="task-page-wrapper">
-    <!-- 底部操作栏 -->
-    <div class="ab-bar">
-      <div class="ab-bar-btns">
-        <el-button
-          type="primary"
-          class="refresh-btn"
-          @click="refreshTasks"
-          :loading="isRefreshing"
-        >
-          <el-icon class="el-icon--right"><Refresh /></el-icon>
-          刷新任务
-        </el-button>
-        <el-button
-          class="clear-btn"
-          @click="clearCompleted"
-        >
-          <el-icon class="el-icon--right"><Delete /></el-icon>
-          清理已完成
-        </el-button>
-      </div>
-    </div>
 
     <div class="main-wrapper">
-      <h1 class="data-page-title">
-        后台子代理任务视图
-      </h1>
 
-      <!-- 搜索 -->
-      <div class="search-wrapper">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="Search tasks by ID / goal / agent"
-          clearable
-          style="max-width: 420px;"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <div class="mode-switch-label">自动刷新</div>
-        <div class="mode-switch">
-          <div class="slider" :class="{ right: store.config.autoRefreshTask }" />
+      <div class="page-title-wrapper">
+        <div class="title-wrapper">
+          <h1 class="data-page-title">
+            后台子代理任务视图
+          </h1>
+          <div class="btn-wrapper">
+            <el-button
+              type="primary"
+              class="refresh-btn"
+              @click="refreshTasks"
+              :loading="isRefreshing"
+            >
+              刷新任务
+              <el-icon style="padding-left: 4px;"><Refresh /></el-icon>
+            </el-button>
+            <el-button
+              class="clear-btn"
+              @click="clearCompleted"
+            >
+              清理已完成
+              <el-icon style="padding-left: 4px;"><Delete /></el-icon>
+            </el-button>
+            <div class="auto-refresh-wrapper">
+              <div class="mode-switch-label">自动刷新</div>
+              <div class="mode-switch">
+                <div class="slider" :class="{ right: store.config.autoRefreshTask }" />
 
-          <button
-            class="off-select"
-            :class="{ active: !store.config.autoRefreshTask }"
-            @click="switchMode('autoRefreshTask', 'off')"
-          >
-            Off
-          </button>
+                <button
+                  class="off-select"
+                  :class="{ active: !store.config.autoRefreshTask }"
+                  @click="switchMode('autoRefreshTask', 'off')"
+                >
+                  Off
+                </button>
 
-          <button
-            class="on-select"
-            :class="{ active: store.config.autoRefreshTask }"
-            @click="switchMode('autoRefreshTask', 'on')"
-          >
-            On
-          </button>
+                <button
+                  class="on-select"
+                  :class="{ active: store.config.autoRefreshTask }"
+                  @click="switchMode('autoRefreshTask', 'on')"
+                >
+                  On
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 搜索 -->
+          <div class="search-wrapper">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="通过任务ID、任务目标、子代理名称搜索任务"
+              clearable
+              style="max-width: 420px;"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </div>
+        </div>
+
+        <div class="page-docs">
+<span>1. 子代理是什么: 子代理是主 Agent 自主分配的后台任务执行者。它是主 Agent 的一个副本，但不具备再分配子代理的权限。子代理在工作时不会干扰用户与主 Agent 之间的对话。</span>
+
+<span>2. 如何使用: 进入设置页面，开启 Agent 的子代理分配权限。当 Agent 分配子代理后，可以在当前页面查看任务分配情况及子代理的运行状态摘要。</span>
+
+<span>3. 注意事项: 子代理任务被中断后，通常无法继续执行（蜂群模式除外）。开启蜂群模式后，除非用户明确要求，否则主 Agent 一般不会与已分配过的子代理继续对话。</span>
         </div>
       </div>
 
       <!-- 统计信息 -->
       <div class="stats-wrapper">
         <div class="stat-item">
-          <div class="stat-value" :style="{ color: 'rgb(136, 202, 197)' }">{{ taskStats.total }}</div>
+          <div class="stat-value status-total-text">{{ taskStats.total }}</div>
           <div class="stat-label">总任务</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value status-running-text">{{ taskStats.running }}</div>
-          <div class="stat-label">运行中</div>
         </div>
         <div class="stat-item">
           <div class="stat-value status-pending-text">{{ taskStats.pending }}</div>
           <div class="stat-label">等待中</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value status-running-text">{{ taskStats.running }}</div>
+          <div class="stat-label">运行中</div>
         </div>
         <div class="stat-item">
           <div class="stat-value status-completed-text">{{ taskStats.completed }}</div>
@@ -115,7 +127,7 @@
       >
         <el-empty description="No tasks found">
           <template #image>
-            <el-icon :size="60" color="#dcdfe6"><DocumentDelete /></el-icon>
+            <el-icon :size="60" color="var(--apix-tertiary-dark-color)"><DocumentDelete /></el-icon>
           </template>
         </el-empty>
       </div>
@@ -390,13 +402,41 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 <style scoped>
 .task-page-wrapper {
   position: relative;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
-  border-radius: 24px;
-  margin: 12px 12px 12px 0;
+  background-color: transparent;
+  height: calc(100vh - 36px);
+}
+
+.page-title-wrapper {
+  display: flex;
+  justify-content: space-between;
+}
+
+.page-docs {
+  min-width: 500px;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--apix-tertiary-dark-color);
+  text-indent: 2em;
+}
+
+.title-wrapper {
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px 12px;
+  min-width: 500px;
+  max-width: 500px;
+}
+
+.data-page-title {
+  padding-left: 6px;
+  font-size: 24px;
+  color: var(--apix-default-dark-color);
+  margin-bottom: 0px;
 }
 
 .main-wrapper {
@@ -407,89 +447,88 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   left: calc((100% - 1090px) / 2);
   padding: 10px 20px;
   overflow-y: scroll;
-  border-radius: 16px;
   align-items: center;
+  scrollbar-width: none;
 }
 
-.data-page-title {
-  padding-left: 6px;
-  font-size: 24px;
-  color: rgb(82, 108, 106);
-  margin-bottom: 0px;
-}
-
-/* 底部操作栏 */
-.ab-bar {
-  width: 100%;
-  position: absolute;
-  bottom: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 999;
-}
-
-.ab-bar-btns {
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-  z-index: 999;
-}
-
-.refresh-btn {
-  height: 36px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 32px;
-  color: #606266;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(136, 202, 197, 0.3);
-  transition: all 0.3s ease;
-}
-
-.refresh-btn:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(136, 202, 197, 0.5);
-  transform: scale(1.05);
-}
-
+.refresh-btn,
 .clear-btn {
-  height: 36px;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 105px;
+  height: 32px;
   font-size: 14px;
-  font-weight: 500;
-  border-radius: 32px;
-  color: #606266;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(136, 202, 197, 0.3);
-  transition: all 0.3s ease;
+  font-weight: bold;
+  border-radius: var(--apix-button-border-radius);
+  color: var(--apix-lightest-color);
+  background: var(--apix-primary-color);
+  transition: all 0.3s var(--apix-cubic-bezier);
+  border: none;
 }
 
+.refresh-btn:hover,
 .clear-btn:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(136, 202, 197, 0.5);
-  transform: scale(1.05);
+  background-color: var(--apix-primary-hover);
 }
 
-/* 统计信息 */
+.refresh-btn:active,
+.clear-btn:active {
+  transform: scale(0.98);
+  background-color: var(--apix-primary-active);
+}
+
+.btn-wrapper {
+  width: 100%; 
+  display: flex; 
+  margin: 8px 0;
+  gap: 12px;
+}
+
+.search-wrapper {
+  width: 100%;
+  margin: 8px 0;
+  display: flex;
+  gap: 12px;
+}
+
+.search-wrapper :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
+  height: 38px !important;
+  transform-origin: center;
+  transform: scale(1);
+  transition: transform 0.22s var(--apix-cubic-bezier);
+}
+
+.search-wrapper :deep(.el-input__wrapper) {
+  height: 38px !important;
+  padding: 0 12px 0 10px;
+  background: transparent;
+  background-color: var(--apix-panel-layer-4-background);
+  border: none;
+  border-radius: var(--apix-border-radius-base);
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.13s var(--apix-cubic-bezier);
+}
+
+/* -------------- 统计信息 -------------- */
 .stats-wrapper {
   display: flex;
   justify-content: center;
   gap: 32px;
   margin: 20px 12px;
   padding: 16px;
-  background: rgba(136, 202, 196, 0.189);
+  background: color-mix(in srgb, var(--apix-primary-color) 20%, transparent);
   border-radius: 24px;
-  box-shadow: 
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
-  transition: all 0.3s ease;
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.3s var(--apix-cubic-bezier);
 }
 
 .stats-wrapper:hover {
   transform: scale(1.01);
-  box-shadow: 
-    0 0px 36px rgba(218, 218, 218, 0.3),
-    0 0px 12px rgba(218, 218, 218, 0.15);
+  box-shadow: var(--apix-shadow-layer-2);
 }
 
 .stat-item {
@@ -506,54 +545,28 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 
 .stat-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--apix-secondary-dark-color);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
+.status-total-text {
+  color: var(--apix-primary-color);
+}
+
 .status-running-text {
-  color: rgb(136, 202, 197);
+  color: var(--apix-primary-active);
 }
 
 .status-pending-text {
-  color: #e6a23c;
+  color: var(--apix-primary-color);
 }
 
 .status-completed-text {
-  color: #67c23a;
+  color: var(--apix-success-color);
 }
 
-
-.search-wrapper {
-  width: 100%; 
-  display: flex; 
-  margin: 16px 0;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-wrapper :deep(.el-input) {
-  height: 32px !important;
-  flex: 1;
-  min-width: 0;
-  transform-origin: left center;
-  transform: scale(1);
-  transform-origin: center;
-  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
-}
-
-.search-wrapper :deep(.el-input__wrapper) {
-  height: 32px !important;
-  background: transparent;
-  border: none;
-  border-radius: 0px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: none;
-  padding: 0 12px 0 10px;
-  transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-/* 任务列表容器 */
+/* -------------- 任务列表容器 -------------- */
 .task-list-container {
   width: 100%;
   min-height: 400px;
@@ -577,6 +590,10 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   justify-content: center;
   align-items: center;
   min-height: 400px;
+}
+
+.empty-state:deep(*) {
+  color: var(--apix-tertiary-dark-color);
 }
 
 /* 滚动条样式 */
@@ -619,22 +636,29 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   transition: transform 0.4s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
+/* ---------------------------------- */
+.auto-refresh-wrapper {
+  padding-left: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 .mode-switch-label {
-  position: absolute;
-  right: 90px;
+  width: fit-content;
   display: flex;
   text-align: center;
   color: rgba(80, 120, 117, 0.712);
 }
 
 .mode-switch {
-  position: absolute;
-  right: 24px;
+  position: relative;
   display: flex;
-  background: rgba(226, 226, 226, 0.32);
+  background: color-mix(in srgb, var(--apix-default-light-color) 32%, transparent);
   border-radius: 999px;
-  border: 1px solid rgba(213, 213, 213, 0.318);
-  box-shadow: inset 1px -1px 16px rgba(117, 187, 248, 0.083);
+  border: 1px solid color-mix(in srgb, var(--apix-border-light) 31.8%, transparent);
+  box-shadow: inset 1px -1px 16px color-mix(in srgb, var(--apix-primary-color) 8.3%, transparent);
 }
 
 .mode-switch button {
@@ -645,12 +669,34 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   cursor: pointer;
   z-index: 1;
   font-size: 12px;
-  color: #4040409A;
+  color: var(--apix-secondary-dark-color);
   transition: color 0.25s ease;
 }
 
 .mode-switch button.active {
-  color: #0000009A;
+  color: var(--apix-darkest-color);
+}
+
+/* 共用 active 时的光晕与背景效果（original used color-mix） */
+.mode-switch:active .slider,
+.mode-switch:active:deep(.slider) {
+  z-index: 999;
+  box-shadow:
+    var(--apix-shadow-lg),
+    0 0 0 2px color-mix(in srgb, var(--apix-primary-color) 14%, transparent);
+  backdrop-filter: saturate(180%) blur(3px);
+  transition: all 0.3s var(--apix-cubic-bezier);
+  background-color: color-mix(in srgb, var(--apix-default-light-color) 1%, transparent);
+}
+
+.highlight-select {
+  color: var(--apix-secondary-dark-color);
+  transition: color 0.25s ease;
+}
+
+.highlight-select.right {
+  color: var(--apix-darkest-color);
+  transition: color 0.25s ease;
 }
 
 /* Slider */
@@ -661,26 +707,15 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   margin-top: -1px;
   margin-left: -1px;
   border-radius: 32px;
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s var(--apix-cubic-bezier);
   box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px rgba(136, 202, 196, 0.471);
-  background-color: #ffffff2c;
+    var(--apix-shadow-md),
+    0 0 0 2px color-mix(in srgb, var(--apix-primary-color) 47.1%, transparent);
+  background-color: var(--apix-lightest-color);
 }
 
 .slider.right {
-  transform: translateX(82%);
+  transform: translateX(87%);
 }
-
-.mode-switch:active:deep(.slider) {
-  z-index: 999;
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  backdrop-filter: saturate(180%) blur(3px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
-}
+/* ---------------------------------- */
 </style>

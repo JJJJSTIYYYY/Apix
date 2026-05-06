@@ -334,6 +334,31 @@ CREATE TABLE task_info (
 
 
 
+DROP TABLE IF EXISTS llm_provider;
+CREATE TABLE llm_provider (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+    provider_id VARCHAR(64) UNIQUE NOT NULL,
+    user_uid VARCHAR(64) NOT NULL,
+
+    provider_name VARCHAR(64) NOT NULL,
+    type ENUM('openai', 'anthropic') NOT NULL DEFAULT 'openai',
+    endpoint VARCHAR(256) NOT NULL,
+    model_list JSON NOT NULL,
+    description TEXT DEFAULT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT fk_provider_user_uid
+        FOREIGN KEY (user_uid)
+        REFERENCES users(user_uid)
+        ON DELETE CASCADE
+
+) DEFAULT CHARSET=utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+
+
 -- Stored Procedure: create_user
 DROP PROCEDURE IF EXISTS create_user;
 DELIMITER $$
@@ -1686,6 +1711,126 @@ BEGIN
       AND conversation_uid = p_conversation_uid
     ORDER BY created_at ASC;
 
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS create_llm_provider;
+DELIMITER $$
+
+CREATE PROCEDURE create_llm_provider (
+    IN p_provider_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_provider_name VARCHAR(64),
+    IN p_type ENUM('openai', 'anthropic'),
+    IN p_endpoint VARCHAR(256),
+    IN p_model_list JSON,
+    IN p_description TEXT
+)
+BEGIN
+    INSERT INTO llm_provider (
+        provider_id,
+        user_uid,
+        provider_name,
+        type,
+        endpoint,
+        model_list,
+        description
+    )
+    VALUES (
+        p_provider_id,
+        p_user_uid,
+        p_provider_name,
+        IFNULL(p_type, 'openai'),
+        p_endpoint,
+        p_model_list,
+        p_description
+    );
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_llm_providers;
+DELIMITER $$
+
+CREATE PROCEDURE get_llm_providers (
+    IN p_user_uid VARCHAR(64)
+)
+BEGIN
+    SELECT
+        provider_id,
+        provider_name,
+        type,
+        endpoint,
+        model_list,
+        description,
+        created_at
+    FROM llm_provider
+    WHERE user_uid = p_user_uid
+      AND is_deleted = FALSE
+    ORDER BY created_at DESC;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_llm_provider_by_id;
+DELIMITER $$
+
+CREATE PROCEDURE get_llm_provider_by_id (
+    IN p_provider_id VARCHAR(64)
+)
+BEGIN
+    SELECT
+        provider_id,
+        provider_name,
+        type,
+        endpoint,
+        model_list,
+        description,
+        created_at
+    FROM llm_provider
+    WHERE provider_id = p_provider_id
+      AND is_deleted = FALSE
+    LIMIT 1;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS update_llm_provider;
+DELIMITER $$
+
+CREATE PROCEDURE update_llm_provider (
+    IN p_provider_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_provider_name VARCHAR(64),
+    IN p_type ENUM('openai', 'anthropic'),
+    IN p_endpoint VARCHAR(256),
+    IN p_model_list JSON,
+    IN p_description TEXT,
+    IN p_is_deleted BOOLEAN
+)
+BEGIN
+    UPDATE llm_provider
+    SET
+        provider_name = IF(p_provider_name IS NULL, provider_name, p_provider_name),
+        type = IF(p_type IS NULL, type, p_type),
+        endpoint = IF(p_endpoint IS NULL, endpoint, p_endpoint),
+        model_list = IF(p_model_list IS NULL, model_list, p_model_list),
+        description = IF(p_description IS NULL, description, p_description),
+        is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted)
+    WHERE provider_id = p_provider_id
+      AND user_uid = p_user_uid
+      AND is_deleted = FALSE;
+
+    SELECT ROW_COUNT() AS affected_rows;
 END$$
 
 DELIMITER ;

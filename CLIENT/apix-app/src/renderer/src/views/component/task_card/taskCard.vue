@@ -1,7 +1,9 @@
 <template>
   <div class="task-card selectable" :class="{ 'is-completed': status === 'completed', 'is-failed': status === 'failed' }">
     <!-- 左侧状态指示条 -->
-    <div class="status-indicator" :class="statusClass"></div>
+    <div class="status-indicator-wrapper">
+      <div class="status-indicator" :class="statusClass"></div>
+    </div>
     
     <!-- 主要内容区 -->
     <div class="task-content">
@@ -144,58 +146,65 @@ const handleTerminate = async () => {
 <style scoped>
 .task-card {
   display: flex;
-  background: color-mix(in oklch, rgb(255, 255, 255) 85%, transparent);
-  border-radius: 16px;
-  border: 1px solid rgba(136, 202, 197, 0.3);
-  box-shadow:
-    0 10px 26px rgba(136, 202, 197, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.05);
+  background: var(--apix-panel-layer-3-background);
+  border: 1px solid transparent;
+  border-radius: var(--apix-border-radius-base);
+  box-shadow: var(--apix-shadow-layer-1);
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: box-shadow 0.22s var(--apix-cubic-bezier);
   position: relative;
 }
 
 .task-card:hover {
-  transform: translateY(-2px) scale(1.005);
-  box-shadow:
-    0 14px 30px rgba(136, 202, 197, 0.15),
-    0 6px 14px rgba(4, 52, 42, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.02);
-  border-color: rgba(136, 202, 197, 0.5);
+  border: 1px solid var(--apix-primary-color);
+  box-shadow: var(--apix-shadow-layer-2);
+  background: var(--apix-panel-layer-5-background);
 }
 
 .task-card.is-completed {
   opacity: 0.85;
-  background: color-mix(in oklch, rgb(248, 248, 248) 90%, transparent);
 }
 
 .task-card.is-failed {
-  border-color: rgba(245, 108, 108, 0.4);
-  background: color-mix(in oklch, rgb(255, 245, 245) 85%, transparent);
+  background: color-mix(in srgb, var(--apix-danger-color) 15%, transparent);
+}
+
+.task-card.is-failed:hover {
+  border-color: var(--apix-danger-color);
 }
 
 /* 状态指示条 */
+.status-indicator-wrapper {
+  padding: 1px 1px 1px 3px;
+  width: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .status-indicator {
+  border-radius: 3px;
   width: 4px;
+  height: 90%;
   flex-shrink: 0;
   transition: background-color 0.3s ease;
 }
 
 .status-pending {
-  background: linear-gradient(180deg, #909399 0%, #a8abb2 100%);
+  background: linear-gradient(180deg, var(--apix-tertiary-light-color) 0%, var(--apix-secondary-light-color) 100%);
 }
 
 .status-running {
-  background: linear-gradient(180deg, rgb(136, 202, 197) 0%, rgb(100, 180, 170) 100%);
+  background: linear-gradient(180deg, var(--apix-primary-active) 0%, var(--apix-primary-color) 100%);
   animation: pulse-bar 2s ease-in-out infinite;
 }
 
 .status-completed {
-  background: linear-gradient(180deg, #67c23a 0%, #85ce61 100%);
+  background: linear-gradient(180deg, var(--apix-success-active) 0%, var(--apix-success-color) 100%);
 }
 
 .status-failed {
-  background: linear-gradient(180deg, #f56c6c 0%, #f89898 100%);
+  background: linear-gradient(180deg, var(--apix-danger-active) 0%, var(--apix-danger-color) 100%);
 }
 
 @keyframes pulse-bar {
@@ -206,7 +215,7 @@ const handleTerminate = async () => {
 /* 内容区 */
 .task-content {
   flex: 1;
-  padding: 16px 20px;
+  padding: 16px 8px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -225,7 +234,7 @@ const handleTerminate = async () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #909399;
+  color: var(--apix-tertiary-dark-color);
 }
 
 .id-text {
@@ -245,23 +254,23 @@ const handleTerminate = async () => {
 }
 
 .task-status.status-pending {
-  background: rgba(144, 147, 153, 0.15);
-  color: #909399;
+  background: var(--apix-tertiary-light-color);
+  color: var(--apix-tertiary-dark-color);
 }
 
 .task-status.status-running {
-  background: rgba(136, 202, 197, 0.2);
-  color: rgb(80, 160, 150);
+  background: var(--apix-primary-color);
+  color: var(--apix-primary-light);
 }
 
 .task-status.status-completed {
-  background: rgba(103, 194, 58, 0.15);
-  color: #67c23a;
+  background: var(--apix-success-color);
+  color: var(--apix-success-light);
 }
 
 .task-status.status-failed {
-  background: rgba(245, 108, 108, 0.15);
-  color: #f56c6c;
+  background: var(--apix-danger-color);
+  color: var(--apix-danger-light);
 }
 
 .task-status .el-icon {
@@ -286,7 +295,7 @@ const handleTerminate = async () => {
 
 .goal-label {
   font-size: 11px;
-  color: #a0a0a0;
+  color: var(--apix-tertiary-dark-color);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: 500;
@@ -294,7 +303,7 @@ const handleTerminate = async () => {
 
 .goal-text {
   font-size: 15px;
-  color: #303133;
+  color: var(--apix-default-dark-color);
   font-weight: 500;
   line-height: 1.4;
   display: -webkit-box;
@@ -312,7 +321,7 @@ const handleTerminate = async () => {
 
 .todo-label {
   font-size: 11px;
-  color: rgb(136, 202, 197);
+  color: var(--apix-primary-color);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: 600;
@@ -323,17 +332,17 @@ const handleTerminate = async () => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #606266;
-  background: rgba(136, 202, 197, 0.1);
+  color: var(--apix-tertiary-dark-color);
+  background: var(--apix-default-light-color);
   padding: 8px 12px;
   border-radius: 8px;
-  border-left: 3px solid rgb(136, 202, 197);
+  border-left: 3px solid var(--apix-primary-active);
 }
 
 .pulse-dot {
   width: 6px;
   height: 6px;
-  background: rgb(136, 202, 197);
+  background: var(--apix-tertiary-dark-color);
   border-radius: 50%;
   animation: pulse-dot 1.5s ease-in-out infinite;
   flex-shrink: 0;
@@ -351,7 +360,7 @@ const handleTerminate = async () => {
   align-items: center;
   margin-top: 4px;
   padding-top: 12px;
-  border-top: 1px solid rgba(136, 202, 197, 0.15);
+  border-top: 1px solid var(--apix-default-light-color);
 }
 
 .agent-info {
@@ -368,7 +377,7 @@ const handleTerminate = async () => {
 
 .agent-name {
   font-size: 13px;
-  color: #606266;
+  color: var(--apix-secondary-dark-color);
   font-weight: 500;
 }
 
@@ -377,12 +386,12 @@ const handleTerminate = async () => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #909399;
+  color: var(--apix-tertiary-dark-color);
 }
 
 .duration-info .el-icon {
   font-size: 14px;
-  color: rgb(136, 202, 197);
+  color: var(--apix-primary-active);
 }
 
 /* 操作区 */
@@ -390,7 +399,7 @@ const handleTerminate = async () => {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  border-left: 1px solid rgba(136, 202, 197, 0.15);
+  border-left: 1px solid var(--apix-default-light-color);
 }
 
 .terminate-btn {
@@ -398,20 +407,16 @@ const handleTerminate = async () => {
   height: 36px;
   font-size: 13px;
   font-weight: 500;
-  border-radius: 10px;
+  border-radius: var(--apix-button-border-radius);
   border: none;
-  background: linear-gradient(135deg, #f56c6c 0%, #f89898 100%);
-  box-shadow:
-    0 4px 12px rgba(245, 108, 108, 0.25),
-    0 2px 4px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  background: linear-gradient(135deg, var(--apix-danger-active) 0%, var(--apix-danger-color) 100%);
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.3s var(--apix-cubic-bezier);
 }
 
 .terminate-btn:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow:
-    0 6px 16px rgba(245, 108, 108, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--apix-shadow-layer-2);
 }
 
 .terminate-btn:active:not(:disabled) {
@@ -419,10 +424,10 @@ const handleTerminate = async () => {
 }
 
 .terminate-btn:disabled {
-  background: #dcdfe6;
+  background: var(--apix-secondary-light-color);
   box-shadow: none;
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.5;
 }
 
 .terminate-btn .el-icon {

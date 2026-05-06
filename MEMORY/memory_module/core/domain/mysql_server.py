@@ -126,7 +126,7 @@ class MysqlService:
     @task_handler("mysql.user.create_a_user")
     async def create_a_user(self, payload: dict) -> dict:
         """
-        Ensure user account exists. Call procedure ensure_user_exists.
+        Ensure user account exists. Call procedure create_a_user.
         If user not exist, raise RuntimeError.
 
         Args:
@@ -168,7 +168,7 @@ class MysqlService:
     @task_handler("mysql.user.verify_user")
     async def verify_user(self, payload: dict) -> dict:
         """
-        Ensure user account exists. Call procedure ensure_user_exists.
+        Ensure user account exists. Call procedure verify_user.
         If user not exist, raise RuntimeError.
 
         Args:
@@ -227,7 +227,9 @@ class MysqlService:
         logger.info(f"[MysqlService][ensure_user_exists] enter.")
         try:
             user_uid = payload["client_id"]
-            res = await self._call_procedure("ensure_user_exists", (user_uid,))
+            user_name = payload.get("username")
+            res = await self._call_procedure("ensure_user_exists", (user_uid, user_name))
+            # logger.debug(res)
             if exist and len(res) == 0: raise Exception("User do not exist.")
             elif not exist and len(res) > 0: raise Exception("User has already exist.")
             return {
@@ -347,9 +349,9 @@ class MysqlService:
             session_id = payload.get("session_id", None)
             workspace = payload.get("workspace", None)
             title = payload.get("title", None)
-            pinned = bool(payload.get("is_pinned", None))
-            is_deleted = bool(payload.get("is_deleted", None))
-            has_new_message = bool(payload.get("has_new_message", None))
+            pinned = payload.get("is_pinned", None)
+            is_deleted = payload.get("is_deleted", None)
+            has_new_message = payload.get("has_new_message", None)
             await self._call_procedure(
                 "update_conversation", 
                 (user_uid, conversation_uid, title, workspace, session_id, pinned, is_deleted, has_new_message)

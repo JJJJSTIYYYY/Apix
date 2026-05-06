@@ -12,12 +12,12 @@
     >
       <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
-          <svg t="1774033696111" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17196" width="16" height="16"><path d="M641.536 382.464l102.4 102.4a38.4 38.4 0 0 1 0 54.272l-102.4 102.4-54.3232-54.272 75.264-75.264-75.264-75.264 54.272-54.272zM280.064 539.136l102.4 102.4 54.3232-54.272L361.5232 512l75.264-75.264-54.272-54.272-102.4 102.4a38.4 38.4 0 0 0 0 54.272z" fill="#2d7e8c" p-id="17197"></path><path d="M870.4 921.6H153.6a25.6 25.6 0 0 1-25.6-25.6v-768A25.6 25.6 0 0 1 153.6 102.4h513.3312a25.6 25.6 0 0 1 18.1248 7.4752l203.4688 203.4688a25.6 25.6 0 0 1 7.4752 18.1248V896a25.6 25.6 0 0 1-25.6 25.6z m-51.2-76.8V352.6656L645.7344 179.2H204.8v665.6h614.4z" fill="#2d7e8c" p-id="17198"></path></svg>
+          <svg t="1774033696111" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17196" width="16" height="16"><path d="M641.536 382.464l102.4 102.4a38.4 38.4 0 0 1 0 54.272l-102.4 102.4-54.3232-54.272 75.264-75.264-75.264-75.264 54.272-54.272zM280.064 539.136l102.4 102.4 54.3232-54.272L361.5232 512l75.264-75.264-54.272-54.272-102.4 102.4a38.4 38.4 0 0 0 0 54.272z" p-id="17197"></path><path d="M870.4 921.6H153.6a25.6 25.6 0 0 1-25.6-25.6v-768A25.6 25.6 0 0 1 153.6 102.4h513.3312a25.6 25.6 0 0 1 18.1248 7.4752l203.4688 203.4688a25.6 25.6 0 0 1 7.4752 18.1248V896a25.6 25.6 0 0 1-25.6 25.6z m-51.2-76.8V352.6656L645.7344 179.2H204.8v665.6h614.4z" p-id="17198"></path></svg>
         </div>
         <input
           class="tab-title-input no-drag"
           v-model="titleInput"
-          placeholder="数据库测试"
+          placeholder="接口测试"
           @change="onTabCardTitleChange($event)"
           @keyup.enter="onTabCardTitleChange($event)"
           @mouseup="onMouseUp_input($event)"
@@ -27,16 +27,14 @@
         />
       </div>
 
-      <transition name="scale-fade">
-        <PopMenu
-          v-if="isShowMenu"
-          :style="menuStyle"
-          @close-menu="closePopMenu"
-          @save-card="saveCardAsPredefined"
-          @mark-card="markCard"
-          @mark-content="updateMarkContent"
-        />
-      </transition>
+      <PopMenu
+        v-if="isShowMenu"
+        :style="menuStyle"
+        @close-menu="closePopMenu"
+        @save-card="saveCardAsPredefined"
+        @mark-card="markCard"
+        @mark-content="updateMarkContent"
+      />
 
       <el-tooltip
         v-if="isShowMark_"
@@ -46,13 +44,15 @@
         raw-content
       >
         <transition name="scale-fade">
-          <el-button
+          <button
             key="11"
             v-if="isShowMark"
             class="mark-btn"
             :class="{ mark_btn_right: mark_btn_right }"
             @click="hideMark"
-          />
+          >
+            <svg t="1778086454896" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10188" width="20" height="20"><path d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z" p-id="10189" fill="var(--apix-lightest-color)"></path><path d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z" p-id="10190" fill="var(--apix-lightest-color)"></path></svg>
+          </button>
         </transition>
       </el-tooltip>
 
@@ -67,7 +67,7 @@
           @click="showPopMenu"
           class="tab-card-btn-menu"
         >
-          <el-icon><More /></el-icon>
+          <el-icon><MoreFilled /></el-icon>
         </el-button>
 
         <el-button
@@ -91,17 +91,17 @@
       </div>
     </div>
 
-    <!-- 简化后的 database 卡片体 -->
-    <div v-if="self.showCardBody" class="database-card-body">
-      <div class="database-body-wrapper">
-        <div class="database-content">
+    <!-- 简化后的 interface 卡片体 -->
+    <div v-if="self.showCardBody" class="interface-card-body">
+      <div class="interface-body-wrapper">
+        <div class="interface-content">
           <div class="field-label">
-            数据库连接:
+            接口地址:
           </div>
           <div class="field-value">
             <el-input
               v-model="addressInput"
-              placeholder="请输入数据库连接 URL"
+              placeholder="请输入接口地址"
               @input="onAddressChange"
             />
           </div>
@@ -114,7 +114,7 @@
               v-model="descriptionInput"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 10 }"
-              placeholder="请输入需要执行的操作描述，比如需要执行的SQL、注意事项等"
+              placeholder="请输入需要执行的操作描述，比如接口依赖、MOCK数据、明确的预期结果等"
               @input="onDescriptionChange"
             />
           </div>
@@ -231,7 +231,6 @@ function showPopMenu() {
     const menuWidth = 144
     const btnRect = menuBtnRef.value.$el.getBoundingClientRect()
     const parentRect = menuBtnRef.value.$el.offsetParent.getBoundingClientRect()
-
     const relativeLeft = btnRect.left - parentRect.left
 
     menuStyle.value = {
@@ -247,9 +246,8 @@ function closePopMenu() {
 }
 
 // ------------------------
-// 菜单里的标记逻辑
-// 这里仍然沿用原来的临时挂载方式
-// 如果你之后想继续彻底简化，也可以把这部分也抽掉
+// 标记逻辑
+// 先保留原有能力，但不再放进新类型里
 // ------------------------
 const mark_btn_right = ref(true)
 
@@ -345,11 +343,11 @@ textarea {
   user-select: none;
 }
 
-.database-body-wrapper {
+.interface-body-wrapper {
   min-height: 60px;
 }
 
-.database-content {
+.interface-content {
   position: relative;
   border-radius: 8px;
   background: transparent;
@@ -410,53 +408,5 @@ textarea {
     opacity: 0;
     transform: scale(0.95) translateY(6px);
   }
-}
-
-/* 统一普通 input 和 textarea 的样式 */
-.field-value :deep(.el-input__wrapper),
-.field-value :deep(.el-textarea__inner) {
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
-  padding: 4px 12px;
-  background: rgba(255, 255, 255, 0.7);
-  transition: all 0.2s ease;
-}
-
-/* textarea 需要额外的 padding 调整 */
-.field-value :deep(.el-textarea__inner) {
-  padding: 8px 12px;
-  min-height: 32px;
-}
-
-.field-value :deep(.el-input__wrapper:hover),
-.field-value :deep(.el-textarea__inner:hover) {
-  box-shadow: inset 0 0 0 1px rgba(136, 202, 197, 0.5);
-}
-
-.field-value :deep(.el-input__wrapper.is-focus),
-.field-value :deep(.el-textarea__inner:focus) {
-  box-shadow: inset 0 0 0 2px rgb(136, 202, 197);
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.field-value :deep(.el-input__inner),
-.field-value :deep(.el-textarea__inner) {
-  color: #2f3a3a;
-  font-size: 14px;
-}
-
-.field-value :deep(.el-input__count) {
-  color: #8a9595;
-  font-size: 11px;
-  background: transparent;
-}
-
-/* textarea 的计数器样式 */
-.field-value :deep(.el-textarea .el-input__count) {
-  color: #8a9595;
-  font-size: 11px;
-  background: transparent;
-  bottom: 4px;
-  right: 12px;
 }
 </style>

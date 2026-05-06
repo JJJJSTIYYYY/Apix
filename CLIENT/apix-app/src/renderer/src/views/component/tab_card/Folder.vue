@@ -7,14 +7,14 @@
   >
     <!-- 卡片头 -->
     <div
-      class="tab-card-header"
+      class="tab-card-header no-drag"
       :class="{ expanded: self.expanded }"
       :draggable="!self.expanded"
       @dragstart.stop="onTabCardDragStart($event)"
     >
       <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
-          <svg t="1758388194426" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="52264" width="16" height="16"><path d="M405.79 96a32 32 0 0 1 24.256 11.128l0.322 0.381L527.483 224h347.833c40.832 0 74.014 32.76 74.674 73.432l0.01 1.235v192c0 17.673-14.327 32-32 32-17.496 0-31.713-14.042-31.996-31.471l-0.004-0.53v-192c0-5.793-4.627-10.512-10.4-10.662l-0.284-0.004H512.5a32 32 0 0 1-24.256-11.128l-0.323-0.381L390.806 160H149.684c-5.808 0-10.53 4.626-10.68 10.383l-0.004 0.284v682.666c0 5.794 4.627 10.513 10.4 10.663l0.284 0.004h320.132c17.673 0 32 14.327 32 32 0 17.496-14.042 31.713-31.471 32h-320.66c-40.833 0-74.015-32.76-74.675-73.432l-0.01-1.235V170.667c0-40.828 32.775-73.998 73.45-74.657l1.234-0.01H405.79z m427.745 499.664l0.377 0.37 106.71 106.667c12.379 12.373 12.502 32.362 0.372 44.887l-0.371 0.377-106.71 106.667c-12.5 12.494-32.761 12.49-45.256-0.01-12.369-12.374-12.488-32.355-0.362-44.877l0.372-0.377 84.069-84.035-84.07-84.034c-12.374-12.37-12.501-32.351-0.38-44.878l0.371-0.377c12.37-12.374 32.351-12.502 44.878-0.38z m-170.35 0.38c12.369 12.374 12.489 32.356 0.362 44.878l-0.372 0.377-84.07 84.034 84.07 84.035c12.375 12.37 12.503 32.351 0.38 44.877l-0.37 0.378c-12.37 12.374-32.351 12.502-44.878 0.38l-0.377-0.37-106.71-106.668c-12.379-12.372-12.502-32.361-0.372-44.886l0.371-0.378 106.71-106.666c12.5-12.495 32.761-12.49 45.256 0.009z" p-id="52265" fill="#2d7e8c"></path></svg>
+          <svg t="1758388194426" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="52264" width="16" height="16"><path d="M405.79 96a32 32 0 0 1 24.256 11.128l0.322 0.381L527.483 224h347.833c40.832 0 74.014 32.76 74.674 73.432l0.01 1.235v192c0 17.673-14.327 32-32 32-17.496 0-31.713-14.042-31.996-31.471l-0.004-0.53v-192c0-5.793-4.627-10.512-10.4-10.662l-0.284-0.004H512.5a32 32 0 0 1-24.256-11.128l-0.323-0.381L390.806 160H149.684c-5.808 0-10.53 4.626-10.68 10.383l-0.004 0.284v682.666c0 5.794 4.627 10.513 10.4 10.663l0.284 0.004h320.132c17.673 0 32 14.327 32 32 0 17.496-14.042 31.713-31.471 32h-320.66c-40.833 0-74.015-32.76-74.675-73.432l-0.01-1.235V170.667c0-40.828 32.775-73.998 73.45-74.657l1.234-0.01H405.79z m427.745 499.664l0.377 0.37 106.71 106.667c12.379 12.373 12.502 32.362 0.372 44.887l-0.371 0.377-106.71 106.667c-12.5 12.494-32.761 12.49-45.256-0.01-12.369-12.374-12.488-32.355-0.362-44.877l0.372-0.377 84.069-84.035-84.07-84.034c-12.374-12.37-12.501-32.351-0.38-44.878l0.371-0.377c12.37-12.374 32.351-12.502 44.878-0.38z m-170.35 0.38c12.369 12.374 12.489 32.356 0.362 44.878l-0.372 0.377-84.07 84.034 84.07 84.035c12.375 12.37 12.503 32.351 0.38 44.877l-0.37 0.378c-12.37 12.374-32.351 12.502-44.878 0.38l-0.377-0.37-106.71-106.668c-12.379-12.372-12.502-32.361-0.372-44.886l0.371-0.378 106.71-106.666c12.5-12.495 32.761-12.49 45.256 0.009z" p-id="52265"></path></svg>
         </div>
         <input
           class="tab-title-input no-drag"
@@ -29,16 +29,14 @@
         />
       </div>
 
-      <transition name="scale-fade">
-        <PopMenu
-          v-if="isShowMenu"
-          :style="menuStyle"
-          @close-menu="closePopMenu"
-          @save-card="saveCardAsPredefined"
-          @mark-card="markCard"
-          @mark-content="updateMarkContent"
-        />
-      </transition>
+      <PopMenu
+        v-if="isShowMenu"
+        :style="menuStyle"
+        @close-menu="closePopMenu"
+        @save-card="saveCardAsPredefined"
+        @mark-card="markCard"
+        @mark-content="updateMarkContent"
+      />
 
       <el-tooltip
         v-if="isShowMark_"
@@ -48,13 +46,15 @@
         raw-content
       >
         <transition name="scale-fade">
-          <el-button
+          <button
             key="11"
             v-if="isShowMark"
             class="mark-btn"
             :class="{ mark_btn_right: mark_btn_right }"
             @click="hideMark"
-          />
+          >
+            <svg t="1778086454896" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10188" width="20" height="20"><path d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z" p-id="10189" fill="var(--apix-lightest-color)"></path><path d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z" p-id="10190" fill="var(--apix-lightest-color)"></path></svg>
+          </button>
         </transition>
       </el-tooltip>
 
@@ -69,7 +69,7 @@
           @click="showPopMenu"
           class="tab-card-btn-menu"
         >
-          <el-icon><More /></el-icon>
+          <el-icon><MoreFilled /></el-icon>
         </el-button>
 
         <el-button
@@ -156,9 +156,8 @@
           <div
             class="tab-card-bottom-line"
             :key="'bottomCard'"
-            style="height: 40px; color: rgba(0,0,0,0.5); background-color: rgba(255,255,255,0.2);"
           >
-            卡片夹中 {{ self.content.length }} 张卡片
+            卡片夹中 {{ self.content.length }} 枚卡片
           </div>
         </div>
       </div>
@@ -173,11 +172,11 @@ import { More, Close } from '@element-plus/icons-vue'
 import { useAppCacheData } from '../../../store/app'
 import { ConfirmDialog } from './../comp/confirmDialog.js'
 import { InputDialog } from '../comp/inputDialog'
-import Interface from './../tab_card_body/Interface.vue'
-import Database from './../tab_card_body/Database.vue'
-import Script from './../tab_card_body/Script.vue'
-import Folder from './../tab_card_body/Folder.vue'
-import Note from './../tab_card_body/Note.vue'
+import Interface from './../tab_card/Interface.vue'
+import Database from './../tab_card/Database.vue'
+import Script from './../tab_card/Script.vue'
+import Folder from './../tab_card/Folder.vue'
+import Note from './../tab_card/Note.vue'
 import { globalState } from '../../../store/globalData.js'
 import PopMenu from './comp/PopMenu.vue'
 
@@ -696,16 +695,12 @@ textarea {
 
 .tab-content {
   position: relative;
-  border-radius: 8px;
   background: transparent;
   display: flex;
   flex-direction: column;
   flex-wrap: wrap;
-  margin-right: 5px;
-  overflow: auto;
-  scrollbar-width: none;
-  gap: 4px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 12px 12px 0 12px;
 }
 
 .scale-fade-enter-active {
@@ -740,14 +735,5 @@ textarea {
     opacity: 0;
     transform: scale(0.95) translateY(6px);
   }
-}
-
-.tab-card-bottom-line {
-  box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 8px;
-  padding: 8px 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  height: 30px;
 }
 </style>

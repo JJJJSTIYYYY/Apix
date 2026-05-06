@@ -99,6 +99,36 @@ class GenerationManager:
 
         return new_gen_id
     
+    def _ensure_code_block(self, content: str) -> str:
+        """
+        Ensure markdown code blocks in cache are properly closed. 
+
+        If the number of ``` is odd, append a closing ``` at the end.
+
+        Args:
+            content (str): streamed markdown content
+
+        Returns:
+            str: content with properly closed code block
+        """
+
+        if not content:
+            return content
+
+        in_code_block = False
+
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_code_block = not in_code_block
+
+        if in_code_block:
+            if not content.endswith("\n"):
+                content += "\n"
+            content += "```\n"
+
+        return content
+    
     async def update_cache_tokens(
         self,
         client_id: str,
@@ -166,8 +196,8 @@ class GenerationManager:
         if interrupted_msg:
             ts = int(time.time() * 1000)
 
-            content = interrupted_msg.get("content", "")
-            think = interrupted_msg.get("think", "")
+            content = self._ensure_code_block(interrupted_msg.get("content", ""))
+            think = self._ensure_code_block(interrupted_msg.get("think", ""))
 
             think_endswith = "[Conversation Abort]" if think and not content else ""
             content_endswith = "[Conversation Abort]" if content or not think_endswith else ""

@@ -6,12 +6,9 @@
         <header class="md-displayer-header">
           <span class="md-displayer-title">{{ title }}</span>
           <div class="btn-area">
-            <div class="mode-switch">
-              <div class="slider" :class="{ right: !isPlain }" />
-              <button @click="switchMode('plain')" class="plain-select" :class="{ right: !isPlain }">Plain</button>
-              <button @click="switchMode('highlight')" class="highlight-select" :class="{ right: !isPlain }">Light</button>
-            </div>
-            <button class="md-displayer-close" @click="close">×</button>
+            <button class="md-displayer-close" @click="close">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M764.288 214.592 512 466.88 259.712 214.592a31.936 31.936 0 0 0-45.12 45.12L466.752 512 214.528 764.224a31.936 31.936 0 1 0 45.12 45.184L512 557.184l252.288 252.288a31.936 31.936 0 0 0 45.12-45.12L557.12 512.064l252.288-252.352a31.936 31.936 0 1 0-45.12-45.184z"></path></svg>
+            </button>
           </div>
         </header>
 
@@ -33,7 +30,7 @@ import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 
 import 'github-markdown-css/github-markdown.css'
-import 'highlight.js/styles/github.css'
+// import 'highlight.js/styles/github.css'
 
 // ------------------------
 // Props
@@ -59,37 +56,30 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   highlight(code, lang) {
-    const raw = md.utils.escapeHtml(code)
-
     let highlighted = ''
+    let languageClass = ''
 
     try {
-      // ------------------------
-      // Plain mode: force plaintext
-      // ------------------------
-      if (isPlain.value) {
-        highlighted = hljs.highlight(code, {
-          language: 'plaintext',
-          ignoreIllegals: true
-        }).value
-      }
-      // ------------------------
-      // Highlight mode
-      // ------------------------
-      else if (lang && hljs.getLanguage(lang)) {
+      if (lang && hljs.getLanguage(lang)) {
         highlighted = hljs.highlight(code, {
           language: lang,
-          ignoreIllegals: true
+          ignoreIllegals: true,
         }).value
+        languageClass = `language-${lang}`
       } else {
-        highlighted = hljs.highlightAuto(code).value
+        const auto = hljs.highlightAuto(code)
+        highlighted = auto.value
+        languageClass = auto.language ? `language-${auto.language}` : ''
       }
     } catch {
-      highlighted = raw
+      highlighted = md.utils.escapeHtml(code)
+      languageClass = ''
     }
 
-    return `<div class="code-block"><button class="code-copy-btn" type="button" data-code="${raw}">复制</button><pre class="hljs"><code>${highlighted}</code></pre></div>`
-  }
+    const raw = md.utils.escapeHtml(code)
+
+    return `<div class="code-block"><button class="code-copy-btn" data-code="${raw}" type="button">${copy_svg.value}</button><code class="hljs ${languageClass}">${highlighted}</code></div>`
+  },
 })
 
 // ------------------------
@@ -109,25 +99,27 @@ const switchMode = (target) => {
 // ------------------------
 // Code copy handler (delegated)
 // ------------------------
+
+const copy_svg = ref(
+  `<svg t="1772102283255" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11499" width="200" height="200"><path d="M624.5 786.3c92.9 0 168.2-75.3 168.2-168.2V309c0-92.4-75.3-168.2-168.2-168.2H303.6c-92.4 0-168.2 75.3-168.2 168.2v309.1c0 92.4 75.3 168.2 168.2 168.2h320.9zM178.2 618.1V309c0-69.4 56.1-125.5 125.5-125.5h320.9c69.4 0 125.5 56.1 125.5 125.5v309.1c0 69.4-56.1 125.5-125.5 125.5h-321c-69.4 0-125.4-56.1-125.4-125.5z" p-id="11500"></path><path d="M849.8 295.1v361.5c0 102.7-83.6 186.3-186.3 186.3H279.1v42.7h384.4c126.3 0 229.1-102.8 229.1-229.1V295.1h-42.8zM307.9 361.8h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4zM307.9 484.6h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4z" p-id="11501"></path><path d="M620.2 607.4c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.8 9.6 21.4 21.4 21.4h312.3z" p-id="11502"></path></svg>`
+)
+
 function onCodeCopyClick(e: Event) {
   const target = e.target as HTMLElement
-  const btn = target.closest('.code-copy-btn') as HTMLButtonElement | null
+  const btn = target.closest('.code-copy-btn')
   if (!btn) return
 
   const code = btn.getAttribute('data-code')
   if (!code) return
 
   navigator.clipboard.writeText(code)
-
-  btn.textContent = '复制了'
-  btn.style.width = '55px'
-  btn.style.background = 'rgba(94, 214, 200, 0.36)'
+  copy_svg.value =
+    `<svg t="1772103245365" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12505" width="200" height="200"><path d="M911.075556 192.796444a45.511111 45.511111 0 0 1 5.518222 64.113778l-455.111111 540.444445a45.511111 45.511111 0 0 1-68.835556 0.910222l-227.555555-256a45.511111 45.511111 0 0 1 68.039111-60.472889l192.625777 216.689778 421.205334-500.224a45.511111 45.511111 0 0 1 64.113778-5.461334z" p-id="12506"></path></svg>`
 
   setTimeout(() => {
-    btn.textContent = '复制'
-    btn.style.width = '44px'
-    btn.style.background = 'rgba(207, 212, 212, 0.36)'
-  }, 1000)
+    copy_svg.value =
+      `<svg t="1772102283255" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11499" width="200" height="200"><path d="M624.5 786.3c92.9 0 168.2-75.3 168.2-168.2V309c0-92.4-75.3-168.2-168.2-168.2H303.6c-92.4 0-168.2 75.3-168.2 168.2v309.1c0 92.4 75.3 168.2 168.2 168.2h320.9zM178.2 618.1V309c0-69.4 56.1-125.5 125.5-125.5h320.9c69.4 0 125.5 56.1 125.5 125.5v309.1c0 69.4-56.1 125.5-125.5 125.5h-321c-69.4 0-125.4-56.1-125.4-125.5z" p-id="11500"></path><path d="M849.8 295.1v361.5c0 102.7-83.6 186.3-186.3 186.3H279.1v42.7h384.4c126.3 0 229.1-102.8 229.1-229.1V295.1h-42.8zM307.9 361.8h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4zM307.9 484.6h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4z" p-id="11501"></path><path d="M620.2 607.4c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.8 9.6 21.4 21.4 21.4h312.3z" p-id="11502"></path></svg>`
+  }, 2000)
 }
 
 onMounted(() => {
@@ -140,23 +132,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.markdown-body :deep(pre) {
-  margin: 0 !important;
-  padding: 0px 6px;
-}
-
-.markdown-body :deep(pre > code) {
-  display: block;
-  padding: 0;
-  margin: 0;
-  line-height: 1.5;
-}
-
-:deep(.code-block) {
-  position: relative;
-  margin: 12px 0; /* 只在这里控制 */
-}
-
 /* ------------------------
    Mask
 ------------------------- */
@@ -171,9 +146,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
 
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--apix-mask-background);
   backdrop-filter: saturate(180%) blur(6px);
-  animation: opacityFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: opacityFadeIn 0.5s var(--apix-cubic-bezier);
 }
 
 @keyframes opacityFadeIn {
@@ -192,13 +167,15 @@ onBeforeUnmount(() => {
   width: min(900px, 92vw);
   max-height: 86vh;
 
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 16px;
+  background: var(--apix-lightest-color);
+  border-radius: var(--apix-panel-border-radius);
+  color: var(--apix-default-dark-color);
 
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: scaleFadeIn .5s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: scaleFadeIn 0.5s var(--apix-cubic-bezier);
+  box-shadow: var(--apix-shadow-lg);
 }
 
 @keyframes scaleFadeIn {
@@ -221,7 +198,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
 
   padding: 20px 18px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--apix-border-light);
 }
 
 .md-displayer-title {
@@ -232,19 +209,20 @@ onBeforeUnmount(() => {
 .md-displayer-close {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--apix-button-border-radius);
+  color: var(--apix-default-dark-color);
 
   border: none;
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
 
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--apix-default-light-color);
 }
 
 .md-displayer-close:hover {
-  color: #be0e0e;
-  background: rgba(255, 47, 0, 0.196);
+  color: var(--apix-danger-color);
+  background: var(--apix-danger-light);
 }
 
 .md-displayer-close:active {
@@ -258,27 +236,22 @@ onBeforeUnmount(() => {
   padding: 16px 18px;
   overflow: auto;
 }
-
-/* ------------------------
-   Markdown
-------------------------- */
-.markdown-body {
+.md-displayer-content::-webkit-scrollbar {
+  width: 6px;
+}
+.md-displayer-content::-webkit-scrollbar-track {
   background: transparent;
 }
-
-/* ------------------------
-   Code block
-------------------------- */
-:deep(.code-block) {
-  position: relative;
-  margin: 14px 0;
+.md-displayer-content::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
 }
-
-:deep(.hljs) {
-  padding: 16px !important;
-  border-radius: 12px;
-  margin: 0;
-  background-color: rgba(208, 208, 208, 0.1);
+.md-displayer-content::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
+.md-displayer-content::-webkit-scrollbar-horizontal {
+  display: none;
+  height: 0;
 }
 
 /* ------------------------
@@ -286,24 +259,24 @@ onBeforeUnmount(() => {
 ------------------------- */
 :deep(.code-copy-btn) {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 1px;
+  right: 1px;
 
   width: 44px;
   height: 24px;
   font-size: 12px;
 
-  border-radius: 8px;
+  border-radius: var(--apix-button-border-radius);
   border: none;
   cursor: pointer;
 
-  background: rgba(207, 212, 212, 0.36);
-  color: #0000009b;
+  background: var(--apix-default-light-color);
+  color: var(--apix-default-dark-color);
 
   opacity: 0;
   transition:
     opacity 0.15s ease,
-    width 0.15s cubic-bezier(0.34, 2.5, 0.64, 1),
+    width 0.15s var(--apix-cubic-bezier),
     background-color 0.05s ease;
 }
 
@@ -316,82 +289,99 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 24px;
 }
+</style>
 
-.mode-switch {
-  position: relative;
-  display: flex;
-  background: rgba(226, 226, 226, 0.32);
-  border-radius: 999px;
-  border: 1px solid rgba(213, 213, 213, 0.318);
-  box-shadow: inset 1px -1px 16px rgba(117, 187, 248, 0.083);
-}
-
-.mode-switch button {
-  flex: 1;
-  height: 24px;
-  border: none;
+<style scoped>
+/* ==================== Markdown 通用表格/代码块增强 ==================== */
+.markdown-body {
   background-color: transparent;
-  cursor: pointer;
-  z-index: 1;
-  font-size: 12px;
-  color: #4040409A;
-  transition: color 0.25s ease;
+  color: var(--apix-default-dark-color)
 }
 
-.mode-switch button.active {
-  color: #0000009A;
+.markdown-body:deep(table) {
+  position: relative;
+  /* margin: auto; */
+  /* margin-bottom: 12px; */
+  /* border-radius: var(--apix-panel-border-radius) !important; */
+  background-color: var(--apix-panel-layer-2-background) !important;
+  /* box-shadow: inset 0 0 0 1px var(--apix-tertiary-dark-color); */
+  /* border: 1px solid var(--apix-tertiary-dark-color); */
+}
+.markdown-body:deep(thead) {
+  width: auto;
+  background-color: var(--apix-default-light-color) !important;
+}
+.markdown-body:deep(th) {
+  width: auto;
+  background-color: transparent !important;
+  border: 1px solid var(--apix-tertiary-light-color);
+}
+.markdown-body:deep(tbody) {
+  width: auto !important;
+  background-color: transparent !important;
+}
+.markdown-body:deep(tr) {
+  width: auto;
+  background-color: transparent !important;
+}
+.markdown-body:deep(td) {
+  width: auto;
+  background-color: transparent !important;
+  border: 1px solid var(--apix-tertiary-light-color);
 }
 
-.mode-switch:active:deep(.slider) {
-  z-index: 999;
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  backdrop-filter: saturate(180%) blur(3px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
+.markdown-body:deep(pre) {
+  scrollbar-width: none;
+  background-color: var(--apix-panel-layer-2-background);
+  /* border-radius: var(--apix-panel-border-radius); */
+  padding: 16px;
+  /* margin-bottom: 0; */
 }
 
-.highlight-select {
-  color: #4040409A;
-  transition: color 0.25s ease;
+.markdown-body:deep(blockquote) {
+  border-left: .25em solid var(--apix-border-hover);
+  color: var(--apix-tertiary-dark-color);
 }
 
-.highlight-select.right {
-  color: #0000009A;
-  transition: color 0.25s ease;
+.markdown-body:deep(hr) {
+  background-color: var(--apix-border-hover);
+  opacity: 0.6;
 }
 
-/* Slider */
-.slider {
+.markdown-body:deep(h2) {
+  border-bottom: 1px solid color-mix(in srgb, var(--apix-border-hover) 50%, transparent);
+}
+
+/* ==================== 代码块相关 ==================== */
+:deep(.code-block) {
+  position: relative !important;
+  height: fit-content !important;
+}
+
+:deep(.code-copy-btn) {
   position: absolute;
-  width: calc(50% + 4px);
-  height: calc(100% + 2px);
-  margin-top: -1px;
-  margin-left: -1px;
-  border-radius: 32px;
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px rgba(136, 202, 196, 0.471);
-  background-color: #ffffff2c;
-}
-
-.slider.right {
-  transform: translateX(88%);
-}
-
-.mode-switch:active:deep(.slider) {
+  top: 8px;
+  right: 8px;
+  padding: 0px;
+  font-size: 12px;
+  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  color: var(--apix-secondary-dark-color);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
   z-index: 999;
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  backdrop-filter: saturate(180%) blur(3px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
+}
+
+:deep(.code-copy-btn .icon) {
+  width: 24px;
+  height: 24px;
+  fill: var(--apix-secondary-dark-color);
+}
+
+:deep(.code-block:hover .code-copy-btn) {
+  opacity: 1;
 }
 </style>

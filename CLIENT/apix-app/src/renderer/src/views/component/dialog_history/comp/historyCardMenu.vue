@@ -62,7 +62,7 @@ const connectProject = async () => {
 
 <style scoped>
 .popup-menu-wrapper {
-  z-index: 9999;
+  z-index: 999999;
   position: relative;
 }
 
@@ -71,13 +71,11 @@ const connectProject = async () => {
   flex-direction: column;
   gap: 1px;
   padding: 6px;
-  background: #ffffff;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.06);
-  animation: menuEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--apix-panel-layer-5-background);
+  border-radius: var(--apix-border-radius-base);
+  border: 1px solid var(--apix-default-light-color);
+  box-shadow: var(--apix-shadow-layer-3);
+  animation: menuEnter 0.18s var(--apix-cubic-bezier);
 }
 
 @keyframes menuEnter {
@@ -100,36 +98,36 @@ const connectProject = async () => {
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: #4b5563;
+  color: var(--apix-default-dark-color);
   font-size: 13px;
   font-weight: 450;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: all 0.12s var(--apix-cubic-bezier);
   text-align: left;
   letter-spacing: 0.01em;
 }
 
 .menu-item:hover {
-  background: #f3f4f6;
-  color: #1f2937;
+  background: var(--apix-default-light-color);
+  color: var(--apix-default-dark-color);
 }
 
 .menu-item:active {
-  background: #e5e7eb;
+  background: var(--apix-secondary-light-color);
   transform: scale(0.985);
 }
 
 .danger-item {
-  color: #d81e06;
+  color: var(--apix-danger-color);
 }
 
 .danger-item:hover {
-  background: #ffe7e7;
-  color: #c10808;
+  background: color-mix(in srgb, var( --apix-danger-hover) 15%, transparent);
+  color: var(--apix-danger-color);
 }
 
 .danger-item:active {
-  background: #f4c6c6;
+  background: color-mix(in srgb, var( --apix-danger-hover) 20%, transparent);
   transform: scale(0.985);
 }
 
@@ -137,11 +135,10 @@ const connectProject = async () => {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  color: #9ca3af;
-  transition: color 0.12s ease;
+  color: var(--apix-default-dark-color);
 }
 
 .menu-item:hover .icon {
-  color: #6b7280;
+  color: var(--apix-default-dark-color);
 }
 </style>

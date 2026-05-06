@@ -1,13 +1,15 @@
 <template>
   <div class="role-page-wrapper">
-    <div class="main-wrapper">
-      <div class="title-wrapper">
-        <h1 class="data-page-title">
-          模型角色卡
-        </h1>
 
-        <div class="btn-wrapper">
-          <div class="ab-bar-btns">
+    <div class="main-wrapper">
+
+      <div class="page-title-wrapper">
+        <div class="title-wrapper">
+          <h1 class="data-page-title">
+            模型角色卡
+          </h1>
+
+          <div class="btn-wrapper">
             <el-button 
               type="primary" 
               class="upload-btn"
@@ -17,20 +19,28 @@
               <el-icon style="padding-left: 4px;"><Plus /></el-icon>
             </el-button>
           </div>
+
+          <!-- Search -->
+          <div class="search-wrapper">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="通过角色名称、角色定义搜索角色卡"
+              clearable
+              style="max-width: 420px;"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </div>
         </div>
 
-        <!-- Search -->
-        <div class="search-wrapper">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="Search roles by name / definition"
-            clearable
-            style="max-width: 420px;"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
+        <div class="page-docs">
+<span>1. 角色卡是什么: 角色卡是为 Agent 预先设定的身份与行为风格模板，用于定义其在对话中的角色定位、语言风格及响应方式。</span>
+
+<span>2. 如何创建: 点击页新建角色卡，输入角色名称及定义后保存即可。可通过下方设置中的`提升角色卡权限等级`将提示词加入系统提示词中，否则将作为用户提示词加入消息列表头部。提升角色卡权限时，请确保角色卡中无危险指令！</span>
+
+<span>3. 使用建议与注意事项: 建议根据当前对话场景选择合适的角色卡，同一时刻只允许开启一张角色卡。创建角色卡时请不要输入危险指令。</span>
         </div>
       </div>
 
@@ -129,18 +139,19 @@
       <div style="width: 100%; height: 60px;"></div>
 
       <!-- Explain -->
-      <div class="explain-tag-wrapper">
+      <!-- <div class="explain-tag-wrapper">
         <div
           class="explain-tag"
           v-html="roleDocs"
         ></div>
       </div>
 
-      <div style="width: 100%; height: 60px;"></div>
+      <div style="width: 100%; height: 60px;"></div> -->
     </div>
   </div>
 
   <RoleEditDialog
+    v-if="dialogVisible"
     v-model="dialogVisible"
     :role="editingRole"
     @save="handleSaveRole"
@@ -303,28 +314,40 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 <style scoped>
 .role-page-wrapper {
   position: relative;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
-  border-radius: 24px;
-  margin: 12px 12px 12px 0;
+  background-color: transparent;
+  height: calc(100vh - 36px);
+}
+
+.page-title-wrapper {
+  display: flex;
+  justify-content: space-between;
+}
+
+.page-docs {
+  min-width: 500px;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--apix-tertiary-dark-color);
+  text-indent: 2em;
 }
 
 .title-wrapper {
-  margin-top: 12px;
+  margin: 8px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   padding: 0px 12px;
-  border-radius: 24px;
+  min-width: 500px;
+  max-width: 500px;
 }
 
 .data-page-title {
   padding-left: 6px;
   font-size: 24px;
-  color: rgb(82, 108, 106);
+  color: var(--apix-default-dark-color);
   margin-bottom: 0px;
 }
 
@@ -336,68 +359,69 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   left: calc((100% - 1090px) / 2);
   padding: 10px 20px;
   overflow-y: scroll;
-  border-radius: 16px;
   align-items: center;
+  scrollbar-width: none;
 }
 
 .upload-btn {
+  margin: 0 !important;
   width: 105px;
   height: 32px;
   font-size: 14px;
   font-weight: bold;
-  border-radius: 12px;
-  color: #ffffff;
-  background: rgb(158, 207, 208);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  border-radius: var(--apix-button-border-radius);
+  color: var(--apix-lightest-color);
+  background: var(--apix-primary-color);
+  transition: all 0.3s var(--apix-cubic-bezier);
   border: none;
 }
 
 .upload-btn:hover {
-  background-color: rgb(147, 195, 196);
+  background-color: var(--apix-primary-hover);
 }
 
 .upload-btn:active {
   transform: scale(0.98);
+  background-color: var(--apix-primary-active);
 }
 
 .btn-wrapper {
   width: 100%; 
   display: flex; 
-  margin: 16px 0 0 0;
+  margin: 8px 0;
   gap: 12px;
 }
 
 .search-wrapper {
-  width: 100%; 
-  display: flex; 
-  margin: 16px 0;
+  width: 100%;
+  margin: 8px 0;
+  display: flex;
   gap: 12px;
 }
 
 .search-wrapper :deep(.el-input) {
-  height: 32px !important;
   flex: 1;
   min-width: 0;
-  transform-origin: left center;
-  transform: scale(1);
+  height: 38px !important;
   transform-origin: center;
-  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
+  transform: scale(1);
+  transition: transform 0.22s var(--apix-cubic-bezier);
 }
 
 .search-wrapper :deep(.el-input__wrapper) {
-  height: 32px !important;
-  background: transparent;
-  border: none;
-  border-radius: 0px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: none;
+  height: 38px !important;
   padding: 0 12px 0 10px;
-  transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  background: transparent;
+  background-color: var(--apix-panel-layer-4-background);
+  border: none;
+  border-radius: var(--apix-border-radius-base);
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.13s var(--apix-cubic-bezier);
 }
 
 /* ---------- Grid layout ---------- */
 .role-grid {
-  border-top: 4px solid rgba(0, 0, 0, 0.08);
+  border-top: 4px solid var(--apix-secondary-light-color);
   margin-top: 20px; 
   padding-top: 32px;
   display: grid;
@@ -415,171 +439,11 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 }
 
 .explain-tag {
-  border-top: 6px solid #00a6ff;
   width: 80%;
   border-radius: 16px;
   text-align: center;
   align-self: center;
   background-color: rgba(255, 255, 255, 0.5);
-}
-
-/* ---------- Settings layout ---------- */
-.setting-group {
-  display: grid;
-  width: 100%;
-  grid-template-columns: 50% 50%;
-  gap: 18px;
-  width: 100%;
-  padding-top: 8px;
-  margin-top: 8px;
-}
-
-.group-divider {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.group-label {
-  position: relative;
-  width: 100%;
-  font-size: 18px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding: 4px 12px;
-  color: rgb(136, 202, 197);
-  background: rgba(136, 202, 197, 0.1);
-  border: 1px solid rgba(136, 202, 197, 0.2);
-  border-radius: 6px;
-}
-
-.setting-card {
-  position: relative;
-  padding: 16px 18px;
-  border-radius: 12px;
-  height: 64px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.04),
-    0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: all 0.2s ease;
-}
-
-.setting-card:hover {
-  position: relative;
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
-    0 6px 18px rgba(0, 0, 0, 0.12);
-}
-
-.setting-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2f3a3a;
-  position: relative;
-}
-
-.setting-control {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  width: calc(100% - 78px);
-}
-
-.setting-info {
-  font-size: 12px;
-  color: #5a6a6a;
-  position: relative;
-  -webkit-transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-
-.danger_info {
-  color: #ff2f28ca;
-  -webkit-transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-
-.mode-switch {
-  position: absolute;
-  right: 14px;
-  display: flex;
-  background: rgba(226, 226, 226, 0.32);
-  border-radius: 999px;
-  border: 1px solid rgba(213, 213, 213, 0.318);
-  box-shadow: inset 1px -1px 16px rgba(117, 187, 248, 0.083);
-}
-
-.mode-switch button {
-  flex: 1;
-  height: 24px;
-  border: none;
-  background-color: transparent;
-  cursor: pointer;
-  z-index: 1;
-  font-size: 12px;
-  color: #4040409A;
-  transition: color 0.25s ease;
-}
-
-.mode-switch button.active {
-  color: #0000009A;
-}
-
-/* Slider */
-.slider {
-  position: absolute;
-  width: calc(50% + 4px);
-  height: calc(100% + 2px);
-  margin-top: -1px;
-  margin-left: -1px;
-  border-radius: 32px;
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px rgba(136, 202, 196, 0.471);
-  background-color: #ffffff2c;
-}
-
-.slider.right {
-  transform: translateX(82%);
-}
-
-.mode-switch:active:deep(.slider) {
-  z-index: 999;
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12),
-    0 0 0 2px color-mix(in srgb, rgba(136, 202, 196, 0.567) 25%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  backdrop-filter: saturate(180%) blur(3px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  background-color: color-mix(in srgb, #ebebeb83 1%, transparent);
-}
-
-/* Scrollbar cleanup */
-.main-wrapper::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-}
-
-.main-wrapper::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.main-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.main-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
 }
 
 /* File card animation with CSS stagger */
@@ -615,4 +479,172 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 .role-fade-move {
   transition: transform 0.4s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
+</style>
+
+<style scoped>
+.setting-group {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 50% 50%;
+  gap: 18px;
+  width: 100%;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.group-divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 6px
+}
+
+.group-label {
+  position: relative;
+  width: 100%;
+  height: 30px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--apix-primary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 0 12px;
+  border-left: 3px solid var(--apix-primary-color);
+}
+
+.setting-card {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: var(--apix-border-radius-base);
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--apix-panel-layer-3-background);
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.2s ease;
+}
+
+.setting-card:hover {
+  position: relative;
+  transform: translateY(-2px);
+  box-shadow: var(--apix-shadow-layer-3);
+}
+
+.setting-label {
+  margin-right: 6px;
+  padding: 2px 6px;
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.1);
+  background: rgba(5, 150, 105, 0.05);
+  border-radius: 16px;
+  font-size: 10px;
+}
+
+.danger-label {
+  margin-right: 6px;
+  padding: 2px 6px;
+  color: #960505;
+  border: 1px solid rgba(150, 22, 5, 0.1);
+  background: rgba(150, 22, 5, 0.05);
+  border-radius: 16px;
+  font-size: 10px;
+}
+
+.setting-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--apix-darkest-color);
+  position: relative;
+}
+
+.setting-control {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  width: calc(100% - 78px);
+}
+
+.setting-info {
+  font-size: 12px;
+  color: var(--apix-secondary-dark-color);
+  position: relative;
+  transition: all 0.25s var(--apix-cubic-bezier);
+}
+
+.danger_info {
+  color: var(--apix-danger-color);
+  transition: all 0.25s var(--apix-cubic-bezier);
+}
+
+/* ---------------------------------- */
+.mode-switch {
+  position: absolute;
+  right: 14px;
+  display: flex;
+  background: color-mix(in srgb, var(--apix-default-light-color) 32%, transparent);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--apix-border-light) 31.8%, transparent);
+  box-shadow: inset 1px -1px 16px color-mix(in srgb, var(--apix-primary-color) 8.3%, transparent);
+}
+
+.mode-switch button {
+  flex: 1;
+  height: 24px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  z-index: 1;
+  font-size: 12px;
+  color: var(--apix-secondary-dark-color);
+  transition: color 0.25s ease;
+}
+
+.mode-switch button.active {
+  color: var(--apix-darkest-color);
+}
+
+/* 共用 active 时的光晕与背景效果（original used color-mix） */
+.mode-switch:active .slider,
+.mode-switch:active:deep(.slider) {
+  z-index: 999;
+  box-shadow:
+    var(--apix-shadow-lg),
+    0 0 0 2px color-mix(in srgb, var(--apix-primary-color) 14%, transparent);
+  backdrop-filter: saturate(180%) blur(3px);
+  transition: all 0.3s var(--apix-cubic-bezier);
+  background-color: color-mix(in srgb, var(--apix-default-light-color) 1%, transparent);
+}
+
+.highlight-select {
+  color: var(--apix-secondary-dark-color);
+  transition: color 0.25s ease;
+}
+
+.highlight-select.right {
+  color: var(--apix-darkest-color);
+  transition: color 0.25s ease;
+}
+
+/* Slider */
+.slider {
+  position: absolute;
+  width: calc(50% + 4px);
+  height: calc(100% + 2px);
+  margin-top: -1px;
+  margin-left: -1px;
+  border-radius: 32px;
+  transition: all 0.3s var(--apix-cubic-bezier);
+  box-shadow:
+    var(--apix-shadow-md),
+    0 0 0 2px color-mix(in srgb, var(--apix-primary-color) 47.1%, transparent);
+  background-color: var(--apix-lightest-color);
+}
+
+.slider.right {
+  transform: translateX(87%);
+}
+/* ---------------------------------- */
 </style>

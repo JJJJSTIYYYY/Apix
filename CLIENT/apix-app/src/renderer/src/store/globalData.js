@@ -1,6 +1,8 @@
 import { reactive } from 'vue'
+import darkCss from 'highlight.js/styles/atom-one-dark.css?url'
+import lightCss from 'highlight.js/styles/github.css?url'
 
-export const apix_client_version = '2.0.3'
+export const apix_client_version = '2.1.0'
 
 export const defaultCards = () => [
   { id: '-annotation-preset', title: '注释卡片', type: 'note', level: 'system' },
@@ -118,4 +120,19 @@ export function formatVarNameList(list) {
     label: item,
     value: item
   }));
+}
+
+
+export const setHighlightTheme = (isDark) => {
+  const id = 'hljs-theme'
+  let link = document.getElementById(id)
+
+  if (!link) {
+    link = document.createElement('link')
+    link.id = id
+    link.rel = 'stylesheet'
+    document.head.appendChild(link)
+  }
+
+  link.href = isDark ? darkCss : lightCss
 }

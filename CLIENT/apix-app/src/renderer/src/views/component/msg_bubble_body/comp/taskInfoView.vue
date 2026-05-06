@@ -391,8 +391,8 @@ watch(
 }
 
 .fade-enter-active {
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.5s var(--apix-cubic-bezier),
+              transform 0.5s var(--apix-cubic-bezier);
 }
 
 /* ------------------------
@@ -403,17 +403,17 @@ watch(
   min-width: 520px;
   display: flex;
   flex-direction: column;
-  color: #333;
+  color: var(--apix-darkest-color);
   overflow: hidden;
   border-radius: 20px;
-  background: rgb(247, 248, 248);
+  background: var(--apix-panel-layer-1-background);
   border-top: 3px solid rgba(43, 159, 140, 0.509);
   border-bottom: 3px solid rgba(43, 159, 140, 0.509);
-  box-shadow:0 10px 26px rgba(0, 0, 0, 0.166);
+  box-shadow: var(--apix-shadow-layer-3);
 
   /* Width + enter/leave damping */
   transition:
-    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.32s var(--apix-cubic-bezier),
     opacity 0.25s ease,
     transform 0.25s ease;
   scrollbar-width: none;
@@ -434,7 +434,7 @@ watch(
 .task-id {
   font-size: 15px;
   font-weight: 600;
-  color: #222;
+  color: var(--apix-darkest-color);
   text-align: center;
 }
 
@@ -469,16 +469,16 @@ watch(
   display: flex;
   width: max-content;
   height: 100%;
-  overflow-y: hidden;  /* 🚫 禁止纵向滚动 */
+  overflow-y: hidden;
   overflow-x: auto;
 }
 
 /* Column base */
 .task-column {
   min-width: 260px;
-  height: 100%;              /* 关键：限定高度 */
+  height: 100%;
   box-shadow: inset -1px 0 0 0 rgba(0, 0, 0, 0.05);
-  padding: 12px 0;           /* 左右 padding 交给内部 */
+  padding: 12px 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -492,7 +492,7 @@ watch(
 .column-slide-leave-active {
   transition:
     opacity 0.22s ease,
-    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    transform 0.22s var(--apix-cubic-bezier);
 }
 
 .column-slide-enter-from {
@@ -535,7 +535,7 @@ watch(
 
 .kv-value {
   font-size: 12px;
-  color: #666;
+  color: var(--apix-secondary-dark-color);
   margin-left: 8px;
   max-width: 140px;
   overflow: hidden;
@@ -550,7 +550,7 @@ watch(
 
 .kv-expand.isSelect {
   font-size: 12px;
-  color: #999999de;
+  color: var(--apix-tertiary-dark-color);
 }
 
 /* ------------------------
@@ -574,7 +574,7 @@ watch(
   font-size: 12px;
   line-height: 1;
 
-  color: #555555;
+  color: var(--apix-secondary-dark-color);
   background: rgba(0, 0, 0, 0.05);
 }
 
@@ -597,12 +597,12 @@ watch(
   font-size: 18px;
   line-height: 1;
 
-  color: #555555;
+  color: var(--apix-secondary-dark-color);
   background: rgba(0, 0, 0, 0.05);
 }
 
 .close-btn:hover {
-  color: #be0e0e;
+  color: var(--apix-danger-color);
   background: rgba(255, 47, 0, 0.196);
 }
 
@@ -621,7 +621,7 @@ watch(
 
 /* TransitionGroup 动画 */
 .footer-label-enter-active {
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.25s var(--apix-cubic-bezier);
 }
 .footer-label-enter-from {
   opacity: 0;

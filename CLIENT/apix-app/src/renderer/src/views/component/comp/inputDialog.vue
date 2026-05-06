@@ -96,24 +96,45 @@ function afterLeave() {
 <style scoped>
 /* ===== mask ===== */
 .cd-mask {
-  position: fixed;
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
   inset: 0;
-  background: rgba(255, 255, 255, 0.35);
+  z-index: 9999;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+
+  background: var(--apix-mask-background);
+  backdrop-filter: saturate(180%) blur(6px);
+  animation: opacityFadeIn 0.5s var(--apix-cubic-bezier);
 }
 
 /* ===== dialog ===== */
 .cd-wrapper {
   width: 420px;
   padding: 24px;
-  border-radius: 16px;
-  border: 1px solid rgb(255, 255, 255);
-  background: rgba(243, 243, 243, 0.637);
-  backdrop-filter: saturate(180%) blur(14px);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+
+  background: var(--apix-lightest-color);
+  border-radius: var(--apix-panel-border-radius);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleFadeIn 0.5s var(--apix-cubic-bezier);
+  box-shadow: var(--apix-shadow-lg);
+}
+
+@keyframes scaleFadeIn {
+  0% { 
+    opacity: 0.3; 
+    transform: scale(0.8); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
 }
 
 /* ===== text ===== */
@@ -122,7 +143,7 @@ function afterLeave() {
   margin: 0 0 12px;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--apix-darkest-color);
 }
 
 .cd-content {
@@ -133,25 +154,26 @@ function afterLeave() {
   margin-bottom: 12px;
   font-size: 14px;
   line-height: 1.6;
-  color: #555;
+  color: var(--apix-default-dark-color);
 }
 
 /* ===== input ===== */
 .cd-input {
   width: calc(100% - 24px);
+  color: var(--apix-default-dark-color);
   padding: 8px 10px;
-  border-radius: 8px;
-  border: none;
+  border-radius: var(--apix-button-border-radius);
+  border: 1px solid var(--apix-default-light-color);
   font-size: 14px;
   outline: none;
-  background-color: rgba(255, 255, 255, 0.507);
+  background-color: color-mix(in srgb, var(--apix-lightest-color) 50.7%, transparent);
   resize: none;
-  transition: all 0.3s ease;
+  transition: all 0.3s var(--apix-cubic-bezier);
   scrollbar-width: none;
 }
 
 .cd-input:focus {
-  background-color: rgba(255, 255, 255, 0.84);
+  background-color: color-mix(in srgb, var(--apix-lightest-color) 84%, transparent);
 }
 
 /* ===== buttons ===== */
@@ -164,44 +186,44 @@ function afterLeave() {
 .btn {
   min-width: 80px;
   padding: 6px 16px;
-  border-radius: 8px;
+  border-radius: var(--apix-button-border-radius);
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--apix-cubic-bezier);
 }
 
 .btn.cancel {
-  background: rgba(255, 255, 255, 0);
-  color: #555;
+  background: transparent;
+  color: var(--apix-default-dark-color);
 }
 
 .btn.cancel:hover {
-  color: #185d56;
+  color: var(--apix-primary-dark);
 }
 
 .btn.confirm {
-  background: rgba(255, 255, 255, 0.85);
-  color: #333;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--apix-lightest-color) 85%, transparent);
+  color: var(--apix-darkest-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--apix-darkest-color) 8%, transparent);
 }
 
 .btn.confirm:hover {
-  background-color: rgba(255, 255, 255, 0.446);
+  background-color: color-mix(in srgb, var(--apix-lightest-color) 44.6%, transparent);
 }
 
 .btn.confirm.warning {
-  color: #c0392b;
+  color: var(--apix-danger-color);
 }
 
 .btn.confirm.warning:hover {
-  background-color: #c03a2b34;
+  background-color: color-mix(in srgb, var(--apix-danger-color) 20.4%, transparent);
 }
 
 /* ===== transition ===== */
 .cd-enter-active,
 .cd-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.25s var(--apix-cubic-bezier);
 }
 
 .cd-enter-from,
@@ -211,14 +233,14 @@ function afterLeave() {
 
 .cd-enter-active .cd-wrapper {
   transition:
-    transform 0.25s ease-out,
-    opacity 0.25s ease-out;
+    transform 0.25s var(--apix-cubic-bezier),
+    opacity 0.25s var(--apix-cubic-bezier);
 }
 
 .cd-leave-active .cd-wrapper {
   transition:
-    transform 0.25s ease-in,
-    opacity 0.25s ease-in;
+    transform 0.25s var(--apix-cubic-bezier),
+    opacity 0.25s var(--apix-cubic-bezier);
 }
 
 .cd-enter-from .cd-wrapper {

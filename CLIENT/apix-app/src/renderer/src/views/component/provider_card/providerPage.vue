@@ -2,47 +2,55 @@
   <div class="provider-page-wrapper">
     <div class="main-wrapper">
 
-      <div class="title-wrapper">
-        <h1 class="data-page-title">
-          LLM 提供商
-        </h1>
+      <div class="page-title-wrapper">
+        <div class="title-wrapper">
+          <h1 class="data-page-title">
+            LLM 供应商
+          </h1>
 
-        <div class="btn-wrapper">
-          <div class="ab-bar-btns">
+          <div class="btn-wrapper">
             <el-button 
               type="primary" 
               class="upload-btn"
               @click="createProvider"
             >
-              新建提供商
+              新建供应商
               <el-icon style="padding-left: 4px;"><Plus /></el-icon>
             </el-button>
+
+            <div class="ab-bar-btns">
+              <el-button 
+                type="primary" 
+                class="test-btn"
+                @click="testConnection"
+              >
+                测试连接
+                <el-icon style="padding-left: 4px;"><Link /></el-icon>
+              </el-button>
+            </div>
           </div>
 
-          <div class="ab-bar-btns">
-            <el-button 
-              type="primary" 
-              class="test-btn"
-              @click="testConnection"
+          <!-- Search -->
+          <div class="search-wrapper">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="通过供应商名称、endpoint、供应商描述搜索供应商"
+              clearable
+              style="max-width: 420px;"
             >
-              测试连接
-              <el-icon style="padding-left: 4px;"><Link /></el-icon>
-            </el-button>
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
           </div>
         </div>
 
-        <!-- Search -->
-        <div class="search-wrapper">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="Search provider by name / endpoint / description"
-            clearable
-            style="max-width: 420px;"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
+        <div class="page-docs">
+<span>1. 什么是自定义大模型供应商: 系统支持接入符合 OpenAI API 兼容协议的大模型服务，以提供非系统内置的模型服务。</span>
+
+<span>2. 如何配置与添加: 请准备供应商的 API Endpoint、API Key，点击新建供应商并填写上述信息并保存。添加后建议先进行连接测试，确认响应正常后再用于对话任务。</span>
+
+<span>3. 注意事项与建议: 请确保供应商服务稳定可用，部分第三方模型可能在响应速度、上下文长度或兼容协议上存在差异。系统不能保证使用自定义供应商时所有功能正常使用。</span>
         </div>
       </div>
 
@@ -86,6 +94,7 @@
   </div>
 
   <ProviderEditDialog
+    v-if="dialogVisible"
     v-model="dialogVisible"
     :provider="editingProvider"
     @save="handleSaveProvider"
@@ -312,7 +321,7 @@ const getProviders = async (cid: string): Promise<ProviderItem[]> => {
 
     ElMessage({
       type: 'error',
-      message: '获取提供商失败',
+      message: '获取供应商失败',
       plain: true,
     })
 
@@ -361,7 +370,7 @@ const handleDeleteProvider = async (providerId: string) => {
 
     ElMessage({
       type: 'error',
-      message: '删除提供商失败: ' + String(err),
+      message: '删除供应商失败: ' + String(err),
       plain: true,
     })
 
@@ -509,28 +518,40 @@ function formatTime(time: string) {
 <style scoped>
 .provider-page-wrapper {
   position: relative;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
-  border-radius: 24px;
-  margin: 12px 12px 12px 0;
+  background-color: transparent;
+  height: calc(100vh - 36px);
+}
+
+.page-title-wrapper {
+  display: flex;
+  justify-content: space-between;
+}
+
+.page-docs {
+  min-width: 500px;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--apix-tertiary-dark-color);
+  text-indent: 2em;
 }
 
 .title-wrapper {
-  margin-top: 12px;
+  margin: 8px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   padding: 0px 12px;
-  border-radius: 24px;
+  min-width: 500px;
+  max-width: 500px;
 }
 
 .data-page-title {
   padding-left: 6px;
   font-size: 24px;
-  color: rgb(82, 108, 106);
+  color: var(--apix-default-dark-color);
   margin-bottom: 0px;
 }
 
@@ -542,158 +563,78 @@ function formatTime(time: string) {
   left: calc((100% - 1090px) / 2);
   padding: 10px 20px;
   overflow-y: scroll;
-  border-radius: 16px;
   align-items: center;
-}
-
-.model-select {
-  font-size: 12px !important;
-  font-weight: bold !important;
-  width: 180px !important;
-  height: 32px !important;
-  border: none !important;
-  border-radius: 12px !important;
-  color: white !important;
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  overflow: hidden;
-}
-
-.model-select:deep(.n-base-selection__border) {
-  opacity: 0;
-}
-
-.model-select:deep(.n-base-selection__state-border) {
-  opacity: 0;
-}
-
-.model-select:hover {
-  background-color: rgb(147, 195, 196) !important;
-}
-
-.model-select:active {
-  transform: scale(0.98);
-}
-
-.model-select:deep(*) {
-  color: white !important;
-  align-items: center;
-  background: transparent !important;
-}
-
-.model-select:not(.errorServer):deep(.n-base-selection) {
-  background: rgb(158, 207, 208) !important;
-}
-
-.model-select.errorServer:deep(.n-base-selection) {
-  background: #f35555ee !important;
-}
-
-.model-select:deep(.n-base-selection-label) {
-  height: 32px !important;
-  position: relative;
-  color: white !important;
-  background-color: transparent !important;
-}
-
-.model-select:deep(.n-base-selection-input) {
-  padding: 6px 8px !important;
-}
-
-.model-select:deep(.n-base-selection-placeholder__inner) {
-  color: rgba(255, 255, 255, 0.731) !important;
-  font-weight: 500;
-  font-size: 14px;
+  scrollbar-width: none;
 }
 
 .test-btn,
 .upload-btn {
+  margin: 0 !important;
   width: 105px;
   height: 32px;
   font-size: 14px;
   font-weight: bold;
-  border-radius: 12px;
-  color: #ffffff;
-  background: rgb(158, 207, 208);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  border-radius: var(--apix-button-border-radius);
+  color: var(--apix-lightest-color);
+  background: var(--apix-primary-color);
+  transition: all 0.3s var(--apix-cubic-bezier);
   border: none;
-}
-
-.test-btn {
-  width: 90px;
 }
 
 .test-btn:hover,
 .upload-btn:hover {
-  background-color: rgb(147, 195, 196);
+  background-color: var(--apix-primary-hover);
 }
 
 .test-btn:active,
 .upload-btn:active {
   transform: scale(0.98);
+  background-color: var(--apix-primary-active);
 }
 
 .btn-wrapper {
   width: 100%; 
   display: flex; 
-  margin: 16px 0 0 0;
+  margin: 8px 0;
   gap: 12px;
 }
 
 .search-wrapper {
-  width: 100%; 
-  display: flex; 
-  margin: 16px 0;
+  width: 100%;
+  margin: 8px 0;
+  display: flex;
   gap: 12px;
 }
 
 .search-wrapper :deep(.el-input) {
-  height: 32px !important;
   flex: 1;
   min-width: 0;
-  transform-origin: left center;
-  transform: scale(1);
+  height: 38px !important;
   transform-origin: center;
-  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
+  transform: scale(1);
+  transition: transform 0.22s var(--apix-cubic-bezier);
 }
 
 .search-wrapper :deep(.el-input__wrapper) {
-  height: 32px !important;
-  background: transparent;
-  border: none;
-  border-radius: 0px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: none;
+  height: 38px !important;
   padding: 0 12px 0 10px;
-  transition: all 0.13s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  background: transparent;
+  background-color: var(--apix-panel-layer-4-background);
+  border: none;
+  border-radius: var(--apix-border-radius-base);
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.13s var(--apix-cubic-bezier);
 }
 
 /* ---------- Grid layout ---------- */
 .provider-grid {
-  border-top: 4px solid rgba(0, 0, 0, 0.08);
+  border-top: 4px solid var(--apix-secondary-light-color);
   margin-top: 20px; 
   padding-top: 32px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 20px;
-}
-
-/* Scrollbar cleanup */
-.main-wrapper::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-}
-
-.main-wrapper::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.main-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.main-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
 }
 
 /* File card animation with CSS stagger */

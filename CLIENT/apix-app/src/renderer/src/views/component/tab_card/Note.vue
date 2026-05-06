@@ -13,7 +13,7 @@
     >
       <div style="display: flex; flex-direction: row;">        
         <div style="width: fit-content; height: 16px; align-self: center;">
-          <svg t="1774033814393" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18411" width="16" height="16"><path d="M352 384a32 32 0 0 1 32-32h256a32 32 0 0 1 0 64h-256a32 32 0 0 1-32-32z m32 160h256a32 32 0 0 0 0-64h-256a32 32 0 0 0 0 64z m128 64h-128a32 32 0 0 0 0 64h128a32 32 0 0 0 0-64zM896 192v434.752A63.488 63.488 0 0 1 877.248 672L672 877.248a63.36 63.36 0 0 1-45.248 18.752H192a64 64 0 0 1-64-64V192a64 64 0 0 1 64-64h640a64 64 0 0 1 64 64zM192 832h416v-192a32 32 0 0 1 32-32h192V192H192v640z m480-160v114.784L786.752 672H672z" p-id="18412" fill="#2d7e8c"></path></svg>
+          <svg t="1774033814393" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18411" width="16" height="16"><path d="M352 384a32 32 0 0 1 32-32h256a32 32 0 0 1 0 64h-256a32 32 0 0 1-32-32z m32 160h256a32 32 0 0 0 0-64h-256a32 32 0 0 0 0 64z m128 64h-128a32 32 0 0 0 0 64h128a32 32 0 0 0 0-64zM896 192v434.752A63.488 63.488 0 0 1 877.248 672L672 877.248a63.36 63.36 0 0 1-45.248 18.752H192a64 64 0 0 1-64-64V192a64 64 0 0 1 64-64h640a64 64 0 0 1 64 64zM192 832h416v-192a32 32 0 0 1 32-32h192V192H192v640z m480-160v114.784L786.752 672H672z" p-id="18412"></path></svg>
         </div>
         <input
           class="tab-title-input no-drag"
@@ -28,16 +28,14 @@
         />
       </div>
 
-      <transition name="scale-fade">
-        <PopMenu 
-          v-if="isShowMenu"
-          :style="menuStyle"
-          @close-menu="closePopMenu"
-          @save-card="saveCardAsPredefined"
-          @mark-card="markCard"
-          @mark-content="updateMarkContent"
-        />
-      </transition>
+      <PopMenu 
+        v-if="isShowMenu"
+        :style="menuStyle"
+        @close-menu="closePopMenu"
+        @save-card="saveCardAsPredefined"
+        @mark-card="markCard"
+        @mark-content="updateMarkContent"
+      />
 
       <el-tooltip
         v-if="isShowMark_"
@@ -45,9 +43,19 @@
         placement="left"
         effect="light"
         raw-content
-      ><transition name="scale-fade">
-        <el-button key="11" v-if="isShowMark" class="mark-btn" :class="{ mark_btn_right: mark_btn_right }" @click="hideMark"></el-button>
-      </transition></el-tooltip>
+      >
+        <transition name="scale-fade">
+          <button
+            key="11"
+            v-if="isShowMark"
+            class="mark-btn"
+            :class="{ mark_btn_right: mark_btn_right }"
+            @click="hideMark"
+          >
+            <svg t="1778086454896" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10188" width="20" height="20"><path d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z" p-id="10189" fill="var(--apix-lightest-color)"></path><path d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z" p-id="10190" fill="var(--apix-lightest-color)"></path></svg>
+          </button>
+        </transition>
+      </el-tooltip>
 
       <div class="tab-card-btn-area"
         @mouseenter="mark_btn_right = false"
@@ -60,7 +68,7 @@
           @click="showPopMenu"
           class="tab-card-btn-menu"
         >
-          <el-icon><More /></el-icon>
+          <el-icon><MoreFilled /></el-icon>
         </el-button>
 
         <el-button

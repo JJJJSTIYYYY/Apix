@@ -194,21 +194,19 @@ const handleEdit = () => {
   display: flex;
   flex-direction: column;
 
-  background: rgb(245, 247, 247);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: var(--apix-panel-layer-2-background);
+  border: 1px solid var(--apix-default-light-color);
 
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.166);
+  box-shadow: var(--apix-shadow-layer-2);
 
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.4s cubic-bezier(0.34, 2, 0.64, 1);
 }
 
 .provider-card:hover {
   transform: translateY(-1px);
 
-  box-shadow:
-    0 10px 26px rgba(4, 52, 42, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--apix-panel-layer-2-background);
+  box-shadow: var(--apix-shadow-layer-3);
 }
 
 /* Header */
@@ -248,7 +246,7 @@ const handleEdit = () => {
   height: 28px;
   border-radius: 6px;
 
-  background: linear-gradient(135deg, #6431c9 0%, #6c6ae1 100%);
+  background: linear-gradient(135deg, #7057B5 0%, #8F84D8 100%);
 
   display: flex;
   align-items: center;
@@ -261,7 +259,7 @@ const handleEdit = () => {
 .provider-title {
   font-size: 15px;
   font-weight: 600;
-  color: #2f3a3a;
+  color: var(--apix-default-dark-color);
 
   overflow: hidden;
   text-overflow: ellipsis;
@@ -277,7 +275,7 @@ const handleEdit = () => {
   font-size: 13px;
   line-height: 1.6;
   height: 3lh;
-  color: #586666;
+  color: var(--apix-tertiary-dark-color);
 
   overflow: hidden;
   text-overflow: ellipsis;
@@ -297,7 +295,7 @@ const handleEdit = () => {
 
   padding-top: 10px;
 
-  border-top: 1px solid rgba(0,0,0,0.06);
+  border-top: 1px solid var(--apix-default-light-color);
 }
 
 .footer-tag {
@@ -308,8 +306,8 @@ const handleEdit = () => {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
-  background: rgba(0, 0, 0, 0.04);
-  color: #6b7280;
+  background: var(--apix-default-light-color);
+  color: var(--apix-secondary-dark-color);
   overflow: hidden;
   max-width: 100%;
   transition: all 0.2s ease;
@@ -324,15 +322,13 @@ const handleEdit = () => {
   background: rgba(37, 99, 235, 0.1);
 }
 
-/* 文本省略在 span 上，保持 flex 布局正常 */
 .tag-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0; /* 关键：允许 flex item 收缩 */
+  min-width: 0;
 }
 
-/* 确保图标不收缩 */
 .footer-tag .el-icon {
   flex-shrink: 0;
 }
@@ -347,15 +343,12 @@ const handleEdit = () => {
   background: rgba(217,119,6,0.1);
 }
 
-/* Status Tag - Enhanced with animations */
-
 .status-tag {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border: none;
-  /* width: fit-content; */
   font-size: 11px;
   font-weight: 600;
   padding: 5px 10px;
@@ -363,6 +356,9 @@ const handleEdit = () => {
   cursor: pointer;
   user-select: none;
   overflow: hidden;
+
+  background: var(--apix-default-light-color);
+  color: var(--apix-secondary-dark-color);
   
   /* Smooth transitions for all properties */
   transition: 
@@ -527,6 +523,7 @@ const handleEdit = () => {
   border-radius: 6px;
   width: 26px;
   height: 26px;
+  color: var(--apix-default-dark-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -534,12 +531,12 @@ const handleEdit = () => {
 }
 
 .icon-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--apix-default-light-color);
 }
 
 .delete-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background-color: color-mix(in srgb, var(--apix-danger-color) 15%, transparent);
+  color: var(--apix-danger-color);
   transform: rotate(4deg);
 }
 </style>

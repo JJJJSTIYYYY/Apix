@@ -1,6 +1,6 @@
 <template>
   <el-container>
-    <el-aside style="width: var(--apix-left-side-bar-width); transition: width 0.28s cubic-bezier(0.23, 1, 0.32, 1);">
+    <el-aside class="aside-area">
       <HomePage />
     </el-aside>
 
@@ -30,7 +30,7 @@
             </el-menu-item>
             <el-menu-item index="4">
               <el-icon><SetUp /></el-icon>
-              <span>MCP</span>
+              <span>M C P</span>
             </el-menu-item>
           </el-menu>
         </el-aside>
@@ -92,9 +92,6 @@ const handleSelect = (key: string) => {
 <style scoped>
 .main-area {
   position: relative;
-  width: 100%;
-  height: calc(100vh - 32px) !important;
-  padding: 0px;
   align-items: center;
   display: flex;
   justify-content: center;
@@ -103,53 +100,66 @@ const handleSelect = (key: string) => {
 
 .menu-aside {
   width: 130px; 
-  align-self: start; 
-  height: calc(100% - 24px); 
-  padding: 16px 3px;
-  margin: 12px;
-  border-radius: 24px;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
-  transition: all 0.28s ease;
+  height: calc(100vh - 36px);
+  background-color: var(--apix-panel-layer-2-background) !important;
+  padding: 0 12px 0 12px !important;
+  box-shadow: inset -1px 0 0 0 var(--apix-border-disabled);
 }
 
-.menu-aside:hover {
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.452),
-    0 0px 6px rgba(218, 218, 218, 0.237);
-  transform: scale(1.01);
+
+.el-menu-vertical {
+  padding-top: 5px !important;
+  left: calc(var(--apix-left-side-bar-width, 66px) - 66px);
+}
+
+.el-menu-vertical :deep(.el-icon svg path) {
+  fill: var(--apix-primary-dark) !important;
+}
+
+.el-menu-vertical:not(.el-menu--collapse) {
+  width: 140px;
+  min-height: 400px;
+}
+
+.el-menu-vertical {
+  position: relative;
+  background: transparent;
+  width: 66px;
+  min-height: 400px;
+  user-select: none;
 }
 
 .el-menu {
-  background-color: rgba(255, 255, 255, 0);
+  background-color: transparent;
   padding: 2px;
   padding-left: 4px;
-}
-
-.el-menu-vertical-data {
-  height: 100%;
+  border: none !important;
 }
 
 .el-menu-item {
-  border-radius: 16px;
+  padding: 0 0 0 12px !important;
+  min-width: 100%;
+  color: var(--apix-primary-dark);
+  transition: background 0.2s var(--apix-cubic-bezier) !important;
+  border-radius: var(--apix-button-border-radius);
 }
 
 .el-menu-item:hover {
-  background: rgba(0, 173, 156, 0.142);
+  color: var(--apix-primary-hover) !important;
+  background-color: color-mix(in srgb, var(--apix-primary-color) 10%, transparent);
+}
+
+.el-menu-vertical :deep(.el-icon:hover svg path) {
+  fill: var(--apix-primary-hover) !important;
 }
 
 .el-menu-item.is-active {
   color: rgb(0, 173, 155);
-  /* 核心：中心到四周减淡的圆形泛光背景 */
   background: radial-gradient(
     circle at center,
-    rgba(0, 231, 208, 0.2) 0%,      /* 中心最亮 */
-    rgba(0, 231, 208, 0.08) 10%,    /* 中间过渡 */
-    rgba(0, 231, 208, 0) 30%        /* 边缘完全透明 */
+    rgba(79, 223, 208, 0.16) 0%, 
+    rgba(79, 223, 208, 0.08) 20%, 
+    rgba(79, 223, 208, 0) 40% 
   );
 }
 </style>

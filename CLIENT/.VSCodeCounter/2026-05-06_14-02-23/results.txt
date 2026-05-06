@@ -1,0 +1,179 @@
+Date : 2026-05-06 14:02:23
+Directory : /Users/justiy/Documents/code/Project/APIX/CLIENT
+Total : 101 files,  37636 codes, 511 comments, 4177 blanks, all 42324 lines
+
+Languages
++--------------------+------------+------------+------------+------------+------------+
+| language           | files      | code       | comment    | blank      | total      |
++--------------------+------------+------------+------------+------------+------------+
+| vue                |         45 |     20,887 |        166 |      3,438 |     24,491 |
+| JSON               |          2 |     11,368 |          0 |          2 |     11,370 |
+| JavaScript         |         29 |      3,751 |        244 |        440 |      4,435 |
+| HTML               |          5 |        935 |         14 |        169 |      1,118 |
+| PostCSS            |          2 |        581 |         87 |        111 |        779 |
+| YAML               |          2 |         48 |          0 |          2 |         50 |
+| XML                |         14 |         36 |          0 |          2 |         38 |
+| Markdown           |          1 |         22 |          0 |         13 |         35 |
+| JSON with Comments |          1 |          8 |          0 |          0 |          8 |
++--------------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                                                   | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                                                      |        101 |     37,636 |        511 |      4,177 |     42,324 |
+| . (Files)                                                                                                                              |          1 |          8 |          0 |          0 |          8 |
+| apix-app                                                                                                                               |        100 |     37,628 |        511 |      4,177 |     42,316 |
+| apix-app (Files)                                                                                                                       |          7 |     11,502 |          3 |         22 |     11,527 |
+| apix-app/out                                                                                                                           |          2 |      1,425 |         13 |          2 |      1,440 |
+| apix-app/out/main                                                                                                                      |          1 |      1,349 |          3 |          1 |      1,353 |
+| apix-app/out/preload                                                                                                                   |          1 |         76 |         10 |          1 |         87 |
+| apix-app/src                                                                                                                           |         91 |     24,701 |        495 |      4,153 |     29,349 |
+| apix-app/src/main                                                                                                                      |         14 |      1,405 |        133 |        269 |      1,807 |
+| apix-app/src/main (Files)                                                                                                              |          2 |         36 |          4 |          7 |         47 |
+| apix-app/src/main/app                                                                                                                  |          2 |        102 |         19 |         20 |        141 |
+| apix-app/src/main/ipc                                                                                                                  |          9 |      1,146 |         83 |        212 |      1,441 |
+| apix-app/src/main/ws                                                                                                                   |          1 |        121 |         27 |         30 |        178 |
+| apix-app/src/preload                                                                                                                   |          1 |        115 |         14 |         15 |        144 |
+| apix-app/src/renderer                                                                                                                  |         76 |     23,181 |        348 |      3,869 |     27,398 |
+| apix-app/src/renderer (Files)                                                                                                          |          1 |         15 |          1 |          2 |         18 |
+| apix-app/src/renderer/src                                                                                                              |         75 |     23,166 |        347 |      3,867 |     27,380 |
+| apix-app/src/renderer/src (Files)                                                                                                      |          3 |        720 |          7 |        135 |        862 |
+| apix-app/src/renderer/src/assets                                                                                                       |         20 |      1,537 |        100 |        280 |      1,917 |
+| apix-app/src/renderer/src/assets (Files)                                                                                               |          2 |        581 |         87 |        111 |        779 |
+| apix-app/src/renderer/src/assets/background                                                                                            |          1 |        390 |         13 |         54 |        457 |
+| apix-app/src/renderer/src/assets/docs                                                                                                  |          3 |        530 |          0 |        113 |        643 |
+| apix-app/src/renderer/src/assets/icons                                                                                                 |         14 |         36 |          0 |          2 |         38 |
+| apix-app/src/renderer/src/assets/icons/llm_providers                                                                                   |         12 |         27 |          0 |          1 |         28 |
+| apix-app/src/renderer/src/assets/icons/something_else                                                                                  |          2 |          9 |          0 |          1 |         10 |
+| apix-app/src/renderer/src/components                                                                                                   |          1 |          0 |          0 |          1 |          1 |
+| apix-app/src/renderer/src/router                                                                                                       |          2 |         92 |         19 |         16 |        127 |
+| apix-app/src/renderer/src/store                                                                                                        |          3 |        538 |         57 |        108 |        703 |
+| apix-app/src/renderer/src/views                                                                                                        |         46 |     20,279 |        164 |      3,327 |     23,770 |
+| apix-app/src/renderer/src/views (Files)                                                                                                |          8 |      6,279 |         30 |        953 |      7,262 |
+| apix-app/src/renderer/src/views/component                                                                                              |         38 |     14,000 |        134 |      2,374 |     16,508 |
+| apix-app/src/renderer/src/views/component (Files)                                                                                      |          1 |        334 |          1 |         54 |        389 |
+| apix-app/src/renderer/src/views/component/comp                                                                                         |          6 |        845 |          7 |        154 |      1,006 |
+| apix-app/src/renderer/src/views/component/dialog_history                                                                               |          4 |      1,179 |          3 |        197 |      1,379 |
+| apix-app/src/renderer/src/views/component/dialog_history (Files)                                                                       |          3 |      1,058 |          3 |        174 |      1,235 |
+| apix-app/src/renderer/src/views/component/dialog_history/comp                                                                          |          1 |        121 |          0 |         23 |        144 |
+| apix-app/src/renderer/src/views/component/msg_bubble_body                                                                              |          8 |      3,576 |         27 |        562 |      4,165 |
+| apix-app/src/renderer/src/views/component/msg_bubble_body (Files)                                                                      |          3 |      2,407 |         15 |        369 |      2,791 |
+| apix-app/src/renderer/src/views/component/msg_bubble_body/comp                                                                         |          5 |      1,169 |         12 |        193 |      1,374 |
+| apix-app/src/renderer/src/views/component/provider_card                                                                                |          3 |      1,465 |         14 |        314 |      1,793 |
+| apix-app/src/renderer/src/views/component/rag_card                                                                                     |          3 |      1,464 |         22 |        284 |      1,770 |
+| apix-app/src/renderer/src/views/component/role_card                                                                                    |          3 |      1,195 |         20 |        199 |      1,414 |
+| apix-app/src/renderer/src/views/component/skill_card                                                                                   |          2 |        683 |         17 |        148 |        848 |
+| apix-app/src/renderer/src/views/component/tab_card                                                                                     |          6 |      2,288 |         11 |        327 |      2,626 |
+| apix-app/src/renderer/src/views/component/tab_card (Files)                                                                             |          5 |      2,176 |         11 |        305 |      2,492 |
+| apix-app/src/renderer/src/views/component/tab_card/comp                                                                                |          1 |        112 |          0 |         22 |        134 |
+| apix-app/src/renderer/src/views/component/task_card                                                                                    |          2 |        971 |         12 |        135 |      1,118 |
++----------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| filename                                                                                                                               | language           | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/CLIENT.code-workspace                                                                 | JSON with Comments |          8 |          0 |          0 |          8 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/.prettierrc.yaml                                                             | YAML               |          4 |          0 |          1 |          5 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/README.md                                                                    | Markdown           |         22 |          0 |         13 |         35 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/electron-builder.yml                                                         | YAML               |         44 |          0 |          1 |         45 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/electron.vite.config.mjs                                                     | JavaScript         |         35 |          3 |          3 |         41 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/eslint.config.mjs                                                            | JavaScript         |         29 |          0 |          2 |         31 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/out/main/index.js                                                            | JavaScript         |      1,349 |          3 |          1 |      1,353 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/out/preload/index.js                                                         | JavaScript         |         76 |         10 |          1 |         87 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/package-lock.json                                                            | JSON               |     11,294 |          0 |          1 |     11,295 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/package.json                                                                 | JSON               |         74 |          0 |          1 |         75 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/app/app.js                                                          | JavaScript         |        100 |         19 |         19 |        138 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/app/constants.js                                                    | JavaScript         |          2 |          0 |          1 |          3 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/config.js                                                           | JavaScript         |          5 |          0 |          0 |          5 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/index.js                                                            | JavaScript         |         31 |          4 |          7 |         42 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/ai_chat.js                                                      | JavaScript         |        273 |         12 |         48 |        333 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/ai_configuration.js                                             | JavaScript         |        176 |          3 |         41 |        220 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/ai_files.js                                                     | JavaScript         |        349 |         26 |         42 |        417 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/ai_task.js                                                      | JavaScript         |         55 |          3 |         12 |         70 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/clipboard.js                                                    | JavaScript         |         19 |          3 |          2 |         24 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/file.js                                                         | JavaScript         |        138 |         15 |         39 |        192 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/local_task.js                                                   | JavaScript         |         45 |          3 |         10 |         58 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/login_register.js                                               | JavaScript         |         79 |         18 |         14 |        111 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ipc/windowIpc.js                                                    | JavaScript         |         12 |          0 |          4 |         16 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/main/ws/wsClient.js                                                      | JavaScript         |        121 |         27 |         30 |        178 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/preload/index.js                                                         | JavaScript         |        115 |         14 |         15 |        144 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/index.html                                                      | HTML               |         15 |          1 |          2 |         18 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/App.vue                                                     | vue                |        216 |          1 |         31 |        248 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/LoginPage.vue                                               | vue                |        472 |          4 |         95 |        571 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/background/main_page.html                            | HTML               |        390 |         13 |         54 |        457 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/docs/ragDocs.html                                    | HTML               |        232 |          0 |         44 |        276 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/docs/roleDocs.html                                   | HTML               |        133 |          0 |         33 |        166 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/docs/skillDocs.html                                  | HTML               |        165 |          0 |         36 |        201 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/global.css                                           | PostCSS            |        398 |         69 |         74 |        541 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/claude.svg                       | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/custom.svg                       | XML                |          9 |          0 |          0 |          9 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/deepseek.svg                     | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/google.svg                       | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/grok.svg                         | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/huggingface.svg                  | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/moonshot.svg                     | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/ollama.svg                       | XML                |          8 |          0 |          1 |          9 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/ollama2.svg                      | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/openai.svg                       | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/qwen.svg                         | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/llm_providers/xiaomimimo.svg                   | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/something_else/keyDark.svg                     | XML                |          1 |          0 |          0 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/icons/something_else/keyLight.svg                    | XML                |          8 |          0 |          1 |          9 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/assets/tab_card_global.css                                  | PostCSS            |        183 |         18 |         37 |        238 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/components/commonFunction.js                                | JavaScript         |          0 |          0 |          1 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/main.js                                                     | JavaScript         |         32 |          2 |          9 |         43 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/router/index.js                                             | JavaScript         |         48 |         17 |         15 |         80 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/router/pageRegistry.js                                      | JavaScript         |         44 |          2 |          1 |         47 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/store/app.js                                                | JavaScript         |        346 |         19 |         71 |        436 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/store/auth.js                                               | JavaScript         |         98 |         19 |         12 |        129 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/store/globalData.js                                         | JavaScript         |         94 |         19 |         25 |        138 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/assistPage.vue                                        | vue                |      2,934 |          0 |        504 |      3,438 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/casePage.vue                                          | vue                |        723 |          2 |        110 |        835 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/TabCardList.vue                             | vue                |        334 |          1 |         54 |        389 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/comp/confirmDialog.js                       | JavaScript         |         28 |          1 |          5 |         34 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/comp/confirmDialog.vue                      | vue                |        220 |          1 |         45 |        266 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/comp/inputDialog.js                         | JavaScript         |         28 |          1 |          5 |         34 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/comp/inputDialog.vue                        | vue                |        214 |          1 |         40 |        255 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/comp/mdDisplayer.js                         | JavaScript         |         24 |          1 |          5 |         30 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/comp/mdDisplayer.vue                        | vue                |        331 |          2 |         54 |        387 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/dialog_history/comp/historyCardMenu.vue     | vue                |        121 |          0 |         23 |        144 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/dialog_history/history_card.vue             | vue                |        416 |          2 |         59 |        477 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/dialog_history/history_pannel.vue           | vue                |        642 |          1 |        114 |        757 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/dialog_history/temp.vue                     | vue                |          0 |          0 |          1 |          1 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/ai_message_bubble.vue       | vue                |      1,300 |          7 |        195 |      1,502 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/comp/msgBubbleMenu.vue      | vue                |        179 |          0 |         29 |        208 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/comp/msgSelectionBubble.vue | vue                |        123 |          0 |         17 |        140 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/comp/taskInfoView.vue       | vue                |        562 |          5 |         94 |        661 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/comp/todoCard.vue           | vue                |        128 |          2 |         23 |        153 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/comp/toolLabelCard.vue      | vue                |        177 |          5 |         30 |        212 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/human_message_bubble.vue    | vue                |        670 |          0 |        103 |        773 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/msg_bubble_body/tool_message_card.vue       | vue                |        437 |          8 |         71 |        516 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/provider_card/ProviderEditDialog.vue        | vue                |        483 |          7 |         87 |        577 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/provider_card/providerCard.vue              | vue                |        439 |          4 |         99 |        542 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/provider_card/providerPage.vue              | vue                |        543 |          3 |        128 |        674 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/rag_card/RagEditDialog.vue                  | vue                |        396 |          2 |         69 |        467 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/rag_card/ragCard.vue                        | vue                |        475 |          8 |        101 |        584 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/rag_card/ragPage.vue                        | vue                |        593 |         12 |        114 |        719 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/role_card/RoleEditDialog.vue                | vue                |        411 |          3 |         70 |        484 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/role_card/roleCard.vue                      | vue                |        234 |          5 |         40 |        279 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/role_card/rolePage.vue                      | vue                |        550 |         12 |         89 |        651 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/skill_card/skillCard.vue                    | vue                |        260 |          5 |         46 |        311 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/skill_card/skillPage.vue                    | vue                |        423 |         12 |        102 |        537 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/tab_card/Database.vue                       | vue                |        402 |          2 |         58 |        462 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/tab_card/Folder.vue                         | vue                |        656 |          2 |         95 |        753 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/tab_card/Interface.vue                      | vue                |        401 |          2 |         57 |        460 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/tab_card/Note.vue                           | vue                |        356 |          3 |         45 |        404 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/tab_card/Script.vue                         | vue                |        361 |          2 |         50 |        413 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/tab_card/comp/PopMenu.vue                   | vue                |        112 |          0 |         22 |        134 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/task_card/taskCard.vue                      | vue                |        370 |          7 |         55 |        432 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/component/task_card/taskPage.vue                      | vue                |        601 |          5 |         80 |        686 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/dataPage.vue                                          | vue                |        142 |          2 |         21 |        165 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/homePage.vue                                          | vue                |        154 |          0 |         28 |        182 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/reportPage.vue                                        | vue                |        534 |         10 |         76 |        620 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/serverPage.vue                                        | vue                |         22 |          0 |          5 |         27 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/settingPage.vue                                       | vue                |      1,631 |         14 |        183 |      1,828 |
+| /Users/justiy/Documents/code/Project/APIX/CLIENT/apix-app/src/renderer/src/views/taskPage.vue                                          | vue                |        139 |          2 |         26 |        167 |
+| Total                                                                                                                                  |                    |     37,636 |        511 |      4,177 |     42,324 |
++----------------------------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+

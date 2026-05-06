@@ -1,135 +1,110 @@
 <template>
   <el-container>
-    <el-aside style="width: var(--apix-left-side-bar-width); transition: width 0.28s cubic-bezier(0.23, 1, 0.32, 1);">
+    <el-aside class="aside-area">
       <HomePage />
     </el-aside>
 
-    <transition name="fade" mode="out-in">
-      <el-main
-        v-if="showPage"
-        ref="page"
-        class="main-area"
-        :style="{
-          height: pageHeight + 'px',
-        }"
-      >
-        <div class="app-layout" style="height: 100%;">
-          <!-- 左边拖拽面板 -->
-          <div
-            class="left-panel"
-            :style="{
-              height: '100%',
-              width: '20%',
-              padding: '0px',
-              color: '#666666'
-            }"
-          >
-            <h3 style="display: table; margin: 0 auto; opacity: 0.65; padding: 12px 0 0 0;">任务卡</h3>
+    <el-main
+      v-if="showPage"
+      ref="page"
+      class="main-area"
+      :style="{
+        height: pageHeight + 'px',
+      }"
+    >
+      <div class="app-layout" style="height: 100%;">
+        <!-- 左边拖拽面板 -->
+        <div class="left-panel">
+          <h3 class="left-panel-title">任务卡</h3>
 
-            <el-scrollbar
-              class="left-card-container"
-              :max-height="pageHeight"
-              :style="{
-                height: '100%',
-                minWidth: '80%',
-                maxWidth: '80%',
-                display: 'block',
-                margin: '0 auto',
-              }"
+          <el-scrollbar class="left-card-container">
+            <div
+              v-for="card in cards"
+              :key="card.id"
+              class="draggable-card"
+              draggable="true"
+              @dragstart="onLeftDragStart(card)"
             >
-              <div
-                v-for="card in cards"
-                :key="card.id"
-                class="draggable-card"
-                draggable="true"
-                @dragstart="onLeftDragStart(card)"
+              {{ card.title }}
+
+              <button
+                type="primary"
+                class="no-drag fixed-left-card-delete"
+                @click="removeLeftCard(card.id)"
+                @mousedown.stop
+                @dragstart.stop
               >
-                {{ card.title }}
+                <svg t="1776755725116" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="8731" width="20" height="20"><path d="M328.777143 377.904762l31.719619 449.657905h310.662095l31.695238-449.657905h73.264762L744.106667 832.707048a73.142857 73.142857 0 0 1-72.94781 67.998476H360.496762a73.142857 73.142857 0 0 1-72.94781-68.022857L255.488 377.904762h73.289143z m159.207619 22.649905v341.333333h-73.142857v-341.333333h73.142857z m133.729524 0v341.333333h-73.142857v-341.333333h73.142857zM146.285714 256h731.428572v73.142857H146.285714v-73.142857z m518.265905-121.904762v73.142857h-292.571429v-73.142857h292.571429z" p-id="8732" fill="var(--apix-tertiary-dark-color)"></path></svg>
+              </button>
+            </div>
+          </el-scrollbar>
+        </div>
 
-                <button
-                  type="primary"
-                  class="no-drag fixed-left-card-delete"
-                  @click="removeLeftCard(card.id)"
-                  @mousedown.stop
-                  @dragstart.stop
-                >
-                  <el-icon><Delete /></el-icon>
-                </button>
-              </div>
-            </el-scrollbar>
-          </div>
-
-          <!-- 右边标签页（case列表）窗口 -->
-          <div
-            class="right-panel"
-            :style="{ height: '100%', maxWidth: '100%', minWidth: '140px', width: '100%' }"
+        <!-- 右边标签页（case列表）窗口 -->
+        <div class="right-panel">
+          <n-tabs
+            v-model:value="activeTab"
+            type="card"
+            size="small"
+            class="ntabs"
+            closable
+            scrollable
+            @close="closeTab"
+            @add="addTab"
+            @update:value="changeTab"
           >
-            <n-tabs
-              v-model:value="activeTab"
-              type="card"
-              size="small"
-              class="ntabs"
-              closable
-              addable
-              scrollable
-              tab-style="min-width: 40px;"
-              :style="{ height: '100%' }"
-              @close="closeTab"
-              @add="addTab"
-              @update:value="changeTab"
+            <n-tab-pane
+              v-for="tab in tabs"
+              :key="tab.tabKey"
+              class="NTabSpane"
+              :name="tab.tabKey"
+              :tab="tab.title"
             >
-              <n-tab-pane
-                v-for="tab in tabs"
-                :key="tab.tabKey"
-                class="NTabSpane"
-                :name="tab.tabKey"
-                :tab="tab.title"
-                :style="{ height: pageHeight - 100 + 'px' }"
+              <el-scrollbar
+                class="right-card-container"
+                :style="{ overflow: 'auto' }"
               >
-                <el-scrollbar
-                  class="right-card-container"
-                  :style="{ overflow: 'auto' }"
-                >
-                  <TabCardList
-                    :items="tab.items ?? []"
-                    :tab_key="tab.tabKey"
-                  />
-                </el-scrollbar>
+                <TabCardList
+                  :items="tab.items ?? []"
+                  :tab_key="tab.tabKey"
+                />
+              </el-scrollbar>
+            </n-tab-pane>
+          </n-tabs>
 
-                <div class="bottom-btn-wrap">
-                  <el-button
-                    type="primary"
-                    round
-                    class="submit-btn fixed-submit"
-                    @click="submitCase(tab)"
-                  >
-                    提交
-                  </el-button>
+          <div class="bottom-btn-wrap">
+            <div class="ctrl-btn-area">
+              <el-button
+                type="primary"
+                text
+                class="commom-btn"
+                @click="unfoldAllCards()"
+              >
+                全部展开
+              </el-button>
 
-                  <el-button
-                    type="primary"
-                    text
-                    class="commom-btn"
-                    @click="unfoldAllCards(tab)"
-                  >
-                    全部展开
-                  </el-button>
+              <el-button
+                type="primary"
+                text
+                class="commom-btn"
+                @click="foldAllCards()"
+              >
+                全部折叠
+              </el-button>
+            </div>
 
-                  <el-button
-                    type="primary"
-                    text
-                    class="commom-btn"
-                    @click="foldAllCards(tab)"
-                  >
-                    全部折叠
-                  </el-button>
-                </div>
-              </n-tab-pane>
-            </n-tabs>
+            <el-button
+              type="primary"
+              round
+              class="submit-btn"
+              @click="submitCase()"
+            >
+              提交
+            </el-button>
           </div>
         </div>
-      </el-main>
-    </transition>
+      </div>
+    </el-main>
   </el-container>
 </template>
 
@@ -137,9 +112,8 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'
 import { NTabPane, NTabs } from 'naive-ui'
 import { ElMessage } from 'element-plus'
-import { Delete } from '@element-plus/icons-vue'
 import HomePage from './homePage.vue'
-import TabCardList from './component/TabCardList.vue'
+import TabCardList from './component/tab_card/TabCardList.vue'
 import { useAppCacheData } from '../store/app.js'
 import { useAuthStore } from '../store/auth'
 import { ConfirmDialog } from './component/comp/confirmDialog.js'
@@ -362,18 +336,23 @@ onBeforeUnmount(() => {
 // ------------------------
 // 提交逻辑
 // ------------------------
-const submitCase = async (tab: TabItem) => {
+const submitCase = async () => {
   console.log('Submitted! Cases in Tab ' + activeTab.value)
-
+  const idx = tabs.findIndex(t => t.tabKey === activeTab.value)
+  if (idx === -1) {
+    ElMessage({ type: 'error', message: '提交失败: 未找到待提交的任务', plain: true })
+    return
+  }
+  const tab = tabs[idx]
   const payload = serializeCards(tab.items)
 
   try {
     const res = await window.api.submitCase(cid.value, payload)
     ElMessage({ type: 'success', message: '已提交', plain: true })
-    console.log('submit payload:', payload)
+    console.log('[submitCase] submit payload:', payload)
   } catch (err) {
-    console.error('提交失败:', err)
-    ElMessage({ type: 'error', message: '提交失败', plain: true })
+    console.error('[submitCase] fail:', err)
+    ElMessage({ type: 'error', message: '提交失败: ' + err, plain: true })
   }
 }
 
@@ -434,8 +413,13 @@ function serializeCards(cards: TabCardItem[]) {
 // ------------------------
 // 卡片折叠与展开
 // ------------------------
-function unfoldAllCards(tab: TabItem) {
+function unfoldAllCards() {
   console.log('unfoldAllCards! Cases in Tab ' + activeTab.value)
+  const idx = tabs.findIndex(t => t.tabKey === activeTab.value)
+  if (idx === -1) {
+    return
+  }
+  const tab = tabs[idx]
 
   function recurse(cards: TabCardItem[]) {
     for (const card of cards) {
@@ -454,8 +438,13 @@ function unfoldAllCards(tab: TabItem) {
   store.saveAllTabs()
 }
 
-function foldAllCards(tab: TabItem) {
+function foldAllCards() {
   console.log('foldAllCards! Cases in Tab ' + activeTab.value)
+  const idx = tabs.findIndex(t => t.tabKey === activeTab.value)
+  if (idx === -1) {
+    return
+  }
+  const tab = tabs[idx]
 
   function recurse(cards: TabCardItem[]) {
     for (const card of cards) {
@@ -476,62 +465,65 @@ function foldAllCards(tab: TabItem) {
 </script>
 
 <style scoped>
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
 .app-layout {
   display: flex;
-  height: 100%;
-  gap: 12px;
-  padding: 12px;
-  box-sizing: border-box;
+  max-height: calc(100vh - 36px);
+  overflow: hidden;
 }
 
 /* 左边拖拽面板 */
 .left-panel {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-sizing: border-box;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
-  border-radius: 24px;
-  max-width: 170px;
+  background-color: var(--apix-panel-layer-2-background) !important;
+  padding: 0;
+  margin: 0px !important;
+  transition: all 0.28s var(--apix-cubic-bezier);
+  box-shadow: inset -1px 0 0 0 var(--apix-border-disabled); 
+}
+
+.left-panel-title {
+  display: table; 
+  margin: 0 auto; 
+  color: var(--apix-secondary-dark-color);
+  padding: 12px 0 0 0;
+}
+
+:deep(.left-panel .el-scrollbar__view) {
+  padding: 0 6px;
 }
 
 /* 右边标签页窗口 */
 .right-panel {
   position: relative;
-  padding: 12px;
+  max-width: 100%; 
+  min-width: 140px; 
+  width: 100%;
+  padding: 12px 24px 0 24px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 
-    inset 0 0 0 2px rgba(255, 255, 255, 0.8),
-    0 0px 26px rgba(218, 218, 218, 0.206),
-    0 0px 6px rgba(218, 218, 218, 0.09);
   border-radius: 24px;
-}
-
-.no-drag {
-  -webkit-app-region: no-drag;
 }
 
 .fixed-left-card-delete {
   border: none;
   width: 16px;
   height: 16px;
-  color: #888888;
   background-color: transparent;
   opacity: 0;
   position: absolute;
-  top: 5px;
-  right: 8px;
+  top: 3px;
+  right: 9px;
   z-index: 2000;
-  transition: all 0.25s ease;
+}
+
+.fixed-left-card-delete:deep(.icon) {
+  width: 16px;
+  height: 16px;
 }
 
 .draggable-card:hover .fixed-left-card-delete {
@@ -540,64 +532,27 @@ function foldAllCards(tab: TabItem) {
 
 .draggable-card {
   position: relative;
-  border-radius: 8px;
-  margin-bottom: 6px;
-  min-width: 80px;
+  border-radius: var(--apix-border-radius-base);
+  min-width: 100px;
+  max-width: 100px;
   margin: 8px;
   padding: 8px;
   cursor: grab;
-  color: rgba(50, 114, 109, 0.761);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: var(--apix-primary-dark);
+  box-shadow: var(--apix-shadow-layer-1);
   text-align: center;
   transition:
-    background-color 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    background-color 320ms var(--apix-cubic-bezier),
+    transform 320ms var(--apix-cubic-bezier),
+    box-shadow 320ms var(--apix-cubic-bezier);
 
-  background: rgba(255, 255, 255, 0.592);
-  border: 1px solid rgba(129, 192, 179, 0.518);
-  box-shadow:
-    0 3px 10px rgba(31, 102, 135, 0.084);
+  background: var(--apix-panel-layer-5-background);
+  border: 1px solid var(--apix-default-light-color);
 }
 
 .draggable-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.draggable-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: 1;
-
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.5),
-    inset 0 -1px 1px rgba(255, 255, 255, 0.3),
-    inset 1px 0 2px rgba(255, 255, 255, 0.15),
-    inset -1px 0 2px rgba(255, 255, 255, 0.15);
-
-  pointer-events: none;
-}
-
-.draggable-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: -1;
-
-  background: inherit;
-  backdrop-filter: blur(6px) saturate(130%);
-  -webkit-backdrop-filter: blur(6px) saturate(130%);
-
-  mask: radial-gradient(circle at center,
-        rgba(0, 0, 0, 0) 40%,
-        rgba(0, 0, 0, 1) 100%);
-  -webkit-mask: radial-gradient(circle at center,
-        rgba(0, 0, 0, 0) 40%,
-        rgba(0, 0, 0, 1) 100%);
+  transform: translateY(-1px);
+  box-shadow: var(--apix-shadow-layer-3);
 }
 
 .main-area {
@@ -605,231 +560,205 @@ function foldAllCards(tab: TabItem) {
   position: relative;
 }
 
-.fade-enter-from {
-  opacity: 0;
-  transform: scale(0.99);
-}
-
-.fade-enter-to {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.fade-leave-from {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.fade-leave-to {
-  opacity: 0;
-  transform: scale(0.99);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition:
-    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 .left-card-container {
-  padding: 15px;
+  padding: 15px 0px;
   padding-top: 0;
   background-color: transparent;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.NTabSpane {
-  position: relative;
+  transition: all 0.25s var(--apix-cubic-bezier);
 }
 
 .right-card-container {
   position: relative;
-  width: 95%;
   margin: 0 auto;
-  padding: 8px;
 }
 
 .bottom-btn-wrap {
   position: absolute;
-  right: 6px;
-  bottom: 0;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
-  margin: auto 10px 6px 10px;
+  margin: auto;
 
   width: 80%;
-  max-width: 670px;
-  height: 60px;
+  max-width: 60vw;
+  height: fit-content;
+  padding: 16px;
+  box-sizing: border-box;
 
-  border-radius: 1rem;
   z-index: 2000;
   isolation: isolate;
 
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
 
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, #fff 10%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  backdrop-filter: saturate(180%) blur(16px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  border-color: transparent;
-  background-color: color-mix(in srgb, #ebebeb 30%, transparent);
+  border-radius: var(--apix-panel-border-radius);
+  backdrop-filter: saturate(300%) blur(16px);
+  background: color-mix(in oklch, var(--apix-panel-layer-3-background) 70%, transparent);
+  box-shadow: var(--apix-shadow-md);
+
+  transition: all 0.6s var(--apix-cubic-bezier);
 }
 
-.bottom-btn-wrap::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: 1;
-
-  box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.8),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.6),
-    inset 2px 0 3px rgba(255, 255, 255, 0.25),
-    inset -2px 0 3px rgba(255, 255, 255, 0.25);
-
-  pointer-events: none;
-}
-
-.bottom-btn-wrap::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: -1;
-
-  background: inherit;
-  background-color: rgb(255, 255, 255);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-
-  mask: radial-gradient(circle at center,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 1) 100%);
-  -webkit-mask: radial-gradient(circle at center,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 1) 100%);
-}
-
-.fixed-submit {
-  position: absolute;
-  right: 12px;
-  top: 10px;
-  height: calc(100% - 20px);
-  width: 16%;
-  z-index: 2000;
-}
-
-.fixed-commom {
-  position: absolute;
-  z-index: 2000;
+.ctrl-btn-area {
+  display: flex;
+  height: fit-content;
 }
 
 .submit-btn {
-  color: #003328d2;
+  width: 80px;
+  height: 32px;
+  padding: 6px 16px;
+  border-radius: var(--apix-button-border-radius) !important;
   border: none;
-  border-radius: 8px;
-  overflow: hidden;
-  background: rgba(62, 255, 191, 0.406);
-  backdrop-filter: blur(6px) saturate(180%);
-  -webkit-backdrop-filter: blur(6px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 8px 24px rgba(6, 130, 101, 0.216),
-    inset 0 4px 16px rgba(255, 255, 255, 0.25);
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.submit-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgba(0, 255, 0, 0.08);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-
-  box-shadow:
-    inset -8px -6px 0px -8px rgba(100, 255, 100, 0.9),
-    inset 0px -8px 0px -6px rgba(100, 255, 100, 0.9);
-
-  opacity: 0.55;
-  z-index: -1;
-  filter: blur(1px) brightness(115%);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s var(--apix-cubic-bezier) !important;
+  color: var(--apix-success-button-text) !important;
+  background: var(--apix-success-button-background) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
 }
 
 .submit-btn:hover {
-  transform: scale(1.05);
-  color: #003320db;
-  box-shadow: 0 8px 28px rgba(94, 249, 223, 0.49);
+  transform: scale(1.03);
+  background: var(--apix-success-button-hover) !important;
 }
 
 .submit-btn:active {
-  transform: scale(0.95);
-  color: #003320ae;
-  box-shadow: 0 6px 20px rgba(70, 210, 100, 0.3);
+  transform: scale(1.01);
+  background: var(--apix-success-button-active) !important;
 }
 
 .commom-btn {
+  width: 80px;
+  height: 32px;
+  padding: 6px 16px;
+  border-radius: var(--apix-button-border-radius) !important;
   border: none;
-  border-radius: 8px;
-  margin-top: 10px;
-  height: calc(100% - 20px);
-  width: 16%;
-  overflow: hidden;
-  color: rgba(38, 101, 97, 0.686);
-
-  background: rgba(211, 211, 211, 0.15);
-  backdrop-filter: blur(6px) saturate(180%);
-  -webkit-backdrop-filter: blur(6px) saturate(180%);
-
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 8px 24px rgba(31, 99, 135, 0.15),
-    inset 0 4px 16px rgba(255, 255, 255, 0.25);
-
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.commom-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgba(165, 165, 165, 0.08);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-
-  box-shadow:
-    inset -8px -6px 0px -8px rgba(255, 255, 255, 0.9),
-    inset 0px -8px 0px -6px rgba(255, 255, 255, 0.9);
-
-  opacity: 0.55;
-  z-index: -1;
-  filter: blur(1px) brightness(115%);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s var(--apix-cubic-bezier) !important;
+  color: var(--apix-default-button-text) !important;
+  background: var(--apix-default-button-background) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .commom-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 28px rgba(235, 236, 246, 0.496);
+  transform: scale(1.03);
+  background: var(--apix-default-button-hover) !important;
 }
 
 .commom-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 6px 20px rgba(200, 200, 180, 0.3);
+  transform: scale(1.01);
+  background: var(--apix-default-button-active) !important;
+}
+
+.NTabSpane {
+  position: relative;
+  padding-top: 0 !important;
+  max-height: calc(100vh - 82px);
+  padding: 0 !important;
 }
 
 .ntabs {
   transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+</style>
+
+<style scoped>
+:deep(.n-tabs .n-tabs-nav) {
+  border-radius: var(--apix-border-radius-base) !important;
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: box-shadow 320ms var(--apix-cubic-bezier);
+}
+:deep(.n-tabs .n-tabs-nav:hover) {
+  box-shadow: var(--apix-shadow-layer-2);
+}
+
+:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab-pad),
+:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-pad) {
+  border: 0;
+}
+
+:deep(.n-tabs.n-tabs--top > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-start::before, .n-tabs.n-tabs--bottom > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-start::before) {
+  box-shadow: inset 10px 0 8px -8px rgba(0, 0, 0, .03);
+}
+
+:deep(.n-tabs.n-tabs--top > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-end::after, .n-tabs.n-tabs--bottom > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-end::after) {
+  box-shadow: inset -10px 0 8px -8px rgba(0, 0, 0, .03);
+}
+
+:deep(.n-tabs .n-tabs-nav-scroll-wrapper) {
+  border-radius: var(--apix-border-radius-base) !important;
+}
+
+:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab.n-tabs-tab--addable .n-base-icon) {
+  color: var(--apix-tertiary-dark-color);
+}
+
+:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab.n-tabs-tab--addable .n-base-icon:hover) {
+  color: var(--apix-default-dark-color);
+}
+
+:deep(.n-tabs-tab-wrapper) {
+  transform-origin: left;
+  background-color: transparent !important;
+  animation: scaleFade-n-tabs-tab-wrapper 0.4s var(--apix-cubic-bezier);
+}
+
+:deep(.n-tabs-tab-pad) {
+  background-color: transparent !important;
+  width: 0;
+}
+
+@keyframes scaleFade-n-tabs-tab-wrapper {
+  0% {
+    opacity: 0;
+    width: 0;
+  }
+  100% {
+    opacity: 1;
+    width: 100px;
+  }
+}
+
+:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab) {
+  border-radius: 0 !important;
+  overflow: hidden;
+  background-color: var(--apix-panel-layer-2-background);
+  border: none;
+  border-right: 1px solid var(--apix-default-light-color);
+  color: var(--apix-secondary-dark-color);
+  height: 32px;
+  min-width: 100px !important;
+  transition: none;
+}
+
+:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab.n-tabs-tab--active) {
+  background-color: var(--apix-panel-layer-5-background);
+  color: var(--apix-primary-active);
+}
+
+:deep(.n-tabs-wrapper .n-tabs-tab-wrapper:nth-last-child(2) .n-tabs-tab) {
+  width: 40px;
+  border: none !important;
+}
+
+:deep(.n-tabs-wrapper .n-tabs-tab-wrapper .n-tabs-tab .n-base-icon) {
+  color: var(--apix-secondary-dark-color);
+}
+
+:deep(.n-tabs .n-tabs-tab .n-tabs-tab__close) {
+  transition: none;
+}
+
+:deep(.n-tabs .n-tabs-tab .n-tabs-tab__close:hover) {
+  background-color: var(--apix-lightest-color);
+}
+
+:deep(.n-tabs .n-tab-pane) {
+  border: 0;
 }
 </style>

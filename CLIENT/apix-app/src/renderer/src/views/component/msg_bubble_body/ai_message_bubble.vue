@@ -2,16 +2,17 @@
   <div 
     class="message-wrapper"
     :class="{ selected: is_selecting && props.msg.selected }"
-    @click.stop="toggleSelectFullArea"
+    @click="toggleSelectFullArea"
   >
     <div
       v-if="is_selecting && props.msg.pending === false"
       class="message-select-box"
       :class="{ checked: props.msg.selected }"
-      @click.stop="toggleSelect"
+      @click="toggleSelect"
     ></div>
     <div 
       class="ai-bubble-wrapper"
+      :class="{ is_selecting: is_selecting }"
       @contextmenu.prevent="onContextMenu"
     >
 
@@ -40,57 +41,14 @@
       </div>
 
       <!-- Think -->
-      <div class="think-block" v-if="hasThink">
-        <div class="think-border-point">
-          <svg
-            t="1772097763053"
-            class="icon"
-            viewBox="0 0 1024 1024"
-            version="1.1"
-            xmlns="http://www.w3.org/2000/svg"
-            p-id="6531"
-            width="200"
-            height="200"
-          >
-            <path d="M717.12 274H762c82.842 0 150 67.158 150 150v200c0 82.842-67.158 150-150 150H262c-82.842 0-150-67.158-150-150V424c0-82.842 67.158-150 150-150h44.88l-18.268-109.602c-4.086-24.514 12.476-47.7 36.99-51.786 24.514-4.086 47.7 12.476 51.786 36.99l20 120c0.246 1.472 0.416 2.94 0.516 4.398h228.192c0.1-1.46 0.27-2.926 0.516-4.398l20-120c4.086-24.514 27.272-41.076 51.786-36.99 24.514 4.086 41.076 27.272 36.99 51.786L717.12 274zM262 364c-33.138 0-60 26.862-60 60v200c0 33.138 26.862 60 60 60h500c33.138 0 60-26.862 60-60V424c0-33.138-26.862-60-60-60H262z m50 548c-24.852 0-45-20.148-45-45S287.148 822 312 822h400c24.852 0 45 20.148 45 45S736.852 912 712 912H312z m-4-428c0-24.852 20.148-45 45-45S398 459.148 398 484v40c0 24.852-20.148 45-45 45S308 548.852 308 524v-40z m318 0c0-24.852 20.148-45 45-45S716 459.148 716 484v40c0 24.852-20.148 45-45 45S626 548.852 626 524v-40z" fill="#325effcf" p-id="6532"></path>
-          </svg>
-        </div>
-
+      <div class="think-block" v-if="hasThink">          
         <button
           class="expend-think-btn"
-          :class="{ breath: msg.label === '思考中...' }"
           @click="triggerThinkVisiable"
         >
-          <svg
-            t="1768987348872"
-            class="icon"
-            v-if="msg.label !== '思考中...'"
-            viewBox="0 0 1024 1024"
-            version="1.1"
-            xmlns="http://www.w3.org/2000/svg"
-            p-id="5007"
-            width="200"
-            height="200"
-          >
-            <path d="M526.464 85.717333L512 170.624a256 256 0 0 0-199.936 415.957333c3.669333 4.522667 34.389333 36.394667 39.125333 41.557334 42.538667 46.250667 68.693333 88.576 74.325334 139.861333h172.970666c5.632-51.285333 31.786667-93.610667 74.24-139.818667 4.821333-5.248 35.413333-36.949333 39.125334-41.514666A254.549333 254.549333 0 0 0 768 426.666667l84.906667-14.506667c0.213333 4.821333 0.426667 9.642667 0.426666 14.506667a339.882667 339.882667 0 0 1-74.922666 213.333333c-26.453333 33.024-95.744 85.333333-95.744 149.333333V896a85.333333 85.333333 0 0 1-85.333334 85.333333h-170.666666a85.333333 85.333333 0 0 1-85.333334-85.333333v-106.666667c0-64-69.333333-116.352-95.829333-149.376a341.333333 341.333333 0 0 1 280.96-554.24zM426.666667 895.957333h170.666666v-42.666666h-170.666666v42.666666zM747.946667 14.08a21.632 21.632 0 0 1 40.106666 0l10.837334 26.026667a186.325333 186.325333 0 0 0 96 99.285333l30.634666 13.610667a22.613333 22.613333 0 0 1 0 41.088l-32.426666 14.421333a186.154667 186.154667 0 0 0-94.634667 96l-10.538667 24.149333a21.589333 21.589333 0 0 1-39.850666 0l-10.496-24.106666a186.197333 186.197333 0 0 0-94.72-96.042667l-32.426667-14.421333a22.613333 22.613333 0 0 1 0-41.088l30.634667-13.653334A186.282667 186.282667 0 0 0 737.109333 40.106667l10.794667-26.026667z" p-id="5008"></path>
-          </svg>
-          <svg
-            t="1769187199002"
-            class="icon-thinking"
-            v-else
-            viewBox="0 0 1024 1024"
-            version="1.1"
-            xmlns="http://www.w3.org/2000/svg"
-            p-id="7536"
-            width="200"
-            height="200"
-          >
-            <path d="M554.688 377.6A199.232 199.232 0 0 0 673.28 490.24l180.032 64.448-197.12 78.528a213.312 213.312 0 0 0-121.6 125.44l-65.28 180.032-45.184-137.408a305.536 305.536 0 0 0-189.44-193.728L85.312 554.688 193.28 522.24A337.28 337.28 0 0 0 411.776 320l57.536-149.312L554.688 377.6z m-85.376-1.28A418.176 418.176 0 0 1 307.2 554.688 384 384 0 0 1 469.312 714.24a290.176 290.176 0 0 1 157.056-152.32l8.064-3.392a277.76 277.76 0 0 1-152.32-151.488l-12.8-30.72zM896 334.528a34.56 34.56 0 0 0 19.2 19.584l31.168 11.136-34.176 13.632a36.416 36.416 0 0 0-20.864 21.76l-11.52 31.552-7.68-23.872a53.824 53.824 0 0 0-32.896-33.664l-25.984-9.408L832 359.68a59.392 59.392 0 0 0 38.016-35.008l9.792-25.984L896 334.528zM768 141.632a56.896 56.896 0 0 0 32.448 29.888l49.024 17.472-53.76 21.376a58.56 58.56 0 0 0-33.28 34.112l-17.472 49.088L732.544 256a85.312 85.312 0 0 0-49.856-51.648L640 190.272l29.44-7.232A92.736 92.736 0 0 0 729.216 128l15.744-42.688 23.04 56.32z" fill="#1A5EFF" p-id="7537"></path>
-          </svg>
-          <div>{{ msg.label }}</div>
+          <svg t="1768788522926" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9133" width="200" height="200"><path d="M882.176 882.176c-53.8368 53.8368-136.832 59.3408-249.0368 16.4864A705.1008 705.1008 0 0 1 512 837.9136a705.1008 705.1008 0 0 1-121.1392 60.7744c-112.1792 42.8288-195.2 37.3248-249.0112-16.512-53.8368-53.8112-59.3408-136.832-16.512-249.0112A705.1008 705.1008 0 0 1 186.112 512a705.1264 705.1264 0 0 1-60.7744-121.1904c-42.8288-112.1792-37.3248-195.2 16.4864-249.0368 53.8368-53.8112 136.8576-59.3152 249.0368-16.4864A705.1264 705.1264 0 0 1 512 186.112a705.1264 705.1264 0 0 1 121.1648-60.7488c112.1792-42.8544 195.1744-37.3504 249.0112 16.4864 53.8368 53.8368 59.3408 136.832 16.4864 249.0112a705.152 705.152 0 0 1-60.7744 121.1904 705.1264 705.1264 0 0 1 60.7488 121.1392c42.8288 112.1792 37.3504 195.1744-16.4864 249.0112zM194.304 194.304c-31.1552 31.1552-31.0272 87.8336 0.3584 170.0608 10.2656 26.88 22.8864 53.6832 37.888 80.4608a1115.8784 1115.8784 0 0 1 99.3536-112.9472 1115.904 1115.904 0 0 1 112.896-99.328 609.1776 609.1776 0 0 0-80.4608-37.888c-82.2016-31.3856-138.88-31.488-170.0352-0.3584z m635.392 0c-31.1296-31.1296-87.808-31.0272-170.0352 0.384-26.88 10.24-53.6832 22.8864-80.4608 37.888a1115.904 1115.904 0 0 1 112.896 99.328 1115.8784 1115.8784 0 0 1 99.3536 112.896 609.1776 609.1776 0 0 0 37.888-80.4352c31.3856-82.2272 31.5136-138.9056 0.384-170.0608z m-445.2864 190.08c-42.4448 42.4448-78.8224 84.992-109.1328 127.6416 30.3104 42.6496 66.688 85.1712 109.1072 127.5904 42.4192 42.4448 84.992 78.8224 127.616 109.1328 42.6752-30.3104 85.1968-66.688 127.6416-109.1328 42.4192-42.4192 78.7968-84.9408 109.1072-127.5904-30.336-42.6752-66.7136-85.2224-109.1328-127.6416-42.4192-42.4192-84.9664-78.7968-127.616-109.1072-42.624 30.3104-85.1712 66.688-127.5904 109.1072zM435.2 512a76.8 76.8 0 1 1 153.6 0 76.8 76.8 0 0 1-153.6 0z m-202.624 67.2256a609.1776 609.1776 0 0 0-37.888 80.4096c-31.3856 82.2272-31.488 138.9056-0.3584 170.0608 31.1552 31.1552 87.8336 31.0272 170.0608-0.3584 26.8544-10.2656 53.6576-22.8864 80.4096-37.888a1115.8784 1115.8784 0 0 1-112.9216-99.328 1115.9552 1115.9552 0 0 1-99.328-112.896z m597.0944 250.4704c31.1552-31.1552 31.0272-87.8336-0.3584-170.0608a609.1776 609.1776 0 0 0-37.888-80.4096 1115.9296 1115.9296 0 0 1-99.2768 112.896 1115.8784 1115.8784 0 0 1-112.9216 99.328 609.1264 609.1264 0 0 0 80.384 37.888c82.2528 31.36 138.9312 31.488 170.0608 0.3584z" p-id="9134"></path></svg>
+          <div class="btn-text" :class="{ breath: msg.label === '正在思考' }">{{ msg.label }}</div>
         </button>
-
-        <div></div>
 
         <div style="display: flex; flex-direction: column;">
           <transition 
@@ -139,8 +97,8 @@
             width="200"
             height="200"
           >
-            <path d="M0.831169 345.766234c0 109.252156 88.566026 197.818182 197.818182 197.818182 109.252156 0 197.818182-88.566026 197.818181-197.818182 0-109.252156-88.566026-197.818182-197.818181-197.818182C89.397195 147.948052 0.831169 236.514078 0.831169 345.766234z" fill="#68df78" p-id="5086" data-spm-anchor-id="a313x.search_index.0.i4.78ef3a811GNESF" class="selected"></path>
-            <path d="M273.255065 960.831169H1023.168831v-99.351273H273.255065V960.831169z m0-317.476572H1023.168831v-99.351272H273.255065v99.351272zM2.493506 332.284675l72.76052-66.912415 103.726545 114.948987L455.749818 64.831169l73.844364 65.821922-349.529766 398.296104L2.493506 332.284675z m626.835949-6.458181H1023.168831V226.476883H629.329455v99.349611z" fill="#2b7af2" p-id="5087" data-spm-anchor-id="a313x.search_index.0.i3.78ef3a811GNESF" class=""></path>
+            <path d="M0.831169 345.766234c0 109.252156 88.566026 197.818182 197.818182 197.818182 109.252156 0 197.818182-88.566026 197.818181-197.818182 0-109.252156-88.566026-197.818182-197.818181-197.818182C89.397195 147.948052 0.831169 236.514078 0.831169 345.766234z" fill="var(--apix-success-color)" p-id="5086" data-spm-anchor-id="a313x.search_index.0.i4.78ef3a811GNESF" class="selected"></path>
+            <path d="M273.255065 960.831169H1023.168831v-99.351273H273.255065V960.831169z m0-317.476572H1023.168831v-99.351272H273.255065v99.351272zM2.493506 332.284675l72.76052-66.912415 103.726545 114.948987L455.749818 64.831169l73.844364 65.821922-349.529766 398.296104L2.493506 332.284675z m626.835949-6.458181H1023.168831V226.476883H629.329455v99.349611z" fill="var(--apix-info-color)" p-id="5087" data-spm-anchor-id="a313x.search_index.0.i3.78ef3a811GNESF" class=""></path>
           </svg>
           <div style="display: flex; align-items: center;">已生成执行计划（{{ msg.todos.length }}）</div>
         </button>
@@ -284,7 +242,7 @@ import ToolLabelCard from './comp/toolLabelCard.vue'
 import MarkdownIt from 'markdown-it'
 import 'github-markdown-css/github-markdown.css'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
+// import 'highlight.js/styles/github.css'
 import { ConfirmDialog } from '../comp/confirmDialog.js'
 import TodoCard from './comp/todoCard.vue'
 import { useAppCacheData } from '../../../store/app'
@@ -362,6 +320,7 @@ const md = new MarkdownIt({
   linkify: true,
   highlight(code, lang) {
     let highlighted = ''
+    let languageClass = ''
 
     try {
       if (lang && hljs.getLanguage(lang)) {
@@ -369,15 +328,20 @@ const md = new MarkdownIt({
           language: lang,
           ignoreIllegals: true,
         }).value
+        languageClass = `language-${lang}`
       } else {
-        highlighted = hljs.highlightAuto(code).value
+        const auto = hljs.highlightAuto(code)
+        highlighted = auto.value
+        languageClass = auto.language ? `language-${auto.language}` : ''
       }
     } catch {
       highlighted = md.utils.escapeHtml(code)
+      languageClass = ''
     }
 
     const raw = md.utils.escapeHtml(code)
-    return `<div class="code-block"><button class="code-copy-btn" data-code="${raw}" type="button">${copy_svg.value}</button><pre class="hljs"><code>${highlighted}</code></pre></div>`
+
+    return `<div class="code-block"><button class="code-copy-btn" data-code="${raw}" type="button">${copy_svg.value}</button><code class="hljs ${languageClass}">${highlighted}</code></div>`
   },
 })
 
@@ -816,7 +780,7 @@ function deleteItem() {
 // }
 
 const copy_svg = ref(
-  `<svg t="1772102283255" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11499" width="200" height="200"><path d="M624.5 786.3c92.9 0 168.2-75.3 168.2-168.2V309c0-92.4-75.3-168.2-168.2-168.2H303.6c-92.4 0-168.2 75.3-168.2 168.2v309.1c0 92.4 75.3 168.2 168.2 168.2h320.9zM178.2 618.1V309c0-69.4 56.1-125.5 125.5-125.5h320.9c69.4 0 125.5 56.1 125.5 125.5v309.1c0 69.4-56.1 125.5-125.5 125.5h-321c-69.4 0-125.4-56.1-125.4-125.5z" p-id="11500"></path><path d="M849.8 295.1v361.5c0 102.7-83.6 186.3-186.3 186.3H279.1v42.7h384.4c126.3 0 229.1-102.8 229.1-229.1V295.1h-42.8zM307.9 361.8h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4zM307.9 484.6h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4z" p-id="11501"></path><path d="M620.2 607.4c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.8 9.6 21.4 21.4 21.4h312.3z" p-id="11502"></path></svg>`
+  `<svg t="1776756262130" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10157" width="20" height="20"><path d="M585.142857 365.714286a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V438.857143a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238z m0 73.142857H195.047619v390.095238h390.095238V438.857143z m-73.142857 219.428571v73.142857H268.190476v-73.142857h243.809524zM828.952381 121.904762a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857h-121.904762v-73.142857h121.904762V195.047619H438.857143v121.904762h-73.142857V195.047619a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238zM512 536.380952v73.142858H268.190476v-73.142858h243.809524z" p-id="10158" fill="var(--apix-default-dark-color)"></path></svg>`
 )
 
 function onCodeCopyClick(e: Event) {
@@ -829,11 +793,11 @@ function onCodeCopyClick(e: Event) {
 
   navigator.clipboard.writeText(code)
   copy_svg.value =
-    `<svg t="1772103245365" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12505" width="200" height="200"><path d="M911.075556 192.796444a45.511111 45.511111 0 0 1 5.518222 64.113778l-455.111111 540.444445a45.511111 45.511111 0 0 1-68.835556 0.910222l-227.555555-256a45.511111 45.511111 0 0 1 68.039111-60.472889l192.625777 216.689778 421.205334-500.224a45.511111 45.511111 0 0 1 64.113778-5.461334z" p-id="12506"></path></svg>`
+    `<svg t="1772103245365" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12505" width="200" height="200"><path d="M911.075556 192.796444a45.511111 45.511111 0 0 1 5.518222 64.113778l-455.111111 540.444445a45.511111 45.511111 0 0 1-68.835556 0.910222l-227.555555-256a45.511111 45.511111 0 0 1 68.039111-60.472889l192.625777 216.689778 421.205334-500.224a45.511111 45.511111 0 0 1 64.113778-5.461334z" p-id="12506" fill="var(--apix-default-dark-color)"></path></svg>`
 
   setTimeout(() => {
     copy_svg.value =
-      `<svg t="1772102283255" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11499" width="200" height="200"><path d="M624.5 786.3c92.9 0 168.2-75.3 168.2-168.2V309c0-92.4-75.3-168.2-168.2-168.2H303.6c-92.4 0-168.2 75.3-168.2 168.2v309.1c0 92.4 75.3 168.2 168.2 168.2h320.9zM178.2 618.1V309c0-69.4 56.1-125.5 125.5-125.5h320.9c69.4 0 125.5 56.1 125.5 125.5v309.1c0 69.4-56.1 125.5-125.5 125.5h-321c-69.4 0-125.4-56.1-125.4-125.5z" p-id="11500"></path><path d="M849.8 295.1v361.5c0 102.7-83.6 186.3-186.3 186.3H279.1v42.7h384.4c126.3 0 229.1-102.8 229.1-229.1V295.1h-42.8zM307.9 361.8h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4zM307.9 484.6h312.3c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.9 9.6 21.4 21.4 21.4z" p-id="11501"></path><path d="M620.2 607.4c11.8 0 21.4-9.6 21.4-21.4 0-11.8-9.6-21.4-21.4-21.4H307.9c-11.8 0-21.4 9.6-21.4 21.4 0 11.8 9.6 21.4 21.4 21.4h312.3z" p-id="11502"></path></svg>`
+      `<svg t="1776756262130" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10157" width="20" height="20"><path d="M585.142857 365.714286a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V438.857143a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238z m0 73.142857H195.047619v390.095238h390.095238V438.857143z m-73.142857 219.428571v73.142857H268.190476v-73.142857h243.809524zM828.952381 121.904762a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857h-121.904762v-73.142857h121.904762V195.047619H438.857143v121.904762h-73.142857V195.047619a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238zM512 536.380952v73.142858H268.190476v-73.142858h243.809524z" p-id="10158" fill="var(--apix-default-dark-color)"></path></svg>`
   }, 2000)
 }
 
@@ -851,7 +815,7 @@ function onResize() {
   closePopMenu()
 }
 
-const abortLabel = '<div style="-webkit-user-select: none !important; -webkit-app-region: no-drag !important; user-select: none !important; color: #dc3545; border: 1px solid #dc3545; padding: 3px 6px; border-radius: 8px; width: fit-content; font-size: 12px;">流式传输终止</div>'
+const abortLabel = '<div style="-webkit-user-select: none !important; -webkit-app-region: no-drag !important; user-select: none !important; color: var(--apix-danger-color); border: 1px solid var(--apix-danger-color); padding: 3px 6px; border-radius: 8px; font-size: 12px; width: fit-content;">流式传输终止</div>'
 
 function postProcessHtml(html: string): string {
   if (!html) return html
@@ -904,27 +868,51 @@ async function scrollThinkToBottom() {
 </script>
 
 <style scoped>
+/* ==================== 公共变量 ==================== */
 .message-wrapper {
-  width: 100%;
+  --msg-transition: background 0.6s var(--apix-cubic-bezier);
+  --select-box-border: var(--apix-tertiary-light-color);
+  --select-box-hover-border: var(--apix-border-error);
+  --select-box-checked-bg: var(--apix-danger-color);
+  --select-box-checked-border: var(--apix-danger-color);
+  --branch-bg: var(--apix-default-light-color);
+  --branch-border: var(--apix-lightest-color);
+  --branch-hover-border: var(--apix-default-light-color);
+  --branch-label-color: var(--apix-default-dark-color);
+  --think-color: var(--apix-tertiary-dark-color);
+  --content-color: var(--apix-default-dark-color);
+  --info-tag-color: var(--apix-tertiary-light-color);
+  --info-tag-hover-color: var(--apix-tertiary-dark-color);
+  --bubble-radius: var(--apix-panel-border-radius);
+}
+
+/* ==================== 布局 ==================== */
+.message-wrapper {
+  position: relative;
+  width: 60vw;
   display: flex;
   flex-direction: row;
   gap: 6px;
-  padding: 12px;
-  border-radius: 18px;
+  padding: 12px 0px;
+  border-radius: var(--bubble-radius);
   align-items: center;
+  justify-content: flex-start;
   background: transparent;
-  transition: background 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  transition: var(--msg-transition);
 }
 
 .message-wrapper.selected {
-  background: #e3dfdf7a;
+  background: var(--apix-default-light-color);
 }
 
+/* ==================== 多选复选框 ==================== */
 .message-select-box {
   z-index: 999;
-  border: 2px solid #bababa;
+  border: 2px solid var(--select-box-border);
   border-radius: 6px;
   width: 16px;
+  min-width: 16px;
+  margin-left: 3px;
   height: 16px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -932,12 +920,12 @@ async function scrollThinkToBottom() {
 }
 
 .message-select-box:hover {
-  border-color: rgb(255, 131, 131);
+  border-color: var(--select-box-hover-border);
 }
 
 .message-select-box.checked {
-  background-color: #f35050;
-  border-color: #ea4444;
+  background-color: var(--select-box-checked-bg);
+  border-color: var(--select-box-checked-border);
 }
 
 .message-select-box.checked::after {
@@ -947,71 +935,44 @@ async function scrollThinkToBottom() {
   top: 0px;
   width: 5px;
   height: 10px;
-  border: solid white;
+  border: solid var(--apix-lightest-color);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
+/* ==================== AI 气泡容器 ==================== */
 .ai-bubble-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 100%;
   padding: 0px 16px;
-  transition: height 0.25s ease;
-} 
-
-.think {
-  background-color: transparent !important;
-  font-size: 14px;
-  width: calc(100% - 32px);
-  padding: 6px 16px 6px 16px;
-  color: #000000a2;
+  width: calc(60vw - 32px);
 }
 
-.content {
-  padding: 6px 0px 6px 0px;
-  color: #000000a2;
+.ai-bubble-wrapper.is_selecting {
+  padding: 0px;
 }
 
+/* ==================== 思考块（Think） ==================== */
 .think-block {
+  word-wrap: break-word;
   position: relative;
   overflow: hidden;
-  align-self: center;
-  align-items: center;
-
-  display: grid;
   grid-template-columns: 6px auto;
-
-  width: calc(100% - 16px);
   min-height: 24px;
-  padding: 8px 32px 0px 4px;
-
-  transition: all 0.25s ease;
-}
-
-.think-border-point {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-}
-
-.think-border-point:deep(.icon) {
-  width: 24px;
-  height: 24px;
+  padding: 8px 4px 0px 4px;
 }
 
 .think-render-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 0px;
+  margin: 12px 12px 0px 12px;
   max-height: 500px;
   overflow-y: auto;
-  overflow-x: hidden; /* 隐藏横向滚动条 */
+  overflow-x: hidden;
 
-  /* 顶部和底部渐隐效果 */
+  /* 渐隐遮罩 */
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
@@ -1027,40 +988,50 @@ async function scrollThinkToBottom() {
     transparent 100%
   );
 
-  /* 滚动条样式 - Webkit (Chrome, Safari, Edge) */
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent; /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+
+  word-wrap: break-word;
+  position: relative;
+  align-self: center;
+
+  width: 100%;
+  max-width: calc(60vw - 58px);
+  padding: 0px;
+  padding-bottom: 8px;
+  line-height: 1.6;
+
+  box-shadow: inset 1px 0 0 0 var(--apix-tertiary-light-color);
 }
 
-/* Webkit 滚动条样式 */
 .think-render-list::-webkit-scrollbar {
   width: 6px;
 }
-
 .think-render-list::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .think-render-list::-webkit-scrollbar-thumb {
   background-color: rgba(156, 163, 175, 0.5);
   border-radius: 3px;
 }
-
 .think-render-list::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.8);
 }
-
-/* 隐藏横向滚动条 - 双重保险 */
 .think-render-list::-webkit-scrollbar-horizontal {
   display: none;
   height: 0;
 }
 
+.think {
+  background-color: transparent !important;
+  font-size: 14px;
+  width: calc(100% - 32px);
+  padding: 6px 16px 6px 16px;
+  color: var(--think-color);
+}
+
 .expend-think-btn {
-  height: 28px !important;
-  width: fit-content;
-  padding: 2px 14px 2px 8px;
-  margin-left: 24px;
+  padding: 0px;
   display: flex;
   flex-direction: row;
   gap: 6px;
@@ -1069,84 +1040,76 @@ async function scrollThinkToBottom() {
   background-color: transparent;
   border: none;
   border-radius: 12px;
-  color: #515151a2;
-}
-
-.expend-think-btn.breath {
-  animation: breath 1.5s infinite ease-in-out;
+  color: var(--apix-tertiary-dark-color);
 }
 
 .expend-think-btn:hover {
-  background-color: #c8c8c868;
   border: none;
-  color: #242424;
+  color: var(--apix-default-dark-color);
 }
 
-.expend-think-btn:deep(.icon) {
+.expend-think-btn:hover :deep(.icon) {
+  fill: var(--apix-secondary-dark-color);
+}
+
+.expend-think-btn :deep(.icon),
+.expend-think-btn :deep(.icon-thinking) {
   height: 20px;
   width: fit-content;
   background-color: transparent;
   border: none;
-  fill: #515151a2;
+  fill: var(--apix-tertiary-dark-color);
 }
 
-.expend-think-btn:hover:deep(.icon) {
-  height: 20px;
-  width: fit-content;
-  background-color: transparent;
-  border: none;
-  fill: #515151;
+.btn-text {
+  display: inline-block;
+  white-space: nowrap;
 }
 
-.expend-think-btn:deep(.icon-thinking) {
-  height: 20px;
-  width: fit-content;
-  background-color: transparent;
-  border: none;
-  fill: #1a5fffb1;
+.btn-text.breath {
+  background-image: linear-gradient(
+    90deg,
+    var(--apix-default-dark-color) 0%,
+    var(--apix-default-dark-color) 30%,
+    var(--apix-default-light-color) 50%,
+    var(--apix-default-dark-color) 70%,
+    var(--apix-default-dark-color) 100%
+  );
+  background-size: 300%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: Gradient 3.5s ease infinite;
 }
 
-.expend-think-btn:hover:deep(.icon-thinking) {
-  height: 20px;
-  width: fit-content;
-  background-color: transparent;
-  border: none;
-  fill: #1A5EFF;
-}
-
-@keyframes breath {
-  0%, 100% {
-    opacity: 0.5;
+@keyframes Gradient {
+  0% {
+    background-position: 150% 50%;
   }
-  50% {
-    opacity: 1;
+  100% {
+    background-position: -50% 50%;
   }
 }
 
-.expend-think-btn {
-  height: 16px;
-  background-color: transparent;
-  border: none;
-}
-
+/* ==================== 待办（Todos） ==================== */
 .expend-todos-btn-wrapper {
   padding: 12px 4px 0px 3px;
 }
 
 .expend-todos-btn {
-  border-radius: 12px;
-  border: 1px solid #325eff76;
-  color: #2545b7bd;
-  background: #ffffff55;
+  border-radius: var(--apix-button-border-radius);
+  border: 1px solid var(--apix-primary-color);
+  color: var(--apix-primary-color);
+  background: var(--apix-panel-layer-2-background);
   height: 28px;
   padding-left: 14px;
   display: flex;
   flex-direction: row;
   gap: 8px;
-  transition: all 0.20s ease;
+  transition: all 0.20s var(--apix-cubic-bezier);
 }
 
-.expend-todos-btn:deep(.icon) {
+.expend-todos-btn :deep(.icon) {
   padding-top: 1px;
   width: 18px;
   height: 18px;
@@ -1154,10 +1117,13 @@ async function scrollThinkToBottom() {
 
 .expend-todos-btn:hover {
   transform: scale(1.03);
+  border: 1px solid var(--apix-primary-hover);
+  color: var(--apix-primary-hover);
 }
-
 .expend-todos-btn:active {
   transform: scale(1.01);
+  border: 1px solid var(--apix-primary-active);
+  color: var(--apix-primary-active);
 }
 
 .todos-block {
@@ -1168,7 +1134,9 @@ async function scrollThinkToBottom() {
   border-radius: 24px;
 }
 
+/* ==================== AI 回答正文 ==================== */
 .ai-bubble {
+  word-wrap: break-word;
   position: relative;
   overflow: hidden;
   align-self: center;
@@ -1176,188 +1144,142 @@ async function scrollThinkToBottom() {
   flex-direction: column;
 
   width: 100%;
-  padding: 8px 16px;
+  max-width: calc(60vw - 32px);
+  padding: 0px;
   gap: 6px;
   border-radius: 12px;
   line-height: 1.6;
-  color: rgba(0, 0, 0, 0.657);
-
-  transition: all 0.25s ease;
 }
 
-/* pending 状态下（占位骨架） */
-.ai-bubble:has(.shine) {
-  padding: 10px 14px;
-  opacity: 0.8;
-  max-height: 48px;
+.content {
+  padding: 6px 0px 6px 0px;
+  color: var(--content-color);
 }
 
-/* ------------------------
-   Shine 动画（修复位置和大小）
-------------------------- */
-.shine {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 80%;
-  height: 100%;
-  background: linear-gradient(
-    120deg,
-    transparent,
-    rgba(200, 200, 200, 0.22),
-    transparent
-  );
-  animation: shining 1.3s infinite;
-}
-@keyframes shining {
-  0% { left: -100%; }
-  100% { left: 120%; }
+/* ==================== 图片展示区域 ==================== */
+.ai-images-wrapper {
+  position: relative;
+  overflow: visible;
+  padding-bottom: 12px;
+  max-width: calc(60vw - 50px);
 }
 
-/* ------------------------
-   Todo动画
-------------------------- */
-.fade-enter-active {
-  animation: fadeIn .25s linear;
+.ai-images-scroller {
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
-.fade-leave-active {
-  animation: fadeOut .2s linear;
+.ai-images-scroller::-webkit-scrollbar {
+  height: 6px;
 }
-@keyframes fadeIn {
-  0% { opacity: 0;}
-  100% { opacity: 1;}
-}
-@keyframes fadeOut {
-  0% { opacity: 1;}
-  100% { opacity: 0;}
-}
-
-/* ------------------------
-   菜单动画
-------------------------- */
-.scale-fade-enter-active {
-  animation: scaleFadeIn .25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.scale-fade-leave-active {
-  animation: scaleFadeOut .2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes scaleFadeIn {
-  0% { opacity: 0; transform: scale(0.9) translateY(6px); }
-  60% { opacity: 1; transform: scale(1.03) translateY(0); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes scaleFadeOut {
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
-}
-
-.opacity-fade-enter-active {
-  animation: opacityFadeIn .25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.opacity-fade-leave-active {
-  animation: opacityFadeOut .2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes opacityFadeIn {
-  0% { opacity: 0; transform: scale(0.9); }
-  60% { opacity: 1; transform: scale(1.03); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes opacityFadeOut {
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.95); }
-}
-
-/* ------------------------
-   思考动画
-------------------------- */
-.scale-fade-height-enter-active,
-.scale-fade-height-leave-active {
-  transition: 
-    opacity 0.25s ease,
-    transform 0.25s ease;
-  transform-origin: top center;
-  overflow: hidden;
-}
-
-.scale-fade-height-enter-from {
-  opacity: 0;
-}
-
-.scale-fade-height-enter-to {
-  opacity: 1;
-}
-
-.scale-fade-height-leave-from {
-  opacity: 1;
-}
-
-.scale-fade-height-leave-to {
-  opacity: 0;
-}
-
-:deep(.code-block) {
-  position: relative !important;
-  height: fit-content !important;;
-}
-
-:deep(.code-copy-btn) {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 0px;
-
-  font-size: 12px;
-  border-radius: 8px;
-  width: 24px;
-  height: 24px;
-
+.ai-images-scroller::-webkit-scrollbar-track {
   background: transparent;
-  color: #0000009b;
-  border: none;
+}
+.ai-images-scroller::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.ai-images {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.ai-image-card {
+  position: relative;
+  flex-shrink: 0;
+  width: 198px;
+  height: 146px;
+  border-radius: 12px;
+  overflow: visible;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-image {
+  display: block;
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 12px;
   cursor: pointer;
+  transition: transform 0.25s ease;
+  position: relative;
+  z-index: 1;
+}
 
+.ai-image-hover-preview {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
   opacity: 0;
-  transition: 
-    width 0.15s cubic-bezier(0.34, 2.5, 0.64, 1),
-    background-color 0.05s ease,
-    opacity 0.15s ease;
-  z-index: 999;
+  pointer-events: none;
+  z-index: 20;
+  padding: 8px;
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--apix-default-light-color) 80%, transparent);
+  backdrop-filter: saturate(300%) blur(6px);
+  box-shadow: var(--apix-shadow-layer-3);
+  transition: opacity 0.25s var(--apix-cubic-bezier), transform 0.25s var(--apix-cubic-bezier);
 }
 
-:deep(.code-copy-btn .icon) {
-  width: 24px;
-  height: 24px;
-  fill: #515151bc;
+.ai-image-preview {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 360px;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 10px;
 }
 
-:deep(.code-block:hover .code-copy-btn) {
+.ai-image-card:hover {
+  z-index: 30;
+}
+.ai-image-card:hover .ai-image-hover-preview {
   opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.ai-image-card:hover .ai-image {
+  transform: scale(1.02);
 }
 
-:deep(.hljs) {
-  padding: 16px !important;
-  margin: 0px !important;
-  border-radius: 24px !important;
-  background-color: #f9f9f9 !important;
-  border: 1px solid #0d0d0d0d;
+.ai-image-loading,
+.ai-image-error {
+  width: 200px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--apix-default-light-color);
+  border-radius: 12px;
+  background: transparent;
 }
 
+/* ==================== 信息标签（Provider/Model/Tokens） ==================== */
 .info-tag {
   display: flex;
   flex-direction: row;
   font-size: 12px;
   gap: 16px;
   padding: 2px 4px;
-  color: #5050504b;
+  color: var(--info-tag-color);
   transition: color 0.15s ease;
   width: inherit;
   height: 20px;
   overflow: scroll;
-  scrollbar-width:none
+  scrollbar-width: none;
 }
 
 .info-tag:hover {
-  color: #505050d6;
+  color: var(--info-tag-hover-color);
 }
 
 .info-tag.show {
@@ -1379,42 +1301,37 @@ async function scrollThinkToBottom() {
   padding: 0px 4px;
   border-radius: 4px;
   border: none;
-  background-color: #5050500a;
-  transition: background 0.15s ease;
+  background-color: var(--apix-default-light-color);
 }
 
 .online-info-btn {
   color: inherit;
   font-size: 12px;
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
 .online-info-btn:active {
   transform: scale(0.95);
 }
 
-.info-tag:hover:deep(.tag-name) {
-  background-color: #50505012;
-}
-
+/* ==================== 分支切换器 ==================== */
 .branch-switch-wrapper {
   opacity: 0.4;
-  width: 100%;
-  background-color: #d0dedc;
+  width: calc(60vw - 34px);
+  background-color: var(--branch-bg);
   border-radius: 24px;
-  border: 1px solid #7c98957e;
+  border: 1px solid var(--branch-border);
 }
 
 .branch-switch-wrapper:hover {
   opacity: 1;
+  border: 1px solid var(--branch-hover-border);
 }
 
 .branch-switch-label-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px; 
+  padding: 4px 0px;
   border-radius: 20px;
   margin: 0px auto;
   width: fit-content;
@@ -1441,164 +1358,145 @@ async function scrollThinkToBottom() {
 .branch-page-label {
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: var(--branch-label-color);
   min-width: 32px;
   text-align: center;
   user-select: none;
   font-variant-numeric: tabular-nums;
 }
 
-.ai-images-wrapper {
-  position: relative;
-  overflow: visible;   /* 允许 hover 层溢出 */
-  height: 150px;
-  padding-bottom: 12px;
+/* ==================== 右键菜单 & 选区气泡动画 ==================== */
+.scale-fade-enter-active {
+  animation: scaleFadeIn 0.25s var(--apix-cubic-bezier);
+}
+.scale-fade-leave-active {
+  animation: scaleFadeOut 0.2s var(--apix-cubic-bezier);
 }
 
-/* 专门负责横向滚动 */
-.ai-images-scroller {
-  height: 150px;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+.opacity-fade-enter-active {
+  animation: opacityFadeIn 0.25s var(--apix-cubic-bezier);
+}
+.opacity-fade-leave-active {
+  animation: opacityFadeOut 0.2s var(--apix-cubic-bezier);
 }
 
-.ai-images-scroller::-webkit-scrollbar {
-  height: 6px;
+.scale-fade-height-enter-active,
+.scale-fade-height-leave-active {
+  transition: opacity 0.25s var(--apix-cubic-bezier), transform 0.25s var(--apix-cubic-bezier);
+  transform-origin: top center;
+  overflow: hidden;
 }
+.scale-fade-height-enter-from { opacity: 0; }
+.scale-fade-height-enter-to { opacity: 1; }
+.scale-fade-height-leave-from { opacity: 1; }
+.scale-fade-height-leave-to { opacity: 0; }
 
-.ai-images-scroller::-webkit-scrollbar-track {
-  background: transparent;
+@keyframes scaleFadeIn {
+  0% { opacity: 0; transform: scale(0.9) translateY(6px); }
+  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  100% { opacity: 1; transform: scale(1); }
 }
-
-.ai-images-scroller::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+@keyframes scaleFadeOut {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
 }
-
-.ai-images {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  margin-top: 10px;
-  width: max-content;
+@keyframes opacityFadeIn {
+  0% { opacity: 0; transform: scale(0.9); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
 }
-
-.ai-image-card {
-  position: relative;
-  flex-shrink: 0;
-  width: 200px;
-  height: 150px;
-  border-radius: 12px;
-  overflow: visible; /* 这里不要再 hidden 了 */
-  background: rgba(255, 255, 255, 0.04);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 缩略图本身 */
-.ai-image {
-  display: block;
-  width: 200px;
-  height: 150px;
-  object-fit: cover;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform 0.25s ease;
-  position: relative;
-  z-index: 1;
-}
-
-/* hover 预览层：默认隐藏 */
-.ai-image-hover-preview {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(0.96);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 20;
-
-  padding: 8px;
-  border-radius: 14px;
-  background: color-mix(in oklch, rgba(26, 205, 181) 80%, transparent);
-  backdrop-filter: saturate(300%) blur(3px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-
-/* 放大预览图 */
-.ai-image-preview {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: 360px;
-  max-height: 400px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-
-/* hover 时显示浮层 */
-.ai-image-card:hover {
-  z-index: 30;
-}
-
-.ai-image-card:hover .ai-image-hover-preview {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-
-.ai-image-card:hover .ai-image {
-  transform: scale(1.02);
-}
-
-.ai-image-loading,
-.ai-image-error {
-  width: 200px;
-  height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.72);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+@keyframes opacityFadeOut {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.95); }
 }
 </style>
 
 <style scoped>
+/* ==================== Markdown 通用表格/代码块增强 ==================== */
 .markdown-body:deep(table) {
-  border-radius: 12px !important;
-  background-color: rgba(255, 255, 255, 0.431) !important;
-  box-shadow: 
-    inset 0 1px 0 1px var(--borderColor-default),  /* 顶部边框 */
-    inset 1px 0 0 1px var(--borderColor-default), /* 右侧边框 */
-    inset 0 -1px 0 1px var(--borderColor-default), /* 底部边框 */
-    inset -1px 0 0 1px var(--borderColor-default); /* 左侧边框 */
+  position: relative;
+  /* margin: auto; */
+  /* margin-bottom: 12px; */
+  /* border-radius: var(--apix-panel-border-radius) !important; */
+  background-color: var(--apix-panel-layer-2-background) !important;
+  /* box-shadow: inset 0 0 0 1px var(--apix-tertiary-dark-color); */
+  /* border: 1px solid var(--apix-tertiary-dark-color); */
 }
 .markdown-body:deep(thead) {
-  background-color: rgba(178, 194, 199, 0.256) !important;
+  width: auto;
+  background-color: var(--apix-default-light-color) !important;
 }
 .markdown-body:deep(th) {
-  background-color: rgba(255, 255, 255, 0) !important;
+  width: auto;
+  background-color: transparent !important;
+  border: 1px solid var(--apix-tertiary-light-color);
 }
 .markdown-body:deep(tbody) {
-  background-color: rgba(255, 255, 255, 0) !important;
+  width: auto !important;
+  background-color: transparent !important;
 }
 .markdown-body:deep(tr) {
-  background-color: rgba(255, 255, 255, 0) !important;
+  width: auto;
+  background-color: transparent !important;
 }
 .markdown-body:deep(td) {
-  background-color: rgba(234, 234, 234, 0) !important;
+  width: auto;
+  background-color: transparent !important;
+  border: 1px solid var(--apix-tertiary-light-color);
 }
 
 .markdown-body:deep(pre) {
-  padding: 0px;
-  margin-bottom: 0px;
-  margin-top: 14px;
-  margin-bottom: 14px;
   scrollbar-width: none;
-  border-radius: 24px !important;
+  background-color: var(--apix-panel-layer-2-background);
+  /* border-radius: var(--apix-panel-border-radius); */
+  padding: 16px;
+  /* margin-bottom: 0; */
+}
+
+.markdown-body:deep(blockquote) {
+  border-left: .25em solid var(--apix-border-hover);
+  color: var(--apix-tertiary-dark-color);
+}
+
+.markdown-body:deep(hr) {
+  background-color: var(--apix-border-hover);
+  opacity: 0.6;
+}
+
+.markdown-body:deep(h2) {
+  border-bottom: 1px solid color-mix(in srgb, var(--apix-border-hover) 50%, transparent);
+}
+
+/* ==================== 代码块相关 ==================== */
+:deep(.code-block) {
+  position: relative !important;
+  height: fit-content !important;
+}
+
+:deep(.code-copy-btn) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0px;
+  font-size: 12px;
+  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  color: var(--apix-secondary-dark-color);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  z-index: 9999;
+}
+
+:deep(.code-copy-btn .icon) {
+  width: 24px;
+  height: 24px;
+  fill: var(--apix-secondary-dark-color);
+}
+
+:deep(.code-block:hover .code-copy-btn) {
+  opacity: 1;
 }
 </style>

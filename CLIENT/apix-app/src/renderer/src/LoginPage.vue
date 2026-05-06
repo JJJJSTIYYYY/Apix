@@ -82,7 +82,7 @@
   <div
     class="version-div"
   >
-    version: APIX.alpha
+    APIX {{ apix_client_version }}
   </div>
 </template>
 
@@ -91,6 +91,7 @@ import { ref, reactive, computed, watch, onMounted } from "vue"
 import { useAuthStore } from "./store/auth"
 import { useRouter } from "vue-router"
 import { registerDynamicRoutes } from '@router/index'
+import { apix_client_version } from './store/globalData'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -139,6 +140,7 @@ const submitText = computed(() => (isLogin.value ? "Login" : "Register"))
 const showToast = (msg) => {
   toast.message = msg
   toast.show = true
+  console.log("start show")
   setTimeout(() => {
     toast.show = false
   }, 3000)
@@ -238,36 +240,16 @@ const onSubmit = async () => {
 .flex-center {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding-top: 12%;
+  align-items: center;
 }
 
 .glass-bg {
-  min-height: 100vh;
+  height: calc(100vh - 30px);
   position: relative;
   overflow: hidden;
+  /* overflow: visible; */
 
-  background:
-    /* warm soft light */
-    radial-gradient(
-      900px 700px at 15% 25%,
-      rgba(254, 219, 233, 0.35),
-      transparent 60%
-    ),
-
-    /* cool soft light */
-    radial-gradient(
-      1000px 800px at 85% 75%,
-      rgba(209, 229, 255, 0.4),
-      transparent 62%
-    ),
-
-    /* neutral base */
-    linear-gradient(
-      135deg,
-      rgb(221, 251, 255),
-      rgb(246, 226, 250)
-    );
+  background: transparent;
 }
 
 
@@ -283,14 +265,10 @@ const onSubmit = async () => {
 /* ================= Card ================= */
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.272);
+  background: var(--apix-panel-layer-1-background);
   backdrop-filter: blur(16px);
   border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.128),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.662),
-    inset -1px -1px 1px rgba(117, 187, 248, 0.083);
+  box-shadow: var(--apix-shadow-layer-2);
 }
 
 .auth-card {
@@ -303,7 +281,7 @@ const onSubmit = async () => {
 
 /* Card float */
 .card-float-enter-active {
-  transition: all 0.4s ease;
+  transition: all 0.4s var(--apix-cubic-bezier);
 }
 
 .card-float-enter-from {
@@ -317,11 +295,10 @@ const onSubmit = async () => {
   position: relative;
   display: flex;
   margin-bottom: 22px;
-  background: rgba(226, 226, 226, 0.32);
+  background: var(--apix-default-light-color);
   border-radius: 999px;
-  border: 2px white;
   box-shadow:
-    inset 1px -1px 16px rgba(117, 187, 248, 0.083);
+    inset 1px -1px 16px var(--apix-default-light-color);
 }
 
 .mode-switch button {
@@ -335,23 +312,23 @@ const onSubmit = async () => {
 }
 
 .login-select {
-  color: #0000009A;
-  transition: color 0.25s ease;
+  color: var(--apix-default-dark-color);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 .login-select:not(.right) {
-  color: #4040409A;
-  transition: color 0.25s ease;
+  color: var(--apix-darkest-color);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 .register-select {
-  color: #0000009A;
-  transition: color 0.25s ease;
+  color: var(--apix-default-dark-color);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 .register-select.right {
-  color: #4040409A;
-  transition: color 0.25s ease;
+  color: var(--apix-darkest-color);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 .slider {
@@ -370,16 +347,14 @@ const onSubmit = async () => {
 
   /* Stable physical shadow (never changes) */
   box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.12);
+    0 8px 24px var(--apix-default-light-color);
 
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, #fff 10%, transparent);
-  -webkit-backdrop-filter: saturate(500%) blur(16px);
+  border: none;
   backdrop-filter: saturate(500%) blur(16px);
-  -webkit-transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
-  transition: all 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: all 0.3s var(--apix-cubic-bezier);
   border-color: transparent;
-  background-color: color-mix(in srgb, #ffffff 30%, transparent);
+  background-color: color-mix(in srgb, var(--apix-lightest-color) 30%, transparent);
 }
 
 .mode-switch:active:deep(.slider) {
@@ -404,6 +379,10 @@ const onSubmit = async () => {
 
 
 /* ================= Form ================= */
+.title {
+  color: var(--apix-darkest-color);
+}
+
 .title:not(.right) {
   margin-top: 40px;
 }
@@ -423,21 +402,21 @@ const onSubmit = async () => {
 
 .field label {
   font-size: 13px;
-  color: #555;
+  color: var(--apix-secondary-dark-color);
 }
 
 .field input {
   height: 38px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--apix-secondary-light-color);
+  background: var(--apix-default-light-color);
   font-size: 14px;
 }
 
 .field input:focus {
   outline: none;
-  border-color: #7a9cff;
+  border-color: var(--apix-primary-hover);
 }
 
 /* ================= Animations ================= */
@@ -494,12 +473,13 @@ const onSubmit = async () => {
 .info-input {
   height: 40px;
   margin-top: 4px;
-  background-color: #ffffff70 !important;
-  border: 1px solid rgba(0, 0, 0, 0.109);
+  background-color: var(--apix-default-light-color) !important;
+  border: 1px solid var(--apix-secondary-light-color);
+  color: var(--apix-default-dark-color);
 }
 
 .confirm-input.error {
-  border: 1px solid red;
+  border: 1px solid var(--apix-danger-color);
 }
 
 /* ================= Button ================= */
@@ -508,37 +488,30 @@ const onSubmit = async () => {
   height: 40px;
   margin-top: 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.69);
+  border: none;
   cursor: pointer;
   font-size: 14px;
-  color: white;
-  background: linear-gradient(135deg, #4fd8c8cf, #4fd8c8cf);
-  box-shadow:
-    0 8px 24px rgba(62, 67, 66, 0.088);
-  transition: all 0.23s ease;
+  color: var(--apix-lightest-color);
+  background: var(--apix-primary-color);
+  box-shadow: var(--apix-shadow-layer-1);
+  transition: all 0.23s var(--apix-cubic-bezier);
 }
 
 .submit-btn:hover {
   transform: scale(1.03);
-  background: linear-gradient(135deg, #4fd8c8cf, #4fd8c8cf);
-  box-shadow:
-    0 8px 24px rgba(40, 44, 43, 0.088);
+  background: var(--apix-primary-hover);
+  box-shadow: var(--apix-shadow-layer-3);
 }
 
 .submit-btn:active {
   transform: scale(1.01);
-  background: linear-gradient(135deg, #4fd8c8cf, #4fd8c8cf);
-  box-shadow:
-    0 8px 24px rgba(40, 44, 43, 0.088);
+  background: var(--apix-primary-active);
+  box-shadow: var(--apix-shadow-layer-2);
 }
 
 .submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.submit-btn.breathing {
-  animation: breathe 1.4s ease-in-out infinite;
 }
 
 .forget-btn {
@@ -558,18 +531,14 @@ const onSubmit = async () => {
   color: rgba(67, 205, 210, 0.875);
 }
 
-@keyframes breathe {
-  0% { filter: brightness(1); }
-  50% { filter: brightness(1.15); }
-  100% { filter: brightness(1); }
-}
-
 .version-div {
+  width: 100px;
+  height: 32px;
   position: absolute;
   right: 10px;
   bottom: 6px;
   z-index: 9999;
-  color: #00000077;
+  color: var(--apix-default-dark-color);
   font-size: 12px;
 }
 
@@ -581,8 +550,8 @@ const onSubmit = async () => {
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 18px;
-  background: rgba(40, 40, 40, 0.8);
-  color: white;
+  background: var(--apix-default-dark-color);
+  color: var(--apix-lightest-color);
   border-radius: 20px;
   font-size: 13px;
   animation: toastIn 0.3s ease;

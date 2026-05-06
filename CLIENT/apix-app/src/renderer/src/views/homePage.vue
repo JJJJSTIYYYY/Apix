@@ -12,8 +12,6 @@
     @select="handleSelect"
     ref="leftMenu"
   >
-    <div style="height: 5px; background-color: transparent;"></div>
-
     <el-menu-item
       v-for="page in pageRegistry"
       :key="page.path"
@@ -32,7 +30,7 @@
     :class="{ rotated: !is_side_show }"
     @click="setSideWidth"
   >
-    <svg t="1776518156313" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6410" width="16" height="16"><path d="M414.037333 695.210667a42.666667 42.666667 0 1 1-60.373333 60.330666l-213.205333-213.504a42.666667 42.666667 0 0 1 0-60.288L353.706667 268.501333a42.666667 42.666667 0 0 1 60.373333 60.330667L273.493333 469.333333H554.666667a341.333333 341.333333 0 0 1 341.162666 330.666667L896 810.666667a42.666667 42.666667 0 1 1-85.333333 0 256 256 0 0 0-246.4-255.829334L554.666667 554.666667H273.664l140.373333 140.544z" fill="#21212188" p-id="6411"></path></svg>
+    <svg t="1777795521468" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5007" width="20" height="20"><path d="M243.2 512m-83.2 0a1.3 1.3 0 1 0 166.4 0 1.3 1.3 0 1 0-166.4 0Z" p-id="5008" fill="var(--apix-default-dark-color)"></path><path d="M512 512m-83.2 0a1.3 1.3 0 1 0 166.4 0 1.3 1.3 0 1 0-166.4 0Z" p-id="5009" fill="var(--apix-secondary-dark-color)"></path><path d="M780.8 512m-83.2 0a1.3 1.3 0 1 0 166.4 0 1.3 1.3 0 1 0-166.4 0Z" p-id="5010" fill="var(--apix-tertiary-dark-color)"></path></svg>
   </button>
   </div>
 </template>
@@ -59,8 +57,10 @@ const is_side_show = ref(true)
 const setSideWidth = () => {
   if (is_side_show.value) {
     document.documentElement.style.setProperty('--apix-left-side-bar-width', '0px')
+    document.documentElement.style.setProperty('--apix-left-side-bar-margin', '3px')
   } else {
-    document.documentElement.style.setProperty('--apix-left-side-bar-width', '64px')
+    document.documentElement.style.setProperty('--apix-left-side-bar-width', '66px')
+    document.documentElement.style.setProperty('--apix-left-side-bar-margin', '6px')
   }
   is_side_show.value = !is_side_show.value
 }
@@ -74,7 +74,8 @@ const updateHeight = () => {
 
 onMounted(() => {
   window.addEventListener('resize', updateHeight)
-  document.documentElement.style.setProperty('--apix-left-side-bar-width', '64px')
+  document.documentElement.style.setProperty('--apix-left-side-bar-width', '66px')
+  document.documentElement.style.setProperty('--apix-left-side-bar-margin', '6px')
 })
 
 onBeforeUnmount(() => {
@@ -85,8 +86,13 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .el-menu-vertical {
-  left: calc(var(--apix-left-side-bar-width, 64px) - 64px);
-  transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+  padding-top: 5px !important;
+  left: calc(var(--apix-left-side-bar-width, 66px) - 66px);
+  transition: all 0.28s var(--apix-cubic-bezier);
+}
+
+.el-menu-vertical :deep(.el-icon svg path) {
+  fill: var(--apix-primary-dark) !important;
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
@@ -95,12 +101,9 @@ onBeforeUnmount(() => {
 }
 
 .el-menu-vertical {
-  background: #00000000;
-  width: 64px;
+  background: transparent;
+  width: 66px;
   min-height: 400px;
-  border-radius: 0 0 5px 0; /* 左上 右上 左下 右下 */
-  border-right: 1px solid #ebeef5;
-  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -108,25 +111,17 @@ onBeforeUnmount(() => {
   background-color: transparent;
   padding: 2px;
   padding-left: 4px;
+  border: none !important;
 }
 
 .menu-item {
-  border-radius: 12px;
-  transition: background-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
-              transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
-              box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.el-menu-item:hover {
-  color: rgb(0, 217, 195);
-  background-color: transparent;
+  transition: all 0.24s var(--apix-cubic-bezier)
 }
 
 .menu-buttom-item {
   opacity: 0.4;
-  border-radius: 12px;
   bottom: 0px;
-  left: 4px;
+  left: 22px;
   width: 32px;
   height: 32px;
   border: none;
@@ -134,16 +129,16 @@ onBeforeUnmount(() => {
   z-index: 999;
   font-size: 12px;
   font-weight: 20;
-  background-color: #00000000; /* 浅灰背景 */
+  background-color: transparent;
 }
 
 .menu-buttom-item:hover {
   opacity: 1;
-  background-color: #00000000; /* 浅灰背景 */
+  background-color: transparent;
 }
 
 .menu-buttom-item {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s var(--apix-cubic-bezier);
   transform-origin: 50% 50%;
 }
 
@@ -153,20 +148,29 @@ onBeforeUnmount(() => {
 
 .text-label {
   width: 0px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s var(--apix-cubic-bezier);
 }
 
 .el-menu-item {
-  border-radius: 12px;
+  transition: all 0.2s var(--apix-cubic-bezier) !important;
+}
+
+.el-menu-item:hover {
+  color: var(--apix-primary-hover) !important;
+  background-color: transparent;
+}
+
+.el-menu-vertical :deep(.el-icon:hover svg path) {
+  fill: var(--apix-primary-hover) !important;
 }
 
 .el-menu-item.is-active {
   color: rgb(0, 173, 155);
   background: radial-gradient(
     circle at center,
-    rgba(0, 231, 208, 0.2) 0%, 
-    rgba(0, 231, 208, 0.08) 20%, 
-    rgba(0, 231, 208, 0) 60% 
+    rgba(79, 223, 208, 0.2) 0%, 
+    rgba(79, 223, 208, 0.08) 20%, 
+    rgba(79, 223, 208, 0) 60% 
   );
 }
 </style>

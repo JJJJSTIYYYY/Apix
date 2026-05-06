@@ -109,24 +109,25 @@ const handleDelete = async () => {
   position: relative;
   padding: 14px 16px;
   border-radius: 12px;
-  height: 220px;
+  height: 250px;
   width: 221px;
 
   display: flex;
   flex-direction: column;
 
-  background: rgb(245, 247, 247);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.166);
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: var(--apix-panel-layer-2-background);
+  border: 1px solid var(--apix-default-light-color);
+
+  box-shadow: var(--apix-shadow-layer-2);
+
+  transition: all 0.4s cubic-bezier(0.34, 2, 0.64, 1);
 }
 
 .role-card:hover {
   transform: translateY(-1px);
-  box-shadow:
-    0 10px 26px rgba(4, 52, 42, 0.166),
-    0 2px 6px rgba(0, 0, 0, 0.05);
+
+  border: 1px solid var(--apix-panel-layer-2-background);
+  box-shadow: var(--apix-shadow-layer-3);
 }
 
 /* Header - 保持原有样式 */
@@ -165,7 +166,7 @@ const handleDelete = async () => {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(135deg, #e8a8f4 0%, #ee788a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,11 +178,11 @@ const handleDelete = async () => {
 .role-title {
   font-size: 15px;
   font-weight: 600;
-  color: #2f3a3a;
+  color: var(--apix-default-dark-color);
+
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.4;
 }
 
 /* 定义区域 - 自适应高度 */
@@ -194,11 +195,14 @@ const handleDelete = async () => {
 .role-definition {
   font-size: 13px;
   line-height: 1.6;
-  color: #586666;
+  height: 3lh;
+  color: var(--apix-tertiary-dark-color);
+
   overflow: hidden;
   text-overflow: ellipsis;
+  
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
 }
 
@@ -209,7 +213,8 @@ const handleDelete = async () => {
   gap: 6px;
   flex-shrink: 0;
   padding-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+
+  border-top: 1px solid var(--apix-default-light-color);
 }
 
 .footer-tag {
@@ -220,8 +225,10 @@ const handleDelete = async () => {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
-  background: rgba(0, 0, 0, 0.04);
-  color: #6b7280;
+  background: var(--apix-default-light-color);
+  color: var(--apix-secondary-dark-color);
+  overflow: hidden;
+  max-width: 100%;
   transition: all 0.2s ease;
 }
 
@@ -243,7 +250,7 @@ const handleDelete = async () => {
   background: rgba(124, 58, 237, 0.15);
 }
 
-/* 按钮样式 */
+/* Buttons */
 .icon-btn {
   border: none;
   background: transparent;
@@ -253,6 +260,7 @@ const handleDelete = async () => {
   border-radius: 6px;
   width: 26px;
   height: 26px;
+  color: var(--apix-default-dark-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -260,12 +268,12 @@ const handleDelete = async () => {
 }
 
 .icon-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--apix-default-light-color);
 }
 
 .delete-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background-color: color-mix(in srgb, var(--apix-danger-color) 15%, transparent);
+  color: var(--apix-danger-color);
   transform: rotate(4deg);
 }
 </style>
