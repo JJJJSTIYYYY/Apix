@@ -403,12 +403,14 @@ DROP PROCEDURE IF EXISTS ensure_user_exists;
 DELIMITER $$
 
 CREATE PROCEDURE ensure_user_exists (
-    IN p_user_uid VARCHAR(64)
+    IN p_user_uid VARCHAR(64),
+    IN p_user_name VARCHAR(64)
 )
 BEGIN
     SELECT user_uid, username
     FROM users
-    WHERE user_uid = p_user_uid;
+    WHERE user_uid = p_user_uid
+        OR username = p_user_name;
 END$$
 
 DELIMITER ;
@@ -461,8 +463,8 @@ CREATE PROCEDURE update_conversation (
     IN p_title VARCHAR(255),
     IN p_workspace VARCHAR(255),
     IN p_session_id VARCHAR(64),
-    IN p_is_pinned TINYINT(1),
-    IN p_is_deleted TINYINT(1),
+    IN p_is_pinned BOOLEAN,
+    IN p_is_deleted BOOLEAN,
     IN p_new_message BOOLEAN
 )
 BEGIN
