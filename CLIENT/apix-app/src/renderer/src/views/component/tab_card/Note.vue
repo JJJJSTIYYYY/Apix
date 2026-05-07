@@ -2,13 +2,13 @@
   <div 
     class="tab-card"
     :class="{ expanded: self.expanded }"
-    :style="{background: self.expanded?color+'CD':color+'58'}"
   >
     <!-- 卡片头 -->
     <div
       class="tab-card-header"
       :class="{ expanded: self.expanded }"
       :draggable="!self.expanded"
+      :style="{background: color }"
       @dragstart.stop="onTabCardDragStart($event)"
     >
       <div style="display: flex; flex-direction: row;">        
@@ -99,17 +99,24 @@
           tag="div"
           class="mark-content"
           draggable="false"
-          style="display: grid; gap: 2px; grid-template-columns: 10% 90%; min-height: auto"
+          style="display: grid; gap: 2px; grid-template-columns: 56px auto; min-height: auto"
         >
-          <el-color-picker class="color-picker" key="2" v-model="color" style="width: 50px; height: 100%;;" :predefine="predefineColors" />
-          <el-mention
-            v-model="textValue"
-            key="1"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 10 }"
-            style="width: 100%;"
-            placeholder="Please input"
-          />
+          <div class="field-value color-picker-wrapper">
+            <el-color-picker 
+              key="2" 
+              v-model="color" 
+              :predefine="predefineColors" 
+            />
+          </div>
+          <div class="field-value">
+            <el-input
+              v-model="descriptionInput"
+              type="textarea"
+              :autosize="{ minRows: 3, maxRows: 10 }"
+              placeholder="请输入需要执行的操作描述，比如需要执行的SQL、注意事项等"
+              @input="onDescriptionChange"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -317,7 +324,7 @@ function onTabCardTitleChange(e: Event) {
 }
 
 const textValue = ref(props.self.prams.text)
-const color = ref(props.self.prams.color)
+const color = ref(props.self.prams.color ?? '')
 
 watch(textValue, (newVal) => {
   props.self.prams.text = newVal
@@ -372,6 +379,10 @@ input, textarea {
   scrollbar-width: none;  /* Firefox 隐藏滚动条 */
   gap: 4px;
   padding: 8px 12px;
+}
+
+.field-value.color-picker-wrapper {
+
 }
 
 /* 开启动画 */

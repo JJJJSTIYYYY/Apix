@@ -488,6 +488,83 @@ body, * {
   color: var(--apix-primary-active) !important;
 }
 
+.el-popper.el-tooltip.el-color-picker__panel {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: var(--apix-shadow-layer-3);
+}
+
+.el-color-picker-panel {
+  border-radius: var(--apix-border-radius-base) !important;
+  background-color: transparent !important;
+}
+
+.el-color-picker-panel .el-input__wrapper {
+  box-shadow: inset 0 0 0 1px var(--apix-default-light-color) !important;
+  border-radius: var(--apix-button-border-radius) !important;
+  padding: 4px 12px !important;
+  background: transparent !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-color-picker-panel .el-input__wrapper:hover {
+  box-shadow: inset 0 0 0 1px var(--apix-default-light-color) !important;
+}
+
+.el-color-picker-panel .el-input__wrapper.is-focus {
+  box-shadow: inset 0 0 0 2px var(--apix-primary-color) !important;
+  background: transparent !important;
+  outline: none;
+}
+
+.el-color-picker-panel .el-input__inner {
+  color: var(--apix-primary-dark) !important;
+  font-size: 12px !important;
+}
+
+.el-color-picker-panel .is-text.el-color-footer__link-btn {
+  padding: 3px 6px !important;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--apix-default-dark-color) !important;
+  background: transparent !important;
+}
+
+.el-color-picker-panel .is-text.el-color-footer__link-btn:hover {
+  color: var(--apix-primary-dark) !important;
+}
+
+.el-color-picker-panel .is-plain.el-color-footer__btn {
+  padding: 6px 12px !important;
+  border-radius: var(--apix-button-border-radius);
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s var(--apix-cubic-bezier),
+    color 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier);
+
+  background: color-mix(in srgb, var(--apix-lightest-color) 85%, transparent);
+  color: var(--apix-darkest-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--apix-darkest-color) 8%, transparent);
+}
+
+.el-color-picker-panel .is-plain.el-color-footer__btn:hover {
+  background-color: color-mix(in srgb, var(--apix-lightest-color) 44.6%, transparent);
+}
+
+.el-color-picker__trigger {
+  border-color: var(--apix-tertiary-dark-color) !important;
+}
+
+.el-color-picker.is-focused .el-color-picker__trigger {
+  border-color: var(--apix-primary-color) !important;
+}
+
+.el-color-picker__color {
+  border-color: var(--apix-tertiary-dark-color) !important;
+}
 
 /* 基础表格样式 */
 .markdown-body table {
