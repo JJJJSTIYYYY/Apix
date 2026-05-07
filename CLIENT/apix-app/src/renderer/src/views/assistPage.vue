@@ -2521,7 +2521,7 @@ const setFullInput = () => {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  transition: all 0.28s var(--apix-cubic-bezier);
+  transition: grid-template-columns 0.28s var(--apix-cubic-bezier);
 }
 
 .ai-page-wrapper:focus {
@@ -2535,14 +2535,15 @@ const setFullInput = () => {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  transition: all 0.28s var(--apix-cubic-bezier);
+  transition: grid-template-columns 0.28s var(--apix-cubic-bezier);
 }
 
 .ai-history-panel {
   background-color: var(--apix-panel-layer-2-background) !important;
   padding: 0 12px 0 12px !important;
   margin: 0px !important;
-  transition: all 0.28s var(--apix-cubic-bezier);
+  transition: width 0.28s var(--apix-cubic-bezier),
+    box-shadow 0.28s var(--apix-cubic-bezier);
   box-shadow: inset -1px 0 0 0 var(--apix-border-disabled);
 }
 
@@ -2597,7 +2598,7 @@ const setFullInput = () => {
 }
 
 .work-dir-label {
-  width: 60%;
+  width: 800px;
   position: absolute;
   align-self: center;
   align-items: center;
@@ -2616,7 +2617,9 @@ const setFullInput = () => {
   white-space: nowrap;
   display: block;
   z-index: 9998;
-  transition: all 0.6s var(--apix-cubic-bezier);
+  transition: width, height, color, background-color, border;
+  transition-duration: 0.6s;
+  transition-timing-function: var(--apix-cubic-bezier);
 }
 
 .work-dir-label.no_work_dir {
@@ -2638,7 +2641,7 @@ const setFullInput = () => {
 }
 
 .work-dir-label.no_work_dir:hover {
-  width: 60%;
+  width: 800px;
   height: 24px;
   color: var(--apix-danger-dark-text);
   background-color: #ebb7b757;
@@ -2658,8 +2661,8 @@ const setFullInput = () => {
   flex-direction: column;
   gap: 12px;
   padding: 12px 100px 88px 100px;
-  max-width: 60vw;
-  min-width: 60vw;
+  max-width: 840px;
+  min-width: 840px;
   height: calc(100vh - 190px);
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(
@@ -2709,13 +2712,13 @@ const setFullInput = () => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  transition: all 0.6s var(--apix-cubic-bezier);
+  transition: bottom 0.6s var(--apix-cubic-bezier),
+              width 0.6s var(--apix-cubic-bezier);
 }
 
 .ctrl-area.empty_messages_list {
   bottom: 44vh;
   width: 80%;
-  transition: all 0.6s var(--apix-cubic-bezier);
 }
 
 .ctrl-btns-area {
@@ -2723,7 +2726,7 @@ const setFullInput = () => {
   position: absolute;
   height: 32px;
   width: 80%;
-  max-width: 60vw;
+  max-width: 840px;
   border-radius: var(--apix-panel-border-radius);
   bottom: 30px;
   padding: 16px 16px;
@@ -2733,7 +2736,6 @@ const setFullInput = () => {
   backdrop-filter: saturate(300%) blur(16px);
   background: linear-gradient(0deg, var(--apix-panel-layer-3-background) 30%, color-mix(in oklch, var(--apix-panel-layer-3-background) 90%, transparent) 60%, color-mix(in oklch, var(--apix-panel-layer-3-background) 70%, transparent) 80%, color-mix(in oklch, var(--apix-panel-layer-3-background) 50%, transparent));
   box-shadow: var(--apix-shadow-md);
-  transition: all 0.6s var(--apix-cubic-bezier);
 }
 
 .cd-actions {
@@ -2750,7 +2752,8 @@ const setFullInput = () => {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier);
+  transition: color 0.2s var(--apix-cubic-bezier),
+    background 0.2s var(--apix-cubic-bezier);
   background: var(--apix-default-button-background);
   color: var(--apix-default-button-text);
   background: transparent;
@@ -2770,7 +2773,7 @@ const setFullInput = () => {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier);
+  transition: background-color 0.2s var(--apix-cubic-bezier);
   color: var(--apix-danger-button-text);
   background: var(--apix-danger-button-background);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -3026,11 +3029,9 @@ const setFullInput = () => {
   background: linear-gradient(0deg, var(--apix-panel-layer-3-background) 30%, color-mix(in oklch, var(--apix-panel-layer-3-background) 90%, transparent) 60%, color-mix(in oklch, var(--apix-panel-layer-3-background) 70%, transparent) 80%, color-mix(in oklch, var(--apix-panel-layer-3-background) 50%, transparent));
   box-shadow: var(--apix-shadow-md);
   border-radius: var(--apix-panel-border-radius);
-  width: 60vw;
-  max-width: 60vw;
+  width: 840px;
+  max-width: 840px;
   row-gap: 14px;
-
-  transition: all 0.3s var(--apix-cubic-bezier);
 }
 
 .send-button {
@@ -3051,7 +3052,9 @@ const setFullInput = () => {
 
   /* 平滑动画 */
   transition: 
-    all 0.35s var(--apix-cubic-bezier);
+    transform 0.35s var(--apix-cubic-bezier),
+    box-shadow 0.35s var(--apix-cubic-bezier),
+    background 0.35s var(--apix-cubic-bezier);
 }
 
 /* 悬停效果：轻微放大 + 阴影增强 */
@@ -3073,7 +3076,6 @@ const setFullInput = () => {
   grid-column: 1 / 3;
   padding: 8px;
   padding-top: 6px;
-  transition: all 0.25s var(--apix-cubic-bezier);
   align-self: center;
   width: calc(100% - 8px);
 }
@@ -3121,7 +3123,7 @@ const setFullInput = () => {
   width: 30px;
   height: 30px;
   background: transparent;
-  transition: all 0.25s var(--apix-cubic-bezier);
+  transition: transform 0.25s var(--apix-cubic-bezier);
   padding: 0px 6px;
   color: var(--apix-default-button-text);
   grid-row: 1;
@@ -3162,7 +3164,6 @@ const setFullInput = () => {
   gap: 12px;
   width: 100%;
   max-width: calc(100%-96px);
-  transition: all 0.28s var(--apix-cubic-bezier);
 }
 
 .model-provider {
@@ -3304,7 +3305,6 @@ const setFullInput = () => {
   width: 52px;
   height: 28px;
   background-color: var(--apix-lightest-color);
-  transition: all 0.25s var(--apix-cubic-bezier);
   padding: 0px 6px;
   transform: translateX(-21px);
 }
@@ -3319,7 +3319,6 @@ const setFullInput = () => {
   width: 52px;
   height: 28px;
   background-color: var(--apix-lightest-color);
-  transition: all 0.25s var(--apix-cubic-bezier);
   padding: 0px 6px;
   transform: translateX(-21px);
 }
@@ -3334,7 +3333,10 @@ const setFullInput = () => {
   width: 100px;
   height: 30px;
   background: var(--apix-common-button-background);
-  transition: all 0.25s var(--apix-cubic-bezier);
+  transition: border-color 0.25s var(--apix-cubic-bezier),
+              background 0.25s var(--apix-cubic-bezier),
+              color 0.25s var(--apix-cubic-bezier),
+              transform 0.25s var(--apix-cubic-bezier);
   padding: 0px 6px;
   color: var(--apix-common-button-text);
   margin: 0px;
@@ -3351,7 +3353,6 @@ const setFullInput = () => {
   width: 100px;
   height: 30px;
   background: transparent;
-  transition: all 0.25s var(--apix-cubic-bezier);
   padding: 0px 6px;
   color: var(--apix-tertiary-dark-color);
   margin: 0px;
@@ -3371,18 +3372,18 @@ const setFullInput = () => {
 .apikey-button:deep(.icon) {
   width: 28px;
   height: 28px;
-  transition: fill 0.25 var(--apix-cubic-bezier);
+  transition: fill 0.25s var(--apix-cubic-bezier);
   padding-left: 16px;
 }
 .thinking-button:deep(.icon) {
   width: 16px;
   height:16px;
-  transition: fill 0.25 var(--apix-cubic-bezier);
+  transition: fill 0.25s var(--apix-cubic-bezier);
 }
 .select-button:deep(.icon) {
   width: 18px;
   height: 18px;
-  transition: fill 0.25 var(--apix-cubic-bezier);
+  transition: fill 0.25s var(--apix-cubic-bezier);
   margin-top: -1px;
 }
 
@@ -3427,11 +3428,10 @@ const setFullInput = () => {
 .file-tag {
   border: none;
   border-radius: 8px;
-  transition: all 0.24s ease;
+  transition: transform 0.24s ease;
 }
 
 .file-tag:hover {
   transform: scale(1.02);
-  border-radius: 8px;
 }
 </style>

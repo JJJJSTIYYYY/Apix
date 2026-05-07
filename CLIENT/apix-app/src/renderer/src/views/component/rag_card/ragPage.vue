@@ -549,7 +549,9 @@ function formatMimeType(mimeType: string) {
   border: none !important;
   border-radius: var(--apix-border-radius-base) !important;
   color: var(--apix-lightest-color) !important;
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: background-color 0.3s var(--apix-cubic-bezier),
+    opacity 0.3s var(--apix-cubic-bezier),
+    transform 0.3s var(--apix-cubic-bezier);
   overflow: hidden;
 }
 
@@ -610,7 +612,8 @@ function formatMimeType(mimeType: string) {
   border-radius: var(--apix-button-border-radius);
   color: var(--apix-lightest-color);
   background: var(--apix-primary-color);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: background-color 0.3s var(--apix-cubic-bezier),
+    transform 0.3s var(--apix-cubic-bezier);
   border: none;
 }
 

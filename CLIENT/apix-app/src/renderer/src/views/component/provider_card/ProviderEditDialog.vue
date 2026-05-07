@@ -512,7 +512,6 @@ const handleSave = () => {
   border: none;
   background: transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .auto-get:hover {
@@ -534,7 +533,6 @@ const handleSave = () => {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier);
   color: var(--apix-default-dark-color);
   background: transparent;
 }
@@ -551,7 +549,9 @@ const handleSave = () => {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier);
+  transition: opacity 0.2s var(--apix-cubic-bezier),
+    color 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier);
 
   background: color-mix(in srgb, var(--apix-lightest-color) 85%, transparent);
   color: var(--apix-darkest-color);

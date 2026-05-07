@@ -8,7 +8,7 @@
       v-if="is_selecting && props.msg.pending === false"
       class="message-select-box"
       :class="{ checked: props.msg.selected }"
-      @click="toggleSelect"
+      @click.stop="toggleSelect"
     ></div>
     <div 
       class="ai-bubble-wrapper"
@@ -889,7 +889,7 @@ async function scrollThinkToBottom() {
 /* ==================== 布局 ==================== */
 .message-wrapper {
   position: relative;
-  width: 60vw;
+  width: 840px;
   display: flex;
   flex-direction: row;
   gap: 6px;
@@ -915,7 +915,8 @@ async function scrollThinkToBottom() {
   margin-left: 3px;
   height: 16px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease,
+              background-color 0.15s ease;
   position: relative;
 }
 
@@ -946,7 +947,7 @@ async function scrollThinkToBottom() {
   display: flex;
   flex-direction: column;
   padding: 0px 16px;
-  width: calc(60vw - 32px);
+  width: calc(840px - 32px);
 }
 
 .ai-bubble-wrapper.is_selecting {
@@ -996,7 +997,7 @@ async function scrollThinkToBottom() {
   align-self: center;
 
   width: 100%;
-  max-width: calc(60vw - 58px);
+  max-width: calc(840px - 58px);
   padding: 0px;
   padding-bottom: 8px;
   line-height: 1.6;
@@ -1106,7 +1107,10 @@ async function scrollThinkToBottom() {
   display: flex;
   flex-direction: row;
   gap: 8px;
-  transition: all 0.20s var(--apix-cubic-bezier);
+  transition:
+    transform 0.20s var(--apix-cubic-bezier),
+    border 0.20s var(--apix-cubic-bezier),
+    color 0.20s var(--apix-cubic-bezier);
 }
 
 .expend-todos-btn :deep(.icon) {
@@ -1144,7 +1148,7 @@ async function scrollThinkToBottom() {
   flex-direction: column;
 
   width: 100%;
-  max-width: calc(60vw - 32px);
+  max-width: calc(840px - 32px);
   padding: 0px;
   gap: 6px;
   border-radius: 12px;
@@ -1161,7 +1165,7 @@ async function scrollThinkToBottom() {
   position: relative;
   overflow: visible;
   padding-bottom: 12px;
-  max-width: calc(60vw - 50px);
+  max-width: calc(840px - 50px);
 }
 
 .ai-images-scroller {
@@ -1316,7 +1320,7 @@ async function scrollThinkToBottom() {
 /* ==================== 分支切换器 ==================== */
 .branch-switch-wrapper {
   opacity: 0.4;
-  width: calc(60vw - 34px);
+  width: calc(840px - 34px);
   background-color: var(--branch-bg);
   border-radius: 24px;
   border: 1px solid var(--branch-border);

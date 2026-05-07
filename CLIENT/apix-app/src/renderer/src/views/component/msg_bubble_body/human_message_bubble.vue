@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
 
 /* ==================== 布局 ==================== */
 .message-wrapper {
-  width: 60vw;
+  width: 840px;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -438,7 +438,8 @@ onBeforeUnmount(() => {
   margin-left: 3px;
   height: 16px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease,
+              background-color 0.15s ease;
   position: relative;
 }
 
@@ -575,7 +576,7 @@ onBeforeUnmount(() => {
 /* ==================== 分支切换器（与 AI 气泡统一） ==================== */
 .branch-switch-wrapper {
   opacity: 0.4;
-  width: calc(60vw - 34px);
+  width: calc(840px - 34px);
   background-color: var(--branch-bg);
   border-radius: 24px;
   border: 1px solid var(--branch-border);
@@ -653,7 +654,8 @@ onBeforeUnmount(() => {
   background-color: var(--apix-panel-layer-1-background);
   color: var(--content-color);
   resize: none;
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: background-color 0.3s var(--apix-cubic-bezier),
+    box-shadow 0.3s var(--apix-cubic-bezier);
   scrollbar-width: none;
 }
 
@@ -676,7 +678,10 @@ onBeforeUnmount(() => {
   align-items: center;
   right: 10px;
   bottom: 10px;
-  transition: all 0.35s var(--apix-cubic-bezier);
+  transition: 
+    transform 0.35s var(--apix-cubic-bezier),
+    box-shadow 0.35s var(--apix-cubic-bezier),
+    background 0.35s var(--apix-cubic-bezier);
 }
 
 .send-button:hover {

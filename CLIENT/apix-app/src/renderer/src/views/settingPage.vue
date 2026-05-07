@@ -1171,7 +1171,6 @@ span.el-popper__arrow {
   border: 2px solid color-mix(in srgb, var(--apix-primary-color) 25%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(3px);
-  -webkit-transition: all 0.3s var(--apix-cubic-bezier);
   transition: all 0.3s var(--apix-cubic-bezier);
   background-color: color-mix(in srgb, var(--apix-panel-base-layer-background) 30%, transparent);
   color: var(--apix-info-dark-text);
@@ -1190,17 +1189,11 @@ span.el-popper__arrow {
 .title-tag-wrapper {
   position: relative;
   width: 100%;
-  transition: all 0.25s ease;
   height: fit-content;
   justify-content: center;
   display: flex;
   align-items: center;
   opacity: 0.95;
-}
-
-
-.title-tag:hover {
-  transform: scale(1.01);
 }
 
 .app-layout {
@@ -1255,11 +1248,11 @@ span.el-popper__arrow {
   gap: 10px;
   background: var(--apix-panel-layer-3-background);
   box-shadow: var(--apix-shadow-layer-1);
-  transition: all 0.2s ease;
+  transition: transform 0.2s var(--apix-cubic-bezier),
+    box-shadow 0.2s var(--apix-cubic-bezier);
 }
 
 .setting-card:hover {
-  position: relative;
   transform: translateY(-2px);
   box-shadow: var(--apix-shadow-layer-3);
 }
@@ -1303,12 +1296,11 @@ span.el-popper__arrow {
   font-size: 12px;
   color: var(--apix-secondary-dark-color);
   position: relative;
-  transition: all 0.25s var(--apix-cubic-bezier);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 .danger_info {
   color: var(--apix-danger-color);
-  transition: all 0.25s var(--apix-cubic-bezier);
 }
 
 .confirm-button {
@@ -1317,7 +1309,8 @@ span.el-popper__arrow {
   width: 64px;
   color: var(--apix-primary-color);
   border: 2px solid var(--apix-primary-light);
-  transition: all 0.22s var(--apix-cubic-bezier);
+  transition: color 0.22s var(--apix-cubic-bezier),
+    border 0.22s var(--apix-cubic-bezier);
   background-color: var(--apix-primary-lighter);
   border-radius: var(--apix-button-border-radius);
 }
@@ -1785,7 +1778,6 @@ span.el-popper__arrow {
   color: #9ab;
   font-weight: 500;
   letter-spacing: 0.5px;
-  transition: all 0.2s ease;
 }
 
 .engine-tag:hover {

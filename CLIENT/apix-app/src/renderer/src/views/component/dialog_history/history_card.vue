@@ -337,7 +337,6 @@ const handleConnectProject = async () => {
   color: rgba(60, 60, 67, 0.323);
   background-color: transparent;
   border: none;
-  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .q-icon-btn-star {

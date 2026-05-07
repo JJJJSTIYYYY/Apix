@@ -464,7 +464,8 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   border-radius: var(--apix-button-border-radius);
   color: var(--apix-lightest-color);
   background: var(--apix-primary-color);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: transform 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier);
   border: none;
 }
 
@@ -523,7 +524,8 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   background: color-mix(in srgb, var(--apix-primary-color) 20%, transparent);
   border-radius: 24px;
   box-shadow: var(--apix-shadow-layer-1);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: transform 0.3s var(--apix-cubic-bezier),
+    box-shadow 0.3s var(--apix-cubic-bezier);
 }
 
 .stats-wrapper:hover {

@@ -480,7 +480,6 @@ function foldAllCards() {
   background-color: var(--apix-panel-layer-2-background) !important;
   padding: 0;
   margin: 0px !important;
-  transition: all 0.28s var(--apix-cubic-bezier);
   box-shadow: inset -1px 0 0 0 var(--apix-border-disabled); 
 }
 
@@ -564,7 +563,6 @@ function foldAllCards() {
   padding: 15px 0px;
   padding-top: 0;
   background-color: transparent;
-  transition: all 0.25s var(--apix-cubic-bezier);
 }
 
 .right-card-container {
@@ -580,7 +578,7 @@ function foldAllCards() {
   margin: auto;
 
   width: 80%;
-  max-width: 60vw;
+  max-width: 840px;
   height: fit-content;
   padding: 16px;
   box-sizing: border-box;
@@ -598,8 +596,6 @@ function foldAllCards() {
   backdrop-filter: saturate(300%) blur(16px);
   background: color-mix(in oklch, var(--apix-panel-layer-3-background) 70%, transparent);
   box-shadow: var(--apix-shadow-md);
-
-  transition: all 0.6s var(--apix-cubic-bezier);
 }
 
 .ctrl-btn-area {
@@ -607,30 +603,7 @@ function foldAllCards() {
   height: fit-content;
 }
 
-.submit-btn {
-  width: 80px;
-  height: 32px;
-  padding: 6px 16px;
-  border-radius: var(--apix-button-border-radius) !important;
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier) !important;
-  color: var(--apix-success-button-text) !important;
-  background: var(--apix-success-button-background) !important;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
-}
-
-.submit-btn:hover {
-  transform: scale(1.03);
-  background: var(--apix-success-button-hover) !important;
-}
-
-.submit-btn:active {
-  transform: scale(1.01);
-  background: var(--apix-success-button-active) !important;
-}
-
+.submit-btn,
 .commom-btn {
   width: 80px;
   height: 32px;
@@ -639,19 +612,45 @@ function foldAllCards() {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier) !important;
-  color: var(--apix-default-button-text) !important;
-  background: var(--apix-default-button-background) !important;
+  transition: transform 0.2s var(--apix-cubic-bezier),
+              background 0.2s var(--apix-cubic-bezier) !important;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
+.submit-btn:hover,
 .commom-btn:hover {
   transform: scale(1.03);
+}
+
+.submit-btn:active,
+.commom-btn:active {
+  transform: scale(1.01);
+}
+
+.submit-btn {
+  color: var(--apix-success-button-text) !important;
+  background: var(--apix-success-button-background) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+}
+
+.submit-btn:hover {
+  background: var(--apix-success-button-hover) !important;
+}
+
+.submit-btn:active {
+  background: var(--apix-success-button-active) !important;
+}
+
+.commom-btn {
+  color: var(--apix-default-button-text) !important;
+  background: var(--apix-default-button-background) !important;
+}
+
+.commom-btn:hover {
   background: var(--apix-default-button-hover) !important;
 }
 
 .commom-btn:active {
-  transform: scale(1.01);
   background: var(--apix-default-button-active) !important;
 }
 
@@ -669,6 +668,7 @@ function foldAllCards() {
 
 <style scoped>
 :deep(.n-tabs .n-tabs-nav) {
+  background-color: var(--apix-default-light-color);
   border-radius: var(--apix-border-radius-base) !important;
   box-shadow: var(--apix-shadow-layer-1);
   transition: box-shadow 320ms var(--apix-cubic-bezier);

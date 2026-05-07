@@ -372,7 +372,8 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   border-radius: var(--apix-button-border-radius);
   color: var(--apix-lightest-color);
   background: var(--apix-primary-color);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: background-color 0.3s var(--apix-cubic-bezier),
+    transform 0.3s var(--apix-cubic-bezier);
   border: none;
 }
 
@@ -523,7 +524,8 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   gap: 10px;
   background: var(--apix-panel-layer-3-background);
   box-shadow: var(--apix-shadow-layer-1);
-  transition: all 0.2s ease;
+  transition: transform 0.2s var(--apix-cubic-bezier),
+    box-shadow 0.2s var(--apix-cubic-bezier);
 }
 
 .setting-card:hover {
@@ -571,12 +573,12 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
   font-size: 12px;
   color: var(--apix-secondary-dark-color);
   position: relative;
-  transition: all 0.25s var(--apix-cubic-bezier);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 .danger_info {
   color: var(--apix-danger-color);
-  transition: all 0.25s var(--apix-cubic-bezier);
+  transition: color 0.25s var(--apix-cubic-bezier);
 }
 
 /* ---------------------------------- */

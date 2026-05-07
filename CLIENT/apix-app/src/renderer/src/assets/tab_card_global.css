@@ -38,7 +38,7 @@
   column-width: 20px;
   width: 60px;
   margin-right: 20px;
-  transition: all 0.25s var(--apix-cubic-bezier);
+  transition: opacity 0.25s var(--apix-cubic-bezier);
 }
 
 .tab-card-btn-area:hover {
@@ -176,15 +176,17 @@
   align-items: center;
   justify-content: center;
   right: 3px;
-  height: 24px !important;
-  width: 24px !important;
-  padding: 0 !important;
+  height: 24px;
+  width: 24px;
+  padding: 0;
   
   background: var(--apix-primary-color);
-  border: none !important;
-  border-radius: 50% !important;
+  border: none;
+  border-radius: 50%;
   
-  transition: all 250ms var(--apix-cubic-bezier);
+  transition: transform 250ms var(--apix-cubic-bezier),
+              background-color 250ms var(--apix-cubic-bezier),
+              opacity 250ms var(--apix-cubic-bezier);
   cursor: pointer;
 }
 
@@ -201,7 +203,6 @@
 .mark-btn.mark_btn_right {
   opacity: 1;
   transform: scale(1) translateX(0);
-  transition: all 300ms var(--apix-cubic-bezier);
 }
 
 .mark-btn:not(.mark_btn_right) {

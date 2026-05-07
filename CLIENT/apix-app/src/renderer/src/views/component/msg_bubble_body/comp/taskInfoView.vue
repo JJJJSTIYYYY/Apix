@@ -514,7 +514,7 @@ watch(
   padding: 6px 8px;
   cursor: pointer;
   border-radius: 10px;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease;
 }
 .kv-item.isSelect {
   background: #94ead54c;
@@ -648,7 +648,9 @@ watch(
 .footer-label {
   border-radius: 24px;
   padding: 4px 8px;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease,
+    border 0.2s ease,
+    box-shadow 0.2s ease;
   border: 1px solid #ffffff00;
 }
 

@@ -128,14 +128,12 @@ const handleDelete = async () => {
 
   box-shadow: var(--apix-shadow-layer-2);
 
-  transition: all 0.4s cubic-bezier(0.34, 2, 0.64, 1);
+  transition: box-shadow 0.4s cubic-bezier(0.34, 2, 0.64, 1);
 }
 
 .skill-card:hover {
-  transform: translateY(-1px);
-
-  border: 1px solid var(--apix-panel-layer-2-background);
-  box-shadow: var(--apix-shadow-layer-3);
+  border: 1px solid var(--apix-primary-color);
+  box-shadow: var(--apix-shadow-layer-2);
 }
 
 /* Header - 保持原有样式 */

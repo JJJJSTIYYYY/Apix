@@ -425,7 +425,9 @@ function mergeSkills(messages: any[]) {
   border-radius: var(--apix-button-border-radius);
   color: var(--apix-lightest-color);
   background: var(--apix-primary-color);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: opacity 0.2s var(--apix-cubic-bezier),
+    color 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier);
   border: none;
 }
 

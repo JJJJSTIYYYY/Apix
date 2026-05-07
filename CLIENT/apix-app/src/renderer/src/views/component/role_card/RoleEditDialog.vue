@@ -393,19 +393,6 @@ const handleSave = () => {
   align-items: center;
 }
 
-.auto-get {
-  font-size: 12px;
-  color: var(--apix-primary-color);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.auto-get:hover {
-  text-decoration: underline;
-}
-
 /* 底部按钮区域 */
 .dialog-footer {
   display: flex;
@@ -421,7 +408,6 @@ const handleSave = () => {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier);
   color: var(--apix-default-dark-color);
   background: transparent;
 }
@@ -438,7 +424,9 @@ const handleSave = () => {
   border: none;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s var(--apix-cubic-bezier);
+  transition: opacity 0.2s var(--apix-cubic-bezier),
+    color 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier);
 
   background: color-mix(in srgb, var(--apix-lightest-color) 85%, transparent);
   color: var(--apix-darkest-color);

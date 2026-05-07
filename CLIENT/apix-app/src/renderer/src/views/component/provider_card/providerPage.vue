@@ -577,7 +577,8 @@ function formatTime(time: string) {
   border-radius: var(--apix-button-border-radius);
   color: var(--apix-lightest-color);
   background: var(--apix-primary-color);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: background-color 0.3s var(--apix-cubic-bezier),
+    transform 0.3s var(--apix-cubic-bezier);
   border: none;
 }
 

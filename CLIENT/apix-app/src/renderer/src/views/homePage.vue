@@ -6,7 +6,6 @@
     class="el-menu-vertical"
     :collapse-transition="false"
     :collapse="true"
-    :style="{ height: menuHeight + 'px' }"
     @open="handleOpen"
     @close="handleClose"
     @select="handleSelect"
@@ -88,7 +87,6 @@ onBeforeUnmount(() => {
 .el-menu-vertical {
   padding-top: 5px !important;
   left: calc(var(--apix-left-side-bar-width, 66px) - 66px);
-  transition: all 0.28s var(--apix-cubic-bezier);
 }
 
 .el-menu-vertical :deep(.el-icon svg path) {
@@ -112,10 +110,7 @@ onBeforeUnmount(() => {
   padding: 2px;
   padding-left: 4px;
   border: none !important;
-}
-
-.menu-item {
-  transition: all 0.24s var(--apix-cubic-bezier)
+  box-sizing: border-box;
 }
 
 .menu-buttom-item {
@@ -134,11 +129,10 @@ onBeforeUnmount(() => {
 
 .menu-buttom-item:hover {
   opacity: 1;
-  background-color: transparent;
 }
 
 .menu-buttom-item {
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: transform 0.3s var(--apix-cubic-bezier);
   transform-origin: 50% 50%;
 }
 
@@ -146,22 +140,9 @@ onBeforeUnmount(() => {
   transform: rotate(180deg);
 }
 
-.text-label {
-  width: 0px;
-  transition: all 0.2s var(--apix-cubic-bezier);
-}
-
-.el-menu-item {
-  transition: all 0.2s var(--apix-cubic-bezier) !important;
-}
-
 .el-menu-item:hover {
   color: var(--apix-primary-hover) !important;
   background-color: transparent;
-}
-
-.el-menu-vertical :deep(.el-icon:hover svg path) {
-  fill: var(--apix-primary-hover) !important;
 }
 
 .el-menu-item.is-active {
@@ -172,6 +153,10 @@ onBeforeUnmount(() => {
     rgba(79, 223, 208, 0.08) 20%, 
     rgba(79, 223, 208, 0) 60% 
   );
+}
+
+.el-menu-vertical :deep(.el-icon:hover svg path) {
+  fill: var(--apix-primary-hover) !important;
 }
 </style>
 

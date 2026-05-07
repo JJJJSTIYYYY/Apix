@@ -250,7 +250,8 @@ const handleTerminate = async () => {
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease,
+    color 0.3s ease;
 }
 
 .task-status.status-pending {
@@ -411,7 +412,10 @@ const handleTerminate = async () => {
   border: none;
   background: linear-gradient(135deg, var(--apix-danger-active) 0%, var(--apix-danger-color) 100%);
   box-shadow: var(--apix-shadow-layer-1);
-  transition: all 0.3s var(--apix-cubic-bezier);
+  transition: transform 0.3s var(--apix-cubic-bezier),
+              box-shadow 0.3s var(--apix-cubic-bezier),
+              background 0.3s var(--apix-cubic-bezier),
+              opacity 0.3s var(--apix-cubic-bezier);
 }
 
 .terminate-btn:hover:not(:disabled) {

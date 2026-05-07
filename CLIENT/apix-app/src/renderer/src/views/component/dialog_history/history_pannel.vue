@@ -507,7 +507,7 @@ const handleDeleteHistory = async (history_id: string) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.22s ease;
+  transition: width 0.22s ease;
 }
 
 .ctrl-line.is-history-hide {
@@ -532,8 +532,12 @@ const handleDeleteHistory = async (history_id: string) => {
 
   /* Transform & Animation */
   transform-origin: center center;
-  transform: translateZ(0) scale(1);
-  transition: all 0.22s var(--apix-cubic-bezier);
+  transform: scale(1);
+  transition: transform 0.22s var(--apix-cubic-bezier),
+              background-color 0.22s var(--apix-cubic-bezier),
+              opacity 0.22s var(--apix-cubic-bezier),
+              width 0.22s var(--apix-cubic-bezier),
+              filter 0.22s var(--apix-cubic-bezier);
 }
 
 .melt-btn:hover {
@@ -542,7 +546,7 @@ const handleDeleteHistory = async (history_id: string) => {
 }
 
 .melt-btn:active {
-  transform: translateZ(0) scale(0.92);
+  transform: scale(0.92);
 }
 
 /* Collapsed State */
@@ -586,9 +590,6 @@ const handleDeleteHistory = async (history_id: string) => {
   flex: 1;
   min-width: 0;
   height: 38px !important;
-  transform-origin: center;
-  transform: scale(1);
-  transition: transform 0.22s var(--apix-cubic-bezier);
 }
 
 .search-wrapper :deep(.el-input__wrapper) {
@@ -619,9 +620,11 @@ const handleDeleteHistory = async (history_id: string) => {
   color: var(--apix-secondary-dark-color);
 
   /* Transform & Animation */
-  transform-origin: center center;
-  transform: translateZ(0) scale(1);
-  transition: all 0.22s var(--apix-cubic-bezier);
+  transition: width 0.22s var(--apix-cubic-bezier),
+              box-shadow 0.22s var(--apix-cubic-bezier),
+              transform 0.22s var(--apix-cubic-bezier),
+              color 0.22s var(--apix-cubic-bezier),
+              background-color 0.22s var(--apix-cubic-bezier);
 }
 
 .create-btn.is-history-hide {
@@ -629,14 +632,24 @@ const handleDeleteHistory = async (history_id: string) => {
   width: 38px;
 }
 
-.create-btn:hover {
+.create-btn:not(.is-history-hide):hover {
   color: var(--apix-lightest-color);
   background-color: var(--apix-primary-color);
   transform: scale(1.02);
 }
 
-.create-btn:active {
-  transform: translateY(0);
+.create-btn.is-history-hide:hover {
+  color: var(--apix-lightest-color);
+  background-color: var(--apix-primary-color);
+  transform: scale(1.05);
+}
+
+.create-btn:not(.is-history-hide):active {
+  transform: scale(0.99);
+}
+
+.create-btn.is-history-hide:active {
+  transform: scale(0.92);
 }
 
 .create-btn .icon {

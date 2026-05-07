@@ -281,7 +281,8 @@ const onSubmit = async () => {
 
 /* Card float */
 .card-float-enter-active {
-  transition: all 0.4s var(--apix-cubic-bezier);
+  transition: opacity 0.4s var(--apix-cubic-bezier),
+    transform 0.4s var(--apix-cubic-bezier);
 }
 
 .card-float-enter-from {
@@ -423,7 +424,8 @@ const onSubmit = async () => {
 
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all 0.25s ease;
+  transition: transform 0.25s ease,
+    opacity 0.25s ease;
 }
 
 .fade-slide-enter-from {
@@ -438,7 +440,8 @@ const onSubmit = async () => {
 
 .form-switch-enter-active,
 .form-switch-leave-active {
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .form-switch-enter-from {
@@ -453,7 +456,8 @@ const onSubmit = async () => {
 
 .expand-fade-enter-active,
 .expand-fade-leave-active {
-  transition: all 0.25s ease;
+  transition: transform 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .expand-fade-enter-from,
@@ -494,7 +498,9 @@ const onSubmit = async () => {
   color: var(--apix-lightest-color);
   background: var(--apix-primary-color);
   box-shadow: var(--apix-shadow-layer-1);
-  transition: all 0.23s var(--apix-cubic-bezier);
+  transition: transform 0.23s var(--apix-cubic-bezier),
+    background 0.23s var(--apix-cubic-bezier),
+    box-shadow 0.23s var(--apix-cubic-bezier);
 }
 
 .submit-btn:hover {
