@@ -54,6 +54,8 @@ FILE/file_service/data/
 FILE/file_service/embed_models/
 # TASK
 TASK/logs/
+# Client
+
 
 # logs
 .apix_pids

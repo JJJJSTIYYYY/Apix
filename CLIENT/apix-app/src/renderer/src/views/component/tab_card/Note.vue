@@ -1,5 +1,5 @@
 <template>
-  <div 
+  <div
     class="tab-card"
     :class="{ expanded: self.expanded }"
   >
@@ -8,112 +8,156 @@
       class="tab-card-header"
       :class="{ expanded: self.expanded }"
       :draggable="!self.expanded"
-      :style="{background: color }"
-      @dragstart.stop="onTabCardDragStart($event)"
+      :style="{ background: self.cardColor }"
+      @dragstart.stop="onTabCardDragStart"
     >
-      <div style="display: flex; flex-direction: row;">        
+      <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
-          <svg t="1774033814393" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18411" width="16" height="16"><path d="M352 384a32 32 0 0 1 32-32h256a32 32 0 0 1 0 64h-256a32 32 0 0 1-32-32z m32 160h256a32 32 0 0 0 0-64h-256a32 32 0 0 0 0 64z m128 64h-128a32 32 0 0 0 0 64h128a32 32 0 0 0 0-64zM896 192v434.752A63.488 63.488 0 0 1 877.248 672L672 877.248a63.36 63.36 0 0 1-45.248 18.752H192a64 64 0 0 1-64-64V192a64 64 0 0 1 64-64h640a64 64 0 0 1 64 64zM192 832h416v-192a32 32 0 0 1 32-32h192V192H192v640z m480-160v114.784L786.752 672H672z" p-id="18412"></path></svg>
+          <svg
+            t="1774033814393"
+            class="icon"
+            viewBox="0 0 1024 1024"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            p-id="18411"
+            width="16"
+            height="16"
+          >
+            <path
+              d="M352 384a32 32 0 0 1 32-32h256a32 32 0 0 1 0 64h-256a32 32 0 0 1-32-32z m32 160h256a32 32 0 0 0 0-64h-256a32 32 0 0 0 0 64z m128 64h-128a32 32 0 0 0 0 64h128a32 32 0 0 0 0-64zM896 192v434.752A63.488 63.488 0 0 1 877.248 672L672 877.248a63.36 63.36 0 0 1-45.248 18.752H192a64 64 0 0 1-64-64V192a64 64 0 0 1 64-64h640a64 64 0 0 1 64 64zM192 832h416v-192a32 32 0 0 1 32-32h192V192H192v640z m480-160v114.784L786.752 672H672z"
+              p-id="18412"
+            />
+          </svg>
         </div>
+
         <input
+          v-model="self.title"
           class="tab-title-input no-drag"
-          v-model="titleInput"
-          :placeholder="'注记卡片'"
-          @change="onTabCardTitleChange($event)"
-          @keyup.enter="onTabCardTitleChange($event)"
-          @mouseup="onMouseUp_input($event)"
-          @focusout="onMouseUp_input($event)"
-          @mousemove="onMouseUp_input($event)"
-          @mouseenter="onMouseUp_input($event)"
+          placeholder="注记卡片"
+          @change="onTabCardTitleChange"
+          @mouseup="onMouseUpInput"
+          @focusout="onMouseUpInput"
+          @mousemove="onMouseUpInput"
+          @mouseenter="onMouseUpInput"
         />
       </div>
 
-      <PopMenu 
+      <PopMenu
         v-if="isShowMenu"
         :style="menuStyle"
         @close-menu="closePopMenu"
-        @save-card="saveCardAsPredefined"
         @mark-card="markCard"
         @mark-content="updateMarkContent"
       />
 
       <el-tooltip
-        v-if="isShowMark_"
-        :content="markMessage"
+        v-if="isShowMarkUICtrl"
+        :content="self.markMessage"
         placement="left"
         effect="light"
         raw-content
       >
         <transition name="scale-fade">
           <button
+            v-if="self.marked"
             key="11"
-            v-if="isShowMark"
             class="mark-btn"
-            :class="{ mark_btn_right: mark_btn_right }"
+            :class="{ mark_btn_right: markBtnRight }"
             @click="hideMark"
           >
-            <svg t="1778086454896" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10188" width="20" height="20"><path d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z" p-id="10189" fill="var(--apix-lightest-color)"></path><path d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z" p-id="10190" fill="var(--apix-lightest-color)"></path></svg>
+            <svg
+              t="1778086454896"
+              class="icon"
+              viewBox="0 0 1024 1024"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              p-id="10188"
+              width="20"
+              height="20"
+            >
+              <path
+                d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z"
+                p-id="10189"
+                fill="var(--apix-lightest-color)"
+              />
+              <path
+                d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z"
+                p-id="10190"
+                fill="var(--apix-lightest-color)"
+              />
+            </svg>
           </button>
         </transition>
       </el-tooltip>
 
-      <div class="tab-card-btn-area"
-        @mouseenter="mark_btn_right = false"
-        @mouseleave="mark_btn_right = true"
+      <div
+        class="tab-card-btn-area"
+        @mouseenter="markBtnRight = false"
+        @mouseleave="markBtnRight = true"
       >
         <!-- More 按钮 -->
         <el-button
           ref="menuBtnRef"
           type="info"
-          @click="showPopMenu"
           class="tab-card-btn-menu"
+          @click="showPopMenu"
         >
-          <el-icon><MoreFilled /></el-icon>
+          <el-icon>
+            <MoreFilled />
+          </el-icon>
         </el-button>
 
         <el-button
-          @click="editTabCard()"
           class="tab-card-btn-more"
-          :class="{ tabcardbtnmoreexpanded: self?.expanded }"
+          :class="{ tabcardbtnmoreexpanded: self.expanded }"
+          @click="editTabCard"
         >
           <el-icon>
-            <component :is="self.expanded ? 'Check' : 'Postcard'" />
+            <component :is="self.expanded ? Check : Postcard" />
           </el-icon>
         </el-button>
 
         <el-button
           type="danger"
-          @click="removeThisCard()"
           class="tab-card-btn-close"
+          @click="removeThisCard"
         >
-          <el-icon><Close /></el-icon>
+          <el-icon>
+            <Close />
+          </el-icon>
         </el-button>
       </div>
     </div>
 
-    <!--  mark 卡片体 -->
-    <div v-if="self?.expanded" class="mark-card-body">
-      <div class="mark-body-wrapper" :style="{height: 'auto', overflow: 'auto', scrollbarWidth: 'none'}">
+    <!-- Note 卡片体 -->
+    <div
+      v-if="self.expanded"
+      class="mark-card-body"
+    >
+      <div
+        class="mark-body-wrapper"
+        style="height: auto; overflow: auto; scrollbar-width: none;"
+      >
         <div
-          tag="div"
           class="mark-content"
           draggable="false"
           style="display: grid; gap: 2px; grid-template-columns: 56px auto; min-height: auto"
         >
           <div class="field-value color-picker-wrapper">
-            <el-color-picker 
-              key="2" 
-              v-model="color" 
-              :predefine="predefineColors" 
+            <el-color-picker
+              v-model="self.cardColor"
+              :predefine="predefineColors"
+              @change="onColorChange"
             />
           </div>
+
           <div class="field-value">
             <el-input
-              v-model="descriptionInput"
+              v-model="self.noteContent"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 10 }"
-              placeholder="请输入需要执行的操作描述，比如需要执行的SQL、注意事项等"
-              @input="onDescriptionChange"
+              placeholder="请输入注记内容"
+              @input="onNoteContentChange"
             />
           </div>
         </div>
@@ -122,19 +166,41 @@
   </div>
 </template>
 
-
 <script setup lang="ts">
+import { ref } from 'vue'
+
+import {
+  MoreFilled,
+  Close,
+  Check,
+  Postcard,
+} from '@element-plus/icons-vue'
+
+import { InputDialog } from '../comp/inputDialog'
+import { globalState } from '../../../store/globalData.js'
+
+import PopMenu from './comp/PopMenu.vue'
+
+// ------------------------
+// 类型定义
+// ------------------------
 type CardBase = {
   id: string
   title: string
   type: string
   level: string
 }
+
 type TabCardBase = CardBase & {
   uid: number
   expanded: boolean
-  prams: {}
-  content: []
+  marked?: boolean
+  markMessage?: string
+}
+
+type NoteCardBase = TabCardBase & {
+  cardColor: string
+  noteContent: string
 }
 
 // ------------------------
@@ -142,7 +208,7 @@ type TabCardBase = CardBase & {
 // ------------------------
 const props = defineProps<{
   father_uid?: number
-  self?: TabCardBase
+  self: NoteCardBase
   tab_key: string
 }>()
 
@@ -150,181 +216,161 @@ const props = defineProps<{
 // 触发事件列表
 // ------------------------
 const emit = defineEmits<{
-  (e: "update:delete-card", card_uid: number): void
+  (e: 'update:delete-card', card_uid: number): void
   (e: 'update:contentChange', card_uid: number): void
 }>()
 
-import { watch, ref } from 'vue'
-import { useAppCacheData } from '../../../store/app'
-import { InputDialog } from '../comp/inputDialog'
-import { globalState } from '../../../store/globalData.js'
-import PopMenu from './comp/PopMenu.vue'
-
-const store = useAppCacheData()
-
-const loadAllVarName = () => {
-  return [
-    { label: 'No Suggestion', value: '' }
-  ]
-}
-if (!props.self.prams) {
-  props.self.prams = {}; // 确保是个字典
-}
-if (!props.self.prams.text) {
-  props.self.prams.text = "";
-}
-if (!props.self.prams.color) {
-  props.self.prams.color = "";
-}
 // ------------------------
-// 右侧标签页里卡片的拖拽逻辑
+// 初始化默认值
 // ------------------------
-function onTabCardDragStart(event: DragEvent) {
+props.self.noteContent ??= ''
+props.self.cardColor ??= ''
+props.self.marked ??= false
+props.self.markMessage ??= '已标记'
+
+// ------------------------
+// 拖拽逻辑
+// ------------------------
+function onTabCardDragStart() {
   globalState.draggedStartCardUid_parent = props.father_uid
-  globalState.draggedStartCardUid = props.self?.uid
-  globalState.draggedCard = ""
-  globalState.draggedTabCard = ""
+  globalState.draggedStartCardUid = props.self.uid
+  globalState.draggedCard = ''
   globalState.draggedTabCard = JSON.stringify(props.self)
 }
 
 // ------------------------
-// 显示弹出菜单
+// 输入框光标修复
 // ------------------------
-let isShowMenu = ref(false)
-const mark_btn_right = ref(true)
-let menuStyle = ref({})
-let menuBtnRef = ref(null)
+function onMouseUpInput(e: Event) {
+  const el = e.target as HTMLInputElement
+  const cursorEnd = el.selectionEnd ?? 0
+
+  el.setSelectionRange(cursorEnd, cursorEnd)
+}
+
+// ------------------------
+// 标题修改
+// ------------------------
+function onTabCardTitleChange(e: Event) {
+  emit('update:contentChange', props.self.uid)
+
+  ;(e.target as HTMLInputElement).blur()
+}
+
+// ------------------------
+// 内容修改
+// ------------------------
+function onNoteContentChange() {
+  emit('update:contentChange', props.self.uid)
+}
+
+function onColorChange() {
+  emit('update:contentChange', props.self.uid)
+}
+
+// ------------------------
+// 弹出菜单
+// ------------------------
+const isShowMenu = ref(false)
+const menuStyle = ref<Record<string, string>>({})
+const menuBtnRef = ref()
 
 function showPopMenu() {
   isShowMenu.value = !isShowMenu.value
-  console.log("Note: showPopMenu: isShowMenu = " + isShowMenu.value)
 
-  if (isShowMenu.value && menuBtnRef.value) {
-    const rect = menuBtnRef.value.$el.getBoundingClientRect()
-    const menuWidth = 144 // 你自己设定的菜单宽度
-    console.log("Note: showPopMenu: rect = "+rect.left+" "+rect.top)
+  const btnEl = menuBtnRef.value?.$el
 
-    const btnRect = menuBtnRef.value.$el.getBoundingClientRect()
-    const parentRect = menuBtnRef.value.$el.offsetParent.getBoundingClientRect()
+  if (!isShowMenu.value || !btnEl) {
+    return
+  }
 
-    // 相对父容器的坐标
-    const relativeTop = btnRect.top - parentRect.top
-    const relativeLeft = btnRect.left - parentRect.left
+  const menuWidth = 144
+  const btnRect = btnEl.getBoundingClientRect()
 
-    menuStyle.value = {
-      position: 'absolute',
-      top: '10px',
-      left: relativeLeft-menuWidth+'px',
-    }
+  const parentEl = btnEl.offsetParent as HTMLElement | null
+
+  if (!parentEl) {
+    return
+  }
+
+  const parentRect = parentEl.getBoundingClientRect()
+
+  menuStyle.value = {
+    position: 'absolute',
+    top: '10px',
+    left: `${btnRect.left - parentRect.left - menuWidth}px`,
   }
 }
 
 function closePopMenu() {
   isShowMenu.value = false
-  console.log("Note: closePopMenu")
 }
 
 // ------------------------
-// 弹出菜单里的操作
+// 标记逻辑
 // ------------------------
-if (!props.self.prams.markIsShow) {
-  props.self.prams.markIsShow = false;
-}
-const isShowMark = ref(props.self.prams.markIsShow)
-const isShowMark_ = ref(true)
-
-if (!props.self.prams.markMessage) {
-  props.self.prams.markMessage = "已标记";
-}
-const markMessage = ref(props.self.prams.markMessage)
-
-function saveCardAsPredefined() {
-  
-}
+const markBtnRight = ref(true)
+const isShowMarkUICtrl = ref(true)
 
 function markCard() {
-  isShowMark.value = !isShowMark.value
-  props.self.prams.markIsShow = isShowMark.value
-  emit("update:contentChange", props.self.uid)
+  props.self.marked = !props.self.marked
+
+  emit('update:contentChange', props.self.uid)
 }
 
 function hideMark() {
-  isShowMark.value = false
-  props.self.prams.markIsShow = isShowMark.value
-  emit("update:contentChange", props.self.uid)
+  props.self.marked = false
+
+  emit('update:contentChange', props.self.uid)
+
   setTimeout(() => {
-    isShowMark_.value = false
+    isShowMarkUICtrl.value = false
   }, 200)
+
   setTimeout(() => {
-    isShowMark_.value = true
+    isShowMarkUICtrl.value = true
   }, 220)
 }
 
 async function updateMarkContent() {
   try {
-    InputDialog.open('请输入文本', '编辑 Mark 内容', {
-      placeholder: markMessage.value,
-      defaultValue: markMessage.value,
-    }).then(value => {
-      markMessage.value = value
-      props.self.prams.markMessage = markMessage.value
-      isShowMark.value = true
-      props.self.prams.markIsShow = isShowMark.value
-      emit("update:contentChange", props.self.uid)
-    }).catch(() => {
-    })
-  } catch {}
+    const value = await InputDialog.open(
+      '请输入文本',
+      '编辑 Mark 内容',
+      {
+        placeholder: props.self.markMessage,
+        defaultValue: props.self.markMessage,
+      }
+    )
+
+    props.self.markMessage = value
+    props.self.marked = true
+
+    emit('update:contentChange', props.self.uid)
+  }
+  catch {}
 }
 
 // ------------------------
-// 删除右侧卡片
+// 删除卡片
 // ------------------------
-async function removeThisCard() {
-  emit("update:delete-card", props.self?.uid)
+function removeThisCard() {
+  emit('update:delete-card', props.self.uid)
 }
 
 // ------------------------
-// 编辑右侧卡片
+// 展开 / 收起
 // ------------------------
 function editTabCard() {
   props.self.expanded = !props.self.expanded
-  emit("update:contentChange", props.self.uid)
+
+  emit('update:contentChange', props.self.uid)
 }
 
 // ------------------------
-// 页面布局控制
+// 预定义颜色
 // ------------------------
-const titleInput = ref(props.self.title)
-
-function onMouseUp_input(e: Event) {
-  const el = e.target as HTMLInputElement
-  const cursorPos = el.selectionStart   // 光标起始位置
-  const cursorEnd = el.selectionEnd     // 光标结束位置
-  // console.log("光标位置:", cursorPos, cursorEnd)
-  el.setSelectionRange(cursorEnd, cursorEnd)
-}
-
-function onTabCardTitleChange(e: Event) {
-  if (props.self) {
-    props.self.title = titleInput.value
-    emit("update:contentChange", props.self.uid)
-  }
-  (e.target as HTMLInputElement).blur()
-}
-
-const textValue = ref(props.self.prams.text)
-const color = ref(props.self.prams.color ?? '')
-
-watch(textValue, (newVal) => {
-  props.self.prams.text = newVal
-  emit("update:contentChange", props.self.uid)
-})
-watch(color, (newVal) => {
-  props.self.prams.color = newVal
-  emit("update:contentChange", props.self.uid)
-})
-
-const predefineColors = ref([
+const predefineColors = [
   '#ff4500',
   '#ff8c00',
   '#ffd700',
@@ -339,7 +385,7 @@ const predefineColors = ref([
   'hsl(181, 100%, 37%)',
   'hsla(209, 100%, 56%, 0.73)',
   '#c7158577',
-])
+]
 </script>
 
 

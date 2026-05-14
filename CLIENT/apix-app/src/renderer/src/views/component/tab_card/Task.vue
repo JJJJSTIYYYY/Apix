@@ -8,99 +8,143 @@
       class="tab-card-header"
       :class="{ expanded: self.expanded }"
       :draggable="!self.expanded"
-      @dragstart.stop="onTabCardDragStart($event)"
+      @dragstart.stop="onTabCardDragStart"
     >
       <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
-          <svg t="1774033696111" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17196" width="16" height="16"><path d="M641.536 382.464l102.4 102.4a38.4 38.4 0 0 1 0 54.272l-102.4 102.4-54.3232-54.272 75.264-75.264-75.264-75.264 54.272-54.272zM280.064 539.136l102.4 102.4 54.3232-54.272L361.5232 512l75.264-75.264-54.272-54.272-102.4 102.4a38.4 38.4 0 0 0 0 54.272z" p-id="17197"></path><path d="M870.4 921.6H153.6a25.6 25.6 0 0 1-25.6-25.6v-768A25.6 25.6 0 0 1 153.6 102.4h513.3312a25.6 25.6 0 0 1 18.1248 7.4752l203.4688 203.4688a25.6 25.6 0 0 1 7.4752 18.1248V896a25.6 25.6 0 0 1-25.6 25.6z m-51.2-76.8V352.6656L645.7344 179.2H204.8v665.6h614.4z" p-id="17198"></path></svg>
+          <svg
+            t="1774033696111"
+            class="icon"
+            viewBox="0 0 1024 1024"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            p-id="17196"
+            width="16"
+            height="16"
+          >
+            <path
+              d="M641.536 382.464l102.4 102.4a38.4 38.4 0 0 1 0 54.272l-102.4 102.4-54.3232-54.272 75.264-75.264-75.264-75.264 54.272-54.272zM280.064 539.136l102.4 102.4 54.3232-54.272L361.5232 512l75.264-75.264-54.272-54.272-102.4 102.4a38.4 38.4 0 0 0 0 54.272z"
+              p-id="17197"
+            />
+            <path
+              d="M870.4 921.6H153.6a25.6 25.6 0 0 1-25.6-25.6v-768A25.6 25.6 0 0 1 153.6 102.4h513.3312a25.6 25.6 0 0 1 18.1248 7.4752l203.4688 203.4688a25.6 25.6 0 0 1 7.4752 18.1248V896a25.6 25.6 0 0 1-25.6 25.6z m-51.2-76.8V352.6656L645.7344 179.2H204.8v665.6h614.4z"
+              p-id="17198"
+            />
+          </svg>
         </div>
+
         <input
+          v-model="self.title"
           class="tab-title-input no-drag"
-          v-model="titleInput"
-          placeholder="数据库测试"
-          @change="onTabCardTitleChange($event)"
-          @keyup.enter="onTabCardTitleChange($event)"
-          @mouseup="onMouseUp_input($event)"
-          @focusout="onMouseUp_input($event)"
-          @mousemove="onMouseUp_input($event)"
-          @mouseenter="onMouseUp_input($event)"
+          placeholder="任务卡"
+          @change="onTabCardTitleChange"
+          @mouseup="onMouseUpInput"
+          @focusout="onMouseUpInput"
+          @mousemove="onMouseUpInput"
+          @mouseenter="onMouseUpInput"
         />
       </div>
 
-      
       <PopMenu
         v-if="isShowMenu"
         :style="menuStyle"
         @close-menu="closePopMenu"
-        @save-card="saveCardAsPredefined"
         @mark-card="markCard"
         @mark-content="updateMarkContent"
       />
 
       <el-tooltip
-        v-if="isShowMark_"
-        :content="markMessage"
+        v-if="isShowMarkUICtrl"
+        :content="self.markMessage"
         placement="left"
         effect="light"
         raw-content
       >
         <transition name="scale-fade">
           <button
+            v-if="self.marked"
             key="11"
-            v-if="isShowMark"
             class="mark-btn"
-            :class="{ mark_btn_right: mark_btn_right }"
+            :class="{ mark_btn_right: markBtnRight }"
             @click="hideMark"
           >
-            <svg t="1778086454896" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10188" width="20" height="20"><path d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z" p-id="10189" fill="var(--apix-lightest-color)"></path><path d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z" p-id="10190" fill="var(--apix-lightest-color)"></path></svg>
+            <svg
+              t="1778086454896"
+              class="icon"
+              viewBox="0 0 1024 1024"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              p-id="10188"
+              width="20"
+              height="20"
+            >
+              <path
+                d="M661.333333 426.666667a149.333333 149.333333 0 1 1-298.666666 0 149.333333 149.333333 0 0 1 298.666666 0z m-58.660571 0a90.672762 90.672762 0 1 0-181.345524 0 90.672762 90.672762 0 0 0 181.345524 0z"
+                p-id="10189"
+                fill="var(--apix-lightest-color)"
+              />
+              <path
+                d="M853.333333 426.666667c0 231.18019-341.333333 512-341.333333 512S170.666667 657.846857 170.666667 426.666667c0-188.513524 152.81981-341.333333 341.333333-341.333334s341.333333 152.81981 341.333333 341.333334z m-58.660571 0c0-156.111238-126.537143-282.672762-282.672762-282.672762-156.111238 0-282.672762 126.537143-282.672762 282.672762 0 44.080762 16.579048 94.98819 46.201905 149.504 29.330286 53.906286 69.193143 107.203048 110.250667 154.916571A1537.926095 1537.926095 0 0 0 512 860.598857a1537.926095 1537.926095 0 0 0 126.22019-129.511619c41.057524-47.713524 80.920381-101.010286 110.250667-154.916571 29.622857-54.51581 46.201905-105.423238 46.201905-149.504z"
+                p-id="10190"
+                fill="var(--apix-lightest-color)"
+              />
+            </svg>
           </button>
         </transition>
       </el-tooltip>
 
       <div
         class="tab-card-btn-area"
-        @mouseenter="mark_btn_right = false"
-        @mouseleave="mark_btn_right = true"
+        @mouseenter="markBtnRight = false"
+        @mouseleave="markBtnRight = true"
       >
         <el-button
           ref="menuBtnRef"
           type="info"
-          @click="showPopMenu"
           class="tab-card-btn-menu"
+          @click="showPopMenu"
         >
-          <el-icon><MoreFilled /></el-icon>
+          <el-icon>
+            <MoreFilled />
+          </el-icon>
         </el-button>
 
         <el-button
-          @click="editTabCard()"
           class="tab-card-btn-more"
           :class="{ tabcardbtnmoreexpanded: self.expanded }"
+          @click="editTabCard"
         >
           <el-icon>
-            <component :is="self.expanded ? 'Check' : 'Postcard'" />
+            <component :is="self.expanded ? Check : Postcard" />
           </el-icon>
         </el-button>
 
         <el-button
           type="danger"
-          @click="removeThisCard()"
           class="tab-card-btn-close"
+          @click="removeThisCard"
         >
-          <el-icon><Close /></el-icon>
+          <el-icon>
+            <Close />
+          </el-icon>
         </el-button>
       </div>
     </div>
 
-    <!-- 简化后的 task 卡片体 -->
-    <div v-if="self.expanded" class="task-card-body">
+    <!-- Task 卡片体 -->
+    <div
+      v-if="self.expanded"
+      class="task-card-body"
+    >
       <div class="task-body-wrapper">
         <div class="task-content">
           <div class="field-label">
             任务描述:
           </div>
+
           <div class="field-value">
             <el-input
-              v-model="addressInput"
+              v-model="self.address"
               placeholder="请输入任务描述"
               @input="onAddressChange"
             />
@@ -109,9 +153,10 @@
           <div class="field-label">
             步骤概述:
           </div>
+
           <div class="field-value">
             <el-input
-              v-model="descriptionInput"
+              v-model="self.description"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 10 }"
               placeholder="（选填）请输入需要执行的操作步骤或描述"
@@ -126,10 +171,17 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { More, Close } from '@element-plus/icons-vue'
-import { useAppCacheData } from '../../../store/app.js'
+
+import {
+  MoreFilled,
+  Close,
+  Check,
+  Postcard,
+} from '@element-plus/icons-vue'
+
 import { InputDialog } from '../comp/inputDialog.js'
 import { globalState } from '../../../store/globalData.js'
+
 import PopMenu from './comp/PopMenu.vue'
 
 type CardBase = {
@@ -142,13 +194,18 @@ type CardBase = {
 type TabCardBase = CardBase & {
   uid: number
   expanded: boolean
+  marked?: boolean
+  markMessage?: string
+}
+
+type TaskCardBase = TabCardBase & {
   address: string
   description: string
 }
 
 const props = defineProps<{
   father_uid?: number
-  self: TabCardBase
+  self: TaskCardBase
   tab_key: string
 }>()
 
@@ -157,30 +214,18 @@ const emit = defineEmits<{
   (e: 'update:contentChange', card_uid: number): void
 }>()
 
-const store = useAppCacheData()
-
 // ------------------------
 // 初始化兜底
 // ------------------------
-if (!props.self.address) {
-  props.self.address = ''
-}
-
-if (!props.self.description) {
-  props.self.description = ''
-}
-
-// ------------------------
-// 页面输入状态
-// ------------------------
-const titleInput = ref(props.self.title)
-const addressInput = ref(props.self.address)
-const descriptionInput = ref(props.self.description)
+props.self.address ??= ''
+props.self.description ??= ''
+props.self.marked ??= false
+props.self.markMessage ??= '已标记'
 
 // ------------------------
 // 拖拽逻辑
 // ------------------------
-function onTabCardDragStart(event: DragEvent) {
+function onTabCardDragStart() {
   globalState.draggedStartCardUid_parent = props.father_uid
   globalState.draggedStartCardUid = props.self.uid
   globalState.draggedCard = ''
@@ -188,31 +233,33 @@ function onTabCardDragStart(event: DragEvent) {
 }
 
 // ------------------------
-// 标题修改
+// 输入框光标修复
 // ------------------------
-function onMouseUp_input(e: Event) {
+function onMouseUpInput(e: Event) {
   const el = e.target as HTMLInputElement
   const cursorEnd = el.selectionEnd ?? 0
+
   el.setSelectionRange(cursorEnd, cursorEnd)
 }
 
+// ------------------------
+// 标题修改
+// ------------------------
 function onTabCardTitleChange(e: Event) {
-  props.self.title = titleInput.value
-  emit("update:contentChange", props.self.uid)
+  emit('update:contentChange', props.self.uid)
+
   ;(e.target as HTMLInputElement).blur()
 }
 
 // ------------------------
 // 卡片体字段修改
 // ------------------------
-function onAddressChange(value: string) {
-  props.self.address = value
-  emit("update:contentChange", props.self.uid)
+function onAddressChange() {
+  emit('update:contentChange', props.self.uid)
 }
 
-function onDescriptionChange(value: string) {
-  props.self.description = value
-  emit("update:contentChange", props.self.uid)
+function onDescriptionChange() {
+  emit('update:contentChange', props.self.uid)
 }
 
 // ------------------------
@@ -225,18 +272,27 @@ const menuBtnRef = ref()
 function showPopMenu() {
   isShowMenu.value = !isShowMenu.value
 
-  if (isShowMenu.value && menuBtnRef.value?.$el) {
-    const menuWidth = 144
-    const btnRect = menuBtnRef.value.$el.getBoundingClientRect()
-    const parentRect = menuBtnRef.value.$el.offsetParent.getBoundingClientRect()
+  const btnEl = menuBtnRef.value?.$el
 
-    const relativeLeft = btnRect.left - parentRect.left
+  if (!isShowMenu.value || !btnEl) {
+    return
+  }
 
-    menuStyle.value = {
-      position: 'absolute',
-      top: '10px',
-      left: `${relativeLeft - menuWidth}px`,
-    }
+  const menuWidth = 144
+  const btnRect = btnEl.getBoundingClientRect()
+
+  const parentEl = btnEl.offsetParent as HTMLElement | null
+
+  if (!parentEl) {
+    return
+  }
+
+  const parentRect = parentEl.getBoundingClientRect()
+
+  menuStyle.value = {
+    position: 'absolute',
+    top: '10px',
+    left: `${btnRect.left - parentRect.left - menuWidth}px`,
   }
 }
 
@@ -245,65 +301,48 @@ function closePopMenu() {
 }
 
 // ------------------------
-// 菜单里的标记逻辑
+// 标记逻辑
 // ------------------------
-const mark_btn_right = ref(true)
-
-const selfExt = props.self as TabCardBase & {
-  markIsShow?: boolean
-  markMessage?: string
-}
-
-if (selfExt.markIsShow === undefined) {
-  selfExt.markIsShow = false
-}
-if (!selfExt.markMessage) {
-  selfExt.markMessage = '已标记'
-}
-
-const isShowMark = ref(selfExt.markIsShow)
-const isShowMark_ = ref(true)
-const markMessage = ref(selfExt.markMessage)
-
-function saveCardAsPredefined() {
-  // 预留
-}
+const markBtnRight = ref(true)
+const isShowMarkUICtrl = ref(true)
 
 function markCard() {
-  isShowMark.value = !isShowMark.value
-  selfExt.markIsShow = isShowMark.value
-  emit("update:contentChange", props.self.uid)
+  props.self.marked = !props.self.marked
+
+  emit('update:contentChange', props.self.uid)
 }
 
 function hideMark() {
-  isShowMark.value = false
-  selfExt.markIsShow = false
-  emit("update:contentChange", props.self.uid)
+  props.self.marked = false
+
+  emit('update:contentChange', props.self.uid)
 
   setTimeout(() => {
-    isShowMark_.value = false
+    isShowMarkUICtrl.value = false
   }, 200)
 
   setTimeout(() => {
-    isShowMark_.value = true
+    isShowMarkUICtrl.value = true
   }, 220)
 }
 
 async function updateMarkContent() {
   try {
-    InputDialog.open('请输入文本', '编辑 Mark 内容', {
-      placeholder: markMessage.value,
-      defaultValue: markMessage.value,
-    })
-      .then((value: string) => {
-        markMessage.value = value
-        selfExt.markMessage = value
-        isShowMark.value = true
-        selfExt.markIsShow = true
-        emit("update:contentChange", props.self.uid)
-      })
-      .catch(() => {})
-  } catch {}
+    const value = await InputDialog.open(
+      '请输入文本',
+      '编辑 Mark 内容',
+      {
+        placeholder: props.self.markMessage,
+        defaultValue: props.self.markMessage,
+      }
+    )
+
+    props.self.markMessage = value
+    props.self.marked = true
+
+    emit('update:contentChange', props.self.uid)
+  }
+  catch {}
 }
 
 // ------------------------
@@ -318,7 +357,8 @@ function removeThisCard() {
 // ------------------------
 function editTabCard() {
   props.self.expanded = !props.self.expanded
-  emit("update:contentChange", props.self.uid)
+
+  emit('update:contentChange', props.self.uid)
 }
 </script>
 

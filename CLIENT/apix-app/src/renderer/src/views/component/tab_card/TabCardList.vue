@@ -80,35 +80,38 @@ type CardBase = {
 type TabCardBase = CardBase & {
   uid: number
   expanded: boolean
+  marked?: boolean
+  markMessage?: string
 }
 
-type BasicTaskCard = TabCardBase & {
+type taskCardBase = TabCardBase & {
   type: 'task'
   address: string
   description: string
 }
 
-type ScriptCard = TabCardBase & {
+type scriptCardBase = TabCardBase & {
   type: 'script'
   script: string
   description: string
 }
 
-type NoteCard = TabCardBase & {
+type noteCardBase = TabCardBase & {
   type: 'note'
-  description?: string
+  cardColor: string
+  noteContent: string
 }
 
-type FolderCard = TabCardBase & {
+type folderCardBase = TabCardBase & {
   type: 'folder'
   content: TabCardItem[]
 }
 
 type TabCardItem =
-  | BasicTaskCard
-  | ScriptCard
-  | NoteCard
-  | FolderCard
+  | taskCardBase
+  | scriptCardBase
+  | noteCardBase
+  | folderCardBase
 
 const props = defineProps<{
   items: TabCardItem[]
@@ -129,7 +132,9 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
     type: virtualCard.type,
     level: virtualCard.level,
     uid: Date.now() + Math.random(),
-    expanded: false
+    expanded: false,
+    marked: false,
+    markMessage: '已标记',
   }
 
   switch (virtualCard.type) {
@@ -160,14 +165,16 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
       return {
         ...base,
         type: 'note',
-        description: '',
+        cardColor: '',
+        noteContent: '',
       }
 
     default:
       return {
         ...base,
         type: 'note',
-        description: '',
+        cardColor: '',
+        noteContent: '',
       }
   }
 }
@@ -245,9 +252,6 @@ function DragCardDropInCardList_insert(item: TabCardItem, dropIndex: number, eve
   globalState.draggedTabCard = ''
 }
 
-// ------------------------
-// 删除右侧卡片
-// ------------------------
 function removeCardFromTree(tree: TabCardItem[], uid: number): boolean {
   if (!Array.isArray(tree)) return false
 
@@ -278,41 +282,6 @@ function removeTabCard(cardUid: number) {
     ElMessage({ type: 'success', message: '已删除' })
     emit("update:contentChange")
   }
-}
-
-// ------------------------
-// 页面动画控制
-// ------------------------
-const DURATION = 100
-const EASE = 'linear'
-
-function beforeLeave(el: HTMLElement) {
-  el.style.boxSizing = 'border-box'
-  el.style.height = el.offsetHeight + 'px'
-  el.style.transition = `height ${DURATION}ms ${EASE}, margin ${DURATION}ms ${EASE}, padding ${DURATION}ms ${EASE}, opacity ${DURATION}ms ${EASE}`
-}
-
-function leave(el: HTMLElement, done: () => void) {
-  requestAnimationFrame(() => {
-    el.style.height = '0px'
-    el.style.opacity = '0'
-    el.style.paddingTop = '0px'
-    el.style.paddingBottom = '0px'
-    el.style.marginBottom = '0px'
-  })
-
-  setTimeout(() => {
-    done()
-  }, DURATION + 10)
-}
-
-function afterLeave(el: HTMLElement) {
-  el.style.transition = ''
-  el.style.height = ''
-  el.style.opacity = ''
-  el.style.paddingTop = ''
-  el.style.paddingBottom = ''
-  el.style.marginBottom = ''
 }
 </script>
 

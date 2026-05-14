@@ -372,7 +372,7 @@ function handleDrop(targetIndex: number) {
   tabs.splice(targetIndex, 0, movedTab)
   draggingTabIndex.value = null
 
-  saveTabs()
+  store.saveTabs()
 }
 
 // ------------------------
@@ -381,11 +381,15 @@ function handleDrop(targetIndex: number) {
 const dirDict = ref(null)
 const filePanelRef = ref<InstanceType<typeof FilePanel>>()
 
-const eventTypesNeedRefresh = new Set([
+const eventTypesNeedRefreshWorkspaceTreeNode = new Set([
   'add',
   'unlink',
   'addDir',
   'unlinkDir'
+])
+
+const eventTypesNeedUpdateFileStatus = new Set([
+  'change',
 ])
 
 // Change workspace
@@ -482,41 +486,45 @@ const collapseDir = async (path) => {
 // Merge fs events into dir tree
 const watchWorkspace = async (events) => {
   for (const e of events) {
-    if (!eventTypesNeedRefresh.has(e.type)) continue
-    // Find parent directory
-    const parentNode = findNodeByPath(dirDict.value, e.parent)
-    if (!parentNode) continue
-    // Ensure children exists
-    if (!Array.isArray(parentNode.children)) {
-      parentNode.children = []
+    if (eventTypesNeedRefreshWorkspaceTreeNode.has(e.type)) {
+      // Find parent directory
+      const parentNode = findNodeByPath(dirDict.value, e.parent)
+      if (!parentNode) continue
+      // Ensure children exists
+      if (!Array.isArray(parentNode.children)) {
+        parentNode.children = []
+      }
+      // Directory add
+      if (e.type === 'addDir') {
+        // Avoid duplicate
+        const exists = parentNode.children.some(child => child.path === e.path)
+        if (exists) continue
+        parentNode.children.push({
+          name: e.path.split('/').pop(),
+          path: e.path,
+          type: 'directory',
+          children: []
+        })
+        sortChildren(parentNode.children)
+      }
+      // File add
+      else if (e.type === 'add') {
+        const exists = parentNode.children.some(child => child.path === e.path)
+        if (exists) continue
+        parentNode.children.push({
+          name: e.path.split('/').pop(),
+          path: e.path,
+          type: 'file'
+        })
+        sortChildren(parentNode.children)
+      }
+      // Remove directory/file
+      else if (e.type === 'unlink' || e.type === 'unlinkDir') {
+        removeNodeByPath(dirDict.value, e.path)
+      }
     }
-    // Directory add
-    if (e.type === 'addDir') {
-      // Avoid duplicate
-      const exists = parentNode.children.some(child => child.path === e.path)
-      if (exists) continue
-      parentNode.children.push({
-        name: e.path.split('/').pop(),
-        path: e.path,
-        type: 'directory',
-        children: []
-      })
-      sortChildren(parentNode.children)
-    }
-    // File add
-    else if (e.type === 'add') {
-      const exists = parentNode.children.some(child => child.path === e.path)
-      if (exists) continue
-      parentNode.children.push({
-        name: e.path.split('/').pop(),
-        path: e.path,
-        type: 'file'
-      })
-      sortChildren(parentNode.children)
-    }
-    // Remove directory/file
-    else if (e.type === 'unlink' || e.type === 'unlinkDir') {
-      removeNodeByPath(dirDict.value, e.path)
+    else if (eventTypesNeedUpdateFileStatus.has(e.type)) {
+      
     }
   }
 }
