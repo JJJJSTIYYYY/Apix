@@ -4,15 +4,28 @@ import path from 'path'
 import os from 'os'
 
 import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { FileSystemManager } from '../modules/file_service/FileSystemManager'
 
 // =====================================================
 //              Data write / read handlers
 // =====================================================
-export function registerFileIpc() {
+export function registerFileIpc(mainWindow) {
   console.log('registerFileIpc...')
   const dataDir = path.join(app.getPath('userData'), 'ApiX')
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   console.log('Apix data dir:', dataDir)
+
+  const fsManager =
+    new FileSystemManager({
+
+      onEvents(events) {
+        // Send fs events to renderer
+        mainWindow.webContents.send(
+          'fs:events',
+          events
+        )
+      }
+    })
 
   ipcMain.handle('openFileDialog', async (event, type, extensions = []) => {
     let properties = []
@@ -134,10 +147,8 @@ export function registerFileIpc() {
       fs.writeFileSync(filePath, Buffer.from(base64, 'base64'))
 
       return filePath
-
     } catch (err) {
       console.error('createTempFileFromBase64 error:', err)
-
       return null
     }
   })
@@ -180,7 +191,6 @@ export function registerFileIpc() {
         success: true,
         removed: removedCount,
       }
-
     } catch (err) {
       console.error('[cleanTempDir] error:', err)
       return {
@@ -189,4 +199,108 @@ export function registerFileIpc() {
       }
     }
   })
+
+  // Watch workspace
+  ipcMain.handle(
+    'fs:watch',
+    async (_, dirPath) => {
+      await fsManager.watchWorkspace(dirPath)
+    }
+  )
+
+  // Unwatch workspace
+  ipcMain.handle(
+    'fs:unwatch',
+    async (_,) => {
+      await fsManager.unwatchWorkspace()
+    }
+  )
+
+  // Get directory tree inside workspace
+  ipcMain.handle(
+    'fs:getDirectoryTree',
+    async (_, targetPath) => {
+      return await fsManager.getDirectoryTree(targetPath)
+    }
+  )
+
+  // Collapse directory tree inside workspace
+  ipcMain.handle(
+    'fs:collapseDirectoryTree',
+    async (_, targetPath) => {
+      return await fsManager.collapseDirectoryTree(targetPath)
+    }
+  )
+
+  // Create file
+  ipcMain.handle(
+    'fs:createFile',
+    async (_, filePath, encoding = 'utf-8') => {
+      return await fsManager.createFile(filePath, encoding)
+    }
+  )
+
+  // Delete file
+  ipcMain.handle(
+    'fs:deleteFile',
+    async (_, filePath) => {
+      await fsManager.deleteFile(filePath)
+    }
+  )
+
+  // Read file
+  ipcMain.handle(
+    'fs:readFile',
+    async (_, filePath, encoding = 'utf-8') => {
+      return await fsManager.readFile(filePath, encoding)
+    }
+  )
+
+  // Write file
+  ipcMain.handle(
+    'fs:writeFile',
+    async (_, filePath, content, encoding = 'utf-8') => {
+      await fsManager.writeFile(filePath, content, encoding)
+    }
+  )
+
+  // Search files
+  ipcMain.handle(
+    'fs:searchFiles',
+    async (_, cwd) => {
+      return await fsManager.searchFiles(cwd)
+    }
+  )
+
+  // Create directory
+  ipcMain.handle(
+    'fs:createDirectory',
+    async (_, dirPath) => {
+      return await fsManager.createDirectory(dirPath)
+    }
+  )
+
+  // Delete directory
+  ipcMain.handle(
+    'fs:deleteDirectory',
+    async (_, dirPath) => {
+      return await fsManager.deleteDirectory(dirPath)
+    }
+  )
+
+  // Rename file
+  ipcMain.handle(
+    'fs:rename',
+    async (_, oldPath, newPath) => {
+      await fsManager.rename(oldPath, newPath)
+    }
+  )
+
+  // Search text
+  ipcMain.handle(
+    'fs:searchText',
+    async (_, keyword, cwd) => {
+      return await fsManager.searchText(keyword, cwd)
+    }
+  )
 }

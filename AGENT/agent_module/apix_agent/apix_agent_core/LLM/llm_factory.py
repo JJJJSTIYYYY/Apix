@@ -14,37 +14,32 @@ def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfig
     if not provider.strip() or not model.strip():
         raise ValueError(f"Unsupported LLM service type: {provider}: {model}")
 
+    llm_model = None
     if provider  in ("ollama:local", "ollama"):
-        ollama_model = get_ollama_model(model, api_key, BASE_URL.get(provider), config)
-        return ollama_model
+        llm_model = get_ollama_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "openai":
-        openai_model = get_openai_model(model, api_key, BASE_URL.get(provider), config)
-        return openai_model
+        llm_model = get_openai_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "deepseek":
-        qianfan_model = get_deepseek_model(model, api_key, BASE_URL.get(provider), config)
-        return qianfan_model
+        llm_model = get_deepseek_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "moonshot":
-        moonshot_model = get_moonshot_model(model, api_key, BASE_URL.get(provider), config)
-        return moonshot_model
+        llm_model = get_moonshot_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "xiaomimimo":
-        openai_model = get_xiaomi_model(model, api_key, BASE_URL.get(provider), config)
-        return openai_model
+        llm_model = get_xiaomi_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "google":
         raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
-        google_model = get_google_model(model, api_key, BASE_URL.get(provider), config)
-        return google_model
+        llm_model = get_google_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "qianfan":
         raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
-        qianfan_model = get_qianfan_model(model, api_key, BASE_URL.get(provider), config)
-        return qianfan_model
+        llm_model = get_qianfan_model(model, api_key, BASE_URL.get(provider), config)
     elif provider.startswith("custom-"):
         _, p_type, p_id = provider.split('-', 2)
         if p_type == "openai":
-            custom_model = get_openai_model(model, api_key, BASE_URL.get(provider), config)
+            llm_model = get_openai_model(model, api_key, BASE_URL.get(provider), config)
         else:
             raise ProviderNoFound(f"Unsupport provider type: {p_type}.", provider=p_id)
-        return custom_model
     else:
         logger.error(f"[get_llm_node] Failed to get {model} from {provider}...")
         raise ValueError(f"Unsupported LLM service type: {provider}")
+    
+    return llm_model
     

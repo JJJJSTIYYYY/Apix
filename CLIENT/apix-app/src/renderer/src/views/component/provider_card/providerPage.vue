@@ -214,7 +214,7 @@ const handleProviderToggle = ({ id, enabled }: { id: string; enabled: boolean })
     })
   }
 
-  store.persistLocalProviders()
+  store.persistState('providers')
 
   // 同步 UI
   const localMap = new Map(
@@ -311,7 +311,7 @@ const getProviders = async (cid: string): Promise<ProviderItem[]> => {
       })
     }
 
-    store.persistLocalProviders()
+    store.persistState('providers')
 
     return mergedList
 
@@ -356,7 +356,7 @@ const handleDeleteProvider = async (providerId: string) => {
       })
     }
 
-    store.persistLocalProviders()
+    store.persistState('providers')
 
     ElMessage({
       type: 'success',
@@ -471,7 +471,7 @@ const handleSaveProvider = async (payload: {
       })
     }
 
-    store.persistLocalProviders()
+    store.persistState('providers')
 
     ElMessage({
       type: 'success',

@@ -96,6 +96,9 @@ class LlmNodeAdapter:
         *,
         input,
         reasoning: bool = False,
+        fall_back_provider: str = '',
+        fall_back_model_name: str = '',
+        fall_back_api_key: str = '',
     ):
         """
         Unified streaming interface.
@@ -119,10 +122,12 @@ class LlmNodeAdapter:
             - Pass reasoning if supported
         """
 
-        provider = getattr(llm_node, "provider", None)
-        model_name = getattr(llm_node, "model_name", None)
-        api_key = getattr(llm_node, "api_key", None)
+        provider = getattr(llm_node, "provider", fall_back_provider)
+        model_name = getattr(llm_node, "model_name", fall_back_model_name)
+        api_key = getattr(llm_node, "api_key", fall_back_api_key)
         config = getattr(llm_node, "extra_body", {}) or {}
+
+        logger.warning(f"[LlmNodeAdapter] [astream] Get attr: provider={provider}, model_name={model_name}.")
 
         if provider == "deepseek" or (
             model_name and model_name.startswith("deepseek")
@@ -130,7 +135,7 @@ class LlmNodeAdapter:
             # If current model not match → rebuild
             if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
                 llm_node = get_llm_node(
-                    provider="deepseek",
+                    provider=provider,
                     model=model_name,
                     api_key=api_key,
                     config={"enable_think": reasoning},
@@ -146,7 +151,7 @@ class LlmNodeAdapter:
             # If current model not match → rebuild
             if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
                 llm_node = get_llm_node(
-                    provider="xiaomimimo",
+                    provider=provider,
                     model=model_name,
                     api_key=api_key,
                     config={"enable_think": reasoning},
@@ -182,6 +187,9 @@ class LlmNodeAdapter:
         *,
         input,
         reasoning: bool = False,
+        fall_back_provider: str = '',
+        fall_back_model_name: str = '',
+        fall_back_api_key: str = '',
     ):
         """
         Unified non-stream invoke interface.
@@ -205,10 +213,12 @@ class LlmNodeAdapter:
             - Keep official LangChain behavior
         """
 
-        provider = getattr(llm_node, "provider", None)
-        model_name = getattr(llm_node, "model_name", None)
-        api_key = getattr(llm_node, "api_key", None)
+        provider = getattr(llm_node, "provider", fall_back_provider)
+        model_name = getattr(llm_node, "model_name", fall_back_model_name)
+        api_key = getattr(llm_node, "api_key", fall_back_api_key)
         config = getattr(llm_node, "extra_body", {}) or {}
+
+        logger.warning(f"[LlmNodeAdapter] [ainvoke] Get attr: provider={provider}, model_name={model_name}.")
 
         if provider == "deepseek" or (
             model_name and model_name.startswith("deepseek")
@@ -319,6 +329,10 @@ class LlmNodeAdapter:
             resp: AIMessage = await cls.ainvoke(
                 llm_node,
                 input=messages,
+                reasoning=False,
+                fall_back_provider=provider,
+                fall_back_model_name=model_name,
+                fall_back_api_key=api_key
             )
 
             content = resp.content

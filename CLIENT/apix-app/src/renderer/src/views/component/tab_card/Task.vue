@@ -72,13 +72,12 @@
         </el-button>
 
         <el-button
-          :type="self.btnType"
           @click="editTabCard()"
           class="tab-card-btn-more"
           :class="{ tabcardbtnmoreexpanded: self.expanded }"
         >
           <el-icon>
-            <component :is="self.btnIcon" />
+            <component :is="self.expanded ? 'Check' : 'Postcard'" />
           </el-icon>
         </el-button>
 
@@ -92,30 +91,30 @@
       </div>
     </div>
 
-    <!-- 简化后的 database 卡片体 -->
-    <div v-if="self.showCardBody" class="database-card-body">
-      <div class="database-body-wrapper">
-        <div class="database-content">
+    <!-- 简化后的 task 卡片体 -->
+    <div v-if="self.expanded" class="task-card-body">
+      <div class="task-body-wrapper">
+        <div class="task-content">
           <div class="field-label">
-            数据库连接:
+            任务描述:
           </div>
           <div class="field-value">
             <el-input
               v-model="addressInput"
-              placeholder="请输入数据库连接 URL"
+              placeholder="请输入任务描述"
               @input="onAddressChange"
             />
           </div>
 
           <div class="field-label">
-            操作描述:
+            步骤概述:
           </div>
           <div class="field-value">
             <el-input
               v-model="descriptionInput"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 10 }"
-              placeholder="请输入需要执行的操作描述，比如需要执行的SQL、注意事项等"
+              placeholder="（选填）请输入需要执行的操作步骤或描述"
               @input="onDescriptionChange"
             />
           </div>
@@ -128,8 +127,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { More, Close } from '@element-plus/icons-vue'
-import { useAppCacheData } from '../../../store/app'
-import { InputDialog } from '../comp/inputDialog'
+import { useAppCacheData } from '../../../store/app.js'
+import { InputDialog } from '../comp/inputDialog.js'
 import { globalState } from '../../../store/globalData.js'
 import PopMenu from './comp/PopMenu.vue'
 
@@ -142,10 +141,7 @@ type CardBase = {
 
 type TabCardBase = CardBase & {
   uid: number
-  showCardBody: boolean
   expanded: boolean
-  btnType: string
-  btnIcon: string
   address: string
   description: string
 }
@@ -158,6 +154,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:delete-card', card_uid: number): void
+  (e: 'update:contentChange', card_uid: number): void
 }>()
 
 const store = useAppCacheData()
@@ -201,7 +198,7 @@ function onMouseUp_input(e: Event) {
 
 function onTabCardTitleChange(e: Event) {
   props.self.title = titleInput.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
   ;(e.target as HTMLInputElement).blur()
 }
 
@@ -210,12 +207,12 @@ function onTabCardTitleChange(e: Event) {
 // ------------------------
 function onAddressChange(value: string) {
   props.self.address = value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 function onDescriptionChange(value: string) {
   props.self.description = value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 // ------------------------
@@ -249,8 +246,6 @@ function closePopMenu() {
 
 // ------------------------
 // 菜单里的标记逻辑
-// 这里仍然沿用原来的临时挂载方式
-// 如果你之后想继续彻底简化，也可以把这部分也抽掉
 // ------------------------
 const mark_btn_right = ref(true)
 
@@ -277,13 +272,13 @@ function saveCardAsPredefined() {
 function markCard() {
   isShowMark.value = !isShowMark.value
   selfExt.markIsShow = isShowMark.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 function hideMark() {
   isShowMark.value = false
   selfExt.markIsShow = false
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 
   setTimeout(() => {
     isShowMark_.value = false
@@ -305,7 +300,7 @@ async function updateMarkContent() {
         selfExt.markMessage = value
         isShowMark.value = true
         selfExt.markIsShow = true
-        store.saveTab(props.tab_key)
+        emit("update:contentChange", props.self.uid)
       })
       .catch(() => {})
   } catch {}
@@ -322,17 +317,8 @@ function removeThisCard() {
 // 展开 / 收起
 // ------------------------
 function editTabCard() {
-  if (props.self.showCardBody) {
-    props.self.btnType = 'primary'
-    props.self.btnIcon = 'Postcard'
-  } else {
-    props.self.btnType = 'success'
-    props.self.btnIcon = 'Check'
-  }
-
   props.self.expanded = !props.self.expanded
-  props.self.showCardBody = !props.self.showCardBody
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 </script>
 
@@ -346,11 +332,11 @@ textarea {
   user-select: none;
 }
 
-.database-body-wrapper {
+.task-body-wrapper {
   min-height: 60px;
 }
 
-.database-content {
+.task-content {
   position: relative;
   border-radius: 8px;
   background: transparent;

@@ -1,7 +1,11 @@
 import { defineStore } from "pinia"
-import { toRaw, isRef, unref, ref } from 'vue'
+import { toRaw, isRef, unref } from 'vue'
 import { setHighlightTheme } from './globalData'
 
+
+// ----------------
+// Default config
+// ----------------
 const DEFAULT_CONFIG = {
   // ----- app ui -----
   dark_theme: false,
@@ -10,7 +14,7 @@ const DEFAULT_CONFIG = {
   backgroundImage: '',
   showToolLabels: false,
 
-  // ----- chat config in setting page -----
+  // ----- chat config -----
   httpProxyUrl: '',
   httpsProxyUrl: '',
   excludeUrl: '',
@@ -29,31 +33,34 @@ const DEFAULT_CONFIG = {
   keepNotSummary: 0,
   pureChat: false,
   agentSwarm: false,
-  
-  // ai permission config
+
+  // ----- ai permissions -----
   fileOpration: false,
   webSearch: false,
   knowledgeRetrieval: false,
   commandOpration: false,
   skillLoad: false,
   agentAssign: false,
-  
-  // ----- chat config in ai page -----
+
+  // ----- ai page -----
   modelProvider: '',
   modelName: '',
   apiKey: '',
   deepThink: false,
   visionOn: false,
-  
-  // ----- extra config in data page -----
+
+  // ----- extra -----
   embeddingModel: '',
+
   rolePrompt: {
     name: '',
     definition: '',
   },
+
   testExpertMode: false,
   higherRolePromptPermission: false,
   autoRefreshTask: false,
+
   activeProvider: {
     provider_id: '',
     name: '',
@@ -62,374 +69,497 @@ const DEFAULT_CONFIG = {
 }
 
 
+// ----------------
+// Persist states
+// ----------------
+const PERSIST_STATES = {
+  work_dir: {
+    storageKey: 'work_dir_map',
+    defaultValue: {},
+  },
+
+  workspace: {
+    storageKey: 'workspace',
+    defaultValue: '',
+  },
+
+  apiKeyCache: {
+    storageKey: 'api_key_cache',
+    defaultValue: {},
+  },
+
+  role_prompts: {
+    storageKey: 'role_prompts',
+    defaultValue: [],
+  },
+
+  providers: {
+    storageKey: 'providers',
+    defaultValue: [],
+  },
+}
+
+
+// ----------------
+// Helpers
+// ----------------
+function cloneDefault(value) {
+  return structuredClone(value)
+}
+
+function parseStorageValue(raw, defaultValue) {
+  try {
+    const parsed = JSON.parse(raw)
+
+    // Array
+    if (Array.isArray(defaultValue)) {
+      return Array.isArray(parsed)
+        ? parsed
+        : cloneDefault(defaultValue)
+    }
+
+    // Object
+    if (
+      typeof defaultValue === 'object'
+      &&
+      defaultValue !== null
+    ) {
+      return (
+        parsed
+        &&
+        typeof parsed === 'object'
+      )
+        ? parsed
+        : cloneDefault(defaultValue)
+    }
+
+    return parsed
+
+  } catch {
+    return cloneDefault(defaultValue)
+  }
+}
+
+
 export const useAppCacheData = defineStore("app", {
   state: () => ({
-    // ---------- UI config (single source of truth)
+    // ---------- persistent config
     config: { ...DEFAULT_CONFIG },
 
-    // ---------- UI state (non-persistent)
+    // ---------- ui state
     activedTabName: "",
     current_history_id: '-1',
     currentWorkDir: '',
 
-    // ---------- data
+    // ---------- runtime data
     cards: [],
     tabs: [],
     messages: [],
-    work_dir: {}, // {hid: work_dir}
-    apiKeyCache: {}, // {provider: api_key}
-    role_prompts: [], // {id, roleName, roleDefinition, enabled}
-    providers: [], // {provider_id, provider_name, api_key, enabled}
+
+    // ---------- persisted states
+    work_dir: {},
+    workspace: '',
+    apiKeyCache: {},
+    role_prompts: [],
+    providers: [],
   }),
 
   actions: {
+
     // ----------------
     // App init
     // ----------------
     async init() {
       try {
-        // Restore config first (do NOT reset defaults here)
         this.restoreAllConfig()
-        this.restoreWorkDir()
-        this.restoreRolePrompts()
-        this.restoreApiKeyCache()
-        this.restoreLocalProvidersCache()
 
-        const cards = await this.readCards()
-        const tabs = await this.readTabs()
+        Object.keys(PERSIST_STATES).forEach((key) => {
+          this.restorePersistedState(key)
+          // console.log("restorePersistedState: ", key, this[key])
+        })
 
-        if (Array.isArray(cards)) this.cards = cards
-        if (Array.isArray(tabs)) this.tabs = tabs
+        await this.restoreTabsAndCards()
+
       } catch (e) {
-        console.error("store.init error", e)
+        console.error('store.init error:', e)
       }
     },
+
+
+    // ----------------
+    // Theme
+    // ----------------
+    applyTheme() {
+      const isDark = this.config.dark_theme
+
+      document.documentElement.setAttribute(
+        'data-theme',
+        isDark ? 'dark' : 'light'
+      )
+
+      setHighlightTheme(isDark)
+    },
+
 
     // ----------------
     // Config
     // ----------------
     restoreAllConfig() {
       Object.keys(DEFAULT_CONFIG).forEach((key) => {
-        const value = localStorage.getItem(key)
-        if (value === null) return
+        const raw = localStorage.getItem(key)
+
+        if (raw === null) {
+          return
+        }
 
         const defaultValue = DEFAULT_CONFIG[key]
 
+        // Boolean
         if (typeof defaultValue === 'boolean') {
-          this.config[key] = value === 'true'
-        } 
+          this.config[key] = raw === 'true'
+        }
+
+        // Number
         else if (typeof defaultValue === 'number') {
-          this.config[key] = Number(value)
+          this.config[key] = Number(raw)
         }
+
+        // Object
         else if (typeof defaultValue === 'object') {
-          try {
-            this.config[key] = JSON.parse(value)
-          } catch {
-            this.config[key] = defaultValue
-          }
+          this.config[key] = parseStorageValue(
+            raw,
+            defaultValue
+          )
         }
+
+        // String
         else {
-          this.config[key] = value
+          this.config[key] = raw
         }
       })
-      
-      if (this.config.dark_theme) {
-        document.documentElement.setAttribute('data-theme', 'dark')
-        setHighlightTheme(true)
-      }
-      else {
-        document.documentElement.setAttribute('data-theme', 'light')
-        setHighlightTheme(false)
-      }
+
+      this.applyTheme()
     },
 
-    restoreWorkDir() {
+    saveAppConfig(key, value) {
       try {
-        const raw = localStorage.getItem("work_dir_map")
-        if (!raw) return
+        const rawValue = isRef(value)
+          ? unref(value)
+          : value
 
-        const parsed = JSON.parse(raw)
+        this.config[key] = rawValue
 
-        if (parsed && typeof parsed === "object") {
-          this.work_dir = parsed
+        localStorage.setItem(
+          key,
+          typeof rawValue === 'object'
+            ? JSON.stringify(rawValue)
+            : String(rawValue)
+        )
+
+        // Auto apply theme
+        if (key === 'dark_theme') {
+          this.applyTheme()
         }
+
       } catch (e) {
-        console.error("restoreWorkDir failed:", e)
-        this.work_dir = {}
+        console.error('saveAppConfig failed:', e)
       }
     },
 
-    restoreApiKeyCache() {
+
+    // ----------------
+    // Generic persist
+    // ----------------
+    restorePersistedState(stateKey) {
+      const config = PERSIST_STATES[stateKey]
+
+      if (!config) {
+        console.warn(`Unknown persist state: ${stateKey}`)
+        return
+      }
+
       try {
-        const raw = localStorage.getItem("api_key_cache")
+        const raw = localStorage.getItem(
+          config.storageKey
+        )
 
-        if (!raw) {
-          this.apiKeyCache = {}
-          return
-        }
+        this[stateKey] = raw
+          ? parseStorageValue(
+              raw,
+              config.defaultValue
+            )
+          : cloneDefault(config.defaultValue)
 
-        const parsed = JSON.parse(raw)
-
-        if (parsed && typeof parsed === "object") {
-          this.apiKeyCache = parsed
-        } else {
-          this.apiKeyCache = {}
-        }
       } catch (e) {
-        console.error("restoreApiKeyCache failed:", e)
-        this.apiKeyCache = {}
+        console.error(
+          `restore ${stateKey} failed:`,
+          e
+        )
+
+        this[stateKey] = cloneDefault(
+          config.defaultValue
+        )
       }
     },
 
-    restoreRolePrompts() {
-      try {
-        const raw = localStorage.getItem("role_prompts")
+    persistState(stateKey) {
+      const config = PERSIST_STATES[stateKey]
 
-        if (!raw) {
-          this.role_prompts = []
-          return
-        }
-
-        const parsed = JSON.parse(raw)
-
-        if (Array.isArray(parsed)) {
-          this.role_prompts = parsed
-        } else {
-          this.role_prompts = []
-        }
-      } catch (e) {
-        console.error("restoreRolePrompts failed:", e)
-        this.role_prompts = []
+      if (!config) {
+        console.warn(`Unknown persist state: ${stateKey}`)
+        return
       }
-    },
 
-    restoreLocalProvidersCache() {
-      try {
-        const raw = localStorage.getItem("providers")
-
-        if (!raw) {
-          this.providers = []
-          return
-        }
-
-        const parsed = JSON.parse(raw)
-
-        if (Array.isArray(parsed)) {
-          this.providers = parsed
-        } else {
-          this.providers = []
-        }
-      } catch (e) {
-        console.error("restoreLocalProvidersCache failed:", e)
-        this.providers = []
-      }
-    },
-
-    persistWorkDir() {
       try {
         localStorage.setItem(
-          "work_dir_map",
-          JSON.stringify(toRaw(this.work_dir))
+          config.storageKey,
+          JSON.stringify(
+            toRaw(this[stateKey])
+          )
         )
+
       } catch (e) {
-        console.error("persistWorkDir failed:", e)
+        console.error(
+          `persist ${stateKey} failed:`,
+          e
+        )
       }
     },
 
-    persistApiKeyCache() {
-      try {
-        localStorage.setItem(
-          "api_key_cache",
-          JSON.stringify(toRaw(this.apiKeyCache))
-        )
-      } catch (e) {
-        console.error("persistApiKeyCache failed:", e)
-      }
-    },
 
-    persistRolePrompts() {
-      try {
-        localStorage.setItem(
-          "role_prompts",
-          JSON.stringify(toRaw(this.role_prompts))
-        )
-      } catch (e) {
-        console.error("persistRolePrompts failed:", e)
-      }
-    },
-
-    persistLocalProviders() {
-      try {
-        localStorage.setItem(
-          "providers",
-          JSON.stringify(toRaw(this.providers))
-        )
-      } catch (e) {
-        console.error("persistLocalProviders failed:", e)
-      }
-    },
-
+    // ----------------
+    // Agent work dir
+    // ----------------
     setWorkDir(history_id, dir) {
       if (!history_id) return
 
       this.work_dir[history_id] = dir
-      this.persistWorkDir()
+      this.persistState('work_dir')
     },
 
     getWorkDir(history_id) {
-      if (!history_id) return ""
-
-      return this.work_dir[history_id] || ""
+      return history_id
+        ? (this.work_dir[history_id] || '')
+        : ''
     },
 
     removeWorkDir(history_id) {
       if (!history_id) return
 
       delete this.work_dir[history_id]
-      this.persistWorkDir()
+      this.persistState('work_dir')
     },
 
-    addRolePrompt(role) {
-      if (!role || !role.id) return
 
-      this.role_prompts.push(role)
-      this.persistRolePrompts()
+    // ----------------
+    // Workspace
+    // ----------------
+    setWorkspace(dir) {
+      this.workspace = dir
+      this.persistState('workspace')
     },
 
+    getWorkspace() {
+      return this.workspace || ''
+    },
+
+    removeWorkspace() {
+      this.workspace = ''
+      this.persistState('workspace')
+    },
+
+
+    // ----------------
+    // Api key cache
+    // ----------------
     setApiKeyCache(provider, apiKey) {
       if (!provider) return
 
-      this.apiKeyCache[provider] = apiKey || ""
-      this.persistApiKeyCache()
+      this.apiKeyCache[provider] = apiKey || ''
+      this.persistState('apiKeyCache')
     },
 
     getApiKeyCache(provider) {
-      if (!provider) return ""
-
-      return this.apiKeyCache[provider] || ""
+      return provider
+        ? (this.apiKeyCache[provider] || '')
+        : ''
     },
 
     removeApiKeyCache(provider) {
       if (!provider) return
 
       delete this.apiKeyCache[provider]
-      this.persistApiKeyCache()
+      this.persistState('apiKeyCache')
+    },
+
+
+    // ----------------
+    // Role prompts
+    // ----------------
+    addRolePrompt(role) {
+      if (!role?.id) return
+
+      this.role_prompts.push(role)
+      this.persistState('role_prompts')
     },
 
     updateRolePrompt(updatedRole) {
-      if (!updatedRole || !updatedRole.id) return
+      if (!updatedRole?.id) return
 
-      const index = this.role_prompts.findIndex(r => r.id === updatedRole.id)
+      const index = this.role_prompts.findIndex(
+        r => r.id === updatedRole.id
+      )
+
       if (index === -1) return
 
       this.role_prompts[index] = updatedRole
-      this.persistRolePrompts()
+
+      this.persistState('role_prompts')
     },
 
     removeRolePrompt(roleId) {
       if (!roleId) return
 
-      this.role_prompts = this.role_prompts.filter(r => r.id !== roleId)
-      this.persistRolePrompts()
+      this.role_prompts = this.role_prompts.filter(
+        r => r.id !== roleId
+      )
+
+      this.persistState('role_prompts')
     },
 
     toggleRolePrompt(roleId) {
-      const role = this.role_prompts.find(r => r.id === roleId)
+      const role = this.role_prompts.find(
+        r => r.id === roleId
+      )
+
       if (!role) return
 
       role.enabled = !role.enabled
-      this.persistRolePrompts()
+
+      this.persistState('role_prompts')
     },
 
-    _saveAppConfig(key, value) {
-      try {
-        const rawValue = isRef(value) ? unref(value) : value
-        this.config[key] = rawValue
-        localStorage.setItem(key, String(rawValue))
-        console.log('Save onfig: Key: ', key, " Value: ", value)
-      } catch (e) {
-        console.error("saveAppConfig failed:", e)
-      }
-    },
-
-    saveAppConfig(key, value) {
-      try {
-        const rawValue = isRef(value) ? unref(value) : value
-        this.config[key] = rawValue
-
-        // 支持对象
-        if (typeof rawValue === 'object') {
-          localStorage.setItem(key, JSON.stringify(rawValue))
-        } else {
-          localStorage.setItem(key, String(rawValue))
-        }
-
-      } catch (e) {
-        console.error("saveAppConfig failed:", e)
-      }
-    },
 
     // ----------------
     // Tabs helpers
     // ----------------
     findTab(tabKey) {
-      return this.tabs.findIndex(t => t.tabKey === tabKey)
+      return this.tabs.findIndex(
+        t => t.tabKey === tabKey
+      )
+    },
+
+    async restoreTabsAndCards() {
+      const cards = await this.readCards()
+      const tabs = await this.readTabs()
+
+      if (Array.isArray(cards)) {
+        this.cards = cards
+      }
+
+      if (Array.isArray(tabs)) {
+        this.tabs = tabs
+      }
     },
 
     async readCards() {
-      return (await window.api.readData("cards")) ?? []
+      return (
+        await window.api.readData('cards')
+      ) ?? []
+    },
+
+    async saveCards() {
+      await window.api.writeData(
+        'cards',
+        toRaw(this.cards)
+      )
     },
 
     async readTabs() {
-      const tabKeys = await window.api.readData("tabs")
+      // Read opened tabs
+      const storedTabs = await window.api.readData('tabs')
 
-      if (Array.isArray(tabKeys) && tabKeys.length > 0) {
+      if (
+        Array.isArray(storedTabs)
+        &&
+        storedTabs.length > 0
+      ) {
         const tabs = []
-        for (const tabKey of tabKeys) {
-          tabs.push(await this.readTab(tabKey))
+
+        for (const item of storedTabs) {
+          // Compatible with old format: ['tab1', 'tab2']
+          const tabKey =
+            typeof item === 'string'
+              ? item
+              : item?.tabKey
+
+          if (!tabKey) {
+            continue
+          }
+
+          const tab = await this.readTab(tabKey)
+
+          tabs.push({
+            tabKey: tabKey,
+
+            // Prefer stored title, fallback to file name
+            title:
+              typeof item === 'object'
+              &&
+              item?.title
+                ? item.title
+                : tabKey,
+
+            content: tab['content'],
+            content_mime: tab['mime'],
+            saved: true
+          })
         }
+
         return tabs
       }
 
-      return [{
-        tabKey: Date.now().toString(),
-        title: "任务流 1",
-        items: [],
-      }]
+      return []
+    },
+
+    async saveTabs() {
+      // Store opened tabs
+      await window.api.writeData(
+        'tabs',
+        this.tabs.map(t => ({
+          tabKey: t.tabKey,
+          title: t.title
+        }))
+      )
     },
 
     async readTab(tabKey) {
       return (
-        (await window.api.readData(`tab_${tabKey}`)) ?? {
-          tabKey,
-          title: "任务流 1",
-          items: [],
-        }
+        await window.api.readFile(tabKey)
+      ) ?? {}
+    },
+
+    async saveTab(tabKey) {
+      const tab = this.tabs.find(
+        t => t.tabKey === tabKey
+      )
+
+      if (!tab) return
+
+      await window.api.writeData(
+        `tab_${tab.tabKey}`,
+        toRaw(tab)
       )
     },
 
-    saveCards() {
-      window.api.writeData('cards', toRaw(this.cards))
-    },
-
-    saveTabs() {
-      const tabKeys = this.tabs.map(t => t.tabKey)
-      window.api.writeData('tabs', tabKeys)
-    },
-
-    saveTab(tabKey) {
-      const tab = this.tabs.find(t => t.tabKey === tabKey)
-      if (tab) {
-        window.api.writeData(`tab_${tab.tabKey}`, toRaw(tab))
-      }
-    },
-
-    saveAllTabs() {
-      const tabKeys = this.tabs.map(t => t.tabKey)
-      window.api.writeData('tabs', tabKeys)
+    async saveAllTabs() {
+      await this.saveTabs()
 
       for (const tab of this.tabs) {
-        window.api.writeData(`tab_${tab.tabKey}`, toRaw(tab))
+        window.api.writeData(
+          `tab_${tab.tabKey}`,
+          toRaw(tab)
+        )
       }
     },
   }

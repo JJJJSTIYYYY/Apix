@@ -9,6 +9,48 @@ const api = {
 
   openFileDialog: (type, extensions) => ipcRenderer.invoke('openFileDialog', type, extensions),
   openCacheDir: () => ipcRenderer.invoke('openCacheDir'),
+  watchWorkspace: (dirPath) => ipcRenderer.invoke('fs:watch', dirPath),
+  unwatchWorkspace: () => ipcRenderer.invoke('fs:unwatch'),
+  getDirectoryTree: (targetPath) => ipcRenderer.invoke('fs:getDirectoryTree', targetPath),
+  collapseDirectoryTree: (targetPath) => ipcRenderer.invoke('fs:collapseDirectoryTree', targetPath),
+  createFile: (filePath, encoding = 'utf-8') => ipcRenderer.invoke('fs:createFile', filePath, encoding),
+  deleteFile: (filePath) => ipcRenderer.invoke('fs:deleteFile', filePath),
+  readFile: (filePath, encoding = 'utf-8') => ipcRenderer.invoke('fs:readFile', filePath, encoding),
+  writeFile: (filePath, content, encoding = 'utf-8') => ipcRenderer.invoke('fs:writeFile', filePath, content, encoding),
+  searchFiles: (cwd) => ipcRenderer.invoke('fs:searchFiles', cwd),
+  createDirectory: (dirPath) => ipcRenderer.invoke('fs:createDirectory', dirPath),
+  deleteDirectory: (dirPath) => ipcRenderer.invoke('fs:deleteDirectory', dirPath),
+  rename: (oldPath, newPath) => ipcRenderer.invoke('fs:rename', oldPath, newPath),
+  searchText: (keyword, cwd) => ipcRenderer.invoke('fs:searchText', keyword, cwd),
+
+  /**
+   * Listen fs watcher events from main process
+   * @param callback (events: any[]) => void
+   * @returns unsubscribe function
+   */
+  onFsEvents: (callback) => {
+
+    const listener = (
+      _event,
+      events
+    ) => {
+      callback(events)
+    }
+
+    ipcRenderer.on(
+      'fs:events',
+      listener
+    )
+
+    // Return unsubscribe function
+    return () => {
+
+      ipcRenderer.removeListener(
+        'fs:events',
+        listener
+      )
+    }
+  },
 
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, re_generate, chat_config) =>

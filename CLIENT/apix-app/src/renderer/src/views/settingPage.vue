@@ -754,10 +754,10 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">将过去的工具返回内容写入提示词</div>
+            <div class="setting-title">将过去的思维链以及工具返回内容回传接口</div>
             <div class="setting-control">
               <div class="setting-info">
-                工具的返回结果通常会携带大量的文本信息，极大增加Token消耗，如果是本地模型，将同时增加GPU的计算负担。
+                工具的返回结果通常会携带大量的文本信息，极大增加Token消耗，如果是本地模型，将同时增加GPU的计算负担，某些供应商需要开启此选项。
               </div>
               <div class="mode-switch">
                 <div class="slider" :class="{ right: store.config.remainToolsCache }" />
@@ -907,7 +907,7 @@ const setNetProxy = async () => {
 }
 
 /* Reset cards */
-const resetPresetCard = () => {
+const resetPresetCard = async () => {
   const presets = defaultCards()
   const cardMap = new Map(store.cards.map(c => [c.id, c]))
 
@@ -928,7 +928,7 @@ const resetPresetCard = () => {
     index++
   })
 
-  store.saveCards()
+  await store.saveCards()
   ElMessage.success('已恢复预设')
 }
 
@@ -1121,19 +1121,6 @@ const onLogout = async () => {
   } catch (err) {
   }
 }
-
-watch(
-  () => store.config.dark_theme,
-  (newValue, oldValue) => {
-    if (newValue === oldValue) return
-
-    if (newValue) document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.setAttribute('data-theme', 'light');
-
-    setHighlightTheme(newValue)
-  },
-  { deep: true }
-)
 </script>
 
 <style scoped>

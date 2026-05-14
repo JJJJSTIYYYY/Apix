@@ -4,6 +4,7 @@ const utils = require("@electron-toolkit/utils");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const worker_threads = require("worker_threads");
 const crypto = require("crypto");
 const axios = require("axios");
 const FormData = require("form-data");
@@ -145,11 +146,201 @@ function registerWindowIpc(win) {
     isWin ? win.close() : electron.app.quit();
   });
 }
-function registerFileIpc() {
+const fsWatcherWorker = "import fs from 'fs/promises'\n\nimport path from 'path'\nimport yaml from 'js-yaml'\n\nimport { parentPort } from 'worker_threads'\n\nimport chokidar from 'chokidar'\n\nimport fg from 'fast-glob'\n\nclass FsWatcherWorker {\n\n  constructor() {\n    // Watchers\n    this.watchers = new Map()\n\n    // Root workspace dir\n    this.root_dir = null\n\n    // Event queue\n    this.eventQueue = []\n\n    // Batch timer\n    this.batchTimer = null\n\n    // Event transition table\n    this.EVENT_TRANSITIONS = {\n      add: {\n        add: 'add',\n        change: 'add',\n        unlink: null\n      },\n\n      change: {\n        add: 'add',\n        change: 'change',\n        unlink: 'unlink'\n      },\n\n      unlink: {\n        add: 'change',\n        change: 'unlink',\n        unlink: 'unlink'\n      },\n\n      addDir: {\n        addDir: 'addDir',\n        changeDir: 'addDir',\n        unlinkDir: null\n      },\n\n      changeDir: {\n        addDir: 'addDir',\n        changeDir: 'changeDir',\n        unlinkDir: 'unlinkDir'\n      },\n\n      unlinkDir: {\n        addDir: 'changeDir',\n        changeDir: 'unlinkDir',\n        unlinkDir: 'unlinkDir'\n      }\n    }\n\n    // Bind message handler\n    parentPort.on(\n      'message',\n      this.handleMessage.bind(this)\n    )\n  }\n\n  // Chokidar options\n  WATCH_OPTIONS = {\n    ignored: this.IGNORE_GLOBS,\n\n    ignoreInitial: true,\n\n    persistent: true,\n\n    depth: 0,\n\n    followSymlinks: false\n  }\n\n  // Ignored names\n  IGNORE_NAMES = new Set([\n    // VCS\n    '.git',\n    '.svn',\n    '.hg',\n\n    // Dependencies\n    'node_modules',\n\n    // Build outputs\n    '.next',\n    '.nuxt',\n    'dist',\n    'build',\n    'out',\n\n    // Cache\n    '.cache',\n    '.temp',\n    '.tmp',\n\n    // Python\n    '.venv',\n    'venv',\n\n    // IDE\n    '.idea',\n    '.vscode',\n\n    // System files\n    '.DS_Store',\n    'Thumbs.db'\n  ])\n\n\n  // Ignored glob patterns\n  IGNORE_GLOBS = [\n    ...[...this.IGNORE_NAMES]\n      .filter(\n        name =>\n          !name.includes('.db')\n          &&\n          !name.includes('.DS_Store')\n      )\n      .map(\n        name => `**/${name}/**`\n      ),\n\n    '**/.DS_Store',\n    '**/Thumbs.db'\n  ]\n\n  // Supported extensions\n  SUPPORTED_EXTENSIONS = new Set([\n    '.md',\n    '.aflow',\n    '.agraph'\n  ])\n\n  // Check supported file\n  isSupportedFile(filePath) {\n    return this.SUPPORTED_EXTENSIONS.has(\n      path.extname(filePath)\n    )\n  }\n\n  guessFileMime(filePath) {\n    if (filePath.endsWith(\".md\")) return 'md'\n    else if (filePath.endsWith(\".aflow\")) return 'aflow'\n    else if (filePath.endsWith(\".agraph\")) return 'agraph'\n    else return 'unsupport'\n  }\n\n  parseFileContent(raw_content, mime) {\n    if (mime === 'md') return raw_content || ''\n    else if (mime === 'aflow') {\n      try {\n        return yaml.load(raw_content) || []\n      } catch (error) {\n        console.error('YAML load error:', error)\n        return []\n      }\n    }\n  }\n\n  // Ignore name\n  shouldIgnoreName(name) {\n    return this.IGNORE_NAMES.has(name)\n  }\n\n  // Normalize path\n  normalizePath(targetPath) {\n    return path.resolve(targetPath)\n  }\n\n  // RPC response\n  response(\n    requestId,\n    result = null,\n    error = null\n  ) {\n    parentPort.postMessage({\n      type: 'response',\n      requestId,\n      result,\n      error\n    })\n  }\n\n  // Merge event into map\n  addEvent(eventMap, event) {\n    const path =\n      event.path\n\n    const nextType =\n      event.type\n\n    const prevEvent =\n      eventMap.get(path)\n\n    // First event\n    if (!prevEvent) {\n      eventMap.set(path, event)\n      return\n    }\n\n    const prevType =\n      prevEvent.type\n\n    const mergedType =\n      this.EVENT_TRANSITIONS[\n        prevType\n      ]?.[\n        nextType\n      ]\n\n    // Events cancelled\n    if (!mergedType) {\n      eventMap.delete(path)\n      return\n    }\n\n    // Update merged event\n    prevEvent.type =\n      mergedType\n\n    eventMap.set(\n      path,\n      prevEvent\n    )\n  }\n\n  // Flush queued events\n  flushEvents() {\n    const merged =\n      new Map()\n\n    for (const event of this.eventQueue) {\n      this.addEvent(\n        merged,\n        event\n      )\n    }\n\n    const events =\n      [...merged.values()]\n\n    if (events.length > 0) {\n      parentPort.postMessage({\n        type: 'events',\n        events\n      })\n    }\n\n    // Clear queue\n    this.eventQueue = []\n\n    this.batchTimer = null\n  }\n\n  // Push watcher event\n  pushEvent(event) {\n    // Ignore unsupported files\n    if (\n      event.path\n      &&\n      !event.type.includes('Dir')\n      &&\n      !this.isSupportedFile(\n        event.path\n      )\n    ) {\n      return\n    }\n\n    // Stop watching removed directory\n    if (event.type === 'unlinkDir') {\n      this.unwatchDirectoryNode(\n        event.path\n      ).catch(() => {})\n    }\n\n    // Push event into queue\n    this.eventQueue.push(event)\n\n    // Debounce flush\n    clearTimeout(\n      this.batchTimer\n    )\n\n    this.batchTimer =\n      setTimeout(() => {\n        this.flushEvents()\n      }, 100)\n  }\n\n  // Create tree node\n  createNode(\n    name,\n    fullPath,\n    type\n  ) {\n    return {\n      name,\n\n      path:\n        this.normalizePath(\n          fullPath\n        ),\n\n      type\n    }\n  }\n\n  // Sort directory children\n  sortChildren(children) {\n    if (!children) {\n      return\n    }\n\n    children.sort(\n      (a, b) => {\n        // Directory first\n        if (\n          a.type !== b.type\n        ) {\n          return a.type === 'directory'\n            ? -1\n            : 1\n        }\n\n        return a.name.localeCompare(\n          b.name\n        )\n      }\n    )\n  }\n\n  // Scan single directory\n  async scanDir(dirPath) {\n    const normalizedPath =\n      this.normalizePath(\n        dirPath\n      )\n\n    const stat =\n      await fs.stat(\n        normalizedPath\n      )\n\n    const node =\n      this.createNode(\n        path.basename(\n          normalizedPath\n        ),\n        normalizedPath,\n        stat.isDirectory()\n          ? 'directory'\n          : 'file'\n      )\n\n    if (!stat.isDirectory()) {\n      return node\n    }\n\n    const children = []\n\n    const entries =\n      await fs.readdir(\n        normalizedPath,\n        {\n          withFileTypes: true\n        }\n      )\n\n    for (const entry of entries) {\n      if (\n        this.shouldIgnoreName(\n          entry.name\n        )\n      ) {\n        continue\n      }\n\n      const fullPath =\n        path.join(\n          normalizedPath,\n          entry.name\n        )\n\n      if (\n        entry.isFile()\n        &&\n        !this.isSupportedFile(\n          fullPath\n        )\n      ) {\n        continue\n      }\n\n      children.push(\n        this.createNode(\n          entry.name,\n          fullPath,\n          entry.isDirectory()\n            ? 'directory'\n            : 'file'\n        )\n      )\n    }\n\n    this.sortChildren(\n      children\n    )\n\n    return {\n      ...node,\n      children\n    }\n  }\n\n  // Get directory tree\n  async getDirectoryTree(\n    targetPath = null\n  ) {\n    if (!this.root_dir) {\n      return null\n    }\n\n    const normalizedPath =\n      this.normalizePath(\n        targetPath\n        || this.root_dir\n      )\n\n    // Watch expanded node\n    await this.watchDirectoryNode(\n      normalizedPath\n    )\n\n    return await this.scanDir(\n      normalizedPath\n    )\n  }\n\n  // Watch workspace root\n  async watchWorkspace(\n    dirPath\n  ) {\n    await this.unwatchWorkspace()\n\n    this.root_dir =\n      this.normalizePath(\n        dirPath\n      )\n\n    // Watch root only\n    await this.watchDirectoryNode(\n      this.root_dir\n    )\n\n    return await this.scanDir(\n      this.root_dir\n    )\n  }\n\n  // Unwatch workspace\n  async unwatchWorkspace() {\n    for (const watchedPath of [\n      ...this.watchers.keys()\n    ]) {\n      await this.unwatchDirectoryNode(\n        watchedPath\n      )\n    }\n\n    this.watchers.clear()\n\n    this.root_dir = null\n  }\n\n  // Watch expanded directory node\n  async watchDirectoryNode(\n    dirPath\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        dirPath\n      )\n\n    if (\n      this.watchers.has(\n        normalizedPath\n      )\n    ) {\n      return\n    }\n\n    console.log(\n      '[watchDirectoryNode] Path:',\n      normalizedPath\n    )\n\n    const watcher =\n      chokidar.watch(\n        normalizedPath,\n        this.WATCH_OPTIONS\n      )\n\n    const events = [\n      'add',\n      'change',\n      'unlink',\n      'addDir',\n      'unlinkDir'\n    ]\n\n    for (const eventName of events) {\n      watcher.on(\n        eventName,\n        targetPath => {\n          this.pushEvent({\n            type: eventName,\n            path: targetPath,\n            parent: normalizedPath,\n            time: Date.now()\n          })\n        }\n      )\n    }\n\n    watcher.on(\n      'error',\n      err => {\n        console.error(\n          '[Watcher Error]',\n          normalizedPath,\n          err\n        )\n      }\n    )\n\n    this.watchers.set(\n      normalizedPath,\n      watcher\n    )\n  }\n\n  // Unwatch collapsed directory node\n  async unwatchDirectoryNode(\n    dirPath\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        dirPath\n      )\n\n    console.log(\n      '[unwatchDirectoryNode] Path:',\n      normalizedPath\n    )\n\n    // Find current watcher subtree\n    const watcherPaths =\n      [...this.watchers.keys()]\n        .filter(\n          watcherPath =>\n            watcherPath === normalizedPath\n            ||\n            watcherPath.startsWith(\n              normalizedPath\n              + path.sep\n            )\n        )\n        // Child first\n        .sort(\n          (a, b) =>\n            b.length - a.length\n        )\n\n    for (const watcherPath of watcherPaths) {\n      const watcher =\n        this.watchers.get(\n          watcherPath\n        )\n\n      if (!watcher) {\n        continue\n      }\n\n      try {\n        await watcher.close()\n      }\n      catch {\n        // Ignore close error\n      }\n\n      this.watchers.delete(\n        watcherPath\n      )\n    }\n  }\n\n  // Create file\n  async createFile(\n    filePath,\n    encoding = 'utf-8'\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        filePath\n      )\n\n    await fs.mkdir(\n      path.dirname(\n        normalizedPath\n      ),\n      {\n        recursive: true\n      }\n    )\n\n    await fs.writeFile(\n      normalizedPath,\n      '',\n      encoding\n    )\n\n    return normalizedPath\n  }\n\n  // Create directory\n  async createDirectory(\n    dirPath\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        dirPath\n      )\n\n    await fs.mkdir(\n      normalizedPath,\n      {\n        recursive: true\n      }\n    )\n\n    return normalizedPath\n  }\n\n  // Delete file\n  async deleteFile(\n    filePath\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        filePath\n      )\n\n    await fs.rm(\n      normalizedPath,\n      {\n        force: true\n      }\n    )\n  }\n\n  // Delete directory\n  async deleteDirectory(\n    dirPath\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        dirPath\n      )\n\n    await this.unwatchDirectoryNode(\n      normalizedPath\n    )\n\n    await fs.rm(\n      normalizedPath,\n      {\n        recursive: true,\n        force: true\n      }\n    )\n  }\n\n  // Rename file or directory\n  async rename(\n    oldPath,\n    newPath\n  ) {\n    const normalizedOldPath =\n      this.normalizePath(\n        oldPath\n      )\n\n    const normalizedNewPath =\n      this.normalizePath(\n        newPath\n      )\n\n    await fs.mkdir(\n      path.dirname(\n        normalizedNewPath\n      ),\n      {\n        recursive: true\n      }\n    )\n\n    // Save watcher subtree\n    const watcherPaths =\n      [...this.watchers.keys()]\n        .filter(\n          watchedPath =>\n            watchedPath\n            === normalizedOldPath\n            ||\n            watchedPath.startsWith(\n              normalizedOldPath\n              + path.sep\n            )\n        )\n        .sort(\n          (a, b) =>\n            a.length - b.length\n        )\n\n    await fs.rename(\n      normalizedOldPath,\n      normalizedNewPath\n    )\n\n    // Rebuild watcher subtree\n    for (const watchedPath of watcherPaths) {\n      const relativePath =\n        path.relative(\n          normalizedOldPath,\n          watchedPath\n        )\n\n      const newWatchedPath =\n        path.join(\n          normalizedNewPath,\n          relativePath\n        )\n\n      await this.unwatchDirectoryNode(\n        watchedPath\n      )\n\n      await this.watchDirectoryNode(\n        newWatchedPath\n      )\n    }\n  }\n\n  // Read full file\n  async readFile(\n    filePath,\n    encoding = 'utf-8'\n  ) {\n    const mime = this.guessFileMime(filePath)\n    if (mime === 'unsupport') return {mime: mime, content: null}\n    const content_raw = await fs.readFile(\n      this.normalizePath(\n        filePath\n      ),\n      encoding\n    )\n    const content = this.parseFileContent(content_raw, mime)\n    return {\n      mime: mime,\n      content: content\n    }\n  }\n\n  // Write full file\n  async writeFile(\n    filePath,\n    content,\n    encoding = 'utf-8'\n  ) {\n    const normalizedPath =\n      this.normalizePath(\n        filePath\n      )\n\n    await fs.mkdir(\n      path.dirname(\n        normalizedPath\n      ),\n      {\n        recursive: true\n      }\n    )\n\n    await fs.writeFile(\n      normalizedPath,\n      content,\n      encoding\n    )\n  }\n\n  // Search files\n  async searchFiles(cwd) {\n    return await fg(\n      [\n        '**/*.md',\n        '**/*.aflow',\n        '**/*.agraph'\n      ],\n      {\n        cwd,\n\n        absolute: true,\n\n        onlyFiles: true,\n\n        ignore: this.IGNORE_GLOBS\n      }\n    )\n  }\n\n  // Search text\n  async searchText(\n    keyword,\n    cwd\n  ) {\n    const files =\n      await this.searchFiles(\n        cwd\n      )\n\n    const results = []\n\n    for (const filePath of files) {\n      try {\n        const content =\n          await this.readFile(\n            filePath\n          )\n\n        if (\n          content.includes(\n            keyword\n          )\n        ) {\n          results.push(\n            filePath\n          )\n        }\n      }\n      catch {\n        // Ignore unreadable file\n      }\n    }\n\n    return results\n  }\n\n  // RPC handlers\n  handlers = {\n    scanDir:\n      this.scanDir.bind(this),\n\n    watchWorkspace:\n      this.watchWorkspace.bind(this),\n\n    unwatchWorkspace:\n      this.unwatchWorkspace.bind(this),\n\n    watchDirectoryNode:\n      this.watchDirectoryNode.bind(this),\n\n    unwatchDirectoryNode:\n      this.unwatchDirectoryNode.bind(this),\n\n    getDirectoryTree:\n      this.getDirectoryTree.bind(this),\n\n    createFile:\n      this.createFile.bind(this),\n\n    deleteFile:\n      this.deleteFile.bind(this),\n\n    readFile:\n      this.readFile.bind(this),\n\n    writeFile:\n      this.writeFile.bind(this),\n\n    searchFiles:\n      this.searchFiles.bind(this),\n\n    createDirectory:\n      this.createDirectory.bind(this),\n\n    deleteDirectory:\n      this.deleteDirectory.bind(this),\n\n    rename:\n      this.rename.bind(this),\n\n    searchText:\n      this.searchText.bind(this)\n  }\n\n  // Handle RPC message\n  async handleMessage(\n    message\n  ) {\n    const {\n      method,\n      params,\n      requestId\n    } = message\n\n    const handler =\n      this.handlers[method]\n\n    if (!handler) {\n      this.response(\n        requestId,\n        null,\n        `Unknown method: ${method}`\n      )\n\n      return\n    }\n\n    try {\n      const result =\n        await handler(\n          ...Object.values(\n            params\n          )\n        )\n\n      this.response(\n        requestId,\n        result\n      )\n    }\n    catch (err) {\n      this.response(\n        requestId,\n        null,\n        err.stack\n      )\n    }\n  }\n}\n\n// Create worker instance\nnew FsWatcherWorker()";
+class FileSystemManager {
+  constructor(options = {}) {
+    this.onEvents = options.onEvents || (() => {
+    });
+    this.requestId = 0;
+    this.pendingRequests = /* @__PURE__ */ new Map();
+    this.worker = new worker_threads.Worker(
+      fsWatcherWorker,
+      {
+        eval: true
+      }
+    );
+    this.worker.on(
+      "message",
+      (message) => {
+        this._handleMessage(
+          message
+        );
+      }
+    );
+    this.worker.on(
+      "error",
+      (err) => {
+        console.error(
+          "[FS Worker Crash]",
+          err
+        );
+      }
+    );
+  }
+  // Handle worker message
+  _handleMessage(message) {
+    const {
+      type,
+      requestId
+    } = message;
+    if (type === "events") {
+      this.onEvents(
+        message.events
+      );
+      return;
+    }
+    if (type === "response") {
+      const pending = this.pendingRequests.get(
+        requestId
+      );
+      if (!pending) {
+        return;
+      }
+      this.pendingRequests.delete(
+        requestId
+      );
+      if (message.error) {
+        pending.reject(
+          message.error
+        );
+      } else {
+        pending.resolve(
+          message.result
+        );
+      }
+    }
+  }
+  // RPC call
+  _call(method, params = {}) {
+    return new Promise(
+      (resolve, reject) => {
+        const requestId = ++this.requestId;
+        this.pendingRequests.set(
+          requestId,
+          {
+            resolve,
+            reject
+          }
+        );
+        this.worker.postMessage({
+          type: "call",
+          method,
+          params,
+          requestId
+        });
+      }
+    );
+  }
+  // Watch workspace
+  watchWorkspace(dirPath) {
+    if (dirPath && dirPath !== "") {
+      return this._call(
+        "watchWorkspace",
+        { dirPath }
+      );
+    }
+  }
+  // Unwatch workspace
+  unwatchWorkspace() {
+    return this._call(
+      "unwatchWorkspace"
+    );
+  }
+  // Get directory tree inside workspace
+  getDirectoryTree(targetPath) {
+    return this._call(
+      "getDirectoryTree",
+      { targetPath }
+    );
+  }
+  // Collapse directory tree inside workspace
+  collapseDirectoryTree(targetPath) {
+    return this._call(
+      "unwatchDirectoryNode",
+      { targetPath }
+    );
+  }
+  // Create file
+  createFile(filePath, encoding = "utf-8") {
+    return this._call(
+      "createFile",
+      { filePath, encoding }
+    );
+  }
+  // Delete file
+  deleteFile(filePath) {
+    return this._call(
+      "deleteFile",
+      { filePath }
+    );
+  }
+  // Read file
+  readFile(filePath, encoding = "utf-8") {
+    return this._call(
+      "readFile",
+      { filePath, encoding }
+    );
+  }
+  // Write file
+  writeFile(filePath, content, encoding = "utf-8") {
+    return this._call(
+      "writeFile",
+      { filePath, content, encoding }
+    );
+  }
+  // Search files
+  searchFiles(cwd) {
+    return this._call(
+      "searchFiles",
+      { cwd }
+    );
+  }
+  // Create directory
+  createDirectory(dirPath) {
+    return this._call(
+      "createDirectory",
+      { dirPath }
+    );
+  }
+  // Delete directory
+  deleteDirectory(dirPath) {
+    return this._call(
+      "deleteDirectory",
+      { dirPath }
+    );
+  }
+  // Rename
+  rename(oldPath, newPath) {
+    return this._call(
+      "rename",
+      { oldPath, newPath }
+    );
+  }
+  // Search text
+  searchText(keyword, cwd) {
+    return this._call(
+      "searchText",
+      { keyword, cwd }
+    );
+  }
+  // Dispose
+  async dispose() {
+    await this.worker.terminate();
+  }
+}
+function registerFileIpc(mainWindow) {
   console.log("registerFileIpc...");
   const dataDir = path.join(electron.app.getPath("userData"), "ApiX");
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   console.log("Apix data dir:", dataDir);
+  const fsManager = new FileSystemManager({
+    onEvents(events) {
+      mainWindow.webContents.send(
+        "fs:events",
+        events
+      );
+    }
+  });
   electron.ipcMain.handle("openFileDialog", async (event, type, extensions = []) => {
     let properties = [];
     if (type === "file") {
@@ -270,6 +461,84 @@ function registerFileIpc() {
       };
     }
   });
+  electron.ipcMain.handle(
+    "fs:watch",
+    async (_, dirPath) => {
+      await fsManager.watchWorkspace(dirPath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:unwatch",
+    async (_) => {
+      await fsManager.unwatchWorkspace();
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:getDirectoryTree",
+    async (_, targetPath) => {
+      return await fsManager.getDirectoryTree(targetPath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:collapseDirectoryTree",
+    async (_, targetPath) => {
+      return await fsManager.collapseDirectoryTree(targetPath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:createFile",
+    async (_, filePath, encoding = "utf-8") => {
+      return await fsManager.createFile(filePath, encoding);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:deleteFile",
+    async (_, filePath) => {
+      await fsManager.deleteFile(filePath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:readFile",
+    async (_, filePath, encoding = "utf-8") => {
+      return await fsManager.readFile(filePath, encoding);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:writeFile",
+    async (_, filePath, content, encoding = "utf-8") => {
+      await fsManager.writeFile(filePath, content, encoding);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:searchFiles",
+    async (_, cwd) => {
+      return await fsManager.searchFiles(cwd);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:createDirectory",
+    async (_, dirPath) => {
+      return await fsManager.createDirectory(dirPath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:deleteDirectory",
+    async (_, dirPath) => {
+      return await fsManager.deleteDirectory(dirPath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:rename",
+    async (_, oldPath, newPath) => {
+      await fsManager.rename(oldPath, newPath);
+    }
+  );
+  electron.ipcMain.handle(
+    "fs:searchText",
+    async (_, keyword, cwd) => {
+      return await fsManager.searchText(keyword, cwd);
+    }
+  );
 }
 const WebSocket = require("ws");
 function registerAiIpc() {
@@ -538,7 +807,6 @@ function attachSiblingLinks(messages, branches) {
       msg.next_node = link.next_node;
     }
   }
-  console.log("Attac branch finish: ", messages);
   return messages;
 }
 function registerClipboardIpc() {
@@ -1298,7 +1566,7 @@ function createAppWindow() {
 function createMainWindow() {
   let mainWindow = createAppWindow();
   registerWindowIpc(mainWindow);
-  registerFileIpc();
+  registerFileIpc(mainWindow);
   registerLocalTaskIpc();
   registerAiIpc();
   registerAiConfigIpc();
@@ -1331,11 +1599,6 @@ electron.app.whenReady().then(() => {
   const root = process.cwd();
   console.warn("root is ", root);
   utils.electronApp.setAppUserModelId("com.electron");
-  if (isMac) {
-    electron.app.dock.setIcon(
-      "/Users/justiy/Documents/code/Project/TestPlat/CLIENT/apix-app/resources/APIX.png"
-    );
-  }
   electron.app.on("browser-window-created", (_, window) => {
     utils.optimizer.watchWindowShortcuts(window);
   });

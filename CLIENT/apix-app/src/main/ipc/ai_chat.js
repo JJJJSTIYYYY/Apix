@@ -291,7 +291,7 @@ export function registerAiIpc() {
 function attachSiblingLinks(messages, branches) {
   if (!messages || !messages.length) return messages
 
-  // ✅ 当前路径上的 node（更可靠）
+  // 当前路径上的 node（更可靠）
   const activeNodeSet = new Set(messages.map(m => m.node_id))
 
   // node_id -> {pre_node, next_node}
@@ -302,7 +302,7 @@ function attachSiblingLinks(messages, branches) {
 
     if (!siblings || siblings.length <= 1) continue
 
-    // ✅ 找当前路径命中的 child
+    // 找当前路径命中的 child
     const activeNode = siblings.find(s => activeNodeSet.has(s.node_id))
 
     if (!activeNode) continue
@@ -328,6 +328,6 @@ function attachSiblingLinks(messages, branches) {
     }
   }
 
-  console.log("Attac branch finish: ", messages)
+  // console.log("Attac branch finish: ", messages)
   return messages
 }

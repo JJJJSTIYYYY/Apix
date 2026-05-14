@@ -5,15 +5,15 @@ import lightCss from 'highlight.js/styles/github.css?url'
 export const apix_client_version = '2.1.0'
 
 export const defaultCards = () => [
-  { id: '-annotation-preset', title: '注释卡片', type: 'note', level: 'system' },
-  { id: '-script-preset', title: '运行脚本', type: 'script', level: 'system' },
   { id: '-folder-preset', title: '卡片组', type: 'folder', level: 'system' },
-  { id: 'interface-preset', title: '接口请求', type: 'interface', level: 'system' },
-  { id: 'database-preset', title: '数据库请求', type: 'database', level: 'system' },
+  { id: '-annotation-preset', title: '注释', type: 'note', level: 'system' },
+  { id: '-script-preset', title: '运行脚本', type: 'script', level: 'system' },
+  { id: '-task-preset', title: '执行任务', type: 'task', level: 'system' },
 ]
 
+export const tabContentCache = {}
+
 export const globalState = {
-  allowToInput: true, // 全局文本输入框disable标记
   draggedStartCardUid_parent: 0, // 记录被拖拽对象的来源，不是被拖拽对象的uid
   draggedStartCardUid: 0, // 记录被拖拽对象的uid
   draggedTabCard: "",

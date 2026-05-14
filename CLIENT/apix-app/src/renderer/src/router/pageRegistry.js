@@ -9,11 +9,11 @@ export const pageRegistry = [
     component: () => import('@renderer/views/assistPage.vue')
   },
   {
-    path: '/sessionPage',
-    name: 'session-page',
-    title: 'Testing',
+    path: '/flowEditPage',
+    name: 'flow-edit-page',
+    title: 'Flow',
     icon: 'CollectionTag',
-    component: () => import('@renderer/views/casePage.vue')
+    component: () => import('@renderer/views/taskFlowPage.vue')
   },
   {
     path: '/dataPage',

@@ -13,20 +13,13 @@
       @dragover.prevent
       :draggable="!item.expanded"
     >
-      <Interface
-        v-if="item.type === 'interface'"
+      <Task
+        v-if="item.type === 'task'"
         :self="item"
         :tab_key="tab_key"
         :father_uid="null"
         @update:delete-card="removeTabCard"
-      />
-
-      <Database
-        v-else-if="item.type === 'database'"
-        :self="item"
-        :tab_key="tab_key"
-        :father_uid="null"
-        @update:delete-card="removeTabCard"
+        @update:content-change="() => { emit('update:contentChange') }"
       />
 
       <Script
@@ -35,7 +28,8 @@
         :tab_key="tab_key"
         :father_uid="null"
         @update:delete-card="removeTabCard"
-      />
+        @update:content-change="() => { emit('update:contentChange') }"
+      ></Script>
 
       <Folder
         v-else-if="item.type === 'folder'"
@@ -43,6 +37,7 @@
         :tab_key="tab_key"
         :father_uid="null"
         @update:delete-card="removeTabCard"
+        @update:content-change="() => { emit('update:contentChange') }"
       />
 
       <Note
@@ -51,6 +46,7 @@
         :tab_key="tab_key"
         :father_uid="null"
         @update:delete-card="removeTabCard"
+        @update:content-change="() => { emit('update:contentChange') }"
       />
     </div>
 
@@ -58,7 +54,7 @@
       class="tab-card-bottom-line"
       :key="'bottomCard'"
     >
-      <div>已放置 {{ items.length }} 枚卡片</div> 
+      <div>已放置 {{ items.length || 0 }} 枚卡片</div> 
     </div>
     <div :key="'bottomArea'" class="bottom-area" :style="{ height: 450 + 'px' }"></div>
   </div>
@@ -68,8 +64,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAppCacheData } from '../../../store/app.js'
-import Interface from './Interface.vue'
-import Database from './Database.vue'
+import Task from './Task.vue'
 import Script from './Script.vue'
 import Folder from './Folder.vue'
 import Note from './Note.vue'
@@ -84,20 +79,11 @@ type CardBase = {
 
 type TabCardBase = CardBase & {
   uid: number
-  showCardBody: boolean
   expanded: boolean
-  btnType: string
-  btnIcon: string
 }
 
-type InterfaceCard = TabCardBase & {
-  type: 'interface'
-  address: string
-  description: string
-}
-
-type DatabaseCard = TabCardBase & {
-  type: 'database'
+type BasicTaskCard = TabCardBase & {
+  type: 'task'
   address: string
   description: string
 }
@@ -119,8 +105,7 @@ type FolderCard = TabCardBase & {
 }
 
 type TabCardItem =
-  | InterfaceCard
-  | DatabaseCard
+  | BasicTaskCard
   | ScriptCard
   | NoteCard
   | FolderCard
@@ -132,6 +117,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:TabCardList', tab_tabKey: string, items: TabCardItem[]): void
+  (e: 'update:contentChange'): void
 }>()
 
 const store = useAppCacheData()
@@ -143,25 +129,14 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
     type: virtualCard.type,
     level: virtualCard.level,
     uid: Date.now() + Math.random(),
-    showCardBody: false,
-    expanded: false,
-    btnType: 'primary',
-    btnIcon: 'Postcard',
+    expanded: false
   }
 
   switch (virtualCard.type) {
-    case 'interface':
+    case 'task':
       return {
         ...base,
-        type: 'interface',
-        address: '',
-        description: '',
-      }
-
-    case 'database':
-      return {
-        ...base,
-        type: 'database',
+        type: 'task',
         address: '',
         description: '',
       }
@@ -211,7 +186,7 @@ function DragCardDropInCardList() {
     const virtualCard = JSON.parse(globalState.draggedCard)
     const newCard = createCardByType(virtualCard)
     props.items.push(newCard)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange")
   } else if (globalState.draggedTabCard) {
     const virtualCard = JSON.parse(globalState.draggedTabCard) as TabCardItem
 
@@ -223,7 +198,7 @@ function DragCardDropInCardList() {
 
     removeCardFromTree(currentTab.items, virtualCard.uid)
     props.items.push(virtualCard)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange")
   }
 
   globalState.draggedStartCardUid_parent = 0
@@ -256,12 +231,12 @@ function DragCardDropInCardList_insert(item: TabCardItem, dropIndex: number, eve
       props.items.splice(dropIndex, 0, virtualCard)
     }
 
-    store.saveTab(props.tab_key)
+    emit("update:contentChange")
   } else if (globalState.draggedCard) {
     const virtualCard = JSON.parse(globalState.draggedCard)
     const newCard = createCardByType(virtualCard)
     props.items.splice(dropIndex, 0, newCard)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange")
   }
 
   globalState.draggedStartCardUid_parent = 0
@@ -301,7 +276,7 @@ function removeTabCard(cardUid: number) {
   if (idx !== -1) {
     props.items.splice(idx, 1)
     ElMessage({ type: 'success', message: '已删除' })
-    store.saveTab(props.tab_key)
+    emit("update:contentChange")
   }
 }
 

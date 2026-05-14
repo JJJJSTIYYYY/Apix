@@ -110,6 +110,9 @@ class SearchResultCleaner:
                 llm,
                 input=prompt,
                 reasoning=False,
+                fall_back_provider=config.get("models_provider"),
+                fall_back_model_name=config.get("model_name"),
+                fall_back_api_key=config.get("api_key")
             )
 
             item.content = (output.content or "").strip()

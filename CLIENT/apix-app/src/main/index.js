@@ -15,11 +15,6 @@ app.whenReady().then(() => {
   const root = process.cwd()
   console.warn("root is ", root)
   electronApp.setAppUserModelId('com.electron')
-  if (isMac) {
-    app.dock.setIcon(
-      '/Users/justiy/Documents/code/Project/TestPlat/CLIENT/apix-app/resources/APIX.png'
-    )
-  }
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

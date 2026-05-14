@@ -236,7 +236,7 @@ const handleRoleToggle = ({ id, enabled }: { id: string; enabled: boolean }) => 
     })
   }
 
-  store.persistRolePrompts()
+  store.persistState('role_prompts')
 }
 
 const dialogVisible = ref(false)
@@ -273,7 +273,7 @@ const handleSaveRole = (roleData: RoleItem) => {
     store.role_prompts.unshift(payload)
   }
 
-  store.persistRolePrompts()
+  store.persistState('role_prompts')
 }
 
 // 删除
@@ -293,7 +293,7 @@ const handleDeleteRole = (id: number) => {
     })
   }
 
-  store.persistRolePrompts()
+  store.persistState('role_prompts')
 }
 
 // ----------------------------------------------------------------------

@@ -72,13 +72,12 @@
         </el-button>
 
         <el-button
-          :type="self.btnType"
           @click="editTabCard()"
           class="tab-card-btn-more"
           :class="{ tabcardbtnmoreexpanded: self?.expanded }"
         >
           <el-icon>
-            <component :is="self.btnIcon" />
+            <component :is="self.expanded ? 'Check' : 'Postcard'" />
           </el-icon>
         </el-button>
 
@@ -93,7 +92,7 @@
     </div>
 
     <!--  mark 卡片体 -->
-    <div v-if="self.showCardBody" class="mark-card-body">
+    <div v-if="self?.expanded" class="mark-card-body">
       <div class="mark-body-wrapper" :style="{height: 'auto', overflow: 'auto', scrollbarWidth: 'none'}">
         <div
           tag="div"
@@ -133,10 +132,7 @@ type CardBase = {
 }
 type TabCardBase = CardBase & {
   uid: number
-  showCardBody: boolean
   expanded: boolean
-  btnType: string
-  btnIcon: string
   prams: {}
   content: []
 }
@@ -155,6 +151,7 @@ const props = defineProps<{
 // ------------------------
 const emit = defineEmits<{
   (e: "update:delete-card", card_uid: number): void
+  (e: 'update:contentChange', card_uid: number): void
 }>()
 
 import { watch, ref } from 'vue'
@@ -177,7 +174,7 @@ if (!props.self.prams.text) {
   props.self.prams.text = "";
 }
 if (!props.self.prams.color) {
-  props.self.prams.color = "#ffffff";
+  props.self.prams.color = "";
 }
 // ------------------------
 // 右侧标签页里卡片的拖拽逻辑
@@ -248,13 +245,13 @@ function saveCardAsPredefined() {
 function markCard() {
   isShowMark.value = !isShowMark.value
   props.self.prams.markIsShow = isShowMark.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 function hideMark() {
   isShowMark.value = false
   props.self.prams.markIsShow = isShowMark.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
   setTimeout(() => {
     isShowMark_.value = false
   }, 200)
@@ -273,7 +270,7 @@ async function updateMarkContent() {
       props.self.prams.markMessage = markMessage.value
       isShowMark.value = true
       props.self.prams.markIsShow = isShowMark.value
-      store.saveTab(props.tab_key)
+      emit("update:contentChange", props.self.uid)
     }).catch(() => {
     })
   } catch {}
@@ -290,16 +287,8 @@ async function removeThisCard() {
 // 编辑右侧卡片
 // ------------------------
 function editTabCard() {
-  if (props.self.showCardBody) {
-    props.self.btnType = "primary"
-    props.self.btnIcon = "Postcard"
-  } else {
-    props.self.btnType = "success"
-    props.self.btnIcon = "Check"
-  }
   props.self.expanded = !props.self.expanded
-  props.self.showCardBody = !props.self.showCardBody
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 // ------------------------
@@ -318,7 +307,7 @@ function onMouseUp_input(e: Event) {
 function onTabCardTitleChange(e: Event) {
   if (props.self) {
     props.self.title = titleInput.value
-    store.saveTab(props.tab_key)
+    emit("update:contentChange", props.self.uid)
   }
   (e.target as HTMLInputElement).blur()
 }
@@ -328,11 +317,11 @@ const color = ref(props.self.prams.color ?? '')
 
 watch(textValue, (newVal) => {
   props.self.prams.text = newVal
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 })
 watch(color, (newVal) => {
   props.self.prams.color = newVal
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 })
 
 const predefineColors = ref([

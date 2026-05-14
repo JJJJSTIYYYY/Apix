@@ -17,7 +17,7 @@
         <input
           class="tab-title-input no-drag"
           v-model="titleInput"
-          placeholder="脚本测试"
+          placeholder="脚本卡"
           @change="onTabCardTitleChange($event)"
           @keyup.enter="onTabCardTitleChange($event)"
           @mouseup="onMouseUp_input($event)"
@@ -71,13 +71,12 @@
         </el-button>
 
         <el-button
-          :type="self.btnType"
           @click="editTabCard()"
           class="tab-card-btn-more"
           :class="{ tabcardbtnmoreexpanded: self.expanded }"
         >
           <el-icon>
-            <component :is="self.btnIcon" />
+            <component :is="self.expanded ? 'Check' : 'Postcard'" />
           </el-icon>
         </el-button>
 
@@ -92,7 +91,7 @@
     </div>
 
     <!-- script 卡片体 -->
-    <div v-if="self.showCardBody" class="script-card-body">
+    <div v-if="self.expanded" class="script-card-body">
       <div class="script-body-wrapper">
         <div class="script-content">
           <div class="field-label">
@@ -143,10 +142,7 @@ type CardBase = {
 
 type TabCardBase = CardBase & {
   uid: number
-  showCardBody: boolean
   expanded: boolean
-  btnType: string
-  btnIcon: string
   script: string
   description: string
 }
@@ -159,6 +155,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:delete-card', card_uid: number): void
+  (e: 'update:contentChange', card_uid: number): void
 }>()
 
 const store = useAppCacheData()
@@ -202,7 +199,7 @@ function onMouseUp_input(e: Event) {
 
 function onTabCardTitleChange(e: Event) {
   props.self.title = titleInput.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
   ;(e.target as HTMLInputElement).blur()
 }
 
@@ -211,12 +208,12 @@ function onTabCardTitleChange(e: Event) {
 // ------------------------
 function onScriptChange(value: string) {
   props.self.script = value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 function onDescriptionChange(value: string) {
   props.self.description = value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 // ------------------------
@@ -275,13 +272,13 @@ function saveCardAsPredefined() {
 function markCard() {
   isShowMark.value = !isShowMark.value
   selfExt.markIsShow = isShowMark.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 function hideMark() {
   isShowMark.value = false
   selfExt.markIsShow = false
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 
   setTimeout(() => {
     isShowMark_.value = false
@@ -303,7 +300,7 @@ async function updateMarkContent() {
         selfExt.markMessage = value
         isShowMark.value = true
         selfExt.markIsShow = true
-        store.saveTab(props.tab_key)
+        emit("update:contentChange", props.self.uid)
       })
       .catch(() => {})
   } catch {}
@@ -320,17 +317,8 @@ function removeThisCard() {
 // 展开 / 收起
 // ------------------------
 function editTabCard() {
-  if (props.self.showCardBody) {
-    props.self.btnType = 'primary'
-    props.self.btnIcon = 'Postcard'
-  } else {
-    props.self.btnType = 'success'
-    props.self.btnIcon = 'Check'
-  }
-
   props.self.expanded = !props.self.expanded
-  props.self.showCardBody = !props.self.showCardBody
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 </script>
 

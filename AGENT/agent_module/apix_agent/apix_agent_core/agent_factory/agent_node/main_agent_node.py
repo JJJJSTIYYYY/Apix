@@ -310,6 +310,9 @@ class MainAgentNode(AgentNodeBase):
                     llm_node=self.llm,
                     input=summary_prompt,
                     reasoning=True,
+                    fall_back_provider=config.get("models_provider"),
+                    fall_back_model_name=config.get("model_name"),
+                    fall_back_api_key=config.get("api_key")
                 )
             except Exception as e:
                 logger.error(f"[context_summary] Summary failed: {e}")
@@ -497,6 +500,9 @@ class MainAgentNode(AgentNodeBase):
             llm_node=self.llm,
             input=llm_input,
             reasoning=enable_think,
+            fall_back_provider=config.get("models_provider"),
+            fall_back_model_name=config.get("model_name"),
+            fall_back_api_key=config.get("api_key")
         )
 
         event_writer.send_event(

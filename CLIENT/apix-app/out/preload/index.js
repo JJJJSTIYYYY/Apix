@@ -7,6 +7,39 @@ const api = {
   submitCase: (cid, content) => electron.ipcRenderer.invoke("api:submit_case", cid, content),
   openFileDialog: (type, extensions) => electron.ipcRenderer.invoke("openFileDialog", type, extensions),
   openCacheDir: () => electron.ipcRenderer.invoke("openCacheDir"),
+  watchWorkspace: (dirPath) => electron.ipcRenderer.invoke("fs:watch", dirPath),
+  unwatchWorkspace: () => electron.ipcRenderer.invoke("fs:unwatch"),
+  getDirectoryTree: (targetPath) => electron.ipcRenderer.invoke("fs:getDirectoryTree", targetPath),
+  collapseDirectoryTree: (targetPath) => electron.ipcRenderer.invoke("fs:collapseDirectoryTree", targetPath),
+  createFile: (filePath, encoding = "utf-8") => electron.ipcRenderer.invoke("fs:createFile", filePath, encoding),
+  deleteFile: (filePath) => electron.ipcRenderer.invoke("fs:deleteFile", filePath),
+  readFile: (filePath, encoding = "utf-8") => electron.ipcRenderer.invoke("fs:readFile", filePath, encoding),
+  writeFile: (filePath, content, encoding = "utf-8") => electron.ipcRenderer.invoke("fs:writeFile", filePath, content, encoding),
+  searchFiles: (cwd) => electron.ipcRenderer.invoke("fs:searchFiles", cwd),
+  createDirectory: (dirPath) => electron.ipcRenderer.invoke("fs:createDirectory", dirPath),
+  deleteDirectory: (dirPath) => electron.ipcRenderer.invoke("fs:deleteDirectory", dirPath),
+  rename: (oldPath, newPath) => electron.ipcRenderer.invoke("fs:rename", oldPath, newPath),
+  searchText: (keyword, cwd) => electron.ipcRenderer.invoke("fs:searchText", keyword, cwd),
+  /**
+   * Listen fs watcher events from main process
+   * @param callback (events: any[]) => void
+   * @returns unsubscribe function
+   */
+  onFsEvents: (callback) => {
+    const listener = (_event, events) => {
+      callback(events);
+    };
+    electron.ipcRenderer.on(
+      "fs:events",
+      listener
+    );
+    return () => {
+      electron.ipcRenderer.removeListener(
+        "fs:events",
+        listener
+      );
+    };
+  },
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, re_generate, chat_config) => electron.ipcRenderer.invoke("api:chat", cid, sid, hid, content, re_generate, chat_config),
   stopGeneration: (cid, sid, hid) => electron.ipcRenderer.invoke("api:stop", cid, sid, hid),

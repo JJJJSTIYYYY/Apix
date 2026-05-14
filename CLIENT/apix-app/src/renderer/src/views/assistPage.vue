@@ -9,9 +9,8 @@
         class="ai-page-wrapper" 
         :class="{ 'is-history-hide': isHistoryHide }"
         tabindex="0"
-        @keydown="wrapperHandleKeydown"
       >
-        <ChatHistoryPannel
+        <ChatHistoryPanel
           style="margin-left: 6%;"
           :histories="historyList"
           :active-id="store.current_history_id"
@@ -151,7 +150,6 @@
                 v-model="inputText"
                 type="textarea"
                 placeholder="Inputs..."
-                @keydown="msgInputHandleKeydown"
                 :autosize="{ minRows: 1, maxRows: fullInput?20:9 }"
                 class="chat-input"
                 style="display: flex; align-items: center;"
@@ -268,7 +266,7 @@ import HomePage from './homePage.vue'
 import HumanMessageBubble from './component/msg_bubble_body/human_message_bubble.vue'
 import AiMessageBubble from './component/msg_bubble_body/ai_message_bubble.vue'
 import ToolMessageCard from './component/msg_bubble_body/tool_message_card.vue'
-import ChatHistoryPannel from './component/dialog_history/history_pannel.vue'
+import ChatHistoryPanel from './component/dialog_history/history_panel.vue'
 import { type ChatHistory } from './component/dialog_history/history_card.vue'
 import { useAppCacheData } from '../store/app'
 import { useAuthStore } from '../store/auth'
@@ -1052,18 +1050,6 @@ const handleHideHistory = (toHide: boolean) => {
   isHistoryHide.value = toHide
 }
 
-// const actionMap: Record<string, (payload: any, historyId: string) => void> = {
-//   msg_stream_start: handleStreamStart,
-//   think_chunk_rtn: handleThinkChunkRtn,
-//   content_chunk_rtn: handleContentChunkRtn,
-//   info_chunk_rtn: handleInfoChunkRtn,
-//   msg_stream_end: handleStreamEnd,
-//   msg_stream_abort: handleStreamAbort,
-//   async_tool_return: handleAsyncToolRtn,
-//   tool_exec_chunk_rtn: handleToolChunkRtn,
-//   token_limit_warning: handleWarning,
-// }
-
 const actionMap: Record<string, (payload: any, historyId: string) => void> = {
   msg_stream_start: handleStreamStart,
   think_chunk_rtn: handleThinkChunkRtn,
@@ -1791,6 +1777,7 @@ onActivated(async () => {
 })
 
 onMounted(async () => {
+  window.addEventListener('keydown', globalHandleKeydown)
   try {
     unsubscribeWs = window.api.onWsMessage((payload: any) => {
       handleWsMessage(payload)
@@ -1820,6 +1807,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', globalHandleKeydown)
   unsubscribeWs?.()
   unsubscribeWs = null
 
@@ -1985,8 +1973,8 @@ watch(
   () => activeCustomProviderKey.value,
   (newValue, oldValue) => {
     if (newValue === oldValue) return
-
-    store.config.apiKey = newValue
+    if (store.config.modelProvider === 'custom')
+      store.config.apiKey = newValue
   },
   { deep: true }
 )
@@ -2311,39 +2299,67 @@ const handleConnectProject = async () => {
   store.removeWorkDir('-1')
 }
 
-const wrapperHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
+const globalHandleKeydown = async (
+  e: KeyboardEvent & {
+    isComposing?: boolean
+    keyCode?: number
+  }
+) => {
+  // IME composing
   if (e.isComposing || e.keyCode === 229) {
     return
   }
-  // console.log("Key down:", e.key)
+
+  const target = e.target as HTMLElement | null
+
+  // Whether current focus is input area
+  const isInputElement =
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLInputElement ||
+    target?.isContentEditable
+
+  console.log('Key down:', e.key)
+
+  // Escape
   if (e.key === 'Escape') {
     handleCancel()
-  }
-  else if (e.key === 'Enter') {
-    if (selectMode.value) handleDeleteMessages()
-  }
-}
-
-const msgInputHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean; keyCode?: number }) => {
-  if (e.isComposing || e.keyCode === 229) {
     return
   }
 
-  if (e.shiftKey && e.key === 'Enter') {
-    return
-  }
-
-  if (e.key === 'Enter') {
+  // Delete selected messages
+  if (e.key === 'Enter' && selectMode.value) {
     e.preventDefault()
+    handleDeleteMessages()
+    return
+  }
+
+  // Input area Enter send
+  if (isInputElement && e.key === 'Enter') {
+    // Shift + Enter => newline
+    if (e.shiftKey) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const text = inputText.value.trim()
+
+    if (!text) {
+      return
+    }
 
     const list = messages.value
-    if(list.at(-1)?.pending === true && inputText.value.trim() !== '') {
+
+    // Streaming in progress
+    if (list.at(-1)?.pending === true) {
       try {
         ElMessage({
           type: 'info',
-          message: "等待流式传输完成...",
+          message: '等待流式传输完成...',
           plain: true,
         })
+
         await window.api.stopGeneration(
           cid.value,
           sid.value,
@@ -2357,7 +2373,8 @@ const msgInputHandleKeydown = async (e: KeyboardEvent & { isComposing?: boolean;
 
     const last_node = list.at(-1)
     const parent_id = last_node?.node_id
-    await sendMessage(inputText.value.trim(), parent_id)
+
+    await sendMessage(text, parent_id)
   }
 }
 

@@ -60,7 +60,7 @@ body, * {
   --apix-primary-lighter: rgb(251, 252, 255); /* 极浅背景 */
   --apix-primary-text: rgb(255, 255, 255);    /* 主色背景上的文字 */
   --apix-primary-light-dark: rgb(177, 201, 200);  /* 浅色背景上的主色文字 */
-  --apix-primary-dark: rgb(40, 85, 82);  /* 浅色背景上的主色文字 */
+  --apix-primary-dark: rgb(54, 121, 117);  /* 浅色背景上的主色文字 */
 
   /* ============================================
      功能色 (Functional Colors)
@@ -395,13 +395,38 @@ body, * {
 }
 
 ::selection {
-  background-color: var(--apix-primary-color);
-  color: var(--apix-lightest-color);
+  background-color: var(--apix-primary-color) !important;
+  color: var(--apix-lightest-color) !important;
 }
 
 ::placeholder {
   color: var(--apix-input-placeholder-color);
   opacity: 0.6;
+}
+
+::-webkit-scrollbar {
+  width: 6px;  /* 垂直滚动条宽度 */
+  height: 6px; /* 水平滚动条高度 */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;  /* 轨道背景色 */
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--apix-secondary-light-color);  /* 滑块颜色 */
+  border-radius: 8px;
+  opacity: 0.3;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--apix-tertiary-light-color);  /* 悬停时颜色 */
+  opacity: 1;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .aside-area {

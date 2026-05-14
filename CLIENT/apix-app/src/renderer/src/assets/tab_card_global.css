@@ -1,7 +1,7 @@
 .tab-card:not(.expanded) {
   box-sizing: border-box; 
   border-radius: var(--apix-border-radius-base);
-  padding: 8px 12px;
+  padding: 8px;
   height: 50px;
   
   background: var(--apix-panel-layer-3-background);
@@ -19,7 +19,7 @@
 .tab-card.expanded {
   box-sizing: border-box;
   border-radius: var(--apix-border-radius-base);
-  padding: 8px 12px;
+  padding: 8px;
   min-height: 50px;
   
   background: var(--apix-panel-layer-5-background);
@@ -37,7 +37,6 @@
   column-gap: 8px;
   column-width: 20px;
   width: 60px;
-  margin-right: 20px;
   transition: opacity 0.25s var(--apix-cubic-bezier);
 }
 
@@ -112,7 +111,7 @@
 .tab-card-header {
   position: relative;
   display: grid; 
-  grid-template-columns: auto 76px;
+  grid-template-columns: auto 76px 8px;
   align-items: center; 
   background-color: color-mix(in srgb, var(--apix-primary-color) 30%, transparent);
   padding-left: 6px;
@@ -156,10 +155,9 @@
   color: var(--apix-secondary-dark-color);
 }
 
-.database-card-body,
+.task-card-body,
 .folder-card-body,
 .if-card-body,
-.interface-card-body,
 .loop-card-body,
 .mark-card-body,
 .switch-card-body {
@@ -179,6 +177,7 @@
   height: 24px;
   width: 24px;
   padding: 0;
+  z-index: 999;
   
   background: var(--apix-primary-color);
   border: none;

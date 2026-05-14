@@ -91,7 +91,7 @@ export function createMainWindow() {
 
   // ---------- Window event bindings ----------
   registerWindowIpc(mainWindow)
-  registerFileIpc()
+  registerFileIpc(mainWindow)
   registerLocalTaskIpc()
   registerAiIpc()
   registerAiConfigIpc()

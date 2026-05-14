@@ -73,13 +73,12 @@
         </el-button>
 
         <el-button
-          :type="self.btnType"
           @click="editTabCard()"
           class="tab-card-btn-more"
           :class="{ tabcardbtnmoreexpanded: self.expanded }"
         >
           <el-icon>
-            <component :is="self.btnIcon" />
+            <component :is="self.expanded ? 'Check' : 'Postcard'" />
           </el-icon>
         </el-button>
 
@@ -94,7 +93,7 @@
     </div>
 
     <!-- Folder 卡片体 -->
-    <div v-if="self.showCardBody" class="folder-card-body">
+    <div v-if="self.expanded" class="folder-card-body">
       <div class="place-holder-tag" style="width: 152px;"></div>
       <div class="folder-body-wrapper" :style="{ height: 'auto', overflow: 'auto', scrollbarWidth: 'none' }">
         <div
@@ -112,20 +111,13 @@
             @dragover.prevent
             :draggable="!item.expanded"
           >
-            <Interface
-              v-if="item.type === 'interface'"
+            <Task
+              v-if="item.type === 'task'"
               :father_uid="self.uid"
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
-            />
-
-            <Database
-              v-else-if="item.type === 'database'"
-              :father_uid="self.uid"
-              :self="item"
-              :tab_key="tab_key"
-              @update:delete-card="deleteTabCardInContent"
+              @update:content-change="() => { emit('update:contentChange', self.uid) }"
             />
 
             <Script
@@ -134,7 +126,8 @@
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
-            />
+              @update:content-change="() => { emit('update:contentChange', self.uid) }"
+            ></Script>
 
             <Folder
               v-else-if="item.type === 'folder'"
@@ -142,6 +135,7 @@
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
+              @update:content-change="() => { emit('update:contentChange', self.uid) }"
             />
 
             <Note
@@ -150,6 +144,7 @@
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
+              @update:content-change="() => { emit('update:contentChange', self.uid) }"
             />
           </div>
 
@@ -157,7 +152,7 @@
             class="tab-card-bottom-line"
             :key="'bottomCard'"
           >
-            卡片夹中 {{ self.content.length }} 枚卡片
+            卡片夹中 {{ self.content.length || 0 }} 枚卡片
           </div>
         </div>
       </div>
@@ -172,8 +167,7 @@ import { More, Close } from '@element-plus/icons-vue'
 import { useAppCacheData } from '../../../store/app'
 import { ConfirmDialog } from './../comp/confirmDialog.js'
 import { InputDialog } from '../comp/inputDialog'
-import Interface from './../tab_card/Interface.vue'
-import Database from './../tab_card/Database.vue'
+import Task from './../tab_card/Task.vue'
 import Script from './../tab_card/Script.vue'
 import Folder from './../tab_card/Folder.vue'
 import Note from './../tab_card/Note.vue'
@@ -189,20 +183,11 @@ type CardBase = {
 
 type TabCardBase = CardBase & {
   uid: number
-  showCardBody: boolean
   expanded: boolean
-  btnType: string
-  btnIcon: string
 }
 
-type InterfaceCard = TabCardBase & {
-  type: 'interface'
-  address: string
-  description: string
-}
-
-type DatabaseCard = TabCardBase & {
-  type: 'database'
+type BasicTaskCard = TabCardBase & {
+  type: 'task'
   address: string
   description: string
 }
@@ -224,8 +209,7 @@ type FolderCard = TabCardBase & {
 }
 
 type TabCardItem =
-  | InterfaceCard
-  | DatabaseCard
+  | BasicTaskCard
   | ScriptCard
   | NoteCard
   | FolderCard
@@ -238,7 +222,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:delete-card', card_uid: number): void
-  (e: 'update:PlaceIntoFolder', card_uid: string): void
+  (e: 'update:contentChange', card_uid: number): void
 }>()
 
 const store = useAppCacheData()
@@ -254,25 +238,14 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
     type: virtualCard.type,
     level: virtualCard.level,
     uid: Date.now() + Math.random(),
-    showCardBody: false,
     expanded: false,
-    btnType: 'primary',
-    btnIcon: 'Postcard',
   }
 
   switch (virtualCard.type) {
-    case 'interface':
+    case 'task':
       return {
         ...base,
-        type: 'interface',
-        address: '',
-        description: '',
-      }
-
-    case 'database':
-      return {
-        ...base,
-        type: 'database',
+        type: 'task',
         address: '',
         description: '',
       }
@@ -325,13 +298,6 @@ function onDragEnter(e: DragEvent) {
   ) {
     return
   }
-
-  if (isContainerType(props.self)) {
-    props.self.expanded = true
-    props.self.showCardBody = true
-    props.self.btnType = 'success'
-    props.self.btnIcon = 'Check'
-  }
 }
 
 function onDragLeave(e: DragEvent) {
@@ -340,13 +306,6 @@ function onDragLeave(e: DragEvent) {
 
   if (related && current.contains(related)) {
     return
-  }
-
-  if (isContainerType(props.self)) {
-    props.self.expanded = false
-    props.self.showCardBody = false
-    props.self.btnType = 'primary'
-    props.self.btnIcon = 'Postcard'
   }
 }
 
@@ -416,13 +375,13 @@ function saveCardAsPredefined() {
 function markCard() {
   isShowMark.value = !isShowMark.value
   selfExt.markIsShow = isShowMark.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 function hideMark() {
   isShowMark.value = false
   selfExt.markIsShow = false
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 
   setTimeout(() => {
     isShowMark_.value = false
@@ -444,7 +403,7 @@ async function updateMarkContent() {
         selfExt.markMessage = value
         isShowMark.value = true
         selfExt.markIsShow = true
-        store.saveTab(props.tab_key)
+        emit("update:contentChange", props.self.uid)
       })
       .catch(() => {})
   } catch {}
@@ -465,7 +424,7 @@ function DragCardDropInCardList() {
     const virtualCard = JSON.parse(globalState.draggedCard)
     const newCard = createCardByType(virtualCard)
     props.self.content.push(newCard)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange", props.self.uid)
   } else if (globalState.draggedTabCard) {
     const virtualCard = JSON.parse(globalState.draggedTabCard) as TabCardItem
     const newCard = { ...virtualCard }
@@ -483,7 +442,7 @@ function DragCardDropInCardList() {
 
     removeCardFromTree(currentTab.items, newCard.uid)
     props.self.content.push(newCard)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange", props.self.uid)
   }
 
   globalState.draggedStartCardUid_parent = 0
@@ -516,12 +475,12 @@ function DragCardDropInCardList_insert(item: TabCardItem, dropIndex: number, eve
       props.self.content.splice(dropIndex, 0, virtualCard)
     }
 
-    store.saveTab(props.tab_key)
+    emit("update:contentChange", props.self.uid)
   } else if (globalState.draggedCard) {
     const virtualCard = JSON.parse(globalState.draggedCard)
     const newCard = createCardByType(virtualCard)
     props.self.content.splice(dropIndex, 0, newCard)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange", props.self.uid)
   }
 
   globalState.draggedStartCardUid_parent = 0
@@ -578,7 +537,7 @@ function deleteTabCardInContent(card_uid: number) {
   const idx = props.self.content.findIndex(c => c.uid === card_uid)
   if (idx !== -1) {
     props.self.content.splice(idx, 1)
-    store.saveTab(props.tab_key)
+    emit("update:contentChange", props.self.uid)
     ElMessage({ type: 'success', message: '已删除' })
   }
 }
@@ -587,17 +546,8 @@ function deleteTabCardInContent(card_uid: number) {
 // 展开 / 收起
 // ------------------------
 function editTabCard() {
-  if (props.self.showCardBody) {
-    props.self.btnType = 'primary'
-    props.self.btnIcon = 'Postcard'
-  } else {
-    props.self.btnType = 'success'
-    props.self.btnIcon = 'Check'
-  }
-
   props.self.expanded = !props.self.expanded
-  props.self.showCardBody = !props.self.showCardBody
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
 }
 
 // ------------------------
@@ -613,7 +563,7 @@ function onMouseUp_input(e: Event) {
 
 function onTabCardTitleChange(e: Event) {
   props.self.title = titleInput.value
-  store.saveTab(props.tab_key)
+  emit("update:contentChange", props.self.uid)
   ;(e.target as HTMLInputElement).blur()
 }
 

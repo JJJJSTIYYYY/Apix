@@ -25,6 +25,7 @@ dist/
 dist-electron/
 .vite/
 out/
+build/
 
 # logs
 npm-debug.log*
@@ -39,6 +40,7 @@ pnpm-debug.log*
 
 .vscode/
 .idea/
+.VSCodeCounter/
 
 ## Runtime / Data
 # AGENT
