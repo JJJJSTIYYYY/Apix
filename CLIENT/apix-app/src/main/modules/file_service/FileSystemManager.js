@@ -143,6 +143,14 @@ export class FileSystemManager {
         )
     }
 
+    // Watch a node
+    watchDirectoryNode(targetPath) {
+        return this._call(
+            'watchDirectoryNode',
+            { targetPath }
+        )
+    }
+
     // Collapse directory tree inside workspace
     collapseDirectoryTree(targetPath) {
         return this._call(
@@ -172,6 +180,14 @@ export class FileSystemManager {
         return this._call(
             'readFile',
             { filePath, encoding }
+        )
+    }
+
+    // reRead file
+    reReadFile(filePath, version, baseContent = '', encoding = 'utf-8') {
+        return this._call(
+            'reReadFile',
+            { filePath, version, baseContent, encoding }
         )
     }
 

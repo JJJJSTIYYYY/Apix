@@ -18,6 +18,7 @@
           @expand-dir="expandDir"
           @collapse-dir="collapseDir"
           @create="reallyCreate"
+          @delete="deletePath"
           @create-new-path="createNewPath"
           @hide-all-input="hideNewFileInput"
           @open-file="openFile"
@@ -51,6 +52,10 @@
                   class="tab-unsaved-dot"
                 />
 
+                <!-- Icon -->
+                <div class="icon-wrapper" v-html="getSupportFileSVG(tab.tabKey)">
+                </div>
+
                 <!-- Title -->
                 <span class="tab-title">
                   {{ tab.title }}
@@ -60,6 +65,7 @@
                 <div
                   class="tab-close"
                   @click.stop="closeTab(tab)"
+                  draggable="false"
                 >
                   <svg t="1778579309106" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7164" width="20" height="20"><path d="M140.5 960L64 883.5 441 512 64 140.5 140.5 64 512 441 883.5 64l76.5 76.5L583 512l377 371.5-76.5 76.5L512 583 140.5 960z" p-id="7165"></path></svg>
                 </div>
@@ -87,6 +93,7 @@
 
                   <MarkdownEditor
                     v-else-if="tab.content_mime === 'md'"
+                    :ref="el => { if (el) { editorRefs[tab.tabKey] = el } else { delete editorRefs[tab.tabKey] } }"
                     v-model="tab.content"
                     :theme="store.config.dark_theme ? 'dark' : 'light'"
                     @change:model-value="handleContentChange(tab.tabKey)"
@@ -164,21 +171,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount, computed, watch, toRaw } from 'vue';
-import { NTabPane, NTabs } from 'naive-ui'
+import { ref, reactive, onMounted, onBeforeUnmount, computed, shallowRef, toRaw } from 'vue';
 import { ElMessage } from 'element-plus'
 import HomePage from './homePage.vue'
 import TabCardList from './component/tab_card/TabCardList.vue'
 import MarkdownEditor from './component/markdown_edit/markdown_editor.vue'
+import { type MarkdownEditorExpose } from './component/markdown_edit/markdown_editor.vue'
 import FilePanel from './component/file_panel/file_explorer.vue'
 import { type NodeBase } from './component/file_panel/file_tree_node.vue'
 import { useAppCacheData } from '../store/app.js'
 import { useAuthStore } from '../store/auth.js'
 import { ConfirmDialog } from './component/comp/confirmDialog.js'
 import { mdDisplayer } from './component/comp/mdDisplayer.js'
-import { defaultCards, globalState } from '../store/globalData.js'
-
-import { mockWorkspace } from '../store/mock.js'
+import { getSupportFileSVG, globalCardDragState } from '../store/globalData.js'
 
 
 // ------------------------
@@ -192,7 +197,7 @@ type CardBase = {
 }
 
 type TabCardBase = CardBase & {
-  uid: number
+  uid: string
   expanded: boolean
 }
 
@@ -231,8 +236,9 @@ type TabItem = {
   title: string // File name
   content: TabCardItem[] | string
   content_mime: string
+  version: number
   saved?: Boolean
-  status?: 'outdated' | 'deleted'
+  status?: 'outdated' | 'deleted' | 'default'
 }
 
 // ------------------------
@@ -252,6 +258,7 @@ const activeTab = computed({
   set(value: string) {
     const idx = tabs.findIndex(t => t.tabKey === value)
     const tab = tabs[idx]
+    if (!tab) return
     activatedTabMeta.value = {
       mime: tab.content_mime,
       name: tab.title,
@@ -265,11 +272,9 @@ const activeTab = computed({
 // 拖拽逻辑
 // ------------------------
 function onLeftDragStart(card: PresetCard) {
-  globalState.draggedStartCardUid_parent = 0
-  globalState.draggedStartCardUid = 0
-  globalState.draggedTabCard = ''
-  globalState.draggedCard = JSON.stringify(card)
-  console.log('onLeftDragStart: globalState.draggedCard: ' + globalState.draggedCard)
+  globalCardDragState.sourceUid = null
+  globalCardDragState.cardUid = card.id
+  globalCardDragState.cardType = 'preset'
 }
 
 // ------------------------
@@ -326,7 +331,9 @@ const addTab = async (key, name, content, content_mime) => {
       title: name,
       content: content,
       content_mime: content_mime,
-      saved: true
+      saved: true,
+      version: 0,
+      status: 'default'
     })
     
     activeTab.value = key
@@ -352,7 +359,55 @@ async function closeTab(tab: TabItem) {
   } catch {}
 }
 
-function changeTab(tab: TabItem) {
+async function closeAllTab() {
+  try {
+    tabs.splice(0, tabs.length)
+    await store.saveTabs()
+  } catch {}
+}
+
+async function changeTab(tab: TabItem) {
+  // Reload outdated file
+  if (tab.status === 'outdated') {
+    try {
+      const result = await window.api.reReadFile(tab.tabKey, tab.version, tab.content)
+
+      // File changed
+      if (result.changed) {
+        // Same base version -> apply patch
+        if (result.version === tab.version) {
+          // aflow / agraph
+          if (isApixFileMime(tab.tabKey)) {
+            // Not replace anything
+          }
+          // Markdown patch
+          else {
+            applyEditorPatch(tab.tabKey, result.patch)
+          }
+        }
+        // External version newer
+        else {
+          // Direct replace
+          if (Array.isArray(tab.content) && Array.isArray(result.content)) {
+            tab.content.splice(0, tab.content.length, ...result.content)
+          } else {
+            tab.content = result.content
+          }
+          tab.version = result.version
+        }
+      }
+
+      tab.status = 'default'
+    } catch (err) {
+      console.error('[changeTab reread outdated] error:', err)
+      ElMessage({
+        type: 'error',
+        message: '文件重新同步失败',
+        plain: true
+      })
+    }
+  }
+
   activeTab.value = tab.tabKey
 }
 
@@ -405,6 +460,7 @@ const changeWorkspace = async (path) => {
 
 // Close workspace
 const closeWorkspace = async () => {
+  await closeAllTab()
   dirDict.value = null
   store.setWorkspace('')
   console.log('Clear workspace structure.')
@@ -472,17 +528,41 @@ const expandDir = async (path) => {
 // Collapse directory
 const collapseDir = async (path) => {
   try {
-    await window.api.collapseDirectoryTree(path)
     const currentNode = findNodeByPath(dirDict.value, path)
     if (!currentNode) return
-    currentNode.children = []
+
+    // Whether opened tabs exist inside this directory
+    const hasOpenedFile = tabs.some(tab =>
+      tab.tabKey.startsWith(path + '/')
+    )
+
+    // Stop watcher only when no opened file exists
+    if (!hasOpenedFile) {
+      await window.api.collapseDirectoryTree(path)
+    }
+
+    // Only collapse ui
     currentNode.expanded = false
-    console.log('Collapse dir:', path)
+
+    console.log(
+      'Collapse dir:',
+      path,
+      'keep watcher:',
+      hasOpenedFile
+    )
+
   } catch (error) {
     console.error('[collapseDir] error:', error)
   }
 }
 
+function isApixFileMime(filePath) {
+  if (filePath.endsWith(".md")) return false
+  else if (filePath.endsWith(".aflow") || filePath.endsWith(".agraph")) return true
+  else return false
+}
+
+const isContntChangeWarningShow = ref(false)
 // Merge fs events into dir tree
 const watchWorkspace = async (events) => {
   for (const e of events) {
@@ -521,10 +601,84 @@ const watchWorkspace = async (events) => {
       // Remove directory/file
       else if (e.type === 'unlink' || e.type === 'unlinkDir') {
         removeNodeByPath(dirDict.value, e.path)
+        const openedTab = tabs.find(t => t.tabKey === e.path)
+        if (openedTab) {
+          openedTab.status = 'deleted'
+        }
       }
     }
     else if (eventTypesNeedUpdateFileStatus.has(e.type)) {
-      
+      if (e.type === 'change') {
+        if (!e.path) continue
+        const openedTab = tabs.find(t => t.tabKey === e.path)
+        if (!openedTab) continue
+        if (isApixFileMime(e.path)) {
+          const content = JSON.stringify(toRaw(openedTab.content))
+          const currentVersion = openedTab.version
+          const result = await window.api.reReadFile(e.path, currentVersion, content)
+          // Ignore self write
+          if (!result.changed) continue
+
+          if (!isContntChangeWarningShow.value) {
+            isContntChangeWarningShow.value = true
+            await ConfirmDialog.confirm(
+              `检测到文件【${e.path}】被外部编辑，为防止文件格式被破坏，保存时将直接覆盖。`,
+              '警告',
+              {
+                confirmButtonText: '确定',
+                cancelButtonText: '',
+                type: 'warning',
+              }
+            )
+            isContntChangeWarningShow.value = false
+          }
+          openedTab.status = 'outdated'
+          continue
+        }
+        else if (activeTab.value === e.path) {
+          let content = openedTab.content
+          const currentVersion = openedTab.version
+          const result = await window.api.reReadFile(e.path, currentVersion, content)
+
+          // Ignore self write
+          if (!result.changed) continue
+
+          // Version unchanged
+          if (result.version === openedTab.version) {
+            applyEditorPatch(openedTab.tabKey, result.patch)
+            openedTab.status = 'default'
+            continue
+          }
+
+          // Already waiting
+          if (pendingReloadTimers.has(openedTab.tabKey)) continue
+
+          pendingReloadTimers.set(openedTab.tabKey, true)
+
+          ;(async () => {
+            const stable = await waitUntilVersionStable(openedTab)
+            pendingReloadTimers.delete(openedTab.tabKey)
+            if (!stable) return
+
+            const latestTab = tabs.find(t => t.tabKey === e.path)
+            if (!latestTab) return
+
+            let latestContent = latestTab.content
+
+            const latestResult = await window.api.reReadFile(e.path, latestTab.version, latestContent)
+            if (!latestResult.changed) return
+
+            // Stable now
+            if (latestResult.version === latestTab.version) {
+              applyEditorPatch(latestTab.tabKey, latestResult.patch)
+              latestTab.status = 'default'
+            }
+          })()
+        }
+        else {
+          openedTab.status = 'outdated'
+        }
+      }
     }
   }
 }
@@ -539,6 +693,27 @@ const reallyCreate = async (at_path, name, type) => {
   else {
     const p = await window.api.createDirectory(c_path)
     console.log("Create directory: ", p)
+  }
+}
+
+const deletePath = async (path) => {
+  const currentNode = findNodeByPath(dirDict.value, path)
+  if (!currentNode) return
+  try {
+    const wariningTail = currentNode.type === 'directory' ? '及其子目录？':'？'
+    await ConfirmDialog.confirm(
+      `您可以从回收站还原此文件。`,
+      `确定要要删除“${currentNode.name}”${wariningTail}`,
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    if (currentNode.type === 'directory') await window.api.deleteDirectory(currentNode.path)
+    else await window.api.deleteFile(currentNode.path)
+  } catch (err: any) {
+    
   }
 }
 
@@ -560,15 +735,91 @@ const openFile = async (path, name) => {
 // ------------------------
 // Markdown
 // ------------------------
-const unsavedTabKeyMap = new Set()
+const editorRefs =
+  shallowRef<
+    Record<
+      string,
+      MarkdownEditorExpose
+    >
+  >({})
+
+const pendingReloadTimers = new Map()
+const RE_READ_IDLE_DELAY = 300
+
+function applyEditorPatch(
+  tabKey: string,
+  patch: {
+    from: number
+    to: number
+    insert: string
+  }[]
+) {
+  const editor =
+    editorRefs.value[
+      tabKey
+    ]
+
+  if (!editor) return
+
+  editor.applyPatch(
+    patch
+  )
+}
+
+async function waitUntilVersionStable(
+  tab
+) {
+  return new Promise<boolean>(
+    resolve => {
+
+      const check = () => {
+
+        const version =
+          tab.version
+
+        setTimeout(() => {
+
+          const currentTab =
+            tabs.find(
+              t =>
+                t.tabKey ===
+                tab.tabKey
+            )
+
+          // Tab closed
+          if (!currentTab) {
+            resolve(false)
+            return
+          }
+
+          // Stable
+          if (
+            currentTab.version ===
+            version
+          ) {
+            resolve(true)
+            return
+          }
+
+          // Still typing
+          check()
+
+        }, RE_READ_IDLE_DELAY)
+      }
+
+      check()
+    }
+  )
+}
+
 function handleContentChange(tabKey: string) {
-  if (unsavedTabKeyMap.has(tabKey)) return
-  const idx = tabs.findIndex(t => t.tabKey === tabKey)
-  tabs[idx].saved = false
+  const tab = tabs.find(t => t.tabKey === tabKey)
+  if (!tab) return
+  tab.saved = false
+  tab.version++
   if (tabKey === activeTab.value) {
     activeTab.value = tabKey // Update activatedTabMeta
   }
-  unsavedTabKeyMap.add(tabKey)
 }
 
 // ------------------------
@@ -611,18 +862,7 @@ const globalHandleKeydown = async (
 
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
     const tabKey = activeTab.value
-    const idx = tabs.findIndex(t => t.tabKey === tabKey)
-    if (tabs[idx].saved) return
-    let content = tabs[idx].content
-    if (typeof content === 'object') {
-      content = JSON.stringify(
-        toRaw(content)
-      )
-    }
-    // console.log("Save content:", content)
-    await window.api.writeFile(tabKey, content)
-    unsavedTabKeyMap.delete(tabs[idx].tabKey)
-    tabs[idx].saved = true
+    store.saveTab(tabKey)
   }
 }
 
@@ -862,13 +1102,15 @@ function foldAllCards() {
   align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
+  z-index: 9999;
 
-  height: 32px;
+  height: 38px;
 
   background-color: var(--apix-default-light-color);
   border-radius: 0;
   box-shadow: var(--apix-shadow-layer-1);
   transition: box-shadow 320ms var(--apix-cubic-bezier);
+  border-bottom: .5px solid var(--apix-border-disabled);
 }
 
 .editor-tabs-header:hover {
@@ -890,7 +1132,7 @@ function foldAllCards() {
   align-items: center;
   justify-content: center;
 
-  height: 32px;
+  height: 38px;
   min-width: 100px;
   max-width: 220px;
   flex-shrink: 0;
@@ -945,6 +1187,23 @@ function foldAllCards() {
   border-radius: 999px;
   background: var(--apix-primary-active);
   flex-shrink: 0;
+}
+
+.icon-wrapper {
+  display: flex;
+  width: 18px;
+
+  margin-right: 4px;
+
+  text-align: center;
+  justify-content: center;
+
+  font-size: 13px;
+}
+
+.icon-wrapper:deep(.icon) {
+  width: 15px;
+  height: 15px;
 }
 
 /* Close button */

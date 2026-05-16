@@ -2,6 +2,9 @@ import fs from 'fs/promises'
 
 import path from 'path'
 import yaml from 'js-yaml'
+import crypto from 'crypto'
+import diff from 'fast-diff'
+import trash from 'trash'
 
 import { parentPort } from 'worker_threads'
 
@@ -21,11 +24,14 @@ class FsWatcherWorker {
     // Event queue
     this.eventQueue = []
 
+    // Event ignore map {path: content_hash}
+    this.changeIgnoreMap = {}
+
     // Batch timer
     this.batchTimer = null
 
     // Event flush interval (ms)
-    this.EVENT_FLUSH_INTERVAL = 300
+    this.EVENT_FLUSH_INTERVAL = 150
 
     // Event transition table
     this.EVENT_TRANSITIONS = {
@@ -456,7 +462,7 @@ class FsWatcherWorker {
   async watchWorkspace(
     dirPath
   ) {
-    await this.unwatchWorkspace()
+    // await this.unwatchWorkspace()
 
     this.root_dir =
       this.normalizePath(
@@ -658,42 +664,27 @@ class FsWatcherWorker {
   }
 
   // Delete file
-  async deleteFile(
-    filePath
-  ) {
+  async deleteFile(filePath) {
     const normalizedPath =
-      this.normalizePath(
-        filePath
-      )
+      this.normalizePath(filePath)
 
-    await fs.rm(
-      normalizedPath,
-      {
-        force: true
-      }
-    )
+    await trash([
+      normalizedPath
+    ])
   }
 
   // Delete directory
-  async deleteDirectory(
-    dirPath
-  ) {
+  async deleteDirectory(dirPath) {
     const normalizedPath =
-      this.normalizePath(
-        dirPath
-      )
+      this.normalizePath(dirPath)
 
     await this.unwatchDirectoryNode(
       normalizedPath
     )
 
-    await fs.rm(
-      normalizedPath,
-      {
-        recursive: true,
-        force: true
-      }
-    )
+    await trash([
+      normalizedPath
+    ])
   }
 
   // Rename file or directory
@@ -787,6 +778,118 @@ class FsWatcherWorker {
     }
   }
 
+  // Read full file and return CodeMirror patch
+  async reReadFile(
+    filePath,
+    version,
+    baseContent = '',
+    encoding = 'utf-8',
+  ) {
+    const normalizedPath =
+      this.normalizePath(
+        filePath
+      )
+
+    const mime =
+      this.guessFileMime(
+        normalizedPath
+      )
+
+    if (mime === 'unsupport') {
+      return {
+        changed: false,
+        mime: mime,
+        version: version,
+        patch: null
+      }
+    }
+
+    const content_raw =
+      await fs.readFile(
+        normalizedPath,
+        encoding
+      )
+
+    // Calculate current disk hash
+    const currentHash =
+      crypto
+        .createHash('sha256')
+        .update(content_raw, encoding)
+        .digest('hex')
+
+    const ignoredHash =
+      this.changeIgnoreMap[
+        normalizedPath
+      ]
+
+    // Ignore self write
+    if (currentHash === ignoredHash) {
+      delete this.changeIgnoreMap[
+        normalizedPath
+      ]
+
+      return {
+        changed: false,
+        mime: mime,
+        version: version,
+        patch: null
+      }
+    }
+
+    // Generate diff patch
+    const diffs =
+      diff(
+        baseContent,
+        content_raw
+      )
+
+    const patch = []
+
+    let cursor = 0
+
+    for (const [
+      type,
+      text
+    ] of diffs) {
+
+      // Equal
+      if (type === 0) {
+        cursor += text.length
+        continue
+      }
+
+      // Insert
+      if (type === 1) {
+        patch.push({
+          from: cursor,
+          to: cursor,
+          insert: text
+        })
+
+        continue
+      }
+
+      // Delete
+      if (type === -1) {
+        patch.push({
+          from: cursor,
+          to: cursor + text.length,
+          insert: ''
+        })
+
+        cursor += text.length
+      }
+    }
+
+    return {
+      changed:
+        patch.length > 0,
+      mime: mime,
+      version: version,
+      patch: patch
+    }
+  }
+
   // Write full file
   async writeFile(
     filePath,
@@ -797,6 +900,13 @@ class FsWatcherWorker {
       this.normalizePath(
         filePath
       )
+
+    // Save content hash before writing
+    this.changeIgnoreMap[normalizedPath] =
+      crypto
+        .createHash('sha256')
+        .update(content, encoding)
+        .digest('hex')
 
     await fs.mkdir(
       path.dirname(
@@ -899,6 +1009,9 @@ class FsWatcherWorker {
 
     readFile:
       this.readFile.bind(this),
+
+    reReadFile:
+      this.reReadFile.bind(this),
 
     writeFile:
       this.writeFile.bind(this),

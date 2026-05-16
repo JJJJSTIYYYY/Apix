@@ -92,11 +92,43 @@ const emit = defineEmits<{
   (e: 'change:modelValue'): void
 }>()
 
+export type MarkdownEditorExpose = {
+  applyPatch: (
+    patch: {
+      from: number
+      to: number
+      insert: string
+    }[]
+  ) => void
+}
+
+
+
 // ------------------------
 // Refs
 // ------------------------
 const editorRef = ref<HTMLDivElement>()
 const editorView = shallowRef<EditorView>()
+
+let applyingPatch = false
+
+function applyPatch(
+  patch
+) {
+  if (!editorView.value) return
+
+  applyingPatch = true
+
+  editorView.value.dispatch({
+    changes: patch
+  })
+
+  applyingPatch = false
+}
+
+defineExpose({
+  applyPatch
+})
 
 // ------------------------
 // Search state
@@ -154,9 +186,19 @@ onMounted(() => {
 // ------------------------
 function onModelValueChange(update: ViewUpdate) {
   if (!update.docChanged) return
+
+  emit(
+    'update:modelValue',
+    update.state.doc.toString()
+  )
+
+  // Ignore external patch sync
+  if (applyingPatch) {
+    return
+  }
+
   emit('change:modelValue')
-  emit('update:modelValue', update.state.doc.toString())
-  // Refresh match count after edits
+
   updateSearchMatches()
 }
 

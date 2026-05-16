@@ -385,7 +385,7 @@ body, * {
 }
 
 :focus-visible {
-  /* outline: none !important; */
+  outline: none !important;
 }
 
 .noselect {

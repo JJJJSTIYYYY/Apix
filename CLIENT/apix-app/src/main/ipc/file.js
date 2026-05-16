@@ -82,6 +82,32 @@ export function registerFileIpc(mainWindow) {
     return result
   })
 
+  ipcMain.handle('openDir', async (event, dirPath, fileName = '') => {
+    try {
+      // Open directory and select file
+      if (fileName) {
+        const fullPath = path.join(dirPath, fileName)
+
+        shell.showItemInFolder(fullPath)
+
+        return { success: true }
+      }
+
+      // Only open directory
+      const err = await shell.openPath(dirPath)
+
+      if (err) {
+        console.error('Failed to open directory:', err)
+        return { success: false, error: err }
+      }
+
+      return { success: true }
+    } catch (e) {
+      console.error('openCacheDir error:', e)
+      return { success: false, error: String(e) }
+    }
+  })
+
   ipcMain.handle('openCacheDir', async () => {
     try {
       // Get user data directory and append custom folder
@@ -224,6 +250,14 @@ export function registerFileIpc(mainWindow) {
     }
   )
 
+  // Watch a node
+  ipcMain.handle(
+    'fs:watchDirectoryNode',
+    async (_, targetPath) => {
+      return await fsManager.watchDirectoryNode(targetPath)
+    }
+  )
+
   // Collapse directory tree inside workspace
   ipcMain.handle(
     'fs:collapseDirectoryTree',
@@ -253,6 +287,14 @@ export function registerFileIpc(mainWindow) {
     'fs:readFile',
     async (_, filePath, encoding = 'utf-8') => {
       return await fsManager.readFile(filePath, encoding)
+    }
+  )
+
+  // Read file
+  ipcMain.handle(
+    'fs:reReadFile',
+    async (_, filePath, version, baseContent = '', encoding = 'utf-8') => {
+      return await fsManager.reReadFile(filePath, version, baseContent, encoding)
     }
   )
 

@@ -444,7 +444,7 @@ export const useAppCacheData = defineStore("app", {
     // Tabs helpers
     // ----------------
     findTab(tabKey) {
-      return this.tabs.findIndex(
+      return this.tabs.find(
         t => t.tabKey === tabKey
       )
     },
@@ -486,8 +486,10 @@ export const useAppCacheData = defineStore("app", {
       ) {
         const tabs = []
 
+        // Avoid duplicate restore
+        const restoredDirs = new Set()
+
         for (const item of storedTabs) {
-          // Compatible with old format: ['tab1', 'tab2']
           const tabKey =
             typeof item === 'string'
               ? item
@@ -497,23 +499,58 @@ export const useAppCacheData = defineStore("app", {
             continue
           }
 
-          const tab = await this.readTab(tabKey)
+          // Restore parent directory watcher
+          const lastSlashIndex =
+            tabKey.lastIndexOf('/')
 
-          tabs.push({
-            tabKey: tabKey,
+          if (lastSlashIndex !== -1) {
+            const dirPath =
+              tabKey.slice(0, lastSlashIndex)
 
-            // Prefer stored title, fallback to file name
-            title:
-              typeof item === 'object'
-              &&
-              item?.title
-                ? item.title
-                : tabKey,
+            if (!restoredDirs.has(dirPath)) {
+              restoredDirs.add(dirPath)
 
-            content: tab['content'],
-            content_mime: tab['mime'],
-            saved: true
-          })
+              try {
+                console.log('[readTabs restore dir] rewatch:', dirPath)
+                await window.api.watchDirectoryNode(
+                  dirPath
+                )
+              }
+              catch (err) {
+                console.error(
+                  '[readTabs restore dir] error:',
+                  dirPath,
+                  err
+                )
+              }
+            }
+          }
+
+          try{
+            const tab =
+              await this.readTab(tabKey)
+
+            tabs.push({
+              tabKey: tabKey,
+
+              // Prefer stored title, fallback to file name
+              title:
+                typeof item === 'object'
+                &&
+                item?.title
+                  ? item.title
+                  : tabKey,
+
+              content: tab['content'],
+              content_mime: tab['mime'],
+              saved: true,
+              status: 'default',
+              version: 0
+            })
+          }
+          catch (e) {
+            
+          }
         }
 
         return tabs
@@ -540,27 +577,18 @@ export const useAppCacheData = defineStore("app", {
     },
 
     async saveTab(tabKey) {
-      const tab = this.tabs.find(
-        t => t.tabKey === tabKey
-      )
-
-      if (!tab) return
-
-      await window.api.writeData(
-        `tab_${tab.tabKey}`,
-        toRaw(tab)
-      )
-    },
-
-    async saveAllTabs() {
-      await this.saveTabs()
-
-      for (const tab of this.tabs) {
-        window.api.writeData(
-          `tab_${tab.tabKey}`,
-          toRaw(tab)
+      const idx = this.tabs.findIndex(t => t.tabKey === tabKey)
+      if (this.tabs[idx].saved && this.tabs[idx].status === 'default') return
+      let content = this.tabs[idx].content
+      if (typeof content === 'object') {
+        content = JSON.stringify(
+          toRaw(content)
         )
       }
+      // console.log("Save content:", content)
+      await window.api.writeFile(tabKey, content)
+      this.tabs[idx].saved = true
+      this.tabs[idx].status = 'default'
     },
   }
 })

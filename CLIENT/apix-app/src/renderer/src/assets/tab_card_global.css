@@ -12,6 +12,7 @@
 
 .tab-card:not(.expanded):hover {
   border: 1px solid var(--apix-primary-color);
+  border-radius: var(--apix-border-radius-base);
   box-shadow: var(--apix-shadow-layer-2);
   background: var(--apix-panel-layer-5-background);
 }
@@ -26,6 +27,10 @@
   border: 1px solid var(--apix-primary-color);
   box-shadow: var(--apix-shadow-layer-2);
   transition: box-shadow 0.22s var(--apix-cubic-bezier);
+}
+
+.tab-card.dragging {
+  border: 1px solid var(--apix-info-hover) !important;
 }
 
 .tab-card-btn-area {

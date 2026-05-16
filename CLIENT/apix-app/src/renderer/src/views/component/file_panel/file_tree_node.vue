@@ -27,15 +27,47 @@
       </div>
 
       <!-- Icon -->
-      <div class="icon-wrapper">
-        <svg v-if="node.type === 'directory'" t="1778343244907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="8542" width="20" height="20"><path d="M453.315048 146.285714a73.142857 73.142857 0 0 1 71.411809 57.295238l3.535238 15.847619H828.952381a73.142857 73.142857 0 0 1 73.142857 73.142858v512a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V219.428571a73.142857 73.142857 0 0 1 73.142857-73.142857h258.267429z m0 73.142857H195.047619v585.142858h633.904762V414.47619H496.688762l-43.373714-195.047619zM780.190476 658.285714v73.142857H243.809524v-73.142857h536.380952z m48.761905-365.714285H544.49981l10.849523 48.761904H828.952381v-48.761904z" fill="var(--apix-secondary-dark-color)" p-id="8543"></path></svg>
-        <svg v-else t="1778344738953" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9209" width="16" height="16"><path d="M170.666667 219.428571h682.666666V146.285714H170.666667v73.142857z m0 219.428572h487.619047v-73.142857H170.666667v73.142857z m0 219.428571h292.571428v-73.142857H170.666667v73.142857z m0 219.428572h682.666666v-73.142857H170.666667v73.142857z" fill="var(--apix-secondary-dark-color)" p-id="9210"></path></svg>
+      <div class="icon-wrapper" v-if="node.type !== 'directory'" v-html="getSupportFileSVG(node.path)">
       </div>
 
       <!-- Name -->
-      <div class="label">
-        {{ node.name }}
+      <div
+        class="label"
+        tabindex="-1"
+        @keydown.enter.prevent="handleRenameStart"
+      >
+        <div v-if="!renameInputShow">
+          {{ node.name }}
+        </div>
+
+        <input
+          v-else
+          id="file-tree-node-rename-input"
+          class="file-tree-node-rename-input"
+          v-model="renameValue"
+          type="text"
+          @keydown.stop
+          @keydown.enter.prevent="confirmRename"
+          @keydown.esc.prevent="cancelRename"
+          @blur="confirmRename"
+        />
       </div>
+
+      <transition name="scale-fade">
+        <fileNodeMenu
+          v-if="isShowMenu"
+          ref="menuRef"
+          :style="menuStyle"
+          @close-menu="closePopMenu"
+          @click.stop
+          @copy-path="handleCopyPath"
+          @open-in-local="handleOpenInLocal"
+          @new-file="handleCreateNewFile"
+          @new-dir="handleCreateNewDir"
+          @rename="handleRenameStart"
+          @delete-item="handleDeleteItem"
+        />
+      </transition>
 
     </div>
 
@@ -78,20 +110,13 @@
           @toggle="$emit('toggle', $event)"
           @select="$emit('select', $event)"
           @create="(...args) => $emit('create', ...args)"
+          @want-to-create-file="(...args) => $emit('wantToCreateFile', ...args)"
+          @want-to-create-dir="(...args) => $emit('wantToCreateDir', ...args)"
           @hide-all-input="(...args) => $emit('hideAllInput', ...args)"
+          @rename="(...args) => $emit('hideAllInput', ...args)"
         />
       </div>
     </Transition>
-
-    <transition name="scale-fade">
-      <fileNodeMenu
-        v-if="isShowMenu"
-        ref="menuRef"
-        :style="menuStyle"
-        @close-menu="closePopMenu"
-        @click.stop
-      />
-    </transition>
   </div>
 </template>
 
@@ -99,6 +124,8 @@
 import { nextTick, ref, watch } from 'vue'
 import TreeNode from './file_tree_node.vue'
 import fileNodeMenu from './comp/fileNodeMenu.vue'
+import { ConfirmDialog } from '../../component/comp/confirmDialog.js'
+import { getSupportFileSVG } from '../../../store/globalData.js'
 
 // ------------------------
 // Props
@@ -111,6 +138,7 @@ export interface NodeBase {
   expanded?: Boolean
   is_creating?: Boolean
   creating_type?: string
+  root?: string
 }
 
 const props = defineProps<{
@@ -122,8 +150,10 @@ const props = defineProps<{
 const emit = defineEmits([
   'toggle',
   'select',
-  'wantToCreate',
+  'wantToCreateFile',
+  'wantToCreateDir',
   'create',
+  'rename',
   'hideAllInput'
 ])
 
@@ -131,11 +161,71 @@ const emit = defineEmits([
 // Click
 // ------------------------
 function onClick() {
+  if (renameInputShow.value) return
   emit('select', props.node)
 
   if (props.node.type === 'directory') {
     emit('toggle', props.node)
   }
+}
+
+// ------------------------
+// Node
+// ------------------------
+const renameInputShow = ref(false)
+const renameValue = ref(props.node.name)
+
+async function handleRenameStart() {
+  if (renameInputShow.value || props.depth === 0) return
+
+  renameValue.value = props.node.name
+  renameInputShow.value = true
+
+  await nextTick()
+
+  const input = document.getElementById('file-tree-node-rename-input')
+
+  if (!input) return
+
+  input.focus()
+
+  // Find extension position
+  const fileName = props.node.name
+  const lastDotIndex = fileName.lastIndexOf('.')
+
+  // Ignore hidden files like ".gitignore"
+  const hasExtension = lastDotIndex > 0
+
+  // Select filename without extension
+  const selectionEnd = hasExtension
+    ? lastDotIndex
+    : fileName.length
+
+  input.setSelectionRange(0, selectionEnd)
+}
+
+async function confirmRename() {
+  if (!renameInputShow.value) return
+  renameInputShow.value = false
+
+  if (renameValue.value !== props.node.name) {
+    console.log('Rename', props.node.path, 'to', props.node.path.substring(0, props.node.path?.length - props.node.name?.length) + renameValue.value)
+    if (props.node.type === 'directory') {
+      emit('rename', props.node.path, props.node.path.substring(0, props.node.path?.length - props.node.name?.length) + renameValue.value)
+      await window.api.rename(props.node.path, props.node.path.substring(0, props.node.path?.length - props.node.name?.length) + renameValue.value)
+    }
+    else {
+      const fileType = '.' + props.node.path.split('.').pop()
+      if (!renameValue.value.endsWith(fileType)) renameValue.value = renameValue.value + fileType
+      emit('rename', props.node.path, props.node.path.substring(0, props.node.path?.length - props.node.name?.length) + renameValue.value)
+      await window.api.rename(props.node.path, props.node.path.substring(0, props.node.path?.length - props.node.name?.length) + renameValue.value)
+    }
+  }
+}
+
+function cancelRename() {
+  renameInputShow.value = false
+  renameValue.value = props.node.name
 }
 
 // ------------------------
@@ -147,7 +237,6 @@ function handleInputKeydown(e) {
   if (e.isComposing || e.keyCode === 229) {
     return
   }
-  console.log('[handleInputKeydown]', props.node.path)
   if (e.key === 'Enter') {
     emit("hideAllInput", props.node.path)
   }
@@ -232,6 +321,63 @@ function showPopMenu(position_x: number, position_y: number) {
 function closePopMenu() {
   isShowMenu.value = false
 }
+
+const handleCopyPath = async (type: string) => {
+  if (type === 'name') {
+    await window.api.copyToClipboard({ type: 'text', data: props.node.name })
+  }
+  else if (type === 'absolute') {
+    await window.api.copyToClipboard({ type: 'text', data: props.node.path })
+  }
+  else if (type === 'relative') {
+    await window.api.copyToClipboard({ type: 'text', data: props.node.path.substring(props.node.root?.length) })
+  }
+}
+
+const handleOpenInLocal = async () => {
+  const path = props.node.path.substring(0, props.node.path?.length - props.node.name?.length)
+  // console.log("Open path: ", path,  props.node.name)
+  window.api.openDir(path,  props.node.name)
+}
+
+const handleCreateNewFile = () => {
+  if (props.node.type === 'directory') {
+    emit("wantToCreateFile", props.node.path)
+  }
+  else {
+    const path = props.node.path.substring(0, props.node.path?.length - props.node.name?.length - 1)
+    emit("wantToCreateFile", path)
+  }
+}
+
+const handleCreateNewDir = () => {
+  if (props.node.type === 'directory') {
+    emit("wantToCreateDir", props.node.path)
+  }
+  else {
+    const path = props.node.path.substring(0, props.node.path?.length - props.node.name?.length - 1)
+    emit("wantToCreateDir", path)
+  }
+}
+
+const handleDeleteItem = async () => {
+  try {
+    const wariningTail = props.node.type === 'directory' ? '及其子目录？':'？'
+    await ConfirmDialog.confirm(
+      `您可以从回收站还原此文件。`,
+      `确定要要删除“${props.node.name}”${wariningTail}`,
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    if (props.node.type === 'directory') await window.api.deleteDirectory(props.node.path)
+    else await window.api.deleteFile(props.node.path)
+  } catch (err: any) {
+    
+  }
+}
 </script>
 
 <style scoped>
@@ -278,6 +424,7 @@ function closePopMenu() {
 .arrow {
   display: flex;
   justify-content: center;
+  padding-right: 2px;
 
   width: 16px;
 
@@ -303,6 +450,11 @@ function closePopMenu() {
   justify-content: center;
 
   font-size: 13px;
+}
+
+.icon-wrapper:deep(.icon) {
+  width: 15px;
+  height: 15px;
 }
 
 /* ------------------------
@@ -337,6 +489,7 @@ function closePopMenu() {
 /* ------------------------
    Input
 ------------------------ */
+.file-tree-node-rename-input,
 .file-tree-node-create-input {
   outline: none;
   background: transparent;
@@ -347,16 +500,20 @@ function closePopMenu() {
   
   flex: 1;
   font-size: 13px;
+  width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--apix-primary-color);
   border-radius: 6px;
   background-color: transparent;
 }
 
+.file-tree-node-rename-input:active,
 .file-tree-node-create-input:active {
+  outline: none;
   border: 1px solid var(--apix-primary-color);
 }
 
+.file-tree-node-rename-input:focus,
 .file-tree-node-create-input:focus {
   outline: none;
   border: 1px solid var(--apix-primary-color);

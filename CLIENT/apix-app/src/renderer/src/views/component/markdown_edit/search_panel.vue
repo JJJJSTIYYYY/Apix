@@ -140,6 +140,7 @@ const emit = defineEmits<{
   (e: 'update:searchText', value: string): void
   (e: 'update:replaceText', value: string): void
   (e: 'update:caseSensitive', value: boolean): void
+  (e: 'update:wholeWord', value: boolean): void
   (e: 'update:regexp', value: boolean): void
   (e: 'next'): void
   (e: 'prev'): void

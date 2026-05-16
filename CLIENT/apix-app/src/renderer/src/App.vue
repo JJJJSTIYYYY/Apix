@@ -57,7 +57,7 @@ const maximize = () => window.electron.ipcRenderer.send('window-maximize')
 async function close() {
   try {
     await ConfirmDialog.confirm(
-      `确认要退出程序吗？所有数据已自动保存`,
+      `确认要退出程序吗？未保存的数据将会丢失`,
       '关闭确认',
       {
         confirmButtonText: '确定',

@@ -908,7 +908,7 @@ const setNetProxy = async () => {
 
 /* Reset cards */
 const resetPresetCard = async () => {
-  const presets = defaultCards()
+  const presets = defaultCards
   const cardMap = new Map(store.cards.map(c => [c.id, c]))
 
   let index = 0

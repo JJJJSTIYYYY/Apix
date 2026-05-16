@@ -3,37 +3,53 @@
     <div class="popup-content" :style="popupStyle">
       <button 
         class="menu-item"
-        @click="copyValue('absolute')"
+        @click="copyPath('name')"
+      >
+        <span>复制文件名</span>
+      </button>
+
+      <button 
+        class="menu-item"
+        @click="copyPath('absolute')"
       >
         <span>复制路径</span>
       </button>
 
       <button 
         class="menu-item"
-        @click="copyValue('relative')"
+        @click="copyPath('relative')"
       >
         <span>复制相对路径</span>
       </button>
 
       <button 
         class="menu-item"
-        @click="reEdit"
+        @click="openInlocal"
       >
         <span>打开文件的本地位置</span>
       </button>
 
+      <div class="hr"></div>
+
       <button 
         class="menu-item"
-        @click="reGenerate"
+        @click="newFile"
       >
-        <span>新建文件</span>
+        <span>新建APIX文件</span>
       </button>
 
       <button 
         class="menu-item"
-        @click="selectText"
+        @click="newDir"
       >
         <span>新建文件夹</span>
+      </button>
+
+      <button 
+        class="menu-item"
+        @click="rename"
+      >
+        <span>重命名</span>
       </button>
 
       <button 
@@ -43,11 +59,20 @@
         <span>删除</span>
       </button>
 
+      <div class="hr"></div>
+
       <button 
         class="menu-item"
-        @click="showDetail"
+        @click="compressToSkill"
       >
-        <span>压缩为技能包归档</span>
+        <span>创建技能包目录</span>
+      </button>
+
+      <button 
+        class="menu-item"
+        @click="compressToSkill"
+      >
+        <span>上传为技能包归档</span>
       </button>
     </div>
   </div>
@@ -61,12 +86,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "close-menu"): void
-  (e: "copy-value", type: string): void
-  (e: "re-edit"): void
-  (e: "re-generate"): void
-  (e: "select-text"): void
+  (e: "copy-path", type: string): void
+  (e: "open-in-local"): void
+  (e: "new-file"): void
+  (e: "new-dir"): void
+  (e: "rename"): void
   (e: "delete-item"): void
-  (e: "show-detail"): void
+  (e: "compress-skill"): void
 }>()
 
 const wrapperRef = ref<HTMLElement | null>(null)
@@ -86,23 +112,28 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousedown', handleClickOutside)
 })
 
-function copyValue(type: string) {
-  emit('copy-value', type)
+function copyPath(type: string) {
+  emit('copy-path', type)
   emit('close-menu')
 }
 
-function reEdit() {
-  emit('re-edit')
+function openInlocal() {
+  emit('open-in-local')
   emit('close-menu')
 }
 
-function reGenerate() {
-  emit('re-generate')
+function newFile() {
+  emit('new-file')
   emit('close-menu')
 }
 
-function selectText() {
-  emit('select-text')
+function newDir() {
+  emit('new-dir')
+  emit('close-menu')
+}
+
+function rename() {
+  emit('rename')
   emit('close-menu')
 }
 
@@ -111,8 +142,8 @@ function deleteItem() {
   emit('close-menu')
 }
 
-function showDetail() {
-  emit('show-detail')
+function compressToSkill() {
+  emit('compress-skill')
   emit('close-menu')
 }
 </script>
@@ -180,12 +211,12 @@ function showDetail() {
 }
 
 .danger-item:hover {
-  background: color-mix(in srgb, var( --apix-danger-hover) 15%, transparent);
+  background: color-mix(in srgb, var(--apix-danger-hover) 15%, transparent);
   color: var(--apix-danger-color);
 }
 
 .danger-item:active {
-  background: color-mix(in srgb, var( --apix-danger-hover) 20%, transparent);
+  background: color-mix(in srgb, var(--apix-danger-hover) 20%, transparent);
   transform: scale(0.985);
 }
 
@@ -198,5 +229,12 @@ function showDetail() {
 
 .menu-item:hover .icon {
   color: var(--apix-default-dark-color);
+}
+
+.hr {
+  align-self: center;
+  height: 1px;
+  width: 95%;
+  background-color: var(--apix-default-light-color);
 }
 </style>

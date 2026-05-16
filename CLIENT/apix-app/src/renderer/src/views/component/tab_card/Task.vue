@@ -1,14 +1,18 @@
 <template>
   <div
     class="tab-card"
-    :class="{ expanded: self.expanded }"
+    :class="{ expanded: self.expanded, dragging: isDragging }"
+    :draggable="!self.expanded"
+    @dragstart.stop="onTabCardDragStart"
+    @dragenter.prevent="onDragEnter"
+    @dragover.prevent
+    @dragleave.prevent="onDragLeave"
+    @drop.prevent="onDrop"
   >
     <!-- 卡片头 -->
     <div
       class="tab-card-header"
       :class="{ expanded: self.expanded }"
-      :draggable="!self.expanded"
-      @dragstart.stop="onTabCardDragStart"
     >
       <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
@@ -180,7 +184,9 @@ import {
 } from '@element-plus/icons-vue'
 
 import { InputDialog } from '../comp/inputDialog.js'
-import { globalState } from '../../../store/globalData.js'
+import {
+  globalCardDragState,
+} from '../../../store/globalData.js'
 
 import PopMenu from './comp/PopMenu.vue'
 
@@ -192,7 +198,7 @@ type CardBase = {
 }
 
 type TabCardBase = CardBase & {
-  uid: number
+  uid: string
   expanded: boolean
   marked?: boolean
   markMessage?: string
@@ -204,14 +210,14 @@ type TaskCardBase = TabCardBase & {
 }
 
 const props = defineProps<{
-  father_uid?: number
+  parent_uid?: string
   self: TaskCardBase
   tab_key: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:delete-card', card_uid: number): void
-  (e: 'update:contentChange', card_uid: number): void
+  (e: 'update:delete-card', card_uid: string): void
+  (e: 'update:contentChange', card_uid: string): void
 }>()
 
 // ------------------------
@@ -225,11 +231,35 @@ props.self.markMessage ??= '已标记'
 // ------------------------
 // 拖拽逻辑
 // ------------------------
+const dragCounter = ref(0)
+const isDragging = ref(false)
+
+function onDragEnter() {
+  dragCounter.value++
+
+  isDragging.value = true
+}
+
+function onDragLeave() {
+  dragCounter.value--
+
+  if (dragCounter.value <= 0) {
+    isDragging.value = false
+    dragCounter.value = 0
+  }
+}
+
+function onDrop() {
+  dragCounter.value = 0
+  isDragging.value = false
+}
+
 function onTabCardDragStart() {
-  globalState.draggedStartCardUid_parent = props.father_uid
-  globalState.draggedStartCardUid = props.self.uid
-  globalState.draggedCard = ''
-  globalState.draggedTabCard = JSON.stringify(props.self)
+  dragCounter.value = 0
+  isDragging.value = false
+  globalCardDragState.sourceUid = props.parent_uid
+  globalCardDragState.cardUid = props.self.uid
+  globalCardDragState.cardType = 'inTab'
 }
 
 // ------------------------

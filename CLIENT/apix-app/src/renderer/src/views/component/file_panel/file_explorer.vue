@@ -42,7 +42,7 @@
       <div class="workspace-label-btn-wrapper">
         <button
           class="icon-btn new-dir-btn"
-          @click="createNewDir"
+          @click="createNewDir(selectedPath)"
           v-if="workspace.length > 0 && !!workspace[0]"
         >
           <svg t="1778492051017" class="icon" viewBox="0 0 1129 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1214" width="20" height="20"><path d="M70.570342 176.426504h542.47341c-15.667589-60.875437-70.92725-105.856162-136.694267-105.856162H105.854864c-19.487148 0-35.284522 15.797374-35.284522 35.28582v70.569045z m614.563529 0h338.13674c58.461445 0 105.854864 47.392122 105.854864 105.854865v635.13308c0 58.462743-47.39342 105.856162-105.856162 105.856162H105.856162C47.39342 1023.270611 0 975.875894 0 917.414449V105.854864C0 47.39342 47.39342 0 105.856162 0H476.348188c104.903544 0 191.985075 76.296436 208.784385 176.426504z m2.926641 70.570343H70.570342v670.417602c0 19.487148 15.797374 35.28582 35.28582 35.28582h917.414449c19.487148 0 35.284522-15.798672 35.284522-35.28582V282.281369c0-19.487148-15.797374-35.28582-35.28582-35.28582h-335.207503zM529.278215 564.562738V390.731924a2.595691 2.595691 0 0 1 2.595691-2.595691h65.378961a2.595691 2.595691 0 0 1 2.595691 2.595691V564.562738h173.829516a2.595691 2.595691 0 0 1 2.59569 2.59569v65.378961a2.595691 2.595691 0 0 1-2.59569 2.595691H599.84726v173.830814a2.595691 2.595691 0 0 1-2.595691 2.59569h-65.378961a2.595691 2.595691 0 0 1-2.59569-2.59569V635.13308H355.447402a2.595691 2.595691 0 0 1-2.595691-2.595691V567.158428a2.595691 2.595691 0 0 1 2.595691-2.59569h173.830813z" fill="var(--apix-default-dark-color)" p-id="1215"></path></svg>
@@ -50,7 +50,7 @@
 
         <button
           class="icon-btn new-file-btn"
-          @click="createNewFile"
+          @click="createNewFile(selectedPath)"
           v-if="workspace.length > 0 && !!workspace[0]"
         >
           <svg t="1778492256909" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7724" width="20" height="20"><path d="M480.426 410.047h62.463v333.14h-62.463z" fill="var(--apix-default-dark-color)" p-id="7725"></path><path d="M345.088 545.385h333.139v62.464H345.088z" fill="var(--apix-default-dark-color)" p-id="7726"></path><path d="M803.196 961.013H220.202c-40.185 0-72.874-32.69-72.874-72.874V138.576c0-40.185 32.69-72.875 72.874-72.875h437.245v214.417H876.07V888.14c0 40.183-32.69 72.873-72.874 72.873zM220.16 128.123c-5.747 0-10.41 4.664-10.41 10.41v749.564c0 5.704 4.663 10.41 10.41 10.41h582.993c5.705 0 10.41-4.706 10.41-10.41V342.58H630.339c-19.53 0-35.396-15.866-35.396-35.395V128.123H220.161z" fill="var(--apix-default-dark-color)" p-id="7727"></path><path d="M657.448 65.7L876.07 280.13l-43.766 44.622-218.623-214.428z" fill="var(--apix-default-dark-color)" p-id="7728"></path></svg>
@@ -74,6 +74,8 @@
           @toggle="toggleFolder"
           @select="selectNode"
           @create="handleCreate"
+          @want-to-create-file="createNewFile"
+          @want-to-create-dir="createNewDir"
           @hide-all-input="(...args) => $emit('hideAllInput', ...args)"
         />
       </div>
@@ -116,6 +118,7 @@ const props = defineProps<{
 const emit = defineEmits({
   close: () => true,
   create: (at_path, name, type) => true,  // Really create.
+  delete: (path) => true,
   openFile: (path, name) => true,
   createNewPath: (at_path, type) => true,  // Fake create, only open a file name input.
   expandDir: (path) => true,
@@ -168,6 +171,7 @@ function normalizeNode(node) {
     expanded: node.expanded ?? false,
     is_creating: node.is_creating ?? false,
     creating_type: node.creating_type ?? 'directory',
+    root: props.workspace[0].path,
 
     children: node.children
       ? node.children.map(normalizeNode)
@@ -219,14 +223,14 @@ const closeWorkspace = async () => {
   }
 }
 
-const createNewFile = async () => {
-  creatingPath.value = selectedPath.value
-  emit("createNewPath", selectedPath.value, 'file')
+const createNewFile = async (atPath: string) => {
+  creatingPath.value = atPath
+  emit("createNewPath", atPath, 'file')
 }
 
-const createNewDir = async () => {
-  creatingPath.value = selectedPath.value
-  emit("createNewPath", selectedPath.value, 'directory')
+const createNewDir = async (atPath: string) => {
+  creatingPath.value = atPath
+  emit("createNewPath", atPath, 'directory')
 }
 
 // ------------------------
@@ -307,10 +311,28 @@ watch(
 // ------------------------
 // Initial
 // ------------------------
+const globalHandleKeydown = async (
+  e: KeyboardEvent & {
+    isComposing?: boolean
+    keyCode?: number
+  }
+) => {
+  // IME composing
+  if (e.isComposing || e.keyCode === 229) {
+    return
+  }
+
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Backspace') {
+    emit('delete', selectedPath.value)
+  }
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', globalHandleKeydown)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', globalHandleKeydown)
 })
 </script>
 

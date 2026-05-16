@@ -1,14 +1,18 @@
 <template>
   <div
     class="tab-card"
-    :class="{ expanded: self.expanded }"
+    :class="{ expanded: self.expanded, dragging: isDragging }"
+    :draggable="!self.expanded"
+    @dragstart.stop="onTabCardDragStart"
+    @dragenter.prevent="onDragEnter"
+    @dragover.prevent
+    @dragleave.prevent="onDragLeave"
+    @drop.prevent="onDrop"
   >
     <!-- 卡片头 -->
     <div
       class="tab-card-header no-drag"
       :class="{ expanded: self.expanded }"
-      :draggable="!self.expanded"
-      @dragstart.stop="onTabCardDragStart"
     >
       <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
@@ -152,12 +156,15 @@
             :key="item.uid"
             class="tab-card-wrapper"
             :draggable="!item.expanded"
+            @drop.stop="DragCardDropOnAnotherCard(item, index)"
+            :class="{
+              dragging: isDragging
+            }"
             @dragover.prevent
-            @drop.stop="DragCardDropInCardList_insert(item, index)"
           >
             <Task
               v-if="item.type === 'task'"
-              :father_uid="self.uid"
+              :parent_uid="self.uid"
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
@@ -166,7 +173,7 @@
 
             <Script
               v-else-if="item.type === 'script'"
-              :father_uid="self.uid"
+              :parent_uid="self.uid"
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
@@ -175,7 +182,7 @@
 
             <Folder
               v-else-if="item.type === 'folder'"
-              :father_uid="self.uid"
+              :parent_uid="self.uid"
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
@@ -184,7 +191,7 @@
 
             <Note
               v-else-if="item.type === 'note'"
-              :father_uid="self.uid"
+              :parent_uid="self.uid"
               :self="item"
               :tab_key="tab_key"
               @update:delete-card="deleteTabCardInContent"
@@ -217,7 +224,12 @@ import {
 import { useAppCacheData } from '../../../store/app'
 import { ConfirmDialog } from './../comp/confirmDialog.js'
 import { InputDialog } from '../comp/inputDialog'
-import { globalState } from '../../../store/globalData.js'
+import {
+  globalCardDragState,
+  clearGlobalDragState,
+  genUUID,
+  defaultCards
+} from '../../../store/globalData.js'
 import Task from './../tab_card/Task.vue'
 import Script from './../tab_card/Script.vue'
 import Folder from './../tab_card/Folder.vue'
@@ -232,7 +244,7 @@ type CardBase = {
 }
 
 type TabCardBase = CardBase & {
-  uid: number
+  uid: string
   expanded: boolean
   marked?: boolean
   markMessage?: string
@@ -264,14 +276,14 @@ type FolderCardBase = TabCardBase & {
 type TabCardItem = TaskCardBase | ScriptCardBase | NoteCardBase | FolderCardBase
 
 const props = defineProps<{
-  father_uid?: number
+  parent_uid?: string
   self: FolderCardBase
   tab_key: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:delete-card', card_uid: number): void
-  (e: 'update:contentChange', card_uid: number): void
+  (e: 'update:delete-card', card_uid: string): void
+  (e: 'update:contentChange', card_uid: string): void
 }>()
 
 const store = useAppCacheData()
@@ -286,11 +298,35 @@ props.self.markMessage ??= '已标记'
 // ------------------------
 // 右侧标签页里卡片的拖拽逻辑
 // ------------------------
+const dragCounter = ref(0)
+const isDragging = ref(false)
+
+function onDragEnter() {
+  dragCounter.value++
+
+  isDragging.value = true
+}
+
+function onDragLeave() {
+  dragCounter.value--
+
+  if (dragCounter.value <= 0) {
+    isDragging.value = false
+    dragCounter.value = 0
+  }
+}
+
+function onDrop() {
+  dragCounter.value = 0
+  isDragging.value = false
+}
+
 function onTabCardDragStart() {
-  globalState.draggedStartCardUid_parent = props.father_uid
-  globalState.draggedStartCardUid = props.self.uid
-  globalState.draggedCard = ''
-  globalState.draggedTabCard = JSON.stringify(props.self)
+  dragCounter.value = 0
+  isDragging.value = false
+  globalCardDragState.sourceUid = props.parent_uid
+  globalCardDragState.cardUid = props.self.uid
+  globalCardDragState.cardType = 'inTab'
 }
 
 // ------------------------
@@ -338,12 +374,12 @@ const isShowMarkUICtrl = ref(true)
 
 function markCard() {
   props.self.marked = !props.self.marked
-  emit('update:contentChange', props.self.uid)
+  notifyContentChange()
 }
 
 function hideMark() {
   props.self.marked = false
-  emit('update:contentChange', props.self.uid)
+  notifyContentChange()
 
   setTimeout(() => {
     isShowMarkUICtrl.value = false
@@ -363,7 +399,7 @@ async function updateMarkContent() {
 
     props.self.markMessage = value
     props.self.marked = true
-    emit('update:contentChange', props.self.uid)
+    notifyContentChange()
   }
   catch {}
 }
@@ -375,7 +411,7 @@ function isContainerType(item: TabCardItem) {
   return item.type === 'folder'
 }
 
-function isDescendant(target: TabCardItem, uid: number): boolean {
+function isDescendant(target: TabCardItem, uid: string): boolean {
   if (target.type !== 'folder') {
     return false
   }
@@ -392,13 +428,16 @@ function isDescendant(target: TabCardItem, uid: number): boolean {
   return false
 }
 
-function createCardByType(virtualCard: CardBase): TabCardItem {
-  const base = {
+function createCardByID(cardID: string): TabCardItem {
+  const virtualCard = defaultCards.find(item => item.id === cardID)
+  console.log("[createCardByID] Create virtualCard:", virtualCard)
+
+  const base: TabCardItem = {
     id: virtualCard.id,
     title: virtualCard.title,
     type: virtualCard.type,
     level: virtualCard.level,
-    uid: Date.now() + Math.random(),
+    uid: genUUID(),
     expanded: false,
     marked: false,
     markMessage: '已标记',
@@ -408,7 +447,6 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
     case 'task':
       return {
         ...base,
-        type: 'task',
         address: '',
         description: '',
       }
@@ -416,7 +454,6 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
     case 'script':
       return {
         ...base,
-        type: 'script',
         script: '',
         description: '',
       }
@@ -431,125 +468,113 @@ function createCardByType(virtualCard: CardBase): TabCardItem {
     case 'note':
       return {
         ...base,
-        type: 'note',
         cardColor: '',
         noteContent: '',
       }
 
     default:
-      return {
-        ...base,
-        type: 'note',
-        cardColor: '',
-        noteContent: '',
-      }
+      return null
   }
 }
 
-function clearDraggedState() {
-  globalState.draggedStartCardUid_parent = 0
-  globalState.draggedStartCardUid = 0
-  globalState.draggedCard = ''
-  globalState.draggedTabCard = ''
+function findCardFromTree(tree: TabCardItem[], uid: string, deleteFound: boolean = false): TabCardItem | null {
+  if (!Array.isArray(tree)) {
+    return null
+  }
+
+  for (let i = 0; i < tree.length; i++) {
+    const node = tree[i]
+
+    if (node.uid === uid) {
+      if (deleteFound) tree.splice(i, 1)
+      return node
+    }
+
+    if (
+      node.type === 'folder'
+      &&
+      Array.isArray(node.content)
+      &&
+      node.content.length > 0
+    ) {
+      const found = findCardFromTree(node.content, uid, deleteFound)
+
+      if (found) return found
+    }
+  }
+
+  return null
 }
 
-// ------------------------
-// 拖拽放入文件夹
-// ------------------------
 function DragCardDropInCardList() {
+  console.log("[DragCardDropInCardList] globalCardDragState:", globalCardDragState)
+  dragCounter.value = 0
+  isDragging.value = false
+  // Append
   if (
-    (globalState.draggedStartCardUid === 0 && globalState.draggedCard === '') ||
-    globalState.draggedStartCardUid === props.self.uid
-  ) {
-    return
-  }
+    globalCardDragState.cardUid === "" || // Not drag a card or
+    globalCardDragState.cardUid === props.self.uid // Drop in self
+  ) return
 
-  if (globalState.draggedCard) {
-    const virtualCard = JSON.parse(globalState.draggedCard) as CardBase
-    const newCard = createCardByType(virtualCard)
+  if (globalCardDragState.cardType === 'preset') {
+    const newCard = createCardByID(globalCardDragState.cardUid)
 
     props.self.content.push(newCard)
-    emit('update:contentChange', props.self.uid)
-    clearDraggedState()
+    notifyContentChange()
+    clearGlobalDragState()
     return
   }
 
-  if (globalState.draggedTabCard) {
-    const virtualCard = JSON.parse(globalState.draggedTabCard) as TabCardItem
+  if (globalCardDragState.cardType === 'inTab') {
+    const currentTab = store.findTab(props.tab_key)
+    const virtualCard = findCardFromTree(currentTab.content, globalCardDragState.cardUid, true)
+    if (!currentTab || !virtualCard) return
 
-    if (virtualCard.uid === props.self.uid || isDescendant(virtualCard, props.self.uid)) {
-      console.warn('不能把卡片放到自己或子孙节点内部')
-      clearDraggedState()
-      return
-    }
-
-    const currentTab = store.tabs.find(t => t.tabKey === props.tab_key)
-    if (!currentTab) {
-      console.warn('未找到 tab:', props.tab_key)
-      clearDraggedState()
-      return
-    }
-
-    removeCardFromTree(currentTab.items, virtualCard.uid)
     props.self.content.push(virtualCard)
-    emit('update:contentChange', props.self.uid)
-    clearDraggedState()
+    notifyContentChange()
+    clearGlobalDragState()
+    return
   }
 }
 
-function DragCardDropInCardList_insert(_item: TabCardItem, dropIndex: number) {
-  if (globalState.draggedStartCardUid === 0 && globalState.draggedCard === '') {
-    return
-  }
+function DragCardDropOnAnotherCard(dropOn: TabCardItem, dropIndex: number) {
+  console.log("[DragCardDropOnAnotherCard] globalCardDragState:", globalCardDragState)
+  dragCounter.value = 0
+  isDragging.value = false
+  // Insert
+  if (globalCardDragState.cardUid === "") return
 
-  if (globalState.draggedTabCard) {
-    const virtualCard = JSON.parse(globalState.draggedTabCard) as TabCardItem
-    const currentIndex = props.self.content.findIndex(c => c.uid === virtualCard.uid)
-
-    if (currentIndex !== -1) {
-      const insertIndex = dropIndex > currentIndex ? dropIndex - 1 : dropIndex
-
-      props.self.content.splice(currentIndex, 1)
-      props.self.content.splice(insertIndex, 0, virtualCard)
-      emit('update:contentChange', props.self.uid)
-      clearDraggedState()
-      return
-    }
-
-    if (virtualCard.uid === props.self.uid || isDescendant(virtualCard, props.self.uid)) {
-      console.warn('不能把卡片放到自己或子孙节点内部')
-      clearDraggedState()
-      return
-    }
-
-    const currentTab = store.tabs.find(t => t.tabKey === props.tab_key)
-    if (!currentTab) {
-      console.warn('未找到 tab:', props.tab_key)
-      clearDraggedState()
-      return
-    }
-
-    removeCardFromTree(currentTab.items, virtualCard.uid)
-    props.self.content.splice(dropIndex, 0, virtualCard)
-    emit('update:contentChange', props.self.uid)
-    clearDraggedState()
-    return
-  }
-
-  if (globalState.draggedCard) {
-    const virtualCard = JSON.parse(globalState.draggedCard) as CardBase
-    const newCard = createCardByType(virtualCard)
+  if (globalCardDragState.cardType === 'preset') {
+    const newCard = createCardByID(globalCardDragState.cardUid)
 
     props.self.content.splice(dropIndex, 0, newCard)
-    emit('update:contentChange', props.self.uid)
-    clearDraggedState()
+    notifyContentChange()
+    clearGlobalDragState()
+    return
+  }
+
+  if (globalCardDragState.cardType === 'inTab') {
+    const currentTab = store.findTab(props.tab_key)
+    const virtualCard = findCardFromTree(currentTab.content, globalCardDragState.cardUid, true)
+    if (!currentTab || !virtualCard) return
+
+    // After delete origin card, we should refresh dropIndex
+    if (props.self.uid === globalCardDragState.sourceUid) {
+      const shouldDropIndex = props.self.content.findIndex(t => t.uid === dropOn.uid)
+      if (shouldDropIndex !== -1) dropIndex = shouldDropIndex
+    } 
+
+    props.self.content.splice(dropIndex, 0, virtualCard)
+    notifyContentChange()
+    clearGlobalDragState()
+    return
   }
 }
 
 // ------------------------
 // 删除逻辑
 // ------------------------
-function removeCardFromTree(tree: TabCardItem[], uid: number): boolean {
+function removeCardFromTree(tree: TabCardItem[], uid: string): boolean {
   if (!Array.isArray(tree)) {
     return false
   }
@@ -594,12 +619,12 @@ async function removeThisCard() {
   emit('update:delete-card', props.self.uid)
 }
 
-function deleteTabCardInContent(card_uid: number) {
+function deleteTabCardInContent(card_uid: string) {
   const idx = props.self.content.findIndex(c => c.uid === card_uid)
 
   if (idx !== -1) {
     props.self.content.splice(idx, 1)
-    emit('update:contentChange', props.self.uid)
+    notifyContentChange()
     ElMessage({ type: 'success', message: '已删除' })
   }
 }
@@ -613,7 +638,7 @@ function notifyContentChange() {
 // ------------------------
 function editTabCard() {
   props.self.expanded = !props.self.expanded
-  emit('update:contentChange', props.self.uid)
+  notifyContentChange()
 }
 
 // ------------------------
@@ -626,7 +651,7 @@ function onMouseUpInput(e: Event) {
 }
 
 function onTabCardTitleChange(e: Event) {
-  emit('update:contentChange', props.self.uid)
+  notifyContentChange()
   ;(e.target as HTMLInputElement).blur()
 }
 </script>
