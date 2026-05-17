@@ -1,12 +1,12 @@
 <template>
   <div
     class="tab-card"
-    :class="{ expanded: self.expanded, dragging: isDragging }"
+    :class="{ expanded: self.expanded, dragging: globalDragHoverCard === self.uid }"
     :draggable="!self.expanded"
     @dragstart.stop="onTabCardDragStart"
-    @dragenter.prevent="onDragEnter"
+    @dragenter.stop="onDragEnter"
     @dragover.prevent
-    @dragleave.prevent="onDragLeave"
+    @dragleave.stop="onDragLeave"
     @drop.prevent="onDrop"
   >
     <!-- 卡片头 -->
@@ -188,6 +188,7 @@ import {
 import { InputDialog } from '../comp/inputDialog'
 import {
   globalCardDragState,
+  globalDragHoverCard,
 } from '../../../store/globalData.js'
 
 import PopMenu from './comp/PopMenu.vue'
@@ -233,32 +234,18 @@ props.self.markMessage ??= '已标记'
 // ------------------------
 // 拖拽逻辑
 // ------------------------
-const dragCounter = ref(0)
-const isDragging = ref(false)
-
 function onDragEnter() {
-  dragCounter.value++
-
-  isDragging.value = true
+  globalDragHoverCard.value = props.self.uid
 }
 
 function onDragLeave() {
-  dragCounter.value--
-
-  if (dragCounter.value <= 0) {
-    isDragging.value = false
-    dragCounter.value = 0
-  }
 }
 
 function onDrop() {
-  dragCounter.value = 0
-  isDragging.value = false
+  globalDragHoverCard.value = ''
 }
 
 function onTabCardDragStart() {
-  dragCounter.value = 0
-  isDragging.value = false
   globalCardDragState.sourceUid = props.parent_uid
   globalCardDragState.cardUid = props.self.uid
   globalCardDragState.cardType = 'inTab'

@@ -1,12 +1,12 @@
 <template>
   <div
     class="tab-card"
-    :class="{ expanded: self.expanded, dragging: isDragging }"
+    :class="{ expanded: self.expanded, dragging: globalDragHoverCard === self.uid }"
     :draggable="!self.expanded"
     @dragstart.stop="onTabCardDragStart"
-    @dragenter.prevent="onDragEnter"
+    @dragenter.stop="onDragEnter"
     @dragover.prevent
-    @dragleave.prevent="onDragLeave"
+    @dragleave.stop="onDragLeave"
     @drop.prevent="onDrop"
   >
     <!-- 卡片头 -->
@@ -157,9 +157,6 @@
             class="tab-card-wrapper"
             :draggable="!item.expanded"
             @drop.stop="DragCardDropOnAnotherCard(item, index)"
-            :class="{
-              dragging: isDragging
-            }"
             @dragover.prevent
           >
             <Task
@@ -228,7 +225,8 @@ import {
   globalCardDragState,
   clearGlobalDragState,
   genUUID,
-  defaultCards
+  defaultCards,
+  globalDragHoverCard
 } from '../../../store/globalData.js'
 import Task from './../tab_card/Task.vue'
 import Script from './../tab_card/Script.vue'
@@ -298,32 +296,18 @@ props.self.markMessage ??= '已标记'
 // ------------------------
 // 右侧标签页里卡片的拖拽逻辑
 // ------------------------
-const dragCounter = ref(0)
-const isDragging = ref(false)
-
 function onDragEnter() {
-  dragCounter.value++
-
-  isDragging.value = true
+  globalDragHoverCard.value = props.self.uid
 }
 
 function onDragLeave() {
-  dragCounter.value--
-
-  if (dragCounter.value <= 0) {
-    isDragging.value = false
-    dragCounter.value = 0
-  }
 }
 
 function onDrop() {
-  dragCounter.value = 0
-  isDragging.value = false
+  globalDragHoverCard.value = ''
 }
 
 function onTabCardDragStart() {
-  dragCounter.value = 0
-  isDragging.value = false
   globalCardDragState.sourceUid = props.parent_uid
   globalCardDragState.cardUid = props.self.uid
   globalCardDragState.cardType = 'inTab'
@@ -508,8 +492,7 @@ function findCardFromTree(tree: TabCardItem[], uid: string, deleteFound: boolean
 
 function DragCardDropInCardList() {
   console.log("[DragCardDropInCardList] globalCardDragState:", globalCardDragState)
-  dragCounter.value = 0
-  isDragging.value = false
+  globalDragHoverCard.value = ''
   // Append
   if (
     globalCardDragState.cardUid === "" || // Not drag a card or
@@ -539,8 +522,7 @@ function DragCardDropInCardList() {
 
 function DragCardDropOnAnotherCard(dropOn: TabCardItem, dropIndex: number) {
   console.log("[DragCardDropOnAnotherCard] globalCardDragState:", globalCardDragState)
-  dragCounter.value = 0
-  isDragging.value = false
+  globalDragHoverCard.value = ''
   // Insert
   if (globalCardDragState.cardUid === "") return
 

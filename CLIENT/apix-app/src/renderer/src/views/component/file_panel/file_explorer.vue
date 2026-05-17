@@ -354,6 +354,8 @@ onBeforeUnmount(() => {
   color: var(--apix-default-dark-color);
 
   flex-shrink: 0;
+
+  border-radius: var(--apix-border-radius-base) 0 0 var(--apix-border-radius-base);
 }
 
 /* ------------------------

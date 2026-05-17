@@ -157,9 +157,9 @@ body, * {
 
   /* 默认/次要按钮（白底灰边） */
   --apix-default-button-background: rgb(255, 255, 255);
-  --apix-default-button-hover: rgb(248, 249, 250);
-  --apix-default-button-active: rgb(243, 245, 247);
-  --apix-default-button-border: rgb(220, 225, 225);
+  --apix-default-button-hover: rgb(232, 235, 238);
+  --apix-default-button-active: rgb(219, 223, 227);
+  --apix-default-button-border: rgb(188, 195, 195);
   --apix-default-button-text: rgb(103, 113, 114);
   --apix-default-button-text-hover: #185d56;
 
@@ -341,9 +341,9 @@ body, * {
 
   /* 默认/次要按钮 — 中性色，反转 */
   --apix-default-button-background: rgb(0, 0, 0);
-  --apix-default-button-hover: rgb(7, 6, 5);
-  --apix-default-button-active: rgb(12, 10, 8);
-  --apix-default-button-border: rgb(35, 30, 30);
+  --apix-default-button-hover: rgb(25, 27, 27);
+  --apix-default-button-active: rgb(32, 34, 34);
+  --apix-default-button-border: rgb(38, 37, 37);
   --apix-default-button-text: rgb(165, 160, 159);
   --apix-default-button-text-hover: rgb(200, 195, 190);
 
@@ -463,6 +463,10 @@ body, * {
   -webkit-user-select: text !important; /* Chromium 内核 */
   -moz-user-select: text !important;    /* Firefox */
   -ms-user-select: text !important;     /* IE/Edge */
+}
+
+.el-main {
+  overflow: visible !important;
 }
 
 .el-message {

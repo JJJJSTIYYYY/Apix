@@ -29,47 +29,21 @@
           <div class="editor-tabs-root">
             <!-- Tabs -->
             <div class="editor-tabs-header">
-              <div
+              <TabHeaderCard
                 v-for="(tab, index) in tabs"
                 :key="tab.tabKey"
-                :title="tab.tabKey"
-                class="editor-tab"
-                :class="{
-                  active: activeTab === tab.tabKey,
-                  deleted: tab.status === 'deleted',
-                  outdated: tab.status === 'outdated'
-                }"
-                draggable="true"
-                @click="changeTab(tab)"
-                @auxclick="handleMiddleClick($event, tab)"
-                @dragstart="handleDragStart(index)"
-                @dragover.prevent
+                :tab="tab"
+                :active="activeTab === tab.tabKey"
+                @change-tab="changeTab"
+                @middle-click="handleMiddleClick"
+                @drag-start="handleDragStart(index)"
                 @drop="handleDrop(index)"
-              >
-                <!-- Unsaved dot -->
-                <div
-                  v-if="tab.saved === false"
-                  class="tab-unsaved-dot"
-                />
-
-                <!-- Icon -->
-                <div class="icon-wrapper" v-html="getSupportFileSVG(tab.tabKey)">
-                </div>
-
-                <!-- Title -->
-                <span class="tab-title">
-                  {{ tab.title }}
-                </span>
-
-                <!-- Close -->
-                <div
-                  class="tab-close"
-                  @click.stop="closeTab(tab)"
-                  draggable="false"
-                >
-                  <svg t="1778579309106" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7164" width="20" height="20"><path d="M140.5 960L64 883.5 441 512 64 140.5 140.5 64 512 441 883.5 64l76.5 76.5L583 512l377 371.5-76.5 76.5L512 583 140.5 960z" p-id="7165"></path></svg>
-                </div>
-              </div>
+                @close-tab="closeTab"
+                @copy-path="(type, tab) => handleCopyPath(type, tab.tabKey, tab.title)"
+                @open-in-local="(tab) => handleOpenInLocal(tab.tabKey, tab.title)"
+                @close-item="handleCloseItem"
+                @pin-tab="handlePinTab"
+              />
             </div>
 
             <!-- Content -->
@@ -101,39 +75,6 @@
                 </el-scrollbar>
               </div>
             </div>
-          </div>
-
-          <div class="bottom-btn-wrap">
-            <div class="ctrl-btn-area">
-              <el-button
-                v-if="activatedTabMeta.mime !== 'md'"
-                type="primary"
-                text
-                class="commom-btn"
-                @click="unfoldAllCards()"
-              >
-                全部展开
-              </el-button>
-
-              <el-button
-                v-if="activatedTabMeta.mime !== 'md'"
-                type="primary"
-                text
-                class="commom-btn"
-                @click="foldAllCards()"
-              >
-                全部折叠
-              </el-button>
-            </div>
-
-            <el-button
-              type="primary"
-              round
-              class="submit-btn"
-              @click="submitCase()"
-            >
-              {{ activatedTabMeta.mime !== 'md' ? '提交' : '预览' }}
-            </el-button>
           </div>
         </div>
 
@@ -168,13 +109,48 @@
       </div>
     </el-main>
   </el-container>
+
+  <div class="bottom-btn-wrap">
+    <button
+      v-if="activatedTabMeta.mime !== 'md'"
+      class="commom-btn"
+      @click="unfoldAllCards()"
+    >
+      全部展开
+    </button>
+
+    <button
+      v-if="activatedTabMeta.mime !== 'md'"
+      class="commom-btn"
+      @click="foldAllCards()"
+    >
+      全部折叠
+    </button>
+
+    <button
+      class="submit-btn save-btn"
+      :class="{save_all_btn: optionKeyPress}"
+      @click="saveTabContent()"
+    >
+      {{ optionKeyPress ? '全部保存' : '保存' }}
+    </button>
+
+    <button
+      class="submit-btn"
+      @click="submitCase()"
+    >
+      <svg t="1778959728742" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6501" width="14" height="14"><path d="M748.083 484.116v59.486L119.768 960l-52.05-29.743V93.743L119.768 64l628.315 420.116z m-81.793 29.743L134.639 160.664v706.39L666.29 513.859zM346.556 867.054L874.49 513.859 346.556 160.664v-85.51l609.726 408.963v59.486L346.556 948.846v-81.792z" fill="currentColor" p-id="6502"></path></svg>
+      {{ activatedTabMeta.mime !== 'md' ? '提交' : '预览' }}
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount, computed, shallowRef, toRaw } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, computed, shallowRef, toRaw, nextTick } from 'vue';
 import { ElMessage } from 'element-plus'
 import HomePage from './homePage.vue'
 import TabCardList from './component/tab_card/TabCardList.vue'
+import TabHeaderCard from './component/tab_card/comp/TabHeaderCard.vue'
 import MarkdownEditor from './component/markdown_edit/markdown_editor.vue'
 import { type MarkdownEditorExpose } from './component/markdown_edit/markdown_editor.vue'
 import FilePanel from './component/file_panel/file_explorer.vue'
@@ -183,7 +159,7 @@ import { useAppCacheData } from '../store/app.js'
 import { useAuthStore } from '../store/auth.js'
 import { ConfirmDialog } from './component/comp/confirmDialog.js'
 import { mdDisplayer } from './component/comp/mdDisplayer.js'
-import { getSupportFileSVG, globalCardDragState } from '../store/globalData.js'
+import { globalCardDragState } from '../store/globalData.js'
 
 
 // ------------------------
@@ -239,6 +215,7 @@ type TabItem = {
   version: number
   saved?: Boolean
   status?: 'outdated' | 'deleted' | 'default'
+  pinned?: Boolean
 }
 
 // ------------------------
@@ -348,6 +325,17 @@ async function closeTab(tab: TabItem) {
     const tabKey = tab.tabKey
     const idx = tabs.findIndex(t => t.tabKey === tabKey)
     if (idx !== -1) {
+      if (!tab.saved)
+        await ConfirmDialog.confirm(
+          `此标签页还没有被保存，未保存的内容将会丢失。`,
+          `确定要关闭${tab.title}？`,
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning',
+          }
+        )
+
       tabs.splice(idx, 1)
 
       if (activeTab.value === tabKey && tabs.length > 0) {
@@ -411,6 +399,10 @@ async function changeTab(tab: TabItem) {
   activeTab.value = tab.tabKey
 }
 
+async function handleMiddleClick(e, tab: TabItem) {
+  if (e.button === 1) await closeTab(tab)
+}
+
 const draggingTabIndex = ref<number | null>(null)
 
 function handleDragStart(index: number) {
@@ -428,6 +420,112 @@ function handleDrop(targetIndex: number) {
   draggingTabIndex.value = null
 
   store.saveTabs()
+}
+
+const handleCopyPath = async (type: string, tabKey: string, title: string) => {
+  console.log(".....", type, tabKey, title)
+  if (type === 'name') {
+    await window.api.copyToClipboard({ type: 'text', data: title })
+  }
+  else if (type === 'absolute') {
+    await window.api.copyToClipboard({ type: 'text', data: tabKey })
+  }
+  else if (type === 'relative') {
+    const root = store.getWorkspace()
+    await window.api.copyToClipboard({ type: 'text', data: tabKey.substring(root.length) })
+  }
+}
+
+const handleOpenInLocal = async (tabKey: string, title: string) => {
+  await window.api.openDir(tabKey,  title)
+}
+
+const handleCloseItem = async (type: string, tab: TabItem) => {
+  const currentIndex =
+    tabs.findIndex(
+      t => t.tabKey === tab.tabKey
+    )
+
+  if (currentIndex === -1) {
+    return
+  }
+
+  // Close self
+  if (type === 'self') {
+    await closeTab(tab)
+    return
+  }
+
+  let targetTabs: TabItem[] = []
+
+  // Close others
+  if (type === 'others') {
+    targetTabs =
+      tabs.filter(
+        t => t.tabKey !== tab.tabKey
+      )
+  }
+
+  // Close left
+  else if (type === 'left') {
+    targetTabs =
+      tabs.slice(
+        0,
+        currentIndex
+      )
+  }
+
+  // Close right
+  else if (type === 'right') {
+    targetTabs =
+      tabs.slice(
+        currentIndex + 1
+      )
+  }
+
+  // Close saved
+  else if (type === 'saved') {
+    targetTabs =
+      tabs.filter(
+        t => t.saved === true
+      )
+  }
+
+  // Ignore pinned tabs
+  targetTabs =
+    targetTabs.filter(
+      t => !t.pinned
+    )
+
+  // Sequential close
+  for (const item of [...targetTabs]) {
+    const exists =
+      tabs.find(
+        t => t.tabKey === item.tabKey
+      )
+
+    if (!exists) {
+      continue
+    }
+
+    await closeTab(exists)
+  }
+}
+
+const handlePinTab = async (tab: TabItem) => {
+  tab.pinned = !tab.pinned
+  
+  // Pinned tabs first
+  tabs.sort((a, b) => {
+    // Both same pinned state
+    if (!!a.pinned === !!b.pinned) {
+      return 0
+    }
+
+    return a.pinned ? -1 : 1
+  })
+
+  await store.saveTabs()
 }
 
 // ------------------------
@@ -703,7 +801,7 @@ const deletePath = async (path) => {
     const wariningTail = currentNode.type === 'directory' ? '及其子目录？':'？'
     await ConfirmDialog.confirm(
       `您可以从回收站还原此文件。`,
-      `确定要要删除“${currentNode.name}”${wariningTail}`,
+      `确定要删除“${currentNode.name}”${wariningTail}`,
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -730,6 +828,16 @@ const openFile = async (path, name) => {
   const content = content_dict['content']
   const content_mime = content_dict['mime']
   addTab(path, name, content, content_mime)
+}
+
+const saveTabContent = async () => {
+  if (!optionKeyPress.value) {
+    const tabKey = activeTab.value
+    await store.saveTabContent(tabKey)
+  }
+  else {
+    await store.saveAllTabContent()
+  }
 }
 
 // ------------------------
@@ -825,6 +933,7 @@ function handleContentChange(tabKey: string) {
 // ------------------------
 // 页面布局控制
 // ------------------------
+const optionKeyPress = ref(false)
 const activatedTabMeta = ref({})
 
 let removeFsEvents = null
@@ -861,8 +970,19 @@ const globalHandleKeydown = async (
   }
 
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+
     const tabKey = activeTab.value
-    store.saveTab(tabKey)
+    await store.saveTabContent(tabKey)
+  }
+  else if (e.key === 'Alt') {
+    optionKeyPress.value = true
+  }
+}
+
+const globalHandleKeyup = (e: KeyboardEvent) => {
+  if (e.key === 'Alt') {
+    optionKeyPress.value = false
   }
 }
 
@@ -876,6 +996,7 @@ onMounted(async () => {
     )
   window.addEventListener('click', handlePageClick, true)
   window.addEventListener('keydown', globalHandleKeydown)
+  window.addEventListener('keyup', globalHandleKeyup)
   await authStore.restore()
   try {
     const dir = store.getWorkspace()
@@ -895,6 +1016,7 @@ onBeforeUnmount(() => {
   removeFsEvents?.()
   window.removeEventListener('click', handlePageClick, true)
   window.removeEventListener('keydown', globalHandleKeydown)
+  window.removeEventListener('keyup', globalHandleKeyup)
 })
 
 // ------------------------
@@ -1105,6 +1227,7 @@ function foldAllCards() {
   z-index: 9999;
 
   height: 38px;
+  min-height: 38px;
 
   background-color: var(--apix-default-light-color);
   border-radius: 0;
@@ -1124,144 +1247,6 @@ function foldAllCards() {
 .editor-tabs-header {
   scrollbar-width: none;
 }
-
-/* Tab item */
-.editor-tab {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  height: 38px;
-  min-width: 100px;
-  max-width: 220px;
-  flex-shrink: 0;
-
-  padding: 0 3px 0 8px;
-
-  overflow: hidden;
-  background-color: var(--apix-panel-layer-2-background);
-  border: none;
-  border-right: 1px solid var(--apix-default-light-color);
-  color: var(--apix-secondary-dark-color);
-
-  border-radius: 0;
-  user-select: none;
-  cursor: pointer;
-
-  transition: none;
-  animation: scaleFade-tab-wrapper 0.4s var(--apix-cubic-bezier);
-}
-
-.editor-tab:hover {
-  background-color: var(--apix-panel-layer-0-background);
-}
-
-.editor-tab.active {
-  background-color: var(--apix-panel-layer-5-background);
-  color: var(--apix-primary-active);
-}
-
-.editor-tab.deleted .tab-title {
-  text-decoration: line-through;
-  opacity: 0.65;
-}
-
-.editor-tab.outdated .tab-title {
-  opacity: 0.75;
-}
-
-/* Title */
-.tab-title {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* Unsaved dot */
-.tab-unsaved-dot {  
-  width: 7px;
-  height: 7px;
-  margin-right: 6px;
-  border-radius: 999px;
-  background: var(--apix-primary-active);
-  flex-shrink: 0;
-}
-
-.icon-wrapper {
-  display: flex;
-  width: 18px;
-
-  margin-right: 4px;
-
-  text-align: center;
-  justify-content: center;
-
-  font-size: 13px;
-}
-
-.icon-wrapper:deep(.icon) {
-  width: 15px;
-  height: 15px;
-}
-
-/* Close button */
-.tab-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 18px;
-  height: 18px;
-  margin-left: 6px;
-
-  border-radius: 4px;
-  opacity: 0;
-  transition: none;
-  flex-shrink: 0;
-}
-
-.editor-tab:hover .tab-close {
-  opacity: 1;
-}
-
-.tab-close:hover {
-  background-color: var(--apix-lightest-color);
-}
-
-.tab-close:deep(.icon) {
-  width: 10px;
-  height: 10px;
-  fill: var(--apix-secondary-dark-color);
-}
-
-/* Optional drag state */
-.editor-tab:active {
-  cursor: grabbing;
-}
-
-/* Content area */
-.editor-tabs-content {
-  flex: 1;
-  min-height: 0;
-}
-
-.editor-tab-pane {
-  height: 100%;
-}
-
-/* Tab enter animation */
-@keyframes scaleFade-tab-wrapper {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-/* --- */
 
 .fixed-left-card-delete {
   border: none;
@@ -1328,17 +1313,16 @@ function foldAllCards() {
 }
 
 .bottom-btn-wrap {
-  opacity: 0.3;
+  -webkit-app-region: no-drag;
+  
+  opacity: 0.85;
   position: absolute;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: -30px;
+  right: 36px;
   margin: auto;
 
-  width: 80%;
-  max-width: 840px;
-  height: fit-content;
-  padding: 16px;
+  height: 30px;
+  padding: 3px 0;
   box-sizing: border-box;
 
   z-index: 2000;
@@ -1346,68 +1330,56 @@ function foldAllCards() {
 
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
 
   overflow: hidden;
-  border-radius: var(--apix-panel-border-radius);
-  backdrop-filter: saturate(300%) blur(16px);
-  background: color-mix(in oklch, var(--apix-panel-layer-3-background) 70%, transparent);
-  box-shadow: var(--apix-shadow-md);
 
-  transition: opacity .35s var(--apix-cubic-bezier);
+  transition: opacity .25s var(--apix-cubic-bezier);
 }
 
 .bottom-btn-wrap:hover {
   opacity: 1;
 }
 
-.ctrl-btn-area {
-  display: flex;
-  height: fit-content;
-}
-
 .submit-btn,
 .commom-btn {
-  width: 80px;
-  height: 32px;
-  padding: 6px 16px;
-  border-radius: var(--apix-button-border-radius) !important;
+  width: 72px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px !important;
   border: none;
   font-size: 14px;
+  gap: 6px;
   cursor: pointer;
   transition: transform 0.2s var(--apix-cubic-bezier),
-              background 0.2s var(--apix-cubic-bezier) !important;
+              background 0.2s var(--apix-cubic-bezier),
+              width .35s var(--apix-cubic-bezier) !important;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
-.submit-btn:hover,
-.commom-btn:hover {
-  transform: scale(1.03);
-}
-
-.submit-btn:active,
-.commom-btn:active {
-  transform: scale(1.01);
-}
-
 .submit-btn {
-  color: var(--apix-success-button-text) !important;
-  background: var(--apix-success-button-background) !important;
+  color: var(--apix-default-button-text) !important;
+  background: var(--apix-default-button-background) !important;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
 }
 
 .submit-btn:hover {
+  color: var(--apix-success-button-text) !important;
   background: var(--apix-success-button-hover) !important;
 }
 
 .submit-btn:active {
+  color: var(--apix-success-button-text) !important;
   background: var(--apix-success-button-active) !important;
 }
 
 .commom-btn {
   color: var(--apix-default-button-text) !important;
   background: var(--apix-default-button-background) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
 }
 
 .commom-btn:hover {
@@ -1418,146 +1390,14 @@ function foldAllCards() {
   background: var(--apix-default-button-active) !important;
 }
 
-.NTabSpane {
-  position: relative;
-  max-height: calc(100vh - 70px);
-  padding: 0 !important;
-}
-
-.tab-label:not(.is_saved)::before {
-  opacity: 1;
-  content: '';
-  position: absolute;
-  height: 6px;
-  width: 6px;
-  top: calc(50% - 3px);
-  left: 5px;
-  border-radius: 12px;
-  background-color: var(--apix-primary-active);
-}
-
-.tab-label.is_saved::before {
-  opacity: 0;
-  content: '';
-  position: absolute;
-  height: 6px;
-  width: 6px;
-  top: calc(50% - 3px);
-  left: 5px;
-  border-radius: 12px;
-  background-color: var(--apix-default-dark-color);
-}
-
-.ntabs {
-  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-</style>
-
-<style scoped>
-:deep(.n-tabs .n-tabs-nav) {
-  background-color: var(--apix-default-light-color);
-  border-radius: 0 !important;
-  box-shadow: var(--apix-shadow-layer-1);
-  transition: box-shadow 320ms var(--apix-cubic-bezier);
-}
-:deep(.n-tabs .n-tabs-nav:hover) {
-  box-shadow: var(--apix-shadow-layer-2);
-}
-
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab-pad),
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-pad) {
-  border: 0;
-}
-
-:deep(.n-tabs.n-tabs--top > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-start::before, .n-tabs.n-tabs--bottom > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-start::before) {
-  box-shadow: inset 10px 0 8px -8px rgba(0, 0, 0, .03);
-}
-
-:deep(.n-tabs.n-tabs--top > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-end::after, .n-tabs.n-tabs--bottom > .n-tabs-nav .n-tabs-nav-scroll-wrapper.n-tabs-nav-scroll-wrapper--shadow-end::after) {
-  box-shadow: inset -10px 0 8px -8px rgba(0, 0, 0, .03);
-}
-
-:deep(.n-tabs .n-tabs-nav-scroll-wrapper) {
-  border-radius: 0 !important;
-}
-
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab.n-tabs-tab--addable .n-base-icon) {
-  color: var(--apix-tertiary-dark-color);
-}
-
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab.n-tabs-tab--addable .n-base-icon:hover) {
-  color: var(--apix-default-dark-color);
-}
-
-:deep(.n-tabs-tab-wrapper) {
-  position: relative;
-  background-color: transparent !important;
-  animation: scaleFade-n-tabs-tab-wrapper 0.4s var(--apix-cubic-bezier);
-}
-
-:deep(.n-tabs-tab-pad) {
-  background-color: transparent !important;
-  width: 0;
-}
-
-@keyframes scaleFade-n-tabs-tab-wrapper {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab) {
-  border-radius: 0 !important;
-  overflow: hidden;
-  background-color: var(--apix-panel-layer-2-background);
-  border: none;
-  border-right: 1px solid var(--apix-default-light-color);
-  color: var(--apix-secondary-dark-color);
-  height: 32px;
-  /* min-width: 100px !important; */
-  transition: none;
-}
-
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab) {
-  display: flex;
-  justify-content: center !important;
-  align-items: center !important;
-}
-
-:deep(.n-tabs .n-tabs-nav.n-tabs-nav--top.n-tabs-nav--card-type .n-tabs-tab.n-tabs-tab--active) {
-  background-color: var(--apix-panel-layer-5-background);
-  color: var(--apix-primary-active);
-}
-
-/* :deep(.n-tabs-wrapper .n-tabs-tab-wrapper:nth-last-child(2) .n-tabs-tab) {
+.save-btn {
   width: 40px;
-  border: none !important;
-} */
-
-:deep(.n-tabs .n-tabs-tab .n-tabs-tab__close) {
-  opacity: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-:deep(.n-tabs .n-tabs-tab:hover .n-tabs-tab__close) {
-  opacity: 1;
-}
-
-:deep(.n-tabs-wrapper .n-tabs-tab-wrapper .n-tabs-tab .n-base-icon) {
-  color: var(--apix-secondary-dark-color);
-}
-
-:deep(.n-tabs .n-tabs-tab .n-tabs-tab__close) {
-  transition: none;
-}
-
-:deep(.n-tabs .n-tabs-tab .n-tabs-tab__close:hover) {
-  background-color: var(--apix-lightest-color);
-}
-
-:deep(.n-tabs .n-tab-pane) {
-  border: 0;
+.save-btn.save_all_btn {
+  width: 72px;
 }
 </style>

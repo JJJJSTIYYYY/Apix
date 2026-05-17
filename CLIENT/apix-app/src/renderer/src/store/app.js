@@ -528,7 +528,7 @@ export const useAppCacheData = defineStore("app", {
 
           try{
             const tab =
-              await this.readTab(tabKey)
+              await this.readTabContent(tabKey)
 
             tabs.push({
               tabKey: tabKey,
@@ -545,13 +545,27 @@ export const useAppCacheData = defineStore("app", {
               content_mime: tab['mime'],
               saved: true,
               status: 'default',
-              version: 0
+              version: 0,
+              pinned:
+                typeof item === 'object'
+                  ? !!item?.pinned
+                  : false
             })
           }
           catch (e) {
-            
+
           }
         }
+
+        // Pinned tabs first
+        tabs.sort((a, b) => {
+          // Both same pinned state
+          if (!!a.pinned === !!b.pinned) {
+            return 0
+          }
+
+          return a.pinned ? -1 : 1
+        })
 
         return tabs
       }
@@ -565,18 +579,19 @@ export const useAppCacheData = defineStore("app", {
         'tabs',
         this.tabs.map(t => ({
           tabKey: t.tabKey,
-          title: t.title
+          title: t.title,
+          pinned: t.pinned
         }))
       )
     },
 
-    async readTab(tabKey) {
+    async readTabContent(tabKey) {
       return (
         await window.api.readFile(tabKey)
       ) ?? {}
     },
 
-    async saveTab(tabKey) {
+    async saveTabContent(tabKey) {
       const idx = this.tabs.findIndex(t => t.tabKey === tabKey)
       if (this.tabs[idx].saved && this.tabs[idx].status === 'default') return
       let content = this.tabs[idx].content
@@ -590,5 +605,22 @@ export const useAppCacheData = defineStore("app", {
       this.tabs[idx].saved = true
       this.tabs[idx].status = 'default'
     },
+
+    async saveAllTabContent() {
+      for (const tab of this.tabs) {
+        if (tab.saved && tab.status === 'default') continue
+        
+        let content = tab.content
+        if (typeof content === 'object') {
+          content = JSON.stringify(
+            toRaw(content)
+          )
+        }
+        // console.log("Save content:", content)
+        await window.api.writeFile(tab.tabKey, content)
+        tab.saved = true
+        tab.status = 'default'
+      }
+    }
   }
 })

@@ -514,6 +514,8 @@ const panelHandleKeydown = (
   background: transparent;
   width: 100%;
   max-width: 240px;
+
+  border-radius: var(--apix-border-radius-base) 0 0 var(--apix-border-radius-base);
 }
 .chat-history.is-hide {
   width: 40px;

@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import darkCss from 'highlight.js/styles/atom-one-dark.css?url'
 import lightCss from 'highlight.js/styles/github.css?url'
 
@@ -43,7 +43,7 @@ export const globalCardDragState = {
   cardType: "", // 'preset' or 'inTab'
 }
 
-export const globalDragHoverCard = ''
+export const globalDragHoverCard = ref('')
 
 export function clearGlobalDragState() {
   globalCardDragState.sourceUid = ''

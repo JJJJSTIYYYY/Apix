@@ -72,7 +72,8 @@ import {
   globalCardDragState,
   genUUID,
   defaultCards,
-  clearGlobalDragState
+  clearGlobalDragState,
+  globalDragHoverCard
 } from '../../../store/globalData.js'
 
 type CardBase = {
@@ -210,6 +211,7 @@ function findCardFromTree(tree: TabCardItem[], uid: string, deleteFound: boolean
 
 function DragCardDropInCardList() {
   console.log("[DragCardDropInCardList] globalCardDragState:", globalCardDragState)
+  globalDragHoverCard.value = ''
   // Append
   if (
     globalCardDragState.cardUid === "" // Not drag a card
@@ -238,6 +240,7 @@ function DragCardDropInCardList() {
 
 function DragCardDropOnAnotherCard(dropOn: TabCardItem, dropIndex: number) {
   console.log("[DragCardDropOnAnotherCard] globalCardDragState:", globalCardDragState)
+  globalDragHoverCard.value = ''
   // Insert
   if (globalCardDragState.cardUid === "") return
 

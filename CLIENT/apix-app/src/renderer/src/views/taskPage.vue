@@ -77,6 +77,8 @@ const handleSelect = (key: string) => {
   background-color: var(--apix-panel-layer-2-background) !important;
   padding: 0 12px 0 12px !important;
   box-shadow: inset -1px 0 0 0 var(--apix-border-disabled);
+
+  border-radius: var(--apix-border-radius-base) 0 0 var(--apix-border-radius-base);
 }
 
 
