@@ -69,6 +69,14 @@ import {
 } from '@codemirror/lang-markdown'
 
 import {
+  javascript
+} from '@codemirror/lang-javascript'
+
+import {
+  python
+} from '@codemirror/lang-python'
+
+import {
   oneDark
 } from '@codemirror/theme-one-dark'
 
@@ -85,6 +93,7 @@ import SearchPanel from './search_panel.vue'
 const props = defineProps<{
   modelValue: string
   theme: string
+  lang?: string
 }>()
 
 const emit = defineEmits<{
@@ -102,7 +111,27 @@ export type MarkdownEditorExpose = {
   ) => void
 }
 
+// ------------------------
+// Language compartment
+// ------------------------
+const languageCompartment = new Compartment()
 
+function getLanguageExtension(lang?: string) {
+  switch ((lang || 'md').toLowerCase()) {
+    case 'js':
+    case 'javascript':
+      return javascript()
+
+    case 'py':
+    case 'python':
+      return python()
+
+    case 'md':
+    case 'markdown':
+    default:
+      return markdown()
+  }
+}
 
 // ------------------------
 // Refs
@@ -158,7 +187,9 @@ onMounted(() => {
     extensions: [
       lineNumbers(),
       highlightActiveLine(),
-      markdown(),
+      languageCompartment.of(
+        getLanguageExtension(props.lang)
+      ),
       themeCompartment.of(
         props.theme === 'dark' ? oneDark : githubLight
       ),
@@ -414,6 +445,26 @@ watch(
     view.dispatch({
       effects: themeCompartment.reconfigure(
         theme === 'dark' ? oneDark : githubLight
+      )
+    })
+  }
+)
+
+// ------------------------
+// Sync language
+// ------------------------
+watch(
+  () => props.lang,
+  lang => {
+    const view = editorView.value
+
+    if (!view) {
+      return
+    }
+
+    view.dispatch({
+      effects: languageCompartment.reconfigure(
+        getLanguageExtension(lang)
       )
     })
   }

@@ -92,7 +92,7 @@ const emit = defineEmits<{
   (e: "new-dir"): void
   (e: "rename"): void
   (e: "delete-item"): void
-  (e: "compress-skill"): void
+  (e: "create-skill"): void
 }>()
 
 const wrapperRef = ref<HTMLElement | null>(null)
@@ -143,7 +143,7 @@ function deleteItem() {
 }
 
 function compressToSkill() {
-  emit('compress-skill')
+  emit('create-skill')
   emit('close-menu')
 }
 </script>

@@ -148,6 +148,9 @@ class FsWatcherWorker {
   // Supported extensions
   SUPPORTED_EXTENSIONS = new Set([
     '.md',
+    '.js',
+    '.py',
+    '.txt',
     '.aflow',
     '.agraph'
   ])
@@ -161,13 +164,16 @@ class FsWatcherWorker {
 
   guessFileMime(filePath) {
     if (filePath.endsWith(".md")) return 'md'
+    else if (filePath.endsWith(".js")) return 'js'
+    else if (filePath.endsWith(".py")) return 'py'
+    else if (filePath.endsWith(".txt")) return 'txt'
     else if (filePath.endsWith(".aflow")) return 'aflow'
     else if (filePath.endsWith(".agraph")) return 'agraph'
     else return 'unsupport'
   }
 
   parseFileContent(raw_content, mime) {
-    if (mime === 'md') return raw_content || ''
+    if (mime === 'md' || mime === 'js' || mime === 'py' || mime === 'txt') return raw_content || ''
     else if (mime === 'aflow') {
       try {
         return yaml.load(raw_content) || []
@@ -678,13 +684,13 @@ class FsWatcherWorker {
     const normalizedPath =
       this.normalizePath(dirPath)
 
-    await this.unwatchDirectoryNode(
-      normalizedPath
-    )
-
     await trash([
       normalizedPath
     ])
+
+    await this.unwatchDirectoryNode(
+      normalizedPath
+    )
   }
 
   // Rename file or directory
@@ -981,6 +987,88 @@ class FsWatcherWorker {
     return results
   }
 
+  // Create Anthropic skill folder
+  async createSkillFolder(atPath, skillName) {
+    try {
+      const basePath =
+        this.normalizePath(
+          atPath
+        )
+
+      const skillDirPath =
+        path.join(
+          basePath,
+          skillName
+        )
+
+      // Check directory exists
+      try {
+        await fs.access(skillDirPath)
+
+        return {
+          success: false,
+          message: '技能包目录已存在'
+        }
+      }
+      catch {
+        // Directory not exists, continue create
+      }
+
+      // Create skill directory
+      await fs.mkdir(
+        skillDirPath,
+        { recursive: true }
+      )
+
+      // Anthropic skill metadata
+      const skillMeta = {
+        name: skillName,
+        description: '',
+        version: '1.0.0'
+      }
+
+      const yamlContent =
+        yaml.dump(
+          skillMeta,
+          {
+            lineWidth: -1
+          }
+        )
+
+      const skillMdContent =
+`---
+${yamlContent}---
+
+# ${skillName}
+
+- Add skill detail here.
+`
+
+      // Create SKILL.md
+      await fs.writeFile(
+        path.join(
+          skillDirPath,
+          'SKILL.md'
+        ),
+        skillMdContent,
+        'utf-8'
+      )
+
+      return {
+        success: true,
+        message: skillDirPath
+      }
+    }
+    catch (e) {
+      console.error('createSkillFolder error:', e)
+
+      return {
+        success: false,
+        message: e?.message || '创建技能包失败'
+      }
+    }
+  }
+
   // RPC handlers
   handlers = {
     scanDir:
@@ -1029,7 +1117,10 @@ class FsWatcherWorker {
       this.rename.bind(this),
 
     searchText:
-      this.searchText.bind(this)
+      this.searchText.bind(this),
+
+    createSkillFolder:
+      this.createSkillFolder.bind(this),
   }
 
   // Handle RPC message

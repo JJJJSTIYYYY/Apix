@@ -2,6 +2,7 @@
 <template>
   <div
     :title="tab.tabKey"
+    :data-tab-key="tab.tabKey"
     class="editor-tab"
     :class="{
       active: active,
@@ -210,6 +211,7 @@ function closePopMenu() {
 
 .editor-tab.outdated .tab-title {
   opacity: 0.75;
+  color: var(--apix-warning-button-active);
 }
 
 /* Title */

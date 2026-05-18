@@ -66,6 +66,7 @@
           @new-dir="handleCreateNewDir"
           @rename="handleRenameStart"
           @delete-item="handleDeleteItem"
+          @create-skill="handleCreateSkill"
         />
       </transition>
 
@@ -125,6 +126,7 @@ import { nextTick, ref, watch } from 'vue'
 import TreeNode from './file_tree_node.vue'
 import fileNodeMenu from './comp/fileNodeMenu.vue'
 import { ConfirmDialog } from '../../component/comp/confirmDialog.js'
+import { InputDialog } from '../../component/comp/inputDialog.js'
 import { getSupportFileSVG } from '../../../store/globalData.js'
 
 // ------------------------
@@ -242,6 +244,15 @@ function handleInputKeydown(e) {
   }
 }
 
+function isSupportFile(file_name: string) {
+  if (file_name.endsWith(".aflow") 
+    || file_name.endsWith(".md") 
+    || file_name.endsWith(".js") 
+    || file_name.endsWith(".py"))
+    return true
+  return false
+}
+
 watch(
   () => props.node.is_creating,
   async (newValue, oldValue) => {
@@ -252,7 +263,7 @@ watch(
       console.log('[watch] inputValue: ', inputValue.value, '. Creating: ', props.node.creating_type)
       let file_name = inputValue.value
       if (props.node.creating_type === 'file') {
-        if (!file_name.endsWith(".md") && !file_name.endsWith(".aflow")) file_name += '.aflow'
+        if (!isSupportFile(file_name)) file_name += '.aflow'
         emit("create", props.node.path, file_name, 'file')
       }
       else {
@@ -377,6 +388,54 @@ const handleDeleteItem = async () => {
   } catch (err: any) {
     
   }
+}
+
+const handleCreateSkill = async () => {
+  InputDialog
+    .open(
+      '请输入技能包名',
+      '新建技能包',
+      {
+        placeholder: '技能包名',
+        defaultValue: '',
+      }
+    )
+    .then(async value => {
+      if (!value) {
+        return
+      }
+
+      if (props.node.type === 'directory') {
+        console.log("Create new skill in", props.node.path, value)
+        const result = await window.api.createSkillFolder(
+          props.node.path,
+          value
+        )
+        console.log("Create new skill result:", result)
+        if (!result.success) {
+          ElMessage({ type: 'error', message: result.message, plain: true })
+        }
+      }
+      else {
+        const parentPath =
+          props.node.path.substring(
+            0,
+            props.node.path.length
+            - props.node.name.length
+            - 1
+          )
+        console.log("Create new skill in", parentPath, value)
+        const result = await window.api.createSkillFolder(
+          parentPath,
+          value
+        )
+        console.log("Create new skill result:", result)
+        if (!result.success) {
+          ElMessage({ type: 'error', message: result.message, plain: true })
+        }
+      }
+    })
+    .catch(() => {})
 }
 </script>
 

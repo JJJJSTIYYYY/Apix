@@ -155,6 +155,12 @@ async function showAppInfo() {
   border-radius: var(--apix-border-radius-base);
   object-fit: contain;
   overflow: hidden;
+  opacity: 0.7;
+  transition: opacity .25s var(--apix-cubic-bezier);
+}
+
+.icon:hover {
+  opacity: 1;
 }
 
 .title {

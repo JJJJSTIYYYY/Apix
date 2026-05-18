@@ -162,10 +162,8 @@
 
 .task-card-body,
 .folder-card-body,
-.if-card-body,
-.loop-card-body,
-.mark-card-body,
-.switch-card-body {
+.script-card-body,
+.mark-card-body {
   border: 1px solid var(--apix-default-light-color);
   margin-top: 10px;
   border-radius: 8px;

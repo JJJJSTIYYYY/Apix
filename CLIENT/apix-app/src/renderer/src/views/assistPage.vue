@@ -314,8 +314,8 @@ interface ChatMessage {
   role: Role
   node_id?: number
   parent_id?: number
-  pre_node?: str[]
-  next_node?: str[]
+  pre_node?: string[]
+  next_node?: string[]
 
   content?: string | MessageChunk[]
   think?: string | MessageChunk[]
@@ -344,6 +344,11 @@ interface TagsItem {
   path: string
   id?: string
   type?: TagProps['type']
+}
+
+type TodoItem = {
+  content: string
+  status: 'pending' | 'in_progress' | 'completed' | 'error'
 }
 
 // ################################
@@ -1195,7 +1200,7 @@ async function handleStreamEnd(payload: any, historyId: string) {
       historyList.value[hIndex].hasNewMessage = true
     }
     else {
-      historyList.value[index].hasNewMessage = false
+      historyList.value[hIndex].hasNewMessage = false
 
       try {
         await window.api.updateConversation(
@@ -1247,7 +1252,7 @@ async function handleStreamAbort(payload: any, historyId: string) {
       historyList.value[hIndex].hasNewMessage = true
     }
     else {
-      historyList.value[index].hasNewMessage = false
+      historyList.value[hIndex].hasNewMessage = false
 
       try {
         await window.api.updateConversation(

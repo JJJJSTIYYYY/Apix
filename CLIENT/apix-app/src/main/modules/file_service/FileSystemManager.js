@@ -239,6 +239,14 @@ export class FileSystemManager {
         )
     }
 
+    // Search text
+    createSkillFolder(atPath, skillName) {
+        return this._call(
+            'createSkillFolder',
+            { atPath, skillName }
+        )
+    }
+
     // Dispose
     async dispose() {
         await this.worker.terminate()

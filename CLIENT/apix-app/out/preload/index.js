@@ -23,6 +23,7 @@ const api = {
   deleteDirectory: (dirPath) => electron.ipcRenderer.invoke("fs:deleteDirectory", dirPath),
   rename: (oldPath, newPath) => electron.ipcRenderer.invoke("fs:rename", oldPath, newPath),
   searchText: (keyword, cwd) => electron.ipcRenderer.invoke("fs:searchText", keyword, cwd),
+  createSkillFolder: (atPath, skillName) => electron.ipcRenderer.invoke("fs:createSkillFolder", atPath, skillName),
   /**
    * Listen fs watcher events from main process
    * @param callback (events: any[]) => void

@@ -143,20 +143,6 @@
       <div class="script-body-wrapper">
         <div class="script-content">
           <div class="field-label">
-            脚本内容:
-          </div>
-
-          <div class="field-value">
-            <el-input
-              v-model="self.script"
-              type="textarea"
-              :autosize="{ minRows: 6, maxRows: 16 }"
-              placeholder="请输入脚本内容"
-              @input="onScriptChange"
-            />
-          </div>
-
-          <div class="field-label">
             脚本描述:
           </div>
 
@@ -167,6 +153,20 @@
               :autosize="{ minRows: 3, maxRows: 10 }"
               placeholder="请输入脚本描述，包括需要执行的代码或伪代码，需要收集的运行结果等"
               @input="onDescriptionChange"
+            />
+          </div>
+
+          <div class="field-label">
+            脚本内容:
+          </div>
+
+          <div class="field-value">
+            <el-input
+              v-model="self.script"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 16 }"
+              placeholder="请输入脚本内容"
+              @input="onScriptChange"
             />
           </div>
         </div>
@@ -415,6 +415,7 @@ textarea {
   display: flex;
   justify-content: center;
   align-items: center;
+  color: var(--apix-default-dark-color);
 }
 
 .field-value {

@@ -25,6 +25,7 @@ const api = {
   deleteDirectory: (dirPath) => ipcRenderer.invoke('fs:deleteDirectory', dirPath),
   rename: (oldPath, newPath) => ipcRenderer.invoke('fs:rename', oldPath, newPath),
   searchText: (keyword, cwd) => ipcRenderer.invoke('fs:searchText', keyword, cwd),
+  createSkillFolder: (atPath, skillName) => ipcRenderer.invoke('fs:createSkillFolder', atPath, skillName),
 
   /**
    * Listen fs watcher events from main process

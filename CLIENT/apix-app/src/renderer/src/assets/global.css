@@ -1,7 +1,7 @@
 html, body {
   overflow: hidden;
   margin: 0px;
-  backdrop-filter: saturate(180%);
+  backdrop-filter: saturate(280%);
   background-color: var(--apix-panel-base-layer-background);
 }
 
@@ -42,7 +42,7 @@ body, * {
      面板层级背景 (Panel Layer Background)
      优化：拉开差距，每层差异清晰可辨
      ============================================ */
-  --apix-panel-base-layer-background: rgba(235, 235, 239, 0.3); 
+  --apix-panel-base-layer-background: rgba(235, 235, 239, 0.2); 
   --apix-panel-layer-0-background: rgb(239, 239, 245);  /* 页面最底层背景 */
   --apix-panel-layer-1-background: rgb(245, 245, 249);  /* 侧边栏、导航栏 */
   --apix-panel-layer-2-background: rgb(249, 249, 252);  /* 卡片、模块背景 */
@@ -431,7 +431,7 @@ body, * {
 
 .aside-area {
   width: var(--apix-left-side-bar-width) !important; 
-  transition: width 0.28s var(--apix-cubic-bezier);
+  transition: width 0.28s ease;
   background: var(--apix-panel-layer-1-background);
   border-radius: var(--apix-border-radius-base);
   margin: 0px var(--apix-left-side-bar-margin) 6px var(--apix-left-side-bar-margin); 
@@ -439,7 +439,7 @@ body, * {
   justify-content: center;
   padding: 0;
   position: relative;
-  overflow: hidden;
+  overflow: hidden !important;
   height: calc(100vh - 36px);
   max-height: calc(100vh - 36px);
 }
@@ -447,6 +447,7 @@ body, * {
 .main-area {
   background: var(--apix-panel-layer-1-background);
   border-radius: var(--apix-border-radius-base);
+  transition: width 0.28s ease;
   margin: 0px 6px 6px 0px;
   display: flex;
   justify-content: center;
@@ -455,6 +456,7 @@ body, * {
   overflow: hidden !important;
   height: calc(100vh - 36px);
   max-height: calc(100vh - 36px);
+  width: calc(100vw - var(--apix-left-side-bar-width) - 2 * var(--apix-left-side-bar-margin) - 6px);
 }
 
 .selectable,

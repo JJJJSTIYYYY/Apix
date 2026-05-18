@@ -345,4 +345,12 @@ export function registerFileIpc(mainWindow) {
       return await fsManager.searchText(keyword, cwd)
     }
   )
+
+  // Search text
+  ipcMain.handle(
+    'fs:createSkillFolder',
+    async (_, atPath, skillName) => {
+      return await fsManager.createSkillFolder(atPath, skillName)
+    }
+  )
 }

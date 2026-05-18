@@ -28,7 +28,10 @@
         <div class="right-panel">
           <div class="editor-tabs-root">
             <!-- Tabs -->
-            <div class="editor-tabs-header">
+            <div
+              ref="tabsHeaderRef"
+              class="editor-tabs-header"
+            >
               <TabHeaderCard
                 v-for="(tab, index) in tabs"
                 :key="tab.tabKey"
@@ -54,25 +57,21 @@
                 v-show="activeTab === tab.tabKey"
                 class="editor-tab-pane"
               >
-                <el-scrollbar
-                  class="right-card-container"
-                  :style="{ overflow: 'auto' }"
-                >
-                  <TabCardList
-                    v-if="tab.content_mime === 'aflow'"
-                    :items="tab.content ?? []"
-                    :tab_key="tab.tabKey"
-                    @update:content-change="handleContentChange(tab.tabKey)"
-                  />
+                <TabCardList
+                  v-if="tab.content_mime === 'aflow'"
+                  :items="tab.content ?? []"
+                  :tab_key="tab.tabKey"
+                  @update:content-change="handleContentChange(tab.tabKey)"
+                />
 
-                  <MarkdownEditor
-                    v-else-if="tab.content_mime === 'md'"
-                    :ref="el => { if (el) { editorRefs[tab.tabKey] = el } else { delete editorRefs[tab.tabKey] } }"
-                    v-model="tab.content"
-                    :theme="store.config.dark_theme ? 'dark' : 'light'"
-                    @change:model-value="handleContentChange(tab.tabKey)"
-                  />
-                </el-scrollbar>
+                <MarkdownEditor
+                  v-else-if="tab.content_mime === 'md' || tab.content_mime === 'py' || tab.content_mime === 'js' || tab.content_mime === 'txt' "
+                  :ref="el => { if (el) { editorRefs[tab.tabKey] = el } else { delete editorRefs[tab.tabKey] } }"
+                  v-model="tab.content"
+                  :theme="store.config.dark_theme ? 'dark' : 'light'"
+                  :lang="tab.content_mime"
+                  @change:model-value="handleContentChange(tab.tabKey)"
+                />
               </div>
             </div>
           </div>
@@ -112,7 +111,7 @@
 
   <div class="bottom-btn-wrap">
     <button
-      v-if="activatedTabMeta.mime !== 'md'"
+      v-if="activatedTabMeta.mime === 'aflow'"
       class="commom-btn"
       @click="unfoldAllCards()"
     >
@@ -120,7 +119,7 @@
     </button>
 
     <button
-      v-if="activatedTabMeta.mime !== 'md'"
+      v-if="activatedTabMeta.mime === 'aflow'"
       class="commom-btn"
       @click="foldAllCards()"
     >
@@ -128,14 +127,25 @@
     </button>
 
     <button
+      v-if="activatedTabMeta.mime === 'md' || activatedTabMeta.mime === 'py' || activatedTabMeta.mime === 'js' || activatedTabMeta.mime === 'txt' "
+      class="submit-btn agent-btn"
+      @click=""
+    >
+      <svg t="1779034242459" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5513" width="20" height="20"><path class="path" d="M741.632 663.296a8.533333 8.533333 0 0 1 15.616 0l23.04 52.266667a42.666667 42.666667 0 0 0 18.602667 20.224l40.746666 22.272a8.533333 8.533333 0 0 1 0 14.933333l-40.746666 22.272a42.666667 42.666667 0 0 0-18.602667 20.224l-23.04 52.266667a8.533333 8.533333 0 0 1-15.616 0l-23.04-52.309334a42.709333 42.709333 0 0 0-18.474667-20.181333l-40.533333-22.272a8.533333 8.533333 0 0 1 0-14.933333l40.533333-22.272a42.666667 42.666667 0 0 0 18.474667-20.181334l23.04-52.309333zM411.136 238.72a21.333333 21.333333 0 0 1 40.106667 0l59.349333 162.986667a85.333333 85.333333 0 0 0 46.122667 49.066666l132.693333 57.728a21.333333 21.333333 0 0 1 0 39.125334l-132.693333 57.728a85.376 85.376 0 0 0-46.08 49.066666l-59.392 163.029334a21.333333 21.333333 0 0 1-40.106667 0l-59.306667-162.986667a85.376 85.376 0 0 0-46.165333-49.066667l-132.693333-57.770666a21.333333 21.333333 0 0 1 0-39.125334l132.693333-57.728a85.333333 85.333333 0 0 0 46.122667-49.066666l59.349333-162.986667zM741.632 188.373333a8.533333 8.533333 0 0 1 15.616 0l23.04 52.309334a42.666667 42.666667 0 0 0 18.602667 20.181333l40.746666 22.272a8.533333 8.533333 0 0 1 0 14.976l-40.746666 22.272a42.666667 42.666667 0 0 0-18.602667 20.181333l-23.04 52.309334a8.533333 8.533333 0 0 1-15.616 0l-23.04-52.352a42.666667 42.666667 0 0 0-18.474667-20.181334l-40.533333-22.186666a8.533333 8.533333 0 0 1 0-14.976l40.533333-22.272a42.666667 42.666667 0 0 0 18.474667-20.181334l23.04-52.352z" fill="currentColor" p-id="5514"></path></svg>
+      智能体
+    </button>
+
+    <button
       class="submit-btn save-btn"
       :class="{save_all_btn: optionKeyPress}"
       @click="saveTabContent()"
     >
+      <svg t="1779034751905" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6501" width="14" height="14"><path d="M833.466 64H94.779L64 94.779v834.443L94.779 960h834.443L960 929.221V190.534l-10.26-20.519-95.755-99.175L833.466 64z m-577.955 61.557v256.489h448V125.557h116.275l78.656 78.656v690.809H128.977V125.557h126.534z m386.443 0v194.931H512V125.557h129.954z" fill="currentColor" p-id="6502"></path></svg>
       {{ optionKeyPress ? '全部保存' : '保存' }}
     </button>
 
     <button
+      v-if="activatedTabMeta.mime === 'md' || activatedTabMeta.mime === 'aflow'"
       class="submit-btn"
       @click="submitCase()"
     >
@@ -299,25 +309,85 @@ async function removeLeftCard(id: string) {
 // ------------------------
 // 标签页增删、拖拽排序
 // ------------------------
+const tabsHeaderRef = ref<HTMLElement>()
+
+const scrollTabIntoView = async (key: string) => {
+  await nextTick()
+
+  const container = tabsHeaderRef.value
+  if (!container) return
+
+  const tabEl =
+    container.querySelector(
+      `[data-tab-key="${CSS.escape(key)}"]`
+    ) as HTMLElement | null
+
+  if (!tabEl) return
+
+  const containerRect = container.getBoundingClientRect()
+  const tabRect = tabEl.getBoundingClientRect()
+
+  const isLeftOverflow =
+    tabRect.left < containerRect.left
+
+  const isRightOverflow =
+    tabRect.right > containerRect.right
+
+  // Already fully visible
+  if (!isLeftOverflow && !isRightOverflow) {
+    return
+  }
+
+  tabEl.scrollIntoView({
+    behavior: 'smooth',
+    inline: 'nearest',
+    block: 'nearest'
+  })
+}
+
 const addTab = async (key, name, content, content_mime) => {
   const existingTab = tabs.find(tab => tab.tabKey === key)
-  
-  if (!existingTab) {
-    tabs.push({
-      tabKey: key,
-      title: name,
-      content: content,
-      content_mime: content_mime,
-      saved: true,
-      version: 0,
-      status: 'default'
-    })
-    
+
+  // Already opened
+  if (existingTab) {
     activeTab.value = key
-    await store.saveTabs()
-  } else {
-    activeTab.value = key
+
+    await nextTick()
+    await scrollTabIntoView(key)
+
+    return
   }
+
+  const newTab = {
+    tabKey: key,
+    title: name,
+    content: content,
+    content_mime: content_mime,
+    saved: true,
+    version: 0,
+    status: 'default'
+  }
+
+  // Insert after current active tab
+  const activeIndex =
+    tabs.findIndex(
+      tab => tab.tabKey === activeTab.value
+    )
+
+  // No active tab
+  if (activeIndex === -1) {
+    tabs.push(newTab)
+  }
+  else {
+    tabs.splice(activeIndex + 1, 0, newTab)
+  }
+
+  activeTab.value = key
+
+  await nextTick()
+  await scrollTabIntoView(key)
+
+  await store.saveTabs()
 }
 
 async function closeTab(tab: TabItem) {
@@ -699,9 +769,27 @@ const watchWorkspace = async (events) => {
       // Remove directory/file
       else if (e.type === 'unlink' || e.type === 'unlinkDir') {
         removeNodeByPath(dirDict.value, e.path)
-        const openedTab = tabs.find(t => t.tabKey === e.path)
-        if (openedTab) {
-          openedTab.status = 'deleted'
+
+        // Deleted file
+        if (e.type === 'unlink') {
+          const openedTab = tabs.find(t => t.tabKey === e.path)
+          if (openedTab) {
+            openedTab.status = 'deleted'
+          }
+        }
+
+        // Deleted directory
+        else if (e.type === 'unlinkDir') {
+          const dirPath = e.path.endsWith('/')
+            ? e.path
+            : `${e.path}/`
+
+          for (const tab of tabs) {
+            // Mark all opened files inside deleted directory
+            if (tab.tabKey.startsWith(dirPath)) {
+              tab.status = 'deleted'
+            }
+          }
         }
       }
     }
@@ -1148,6 +1236,9 @@ function foldAllCards() {
 .app-layout {
   display: flex;
   max-height: calc(100vh - 36px);
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--apix-border-radius-base);
   overflow: hidden;
 }
 
@@ -1208,7 +1299,6 @@ function foldAllCards() {
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
-  border-radius: 24px;
 }
 
 /* 标签页 */
@@ -1294,19 +1384,20 @@ function foldAllCards() {
   box-shadow: var(--apix-shadow-layer-3);
 }
 
-.main-area {
-  padding: 0px;
-  position: relative;
-}
-
 .left-card-container {
   padding: 15px 0px;
   padding-top: 0;
   background-color: transparent;
 }
 
+.editor-tabs-content {
+  height: 100%;
+  overflow: scroll;
+}
+
 .right-card-container {
   position: relative;
+  max-height: 100%;
   margin: 0 auto;
   border-radius:
     var(--apix-border-radius-base) var(--apix-border-radius-base) 0 0;
@@ -1315,7 +1406,7 @@ function foldAllCards() {
 .bottom-btn-wrap {
   -webkit-app-region: no-drag;
   
-  opacity: 0.85;
+  opacity: 0.65;
   position: absolute;
   top: -30px;
   right: 36px;
@@ -1367,13 +1458,13 @@ function foldAllCards() {
 }
 
 .submit-btn:hover {
-  color: var(--apix-success-button-text) !important;
-  background: var(--apix-success-button-hover) !important;
+  color: var(--apix-common-button-text) !important;
+  background: var(--apix-common-button-hover) !important;
 }
 
 .submit-btn:active {
-  color: var(--apix-success-button-text) !important;
-  background: var(--apix-success-button-active) !important;
+  color: var(--apix-common-button-text) !important;
+  background: var(--apix-common-button-active) !important;
 }
 
 .commom-btn {
@@ -1391,13 +1482,17 @@ function foldAllCards() {
 }
 
 .save-btn {
-  width: 40px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .save-btn.save_all_btn {
-  width: 72px;
+  width: 100px;
+}
+
+.agent-btn {
+  gap: 2px !important;
+  padding: 1px 4px 1px 1px;
 }
 </style>

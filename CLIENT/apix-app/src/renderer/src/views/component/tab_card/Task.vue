@@ -149,6 +149,8 @@
           <div class="field-value">
             <el-input
               v-model="self.address"
+              type="textarea"
+              :autosize="{ minRows: 3, maxRows: 10 }"
               placeholder="请输入任务描述"
               @input="onAddressChange"
             />
@@ -162,7 +164,7 @@
             <el-input
               v-model="self.description"
               type="textarea"
-              :autosize="{ minRows: 3, maxRows: 10 }"
+              :autosize="{ minRows: 6, maxRows: 16 }"
               placeholder="（选填）请输入需要执行的操作步骤或描述"
               @input="onDescriptionChange"
             />
@@ -413,6 +415,7 @@ textarea {
   display: flex;
   justify-content: center;
   align-items: center;
+  color: var(--apix-default-dark-color);
 }
 
 .field-value {
