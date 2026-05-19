@@ -1,115 +1,130 @@
 <template>
-  <!-- Root enter / leave -->
-  <Transition name="fade" appear style="position: fixed; top: 46vh; left: 62%; transform: translate(-50%, -50%);">
-    <div
-      class="task-info-root"
-      :style="{
-        width: `${(columns.length * COLUMN_WIDTH) > 520 ? (columns.length * COLUMN_WIDTH) : 520}px`
-      }"
-    >
-      <!-- Header -->
-      <header class="task-header">
-        <div 
-          class="btn-area"
+  <Teleport to="body">
+    <Transition name="cd">
+      <div 
+        v-if="visible"
+        class="task-info-mask" 
+        @click.self="close"
+      >
+        <div
+          class="task-info-root"
+          :style="{
+            width: `${(columns.length * COLUMN_WIDTH) > 520 ? (columns.length * COLUMN_WIDTH) : 520}px`
+          }"
         >
-          <button
-            plain
-            class="path-ctrl-btn before-btn"
-            @click="returnBeforeDir()"
-          >
-            <div style="transform: scaleY(1.8);"><</div>
-          </button>
-          <button
-            plain
-            class="path-ctrl-btn after-btn"
-            @click="returnAfterDir()"
-          >
-            <div style="transform: scaleY(1.8);">></div>
-          </button>
-        </div>
-        <div class="task-info-title">
-          <div class="task-id">任务详情</div>
-          <div class="task-id">{{ taskInfo.messages.task_id }}</div>
-        </div>
-        <div 
-          class="btn-area"
-        >
-          <button
-            plain
-            class="close-btn"
-            @click="emit('close')"
-          >
-            ×
-          </button>
-        </div>
-      </header>
-
-      <!-- Scroll Wrapper -->
-      <div class="scroll-wrapper">
-        <TransitionGroup
-          name="column-slide"
-          tag="div"
-          class="task-content"
-        >
-          <div
-            v-for="(column, colIndex) in columns"
-            :key="colIndex"
-            class="task-column"
-          >
-            <!-- Column inner scroll -->
-            <div class="column-scroll">
-              <div
-                v-for="item in column"
-                :key="item.keyPath"
-                class="kv-item"
-                :class="{isSelect: item.active}"
-                @click="onItemClick(item, colIndex)"
+          <!-- Header -->
+          <header class="task-header">
+            <div 
+              class="btn-area"
+            >
+              <button
+                plain
+                class="path-ctrl-btn before-btn"
+                @click="returnBeforeDir()"
               >
-                <div class="kv-key">
-                  {{ item.key }}
-                </div>
+                <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16">
+                  <path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="currentColor" p-id="1148"></path>
+                </svg>
+              </button>
+              <button
+                plain
+                class="path-ctrl-btn after-btn"
+                @click="returnAfterDir()"
+              >
+                <svg t="1777025401907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16">
+                  <path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" fill="currentColor" p-id="1365"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="task-info-title">
+              <div class="task-id">任务详情</div>
+            </div>
+            <div 
+              class="btn-area"
+            >
+              <div style="min-width: 28px;"></div>
+              <button
+                plain
+                class="close-btn"
+                @click="close"
+              >
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path d="M764.288 214.592 512 466.88 259.712 214.592a31.936 31.936 0 0 0-45.12 45.12L466.752 512 214.528 764.224a31.936 31.936 0 1 0 45.12 45.184L512 557.184l252.288 252.288a31.936 31.936 0 0 0 45.12-45.12L557.12 512.064l252.288-252.352a31.936 31.936 0 1 0-45.12-45.184z" fill="currentColor"></path></svg>
+              </button>
+            </div>
+          </header>
 
-                <div class="kv-value" v-if="!item.hasChildren">
-                  {{ item.value }}
-                </div>
+          <!-- Scroll Wrapper -->
+          <div class="scroll-wrapper">
+            <TransitionGroup
+              name="column-slide"
+              tag="div"
+              class="task-content"
+            >
+              <div
+                v-for="(column, colIndex) in columns"
+                :key="colIndex"
+                class="task-column"
+              >
+                <!-- Column inner scroll -->
+                <div class="column-scroll">
+                  <div
+                    v-for="item in column"
+                    :key="item.keyPath"
+                    class="kv-item"
+                    :class="{isSelect: item.active}"
+                    @click="onItemClick(item, colIndex)"
+                  >
+                    <div class="kv-key">
+                      {{ item.key }}
+                    </div>
 
-                <div class="kv-expand" :class="{isSelect: item.active}" v-else>
-                  ▶
+                    <div class="kv-value" v-if="!item.hasChildren">
+                      {{ item.value }}
+                    </div>
+
+                    <div class="kv-expand" :class="{isSelect: item.active}" v-else>
+                      ▶
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </TransitionGroup>
           </div>
-        </TransitionGroup>
-      </div>
 
-      <!-- Footer -->
-      <footer class="task-footer" v-if="footerPathLabel.length">
-        <TransitionGroup
-          name="footer-label"
-          tag="div"
-          class="footer-label-wrapper"
-        >
-          <span
-            v-for="(label, index) in footerPathLabel"
-            :key="label"
-            class="footer-label-item"
-          >
-            <span 
-              class="footer-label"
-              @click="jumpToPath(index)"
+          <!-- Footer -->
+          <footer class="task-footer">
+            <TransitionGroup
+              name="footer-label"
+              tag="div"
+              class="footer-label-wrapper"
             >
-              {{ label }}
-            </span>
-            <span v-if="index < footerPathLabel.length - 1"> > </span>
-          </span>
-        </TransitionGroup>
-      </footer>
+              <span
+                v-for="(label, index) in footerPathLabel"
+                :key="label"
+                class="footer-label-item"
+              >
+                <span 
+                  class="footer-label"
+                  @click="jumpToPath(index)"
+                >
+                  {{ label }}
+                </span>
+                <span v-if="index < footerPathLabel.length - 1"> > </span>
+              </span>
+            </TransitionGroup>
+          </footer>
 
-    </div>
-  </Transition>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
+import { nextTick, ref, watch, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { mdDisplayer } from '../../comp/mdDisplayer';
+
 // ------------------------
 // Props / Emits
 // ------------------------
@@ -124,6 +139,18 @@ const emit = defineEmits({
   close: () => true,
 })
 
+async function close() {
+  visible.value = false
+  await nextTick()
+  emit('close')
+}
+
+const visible = ref(false)
+
+onMounted(() => {
+  visible.value = true
+})
+
 // ------------------------
 // Layout
 // ------------------------
@@ -132,9 +159,6 @@ const COLUMN_WIDTH = 260 // Must match .task-column min-width
 // ------------------------
 // State
 // ------------------------
-import { nextTick, ref, watch, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { mdDisplayer } from '../../comp/mdDisplayer';
 
 const columns = ref([])
 const footerPathLabel = ref([])
@@ -163,6 +187,24 @@ function normalizeValue(value) {
 
 function buildColumn(data, depth = 0, basePath = '') {
   if (!isObject(data)) return []
+
+  // Array support
+  if (Array.isArray(data)) {
+    return data.map((value, index) => {
+      const rawValue = normalizeValue(value)
+      const keyPath = basePath ? `${basePath}.${index}` : `${index}`
+
+      return {
+        key: `[${index}]`,
+        keyPath,
+        value: isObject(rawValue) ? null : rawValue,
+        rawValue,
+        depth,
+        hasChildren: isObject(rawValue),
+        active: false,
+      }
+    })
+  }
 
   return Object.keys(data).map((key) => {
     const rawValue = normalizeValue(data[key])
@@ -214,13 +256,8 @@ function jumpToKeyPath(path) {
   const pathKeys = path.split('.')
   const newColumns = []
 
-  let currentData = {
-    payload: props.taskInfo.messages.payload,
-    result: props.taskInfo.messages.result,
-    status: props.taskInfo.messages.status,
-    created_at: props.taskInfo.messages.created_at,
-    finished_at: props.taskInfo.messages.finished_at,
-  }
+  // Root is taskInfo itself
+  let currentData = props.taskInfo
 
   let lastItem = null
 
@@ -241,18 +278,22 @@ function jumpToKeyPath(path) {
     lastItem = item
   }
 
-  // Auto expand only once (file-manager behavior)
+  // Auto expand only once
   if (lastItem && lastItem.hasChildren) {
     const nextColumn = buildColumn(
       lastItem.rawValue,
       pathKeys.length,
       lastItem.keyPath
     )
+
     if (nextColumn.length) {
       newColumns.push(nextColumn)
     }
     else {
-      ElMessage({ message: '空的子集', plain: true, }) 
+      ElMessage({
+        message: '空的子集',
+        plain: true,
+      })
     }
   }
 
@@ -288,24 +329,10 @@ function scrollToRight() {
 // Init
 // ------------------------
 function initColumns() {
-  const { payload, status, result, created_at, finished_at } =
-    props.taskInfo.messages
-
-  const rootData = {
-    payload,
-    result,
-    status,
-    created_at,
-    finished_at,
-  }
-
   columns.value = [
-    buildColumn(rootData, 0),
+    buildColumn(props.taskInfo, 0),
   ]
 
-  // updateFooterPath('result')
-
-  // Init history ONCE
   backStack.value = []
   forwardStack.value = []
 }
@@ -382,22 +409,34 @@ watch(
 </script>
 
 <style scoped>
-.fade-enter-from {
-  opacity: 0;
-}
-
-.fade-enter-to {
-  opacity: 1;
-}
-
-.fade-enter-active {
-  transition: opacity 0.5s var(--apix-cubic-bezier),
-              transform 0.5s var(--apix-cubic-bezier);
-}
-
 /* ------------------------
    Root
 ------------------------ */
+.task-info-mask {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--apix-mask-background);
+  backdrop-filter: saturate(180%) blur(6px);
+  animation: opacityFadeIn 0.5s var(--apix-cubic-bezier);
+}
+
+@keyframes opacityFadeIn {
+  0% { 
+    opacity: 0.3; 
+  }
+  100% { 
+    opacity: 1; 
+  }
+}
+
 .task-info-root {
   max-width: 780px;
   min-width: 520px;
@@ -407,16 +446,26 @@ watch(
   overflow: hidden;
   border-radius: 20px;
   background: var(--apix-panel-layer-1-background);
-  border-top: 3px solid rgba(43, 159, 140, 0.509);
-  border-bottom: 3px solid rgba(43, 159, 140, 0.509);
-  box-shadow: var(--apix-shadow-layer-3);
+  box-shadow: var(--apix-shadow-lg);
 
   /* Width + enter/leave damping */
   transition:
     width 0.32s var(--apix-cubic-bezier),
-    opacity 0.25s ease,
-    transform 0.25s ease;
+    opacity 0.25s var(--apix-cubic-bezier),
+    transform 0.25s var(--apix-cubic-bezier);
   scrollbar-width: none;
+  animation: scaleFadeIn 0.5s var(--apix-cubic-bezier);
+}
+
+@keyframes scaleFadeIn {
+  0% { 
+    opacity: 0.3; 
+    transform: scale(0.8); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
 }
 
 /* ------------------------
@@ -429,13 +478,7 @@ watch(
   align-items: center;
   padding: 16px 20px;
   flex-shrink: 0;
-}
-
-.task-id {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--apix-darkest-color);
-  text-align: center;
+  color: var(--apix-default-dark-color);
 }
 
 /* ------------------------
@@ -458,8 +501,8 @@ watch(
   height: calc(100% - 110px);
   width: 100%;
   scroll-behavior: smooth;
-  border-top: 1px solid #02676515;
-  border-bottom: 1px solid #02676515;
+  border-top: 1px solid var(--apix-default-light-color);
+  border-bottom: 1px solid var(--apix-default-light-color);
 }
 
 /* ------------------------
@@ -477,7 +520,8 @@ watch(
 .task-column {
   min-width: 260px;
   height: 100%;
-  box-shadow: inset -1px 0 0 0 rgba(0, 0, 0, 0.05);
+  max-height: 500px;
+  box-shadow: inset -1px 0 0 0 var(--apix-default-light-color);
   padding: 12px 0;
   box-sizing: border-box;
   display: flex;
@@ -485,13 +529,14 @@ watch(
   overflow-y: hidden;
   overflow-x: auto;
   touch-action: pan-y;
+  transition: height .25s var(--apix-cubic-bezier);
 }
 
 /* Column slide animation */
 .column-slide-enter-active,
 .column-slide-leave-active {
   transition:
-    opacity 0.22s ease,
+    opacity 0.22s var(--apix-cubic-bezier),
     transform 0.22s var(--apix-cubic-bezier);
 }
 
@@ -515,17 +560,11 @@ watch(
   cursor: pointer;
   border-radius: 10px;
   transition: background 0.15s ease;
-}
-.kv-item.isSelect {
-  background: #94ead54c;
+  color: var(--apix-default-dark-color);
 }
 
 .kv-item:hover {
-  background: #94ead5b3;
-}
-
-.kv-item:active {
-  background: #7ad1bbb3;
+  background: var(--apix-default-light-color);
 }
 
 .kv-key {
@@ -545,12 +584,26 @@ watch(
 
 .kv-expand {
   font-size: 12px;
-  color: #9999992a;
+  color: var(--apix-tertiary-dark-color);
+}
+
+.kv-item.isSelect {
+  background: var(--apix-common-button-active);
+  color: var(--apix-common-button-text);
 }
 
 .kv-expand.isSelect {
   font-size: 12px;
-  color: var(--apix-tertiary-dark-color);
+  color: var(--apix-default-light-color);
+}
+
+.kv-item:active {
+  background: var(--apix-common-button-active);
+  color: var(--apix-common-button-text);
+}
+
+.kv-item:active .kv-value {
+  color: var(--apix-default-light-color);
 }
 
 /* ------------------------
@@ -575,16 +628,15 @@ watch(
   line-height: 1;
 
   color: var(--apix-secondary-dark-color);
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--apix-default-light-color);
 }
 
 .path-ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.435);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.09);
+  background: var(--apix-lightest-color);
 }
 
 .path-ctrl-btn:active {
-  background: rgba(255, 255, 255, 0.429);
+  background: var(--apix-default-light-color);
 }
 
 .close-btn {
@@ -598,16 +650,16 @@ watch(
   line-height: 1;
 
   color: var(--apix-secondary-dark-color);
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--apix-default-light-color);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .close-btn:hover {
-  color: var(--apix-danger-color);
-  background: rgba(255, 47, 0, 0.196);
-}
-
-.close-btn:active {
-  transform: scale(0.9);
+  color: var(--apix-danger-text);
+  background: var(--apix-danger-hover);
 }
 
 /* ------------------------
@@ -640,23 +692,56 @@ watch(
 }
 
 .task-footer {
+  min-height: 32px;
   padding: 4px 16px;
   text-align: center;
-  color: #012b2a71;
+  color: var(--apix-tertiary-dark-color);
 }
 
 .footer-label {
   border-radius: 24px;
   padding: 4px 8px;
-  transition: color 0.2s ease,
-    border 0.2s ease,
-    box-shadow 0.2s ease;
-  border: 1px solid #ffffff00;
+  transition: color 0.2s var(--apix-cubic-bezier),
+    border 0.2s var(--apix-cubic-bezier),
+    box-shadow 0.2s var(--apix-cubic-bezier);
 }
 
 .footer-label:hover { 
-  color: #012b2ac4;
-  border: 1px solid #83838380;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+  color: var(--apix-link-color);
+  text-decoration: underline;
+}
+
+/* ===== transition: mask ===== */
+.cd-enter-active,
+.cd-leave-active {
+  transition: opacity 0.25s var(--apix-cubic-bezier);
+}
+
+.cd-enter-from,
+.cd-leave-to {
+  opacity: 0;
+}
+
+/* ===== transition: dialog ===== */
+.cd-enter-active .cd-wrapper {
+  transition:
+    transform 0.25s var(--apix-cubic-bezier),
+    opacity 0.25s var(--apix-cubic-bezier);
+}
+
+.cd-leave-active .cd-wrapper {
+  transition:
+    transform 0.25s var(--apix-cubic-bezier),
+    opacity 0.25s var(--apix-cubic-bezier);
+}
+
+.cd-enter-from .cd-wrapper {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.cd-leave-to .cd-wrapper {
+  opacity: 0;
+  transform: scale(0.92);
 }
 </style>

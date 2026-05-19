@@ -144,6 +144,11 @@ type UploadedFile = {
   file_id: string
 }
 
+interface MessageLabel {
+  content: string
+  label_type: 'think' | 'content'
+}
+
 type msgBubData = {
   id: string
   cid: string
@@ -153,7 +158,7 @@ type msgBubData = {
   pre_node?: str[]
   next_node?: str[]
   role: 'human'
-  content: string
+  chunks: MessageLabel[]
   extra: any
   pending?: boolean
   error?: boolean
@@ -171,7 +176,7 @@ const md = new MarkdownIt({
 })
 
 const renderedContent = computed(() => {
-  return md.render(props.msg.content || '')
+  return md.render(props.msg.chunks[0].content || '')
 })
 
 const uploadedFiles = computed<UploadedFile[]>(() => {
@@ -249,7 +254,7 @@ function closePopMenu() {
 
 function copyContextValue() {
   // Copy original text, not rendered HTML
-  window.api?.copyToClipboard({ type: 'text', data: props.msg.content })
+  window.api?.copyToClipboard({ type: 'text', data: props.msg.chunks[0].content })
 }
 
 const newContext = ref("")
@@ -277,7 +282,7 @@ function onWindowResize() {
   closePopMenu()
 }
 
-const reEditInputValue = ref(props.msg.content || '')
+const reEditInputValue = ref(props.msg.chunks[0].content || '')
 const wrapperRef = ref<HTMLElement | null>(null)
 
 const handleClickOutside = (e: MouseEvent) => {
@@ -288,14 +293,14 @@ const handleClickOutside = (e: MouseEvent) => {
 
 const handleSendMessage = () => {
   if(reEditInputValue.value !== '') {
-    props.msg.content = reEditInputValue.value
+    props.msg.chunks[0].content = reEditInputValue.value
     emit("editFinish", props.msg.id, reEditInputValue.value)
     props.msg.is_editing = false
   }
 }
 
 const reSendMsg = () => {
-  emit("editFinish", props.msg.id, props.msg.content)
+  emit("editFinish", props.msg.id, props.msg.chunks[0].content)
   props.msg.error = false
   props.msg.is_editing = false
 }

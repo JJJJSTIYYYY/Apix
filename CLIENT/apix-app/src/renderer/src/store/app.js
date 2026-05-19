@@ -21,7 +21,7 @@ const DEFAULT_CONFIG = {
   tokenLimit: 0,
   linkProvider: '',
   linkApiKey: '',
-  contentPovider: '',
+  contentProvider: '',
   contentApiKey: '',
   webContentFilter: 'rule',
   excludeWebUrl: '',
@@ -51,6 +51,7 @@ const DEFAULT_CONFIG = {
 
   // ----- extra -----
   embeddingModel: '',
+  alwaysQuoteFile: false,
 
   rolePrompt: {
     name: '',
@@ -147,9 +148,11 @@ export const useAppCacheData = defineStore("app", {
     config: { ...DEFAULT_CONFIG },
 
     // ---------- ui state
-    activedTabName: "",
-    current_history_id: '-1',
-    currentWorkDir: '',
+    activedTabKey: "",
+    current_history_id: '-1', // Current actived history id at agent page
+    currentWorkDir: '', // Current agent work dir at agent page
+    mini_chat_current_history_id: {}, // page_id : current_history_id
+    mini_chat_currentWorkDir: {}, // page_id : currentWorkDir
 
     // ---------- runtime data
     cards: [],
@@ -157,8 +160,8 @@ export const useAppCacheData = defineStore("app", {
     messages: [],
 
     // ---------- persisted states
-    work_dir: {},
-    workspace: '',
+    work_dir: {}, // Local agent work dir store
+    workspace: '', // Opened workspace at editor page
     apiKeyCache: {},
     role_prompts: [],
     providers: [],
@@ -352,24 +355,6 @@ export const useAppCacheData = defineStore("app", {
 
 
     // ----------------
-    // Workspace
-    // ----------------
-    setWorkspace(dir) {
-      this.workspace = dir
-      this.persistState('workspace')
-    },
-
-    getWorkspace() {
-      return this.workspace || ''
-    },
-
-    removeWorkspace() {
-      this.workspace = ''
-      this.persistState('workspace')
-    },
-
-
-    // ----------------
     // Api key cache
     // ----------------
     setApiKeyCache(provider, apiKey) {
@@ -437,6 +422,24 @@ export const useAppCacheData = defineStore("app", {
       role.enabled = !role.enabled
 
       this.persistState('role_prompts')
+    },
+
+
+    // ----------------
+    // Workspace
+    // ----------------
+    setWorkspace(dir) {
+      this.workspace = dir
+      this.persistState('workspace')
+    },
+
+    getWorkspace() {
+      return this.workspace || ''
+    },
+
+    removeWorkspace() {
+      this.workspace = ''
+      this.persistState('workspace')
     },
 
 

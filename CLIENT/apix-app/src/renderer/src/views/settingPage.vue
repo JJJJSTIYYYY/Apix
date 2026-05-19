@@ -612,7 +612,7 @@
           <div class="setting-card">
             <div class="setting-title">配置网页内容搜索引擎</div>
             <div class="setting-control">
-              <el-select v-model="contentPovider" placeholder="Auto" class="select-input">
+              <el-select v-model="contentProvider" placeholder="Auto" class="select-input">
                 <el-option
                   v-for="item in contentPoviderOptions"
                   :key="item.value"
@@ -1037,7 +1037,7 @@ function storeLinkApiKey() {
 }
 
 /* Search Contents Provider */
-const contentPovider = ref(store.config.contentPovider || '')
+const contentProvider = ref(store.config.contentProvider || '')
 const contentPoviderOptions = [
   {
     value: '',
@@ -1057,8 +1057,8 @@ const contentPoviderOptions = [
   }
 ]
 function storeContentPovider() {
-  store.config.contentPovider = contentPovider.value
-  store.saveAppConfig('contentPovider', contentPovider.value)
+  store.config.contentProvider = contentProvider.value
+  store.saveAppConfig('contentProvider', contentProvider.value)
   ElMessage.success('保存成功')
 }
 

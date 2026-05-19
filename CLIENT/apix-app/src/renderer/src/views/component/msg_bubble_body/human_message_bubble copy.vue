@@ -124,10 +124,10 @@
 
 <script setup lang="ts">
 import { nextTick, ref, onMounted, onBeforeUnmount, computed } from 'vue'
-import msgBubbleMenu from '../../msg_bubble_body/comp/msgBubbleMenu.vue'
+import msgBubbleMenu from './comp/msgBubbleMenu.vue'
 import MarkdownIt from 'markdown-it'
-import msgSelectionBubble from '../../msg_bubble_body/comp/msgSelectionBubble.vue'
-import { globalSelection } from '../../../../store/globalData.js'
+import msgSelectionBubble from './comp/msgSelectionBubble.vue'
+import { globalSelection } from '../../../store/globalData.js'
 
 const emit = defineEmits<{
   edit: [id: string]
@@ -144,11 +144,6 @@ type UploadedFile = {
   file_id: string
 }
 
-interface MessageLabel {
-  content: string
-  label_type: 'think' | 'content'
-}
-
 type msgBubData = {
   id: string
   cid: string
@@ -158,7 +153,7 @@ type msgBubData = {
   pre_node?: str[]
   next_node?: str[]
   role: 'human'
-  chunks: MessageLabel[]
+  content: string
   extra: any
   pending?: boolean
   error?: boolean
@@ -176,7 +171,7 @@ const md = new MarkdownIt({
 })
 
 const renderedContent = computed(() => {
-  return md.render(props.msg.chunks[0].content || '')
+  return md.render(props.msg.content || '')
 })
 
 const uploadedFiles = computed<UploadedFile[]>(() => {
@@ -254,7 +249,7 @@ function closePopMenu() {
 
 function copyContextValue() {
   // Copy original text, not rendered HTML
-  window.api?.copyToClipboard({ type: 'text', data: props.msg.chunks[0].content })
+  window.api?.copyToClipboard({ type: 'text', data: props.msg.content })
 }
 
 const newContext = ref("")
@@ -282,7 +277,7 @@ function onWindowResize() {
   closePopMenu()
 }
 
-const reEditInputValue = ref(props.msg.chunks[0].content || '')
+const reEditInputValue = ref(props.msg.content || '')
 const wrapperRef = ref<HTMLElement | null>(null)
 
 const handleClickOutside = (e: MouseEvent) => {
@@ -293,14 +288,14 @@ const handleClickOutside = (e: MouseEvent) => {
 
 const handleSendMessage = () => {
   if(reEditInputValue.value !== '') {
-    props.msg.chunks[0].content = reEditInputValue.value
+    props.msg.content = reEditInputValue.value
     emit("editFinish", props.msg.id, reEditInputValue.value)
     props.msg.is_editing = false
   }
 }
 
 const reSendMsg = () => {
-  emit("editFinish", props.msg.id, props.msg.chunks[0].content)
+  emit("editFinish", props.msg.id, props.msg.content)
   props.msg.error = false
   props.msg.is_editing = false
 }
@@ -418,7 +413,7 @@ onBeforeUnmount(() => {
 
 /* ==================== 布局 ==================== */
 .message-wrapper {
-  width: 400px;
+  width: 840px;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -581,7 +576,7 @@ onBeforeUnmount(() => {
 /* ==================== 分支切换器（与 AI 气泡统一） ==================== */
 .branch-switch-wrapper {
   opacity: 0.4;
-  width: calc(400px - 34px);
+  width: calc(840px - 34px);
   background-color: var(--branch-bg);
   border-radius: 24px;
   border: 1px solid var(--branch-border);

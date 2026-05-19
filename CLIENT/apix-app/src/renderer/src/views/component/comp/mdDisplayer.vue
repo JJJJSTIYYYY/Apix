@@ -1,31 +1,37 @@
 <template>
   <Teleport to="body">
-    <div class="md-displayer-mask" @click.self="close">
-      <div class="md-displayer-dialog">
-        <!-- Header -->
-        <header class="md-displayer-header">
-          <span class="md-displayer-title">{{ title }}</span>
-          <div class="btn-area">
-            <button class="md-displayer-close" @click="close">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M764.288 214.592 512 466.88 259.712 214.592a31.936 31.936 0 0 0-45.12 45.12L466.752 512 214.528 764.224a31.936 31.936 0 1 0 45.12 45.184L512 557.184l252.288 252.288a31.936 31.936 0 0 0 45.12-45.12L557.12 512.064l252.288-252.352a31.936 31.936 0 1 0-45.12-45.184z"></path></svg>
-            </button>
-          </div>
-        </header>
+    <Transition name="cd">
+      <div 
+        v-if="visible"
+        class="md-displayer-mask" 
+        @click.self="close"
+      >
+        <div class="md-displayer-dialog">
+          <!-- Header -->
+          <header class="md-displayer-header">
+            <span class="md-displayer-title">{{ title }}</span>
+            <div class="btn-area">
+              <button class="md-displayer-close" @click="close">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M764.288 214.592 512 466.88 259.712 214.592a31.936 31.936 0 0 0-45.12 45.12L466.752 512 214.528 764.224a31.936 31.936 0 1 0 45.12 45.184L512 557.184l252.288 252.288a31.936 31.936 0 0 0 45.12-45.12L557.12 512.064l252.288-252.352a31.936 31.936 0 1 0-45.12-45.184z"></path></svg>
+              </button>
+            </div>
+          </header>
 
-        <!-- Content -->
-        <section class="md-displayer-content selectable">
-          <div
-            class="markdown-body"
-            v-html="result"
-          ></div>
-        </section>
+          <!-- Content -->
+          <section class="md-displayer-content selectable">
+            <div
+              class="markdown-body"
+              v-html="result"
+            ></div>
+          </section>
+        </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 
@@ -45,9 +51,13 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-function close() {
+async function close() {
+  visible.value = false
+  await nextTick()
   emit('close')
 }
+
+const visible = ref(false)
 
 // ------------------------
 // Markdown instance
@@ -123,6 +133,7 @@ function onCodeCopyClick(e: Event) {
 }
 
 onMounted(() => {
+  visible.value = true
   document.addEventListener('click', onCodeCopyClick)
 })
 
@@ -383,5 +394,39 @@ onBeforeUnmount(() => {
 
 :deep(.code-block:hover .code-copy-btn) {
   opacity: 1;
+}
+
+/* ===== transition: mask ===== */
+.cd-enter-active,
+.cd-leave-active {
+  transition: opacity 0.25s var(--apix-cubic-bezier);
+}
+
+.cd-enter-from,
+.cd-leave-to {
+  opacity: 0;
+}
+
+/* ===== transition: dialog ===== */
+.cd-enter-active .cd-wrapper {
+  transition:
+    transform 0.25s var(--apix-cubic-bezier),
+    opacity 0.25s var(--apix-cubic-bezier);
+}
+
+.cd-leave-active .cd-wrapper {
+  transition:
+    transform 0.25s var(--apix-cubic-bezier),
+    opacity 0.25s var(--apix-cubic-bezier);
+}
+
+.cd-enter-from .cd-wrapper {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.cd-leave-to .cd-wrapper {
+  opacity: 0;
+  transform: scale(0.92);
 }
 </style>

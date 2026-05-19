@@ -170,7 +170,7 @@ const groupedHistories = computed(() => {
 
   if (starred.length > 0) {
     result.push({
-      date: 'Pinned',
+      date: '已收藏',
       items: [...starred].sort((a, b) => b.createTime - a.createTime),
     })
   }
@@ -192,11 +192,11 @@ const groupedHistories = computed(() => {
 
 // fold 状态
 const foldStatus = ref<Record<string, boolean>>({
-  'Pinned': false,
-  'Today': true,
-  'Yesterday': true,
-  'In this Week': true,
-  'Further more': true,
+  '已收藏': true,
+  '今天': true,
+  '昨天': true,
+  '这周内': true,
+  '更早以前': false,
 })
 
 // 当前 active 所在 group

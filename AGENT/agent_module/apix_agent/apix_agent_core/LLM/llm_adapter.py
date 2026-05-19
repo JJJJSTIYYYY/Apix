@@ -99,6 +99,7 @@ class LlmNodeAdapter:
         fall_back_provider: str = '',
         fall_back_model_name: str = '',
         fall_back_api_key: str = '',
+        fall_back_config: AgentConfigSchema = None
     ):
         """
         Unified streaming interface.
@@ -190,6 +191,7 @@ class LlmNodeAdapter:
         fall_back_provider: str = '',
         fall_back_model_name: str = '',
         fall_back_api_key: str = '',
+        fall_back_config: AgentConfigSchema = None
     ):
         """
         Unified non-stream invoke interface.

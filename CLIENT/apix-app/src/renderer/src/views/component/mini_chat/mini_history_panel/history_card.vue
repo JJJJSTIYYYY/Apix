@@ -3,7 +3,7 @@
     <div class="q-card-wrapper">
       <div class="q-card">
         <!-- Left: preview content -->
-        <div class="q-card-body" :class="{'is_active': store.current_history_id === history.id}">
+        <div class="q-card-body">
           <transition name="star-pop">
             <div class="q-card-status">
               <span
@@ -71,10 +71,11 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onBeforeUnmount, computed } from 'vue'
-import HistoryCardMenu from './comp/historyCardMenu.vue'
-import { useAuthStore } from '../../../store/auth'
-import { useAppCacheData } from '../../../store/app'
-import { InputDialog } from '../comp/inputDialog'
+import HistoryCardMenu from '../../dialog_history/comp/historyCardMenu.vue'
+import { useAuthStore } from '../../../../store/auth'
+import { useAppCacheData } from '../../../../store/app'
+import { InputDialog } from '../../comp/inputDialog'
+import { ElMessage } from 'element-plus'
 
 export interface ChatHistory {
   id: number | string
@@ -214,23 +215,7 @@ const handleReEditPreview = async (data) => {
 }
 
 const handleConnectProject = async () => {
-  const result = await window.api.openFileDialog("folder")
-  if (result.canceled || result.filePaths.length === 0) {
-      return
-    }
-  store.setWorkDir(props.history.id, result.filePaths[0])
-  store.currentWorkDir=result.filePaths[0]
-
-  try {
-    await window.api.updateConversation(
-      cid.value,
-      props.history.sid ?? "",
-      props.history.id,
-      { workspace: result.filePaths[0] }
-    )
-  } catch (err) {
-    console.log("Set workspace err: "+err)
-  }
+  ElMessage({ type: 'warning', message: '当前不允许修改工作目录', plain: true })
 }
 </script>
 
@@ -288,11 +273,11 @@ const handleConnectProject = async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  width: 230px;
+  width: 380px;
 }
 
 .q-card:hover .q-preview-text {
-  width: 170px;
+  width: 360px;
 }
 
 .q-star-badge-inline {

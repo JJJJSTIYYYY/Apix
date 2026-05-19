@@ -894,10 +894,10 @@ async def move_workspace_file(
 
 @tool
 async def list_workspace_files(
-    path: Optional[str],
-    recursively_scan: Optional[bool],
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
+    path: Optional[str] = '/workspace',
+    recursively_scan: Optional[bool] = False,
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
     """
     List files and directories inside workspace.

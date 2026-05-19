@@ -1,5 +1,5 @@
 <template>
-  <div 
+  <div
     class="message-wrapper"
     :class="{ selected: is_selecting && props.msg.selected }"
     @click="toggleSelectFullArea"
@@ -10,74 +10,105 @@
       :class="{ checked: props.msg.selected }"
       @click.stop="toggleSelect"
     ></div>
-    <div 
+
+    <div
       class="ai-bubble-wrapper"
       :class="{ is_selecting: is_selecting }"
       @contextmenu.prevent="onContextMenu"
     >
-
       <!-- Branch switch -->
-      <div class="branch-switch-wrapper"
-          v-if="(props.msg.pre_node && props.msg.pre_node.length > 0) || (props.msg.next_node && props.msg.next_node.length > 0)">
-        <div 
-          class="branch-switch-label-wrapper"
-        >
+      <div
+        v-if="(props.msg.pre_node && props.msg.pre_node.length > 0) || (props.msg.next_node && props.msg.next_node.length > 0)"
+        class="branch-switch-wrapper"
+      >
+        <div class="branch-switch-label-wrapper">
           <button
             class="branch-switch-btn pre"
             :disabled="!props.msg.pre_node || props.msg.pre_node.length === 0"
             @click="handlePreNodeClick"
           >
-            <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16"><path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="#7C8394" p-id="1148"></path></svg>
+            <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16">
+              <path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="#7C8394" p-id="1148"></path>
+            </svg>
           </button>
-          <div class="branch-page-label">{{ (props.msg.pre_node.length ?? 0) + 1}}{{ ' / ' }}{{ (props.msg.pre_node.length ?? 0) + (props.msg.next_node.length ?? 0) + 1}}</div>
+
+          <div class="branch-page-label">
+            {{ (props.msg.pre_node?.length ?? 0) + 1 }}{{ ' / ' }}{{ (props.msg.pre_node?.length ?? 0) + (props.msg.next_node?.length ?? 0) + 1 }}
+          </div>
+
           <button
             class="branch-switch-btn next"
             :disabled="!props.msg.next_node || props.msg.next_node.length === 0"
             @click="handleNextNodeClick"
           >
-            <svg t="1777025401907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16"><path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" fill="#7C8394" p-id="1365"></path></svg>
+            <svg t="1777025401907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16">
+              <path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" fill="#7C8394" p-id="1365"></path>
+            </svg>
           </button>
         </div>
       </div>
 
-      <!-- Think -->
-      <div class="think-block" v-if="hasThink">          
-        <button
-          class="expend-think-btn"
-          @click="triggerThinkVisiable"
-        >
-          <svg t="1768788522926" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9133" width="200" height="200"><path d="M882.176 882.176c-53.8368 53.8368-136.832 59.3408-249.0368 16.4864A705.1008 705.1008 0 0 1 512 837.9136a705.1008 705.1008 0 0 1-121.1392 60.7744c-112.1792 42.8288-195.2 37.3248-249.0112-16.512-53.8368-53.8112-59.3408-136.832-16.512-249.0112A705.1008 705.1008 0 0 1 186.112 512a705.1264 705.1264 0 0 1-60.7744-121.1904c-42.8288-112.1792-37.3248-195.2 16.4864-249.0368 53.8368-53.8112 136.8576-59.3152 249.0368-16.4864A705.1264 705.1264 0 0 1 512 186.112a705.1264 705.1264 0 0 1 121.1648-60.7488c112.1792-42.8544 195.1744-37.3504 249.0112 16.4864 53.8368 53.8368 59.3408 136.832 16.4864 249.0112a705.152 705.152 0 0 1-60.7744 121.1904 705.1264 705.1264 0 0 1 60.7488 121.1392c42.8288 112.1792 37.3504 195.1744-16.4864 249.0112zM194.304 194.304c-31.1552 31.1552-31.0272 87.8336 0.3584 170.0608 10.2656 26.88 22.8864 53.6832 37.888 80.4608a1115.8784 1115.8784 0 0 1 99.3536-112.9472 1115.904 1115.904 0 0 1 112.896-99.328 609.1776 609.1776 0 0 0-80.4608-37.888c-82.2016-31.3856-138.88-31.488-170.0352-0.3584z m635.392 0c-31.1296-31.1296-87.808-31.0272-170.0352 0.384-26.88 10.24-53.6832 22.8864-80.4608 37.888a1115.904 1115.904 0 0 1 112.896 99.328 1115.8784 1115.8784 0 0 1 99.3536 112.896 609.1776 609.1776 0 0 0 37.888-80.4352c31.3856-82.2272 31.5136-138.9056 0.384-170.0608z m-445.2864 190.08c-42.4448 42.4448-78.8224 84.992-109.1328 127.6416 30.3104 42.6496 66.688 85.1712 109.1072 127.5904 42.4192 42.4448 84.992 78.8224 127.616 109.1328 42.6752-30.3104 85.1968-66.688 127.6416-109.1328 42.4192-42.4192 78.7968-84.9408 109.1072-127.5904-30.336-42.6752-66.7136-85.2224-109.1328-127.6416-42.4192-42.4192-84.9664-78.7968-127.616-109.1072-42.624 30.3104-85.1712 66.688-127.5904 109.1072zM435.2 512a76.8 76.8 0 1 1 153.6 0 76.8 76.8 0 0 1-153.6 0z m-202.624 67.2256a609.1776 609.1776 0 0 0-37.888 80.4096c-31.3856 82.2272-31.488 138.9056-0.3584 170.0608 31.1552 31.1552 87.8336 31.0272 170.0608-0.3584 26.8544-10.2656 53.6576-22.8864 80.4096-37.888a1115.8784 1115.8784 0 0 1-112.9216-99.328 1115.9552 1115.9552 0 0 1-99.328-112.896z m597.0944 250.4704c31.1552-31.1552 31.0272-87.8336-0.3584-170.0608a609.1776 609.1776 0 0 0-37.888-80.4096 1115.9296 1115.9296 0 0 1-99.2768 112.896 1115.8784 1115.8784 0 0 1-112.9216 99.328 609.1264 609.1264 0 0 0 80.384 37.888c82.2528 31.36 138.9312 31.488 170.0608 0.3584z" p-id="9134"></path></svg>
-          <div class="btn-text" :class="{ breath: msg.label === '正在思考' }">{{ msg.label }}</div>
-        </button>
+      <!-- Unified chunks -->
+      <div
+        class="ai-bubble"
+        @mousedown="handleMouseDown"
+        @mouseup="handleMouseUp"
+      >
 
-        <div style="display: flex; flex-direction: column;">
-          <transition 
-            name="scale-fade-height"
-            @after-enter="scrollThinkToBottom"
+        <!-- Chunks -->
+        <template
+          v-for="(item, index) in renderItems"
+          :key="item.key"
+        >
+          <!-- Think -->
+          <template
+            v-if="item.kind === 'message' && item.label_type === 'think'"
           >
-            <div 
-              v-if="isThinkVisiable"
-              ref="thinkBox"
-              class="think-render-list"
-            >
-              <template v-for="item in thinkRenderItems" :key="item.key">
-                <ToolLabelCard
-                  v-if="item.kind === 'tool' && store.config.showToolLabels"
-                  :tool_name="item.tool.tool_name"
-                  :tool_call_id="item.tool.tool_call_id"
-                  :content="item.tool.content"
-                  :status="item.tool.status"
-                  style="margin-left: 6px;"
-                />
-                <div
-                  v-else
-                  v-html="item.html"
-                  class="markdown-body think selectable"
-                ></div>
-              </template>
+            <div class="think-toggle-row">
+              <button
+                class="expend-think-btn"
+                :class="{expended_think_btn: isThinkExpanded(item.key)}"
+                @click="toggleThinkItem(item.key)"
+              >
+                <svg t="1768788522926" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9133" width="200" height="200"><path d="M882.176 882.176c-53.8368 53.8368-136.832 59.3408-249.0368 16.4864A705.1008 705.1008 0 0 1 512 837.9136a705.1008 705.1008 0 0 1-121.1392 60.7744c-112.1792 42.8288-195.2 37.3248-249.0112-16.512-53.8368-53.8112-59.3408-136.832-16.512-249.0112A705.1008 705.1008 0 0 1 186.112 512a705.1264 705.1264 0 0 1-60.7744-121.1904c-42.8288-112.1792-37.3248-195.2 16.4864-249.0368 53.8368-53.8112 136.8576-59.3152 249.0368-16.4864A705.1264 705.1264 0 0 1 512 186.112a705.1264 705.1264 0 0 1 121.1648-60.7488c112.1792-42.8544 195.1744-37.3504 249.0112 16.4864 53.8368 53.8368 59.3408 136.832 16.4864 249.0112a705.152 705.152 0 0 1-60.7744 121.1904 705.1264 705.1264 0 0 1 60.7488 121.1392c42.8288 112.1792 37.3504 195.1744-16.4864 249.0112zM194.304 194.304c-31.1552 31.1552-31.0272 87.8336 0.3584 170.0608 10.2656 26.88 22.8864 53.6832 37.888 80.4608a1115.8784 1115.8784 0 0 1 99.3536-112.9472 1115.904 1115.904 0 0 1 112.896-99.328 609.1776 609.1776 0 0 0-80.4608-37.888c-82.2016-31.3856-138.88-31.488-170.0352-0.3584z m635.392 0c-31.1296-31.1296-87.808-31.0272-170.0352 0.384-26.88 10.24-53.6832 22.8864-80.4608 37.888a1115.904 1115.904 0 0 1 112.896 99.328 1115.8784 1115.8784 0 0 1 99.3536 112.896 609.1776 609.1776 0 0 0 37.888-80.4352c31.3856-82.2272 31.5136-138.9056 0.384-170.0608z m-445.2864 190.08c-42.4448 42.4448-78.8224 84.992-109.1328 127.6416 30.3104 42.6496 66.688 85.1712 109.1072 127.5904 42.4192 42.4448 84.992 78.8224 127.616 109.1328 42.6752-30.3104 85.1968-66.688 127.6416-109.1328 42.4192-42.4192 78.7968-84.9408 109.1072-127.5904-30.336-42.6752-66.7136-85.2224-109.1328-127.6416-42.4192-42.4192-84.9664-78.7968-127.616-109.1072-42.624 30.3104-85.1712 66.688-127.5904 109.1072zM435.2 512a76.8 76.8 0 1 1 153.6 0 76.8 76.8 0 0 1-153.6 0z m-202.624 67.2256a609.1776 609.1776 0 0 0-37.888 80.4096c-31.3856 82.2272-31.488 138.9056-0.3584 170.0608 31.1552 31.1552 87.8336 31.0272 170.0608-0.3584 26.8544-10.2656 53.6576-22.8864 80.4096-37.888a1115.8784 1115.8784 0 0 1-112.9216-99.328 1115.9552 1115.9552 0 0 1-99.328-112.896z m597.0944 250.4704c31.1552-31.1552 31.0272-87.8336-0.3584-170.0608a609.1776 609.1776 0 0 0-37.888-80.4096 1115.9296 1115.9296 0 0 1-99.2768 112.896 1115.8784 1115.8784 0 0 1-112.9216 99.328 609.1264 609.1264 0 0 0 80.384 37.888c82.2528 31.36 138.9312 31.488 170.0608 0.3584z" p-id="9134"></path></svg>
+
+                <div class="btn-text" :class="{breath: index >= renderItems.length -1}">
+                  {{ index >= renderItems.length -1 ? msg.label || '正在思考' : '已思考' }}
+                </div>
+
+                <svg t="1777025401907" class="icon expend-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16">
+                  <path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" p-id="1365"></path>
+                </svg>
+              </button>
             </div>
-          </transition>
-        </div>
+
+            <transition name="scale-fade-height">
+              <div
+                v-show="isThinkExpanded(item.key)"
+                v-html="item.html"
+                class="markdown-body think selectable"
+              ></div>
+            </transition>
+          </template>
+
+          <!-- Tool -->
+          <ToolLabelCard
+            v-else-if="item.kind === 'tool' && store.config.showToolLabels"
+            :tool_name="item.tool.tool_name"
+            :tool_call_id="item.tool.tool_call_id"
+            :content="item.tool.content"
+            :status="item.tool.status"
+            :obj="item.tool"
+          />
+
+          <!-- Content -->
+          <div
+            v-else
+            v-html="item.html"
+            class="markdown-body content selectable"
+            style="background: transparent;"
+          ></div>
+        </template>
       </div>
 
       <!-- Todos -->
@@ -105,52 +136,47 @@
       </div>
 
       <transition name="fade">
-        <div class="todos-block" v-if="msg.todos && msg.todos.length > 0 && isTodosVisiable">
-          <div v-for="item in (props.msg.todos ?? [])" class="todo-card" :key="`${item.content}-${item.status}`">
-            <TodoCard 
-              :content="item.content" 
-              :status="item.status" 
+        <div
+          v-if="msg.todos && msg.todos.length > 0 && isTodosVisiable"
+          class="todos-block"
+        >
+          <div
+            v-for="item in (props.msg.todos ?? [])"
+            :key="`${item.content}-${item.status}`"
+            class="todo-card"
+          >
+            <TodoCard
+              :content="item.content"
+              :status="item.status"
               :pending="msg.pending"
             />
           </div>
         </div>
       </transition>
 
-      <!-- Response -->
-      <div
-        class="ai-bubble selectable"
-        v-if="hasContent"
-        @mousedown="handleMouseDown"
-        @mouseup="handleMouseUp"
-      >
-        <template v-for="item in contentRenderItems" :key="item.key">
-          <ToolLabelCard
-            v-if="item.kind === 'tool' && store.config.showToolLabels"
-            :tool_name="item.tool.tool_name"
-            :tool_call_id="item.tool.tool_call_id"
-            :content="item.tool.content"
-            :status="item.tool.status"
-              style="margin-left: 6px;" 
-          />
-          <div
-            v-else
-            v-html="item.html"
-            class="markdown-body content"
-            style="background: transparent;"
-          ></div>
-        </template>
-      </div>
-
       <!-- Images -->
-      <div class="ai-images-wrapper" v-if="imageItems.length > 0">
+      <div
+        v-if="imageItems.length > 0"
+        class="ai-images-wrapper"
+      >
         <div class="ai-images-scroller">
           <div class="ai-images">
-            <div class="ai-image-card" v-for="item in imageItems" :key="item.fileId">
-              <div v-if="item.loading" class="ai-image-loading">
+            <div
+              v-for="item in imageItems"
+              :key="item.fileId"
+              class="ai-image-card"
+            >
+              <div
+                v-if="item.loading"
+                class="ai-image-loading"
+              >
                 Loading...
               </div>
 
-              <div v-else-if="item.error" class="ai-image-error">
+              <div
+                v-else-if="item.error"
+                class="ai-image-error"
+              >
                 Load Failed
               </div>
 
@@ -177,7 +203,10 @@
       </div>
 
       <!-- Info tag -->
-      <div class="info-tag" :class="{ show: !msg.pending }">
+      <div
+        class="info-tag"
+        :class="{ show: !msg.pending }"
+      >
         <div class="tag-wrapper">
           <div class="tag-name">Provider:</div>
           <div>{{ msg.info?.model_provider }}</div>
@@ -192,13 +221,16 @@
         </div>
         <div class="tag-wrapper">
           <div class="tag-name">Duration:</div>
-          <div>{{ (msg.info?.total_duration/1000) ?? 'N/A' }}S</div>
+          <div>{{ (msg.info?.total_duration / 1000) ?? 'N/A' }}S</div>
         </div>
         <div
-          class="tag-wrapper"
           v-if="msg.extra?.link_provider?.length > 0 || msg.extra?.content_provider?.length > 0 || msg.extra?.key_word?.length > 0 || msg.extra?.urls?.length > 0"
+          class="tag-wrapper"
         >
-          <button class="tag-name online-info-btn" @click="showLinks">
+          <button
+            class="tag-name online-info-btn"
+            @click="showLinks"
+          >
             🔍 查看访问的链接
           </button>
         </div>
@@ -242,7 +274,6 @@ import ToolLabelCard from './comp/toolLabelCard.vue'
 import MarkdownIt from 'markdown-it'
 import 'github-markdown-css/github-markdown.css'
 import hljs from 'highlight.js'
-// import 'highlight.js/styles/github.css'
 import { ConfirmDialog } from '../comp/confirmDialog.js'
 import TodoCard from './comp/todoCard.vue'
 import { useAppCacheData } from '../../../store/app'
@@ -259,14 +290,19 @@ const emit = defineEmits<{
 
 const store = useAppCacheData()
 
-type ToolLabel = {
+interface ToolLabel {
   tool_call_id: string
   tool_name: string
-  content: string
-  status: 'pending' | 'in_progress' | 'completed' | 'error' | "outdated"
+  content: object
+  status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
 }
 
-type MessageChunk = string | ToolLabel
+interface MessageLabel {
+  content: string
+  label_type: 'think' | 'content'
+}
+
+type MessageChunk = MessageLabel | ToolLabel
 
 type InfoTag = {
   id?: string
@@ -283,8 +319,8 @@ type TodoItem = {
 
 type ImageItem = {
   fileId: string
-  src: string
-  base64: string
+  src?: string
+  base64?: string
   contentType?: string
   loading: boolean
   error: boolean
@@ -296,12 +332,11 @@ type MsgBubbleData = {
   hid: string
   node_id?: number
   parent_id?: number
-  pre_node?: str[]
-  next_node?: str[]
+  pre_node?: string[]
+  next_node?: string[]
   role: 'ai'
   label: string
-  content: string | MessageChunk[]
-  think?: string | MessageChunk[]
+  chunks: MessageChunk[]
   todos?: TodoItem[]
   images?: string[]
   info?: InfoTag
@@ -314,6 +349,14 @@ const props = defineProps<{
   msg: MsgBubbleData
   is_selecting?: boolean
 }>()
+
+function isToolLabel(chunk: MessageChunk): chunk is ToolLabel {
+  return 'tool_call_id' in chunk
+}
+
+function isMessageLabel(chunk: MessageChunk): chunk is MessageLabel {
+  return 'label_type' in chunk
+}
 
 const md = new MarkdownIt({
   html: true,
@@ -346,13 +389,101 @@ const md = new MarkdownIt({
 })
 
 type RenderItem =
-  | { kind: 'text'; key: string; html: string }
-  | { kind: 'tool'; key: string; tool: ToolLabel }
+  | {
+      kind: 'message'
+      key: string
+      html: string
+      label_type: 'think' | 'content'
+    }
+  | {
+      kind: 'tool'
+      key: string
+      tool: ToolLabel
+    }
 
-function toChunks(input?: string | MessageChunk[]): MessageChunk[] {
-  if (!input) return []
-  return Array.isArray(input) ? input : [input]
+const expandedThinkMap = ref<Record<string, boolean>>({})
+
+function toggleThinkItem(key: string) {
+  expandedThinkMap.value[key] =
+    !expandedThinkMap.value[key]
 }
+
+function isThinkExpanded(key: string) {
+  return Boolean(expandedThinkMap.value[key])
+}
+
+function buildRenderItems(chunks: MessageChunk[] = []): RenderItem[] {
+  const items: RenderItem[] = []
+
+  // Step 1: filter tool chunks
+  const filteredChunks = chunks.filter((chunk) => {
+    if (!isMessageLabel(chunk)) {
+      return store.config.showToolLabels
+    }
+
+    return true
+  })
+
+  // Step 2: merge continuous think
+  const mergedChunks: MessageChunk[] = []
+
+  for (const chunk of filteredChunks) {
+    if (
+      isMessageLabel(chunk)
+      &&
+      chunk.label_type === 'think'
+    ) {
+      const last = mergedChunks.at(-1)
+
+      if (
+        last
+        &&
+        isMessageLabel(last)
+        &&
+        last.label_type === 'think'
+      ) {
+        last.content += chunk.content
+      }
+      else {
+        mergedChunks.push({
+          ...chunk,
+        })
+      }
+
+      continue
+    }
+
+    mergedChunks.push(chunk)
+  }
+
+  // Step 3: render
+  return mergedChunks.map((chunk, index) => {
+    if (isMessageLabel(chunk)) {
+      let html = chunk.content.length
+        ? md.render(chunk.content)
+        : ''
+
+      html = postProcessHtml(html)
+
+      return {
+        kind: 'message',
+        key: `msg-${index}`,
+        html,
+        label_type: chunk.label_type,
+      }
+    }
+
+    return {
+      kind: 'tool',
+      key: `tool-${chunk.tool_call_id || index}`,
+      tool: chunk,
+    }
+  })
+}
+
+const renderItems = computed(() => {
+  return buildRenderItems(props.msg.chunks ?? [])
+})
 
 function toggleSelectFullArea() {
   if (props.is_selecting && props.msg.pending === false) {
@@ -362,92 +493,18 @@ function toggleSelectFullArea() {
 
 function toggleSelect() {
   props.msg.selected = !props.msg.selected
-  if (props.msg.selected) emit("selected", props.msg.id)
+  if (props.msg.selected) emit('selected', props.msg.id)
 }
 
-function normalizeToString(input?: string | MessageChunk[]) {
-  if (!input) return ''
-  if (typeof input === 'string') return input
-
+function normalizeToString(input?: MessageChunk[]) {
+  if (!Array.isArray(input) || input.length === 0) return ''
   return input
-    .map((chunk) => (typeof chunk === 'string' ? chunk : ''))
-    .join('')
+    .filter(isMessageLabel)
+    .map(chunk => chunk.content)
+    .join('\n\n')
 }
 
-function buildRenderItems(
-  input?: string | MessageChunk[],
-  items: RenderItem[] = []
-): RenderItem[] {
-  const chunks = toChunks(input)
-
-  const prevLen = items.length
-  const currLen = chunks.length
-
-  for (let i = prevLen; i < currLen; i++) {
-    const chunk = chunks[i]
-
-    if (typeof chunk === 'string') {
-      let html = chunk.length ? md.render(chunk) : ''
-      html = postProcessHtml(html)
-
-      items[i] = {
-        kind: 'text',
-        key: `text-${i}`,
-        html,
-      }
-    } else {
-      items[i] = {
-        kind: 'tool',
-        key: `tool-${chunk.tool_call_id || i}`,
-        tool: chunk,
-      }
-      scrollThinkToBottom()
-    }
-  }
-
-  if (currLen === prevLen && currLen > 0) {
-    const lastIndex = currLen - 1
-    const chunk = chunks[lastIndex]
-
-    if (typeof chunk === 'string') {
-      let html = chunk.length ? md.render(chunk) : ''
-      html = postProcessHtml(html)
-
-      items[lastIndex] = {
-        kind: 'text',
-        key: `text-${lastIndex}`,
-        html,
-      }
-    } else {
-      items[lastIndex] = {
-        kind: 'tool',
-        key: `tool-${chunk.tool_call_id || lastIndex}`,
-        tool: chunk,
-      }
-      scrollThinkToBottom()
-    }
-  }
-
-  return items
-}
-
-const thinkCache = ref<RenderItem[]>([])
-const contentCache = ref<RenderItem[]>([])
-const thinkRenderItems = computed(() => {
-  thinkCache.value = buildRenderItems(props.msg.think, thinkCache.value)
-  return thinkCache.value
-})
-
-const contentRenderItems = computed(() => {
-  contentCache.value = buildRenderItems(props.msg.content, contentCache.value)
-  return contentCache.value
-})
-
-const hasThink = computed(() => thinkRenderItems.value.length > 0)
-const hasContent = computed(() => contentRenderItems.value.length > 0)
-
-// 选区逻辑
-function handleMouseDown(e: MouseEvent) {
+function handleMouseDown() {
   globalSelection.id = ''
   globalSelection.content = ''
   globalSelection.rect = null
@@ -471,7 +528,6 @@ function handleMouseUp(e: MouseEvent) {
 
   const range = selection.getRangeAt(0)
   const container = range.commonAncestorContainer
-
   const wrapper = e.currentTarget as HTMLElement
 
   if (!wrapper.contains(container) || props.msg.pending) {
@@ -488,10 +544,7 @@ function handleMouseUp(e: MouseEvent) {
 }
 
 const isShowSelectionBubble = computed(() => {
-  return (
-    Boolean(globalSelection.content) &&
-    globalSelection.id === props.msg.id
-  )
+  return Boolean(globalSelection.content) && globalSelection.id === props.msg.id
 })
 
 const bubblePosition = computed(() => {
@@ -507,7 +560,6 @@ const bubblePosition = computed(() => {
 function handleSelectionChange() {
   const selection = window.getSelection()
 
-  // 如果拖动过程中被清空
   if (!selection || selection.isCollapsed) {
     globalSelection.content = ''
     globalSelection.id = ''
@@ -520,9 +572,8 @@ function closeSelectionBubble() {
 }
 
 function handleQuoteContent() {
-  emit("quoted", props.msg.hid, globalSelection.content)
+  emit('quoted', props.msg.hid, globalSelection.content)
 }
-
 
 const imageItems = ref<ImageItem[]>([])
 const imageObjectUrls = new Set<string>()
@@ -562,7 +613,7 @@ async function loadImages() {
     return
   }
 
-  imageItems.value = fileIds.map((fileId) => ({
+  imageItems.value = fileIds.map(fileId => ({
     fileId,
     src: '',
     loading: true,
@@ -616,7 +667,6 @@ async function previewImage(item: ImageItem) {
 
   try {
     const ext = getExtFromType(item.contentType)
-
     await window.api.openImageTemp(item.base64, `${item.fileId}.${ext}`)
   } catch (err) {
     console.error('previewImage error:', err)
@@ -704,11 +754,11 @@ const showLinks = async () => {
 }
 
 function handlePreNodeClick() {
-  emit("switchToBranch", props.msg.pre_node?.at(-1))
+  emit('switchToBranch', props.msg.pre_node?.at(-1) ?? '')
 }
 
 function handleNextNodeClick() {
-  emit("switchToBranch", props.msg.next_node?.at(0))
+  emit('switchToBranch', props.msg.next_node?.at(0) ?? '')
 }
 
 function onContextMenu(e: MouseEvent) {
@@ -756,28 +806,21 @@ function closePopMenu() {
 }
 
 function copyContextValue() {
-  const text = normalizeToString(props.msg.content)
+  const text = normalizeToString(props.msg.chunks)
   window.api?.copyToClipboard({ type: 'text', data: text })
 }
 
 function reGenerateContext() {
-  emit("reGenerate", props.msg.parent_id)
+  emit('reGenerate', String(props.msg.parent_id ?? ''))
 }
 
 function selectText() {
-  emit("selectText", props.msg.id, 'ai')
+  emit('selectText', props.msg.id, 'ai')
 }
 
 function deleteItem() {
-  emit("delete", props.msg.id)
+  emit('delete', props.msg.id)
 }
-
-// function onDocumentClick(e: MouseEvent) {
-//   const menuEl = menuRef.value?.$el || menuRef.value
-//   if (!menuEl) return
-//   if (e.target === menuEl || menuEl.contains(e.target as Node)) return
-//   closePopMenu()
-// }
 
 const copy_svg = ref(
   `<svg t="1776756262130" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10157" width="20" height="20"><path d="M585.142857 365.714286a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V438.857143a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238z m0 73.142857H195.047619v390.095238h390.095238V438.857143z m-73.142857 219.428571v73.142857H268.190476v-73.142857h243.809524zM828.952381 121.904762a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857h-121.904762v-73.142857h121.904762V195.047619H438.857143v121.904762h-73.142857V195.047619a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238zM512 536.380952v73.142858H268.190476v-73.142858h243.809524z" p-id="10158" fill="var(--apix-default-dark-color)"></path></svg>`
@@ -839,32 +882,18 @@ watch(
 )
 
 onMounted(() => {
-  // document.addEventListener('click', onDocumentClick)
   document.addEventListener('click', onCodeCopyClick)
   document.addEventListener('selectionchange', handleSelectionChange)
   window.addEventListener('resize', onResize)
 })
 
 onBeforeUnmount(() => {
-  // document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('click', onCodeCopyClick)
   document.removeEventListener('selectionchange', handleSelectionChange)
   window.removeEventListener('resize', onResize)
 
   revokeAllImageObjectUrls()
 })
-
-const thinkBox = ref<HTMLElement | null>(null)
-
-async function scrollThinkToBottom() {
-  await nextTick() // wait DOM update
-  if (!thinkBox.value) return
-
-  thinkBox.value.scrollTo({
-    top: thinkBox.value.scrollHeight,
-    behavior: 'smooth'
-  })
-}
 </script>
 
 <style scoped>
@@ -964,65 +993,6 @@ async function scrollThinkToBottom() {
   padding: 8px 4px 0px 4px;
 }
 
-.think-render-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 12px 12px 0px 12px;
-  max-height: 500px;
-  overflow-y: auto;
-  overflow-x: hidden;
-
-  /* 渐隐遮罩 */
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 12px,
-    black calc(100% - 12px),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 12px,
-    black calc(100% - 12px),
-    transparent 100%
-  );
-
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
-
-  word-wrap: break-word;
-  position: relative;
-  align-self: center;
-
-  width: 100%;
-  max-width: calc(840px - 58px);
-  padding: 0px;
-  padding-bottom: 8px;
-  line-height: 1.6;
-
-  box-shadow: inset 1px 0 0 0 var(--apix-tertiary-light-color);
-}
-
-.think-render-list::-webkit-scrollbar {
-  width: 6px;
-}
-.think-render-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.think-render-list::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 3px;
-}
-.think-render-list::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.8);
-}
-.think-render-list::-webkit-scrollbar-horizontal {
-  display: none;
-  height: 0;
-}
-
 .think {
   background-color: transparent !important;
   font-size: 14px;
@@ -1044,6 +1014,10 @@ async function scrollThinkToBottom() {
   color: var(--apix-tertiary-dark-color);
 }
 
+.expend-think-btn.expended_think_btn :deep(.expend-icon) {
+  transform: rotate(90deg)
+}
+
 .expend-think-btn:hover {
   border: none;
   color: var(--apix-default-dark-color);
@@ -1051,6 +1025,12 @@ async function scrollThinkToBottom() {
 
 .expend-think-btn:hover :deep(.icon) {
   fill: var(--apix-secondary-dark-color);
+}
+
+.expend-think-btn :deep(.expend-icon) {
+  transition: transform .25s var(--apix-cubic-bezier);
+  width: 15px !important;
+  height: 15px !important;
 }
 
 .expend-think-btn :deep(.icon),
@@ -1094,7 +1074,7 @@ async function scrollThinkToBottom() {
 
 /* ==================== 待办（Todos） ==================== */
 .expend-todos-btn-wrapper {
-  padding: 12px 4px 0px 3px;
+  padding: 12px 0px;
 }
 
 .expend-todos-btn {
@@ -1150,13 +1130,11 @@ async function scrollThinkToBottom() {
   width: 100%;
   max-width: calc(840px - 32px);
   padding: 0px;
-  gap: 6px;
-  border-radius: 12px;
+  gap: 16px;
   line-height: 1.6;
 }
 
 .content {
-  padding: 6px 0px 6px 0px;
   color: var(--content-color);
 }
 
@@ -1419,12 +1397,7 @@ async function scrollThinkToBottom() {
 /* ==================== Markdown 通用表格/代码块增强 ==================== */
 .markdown-body:deep(table) {
   position: relative;
-  /* margin: auto; */
-  /* margin-bottom: 12px; */
-  /* border-radius: var(--apix-panel-border-radius) !important; */
   background-color: var(--apix-panel-layer-2-background) !important;
-  /* box-shadow: inset 0 0 0 1px var(--apix-tertiary-dark-color); */
-  /* border: 1px solid var(--apix-tertiary-dark-color); */
 }
 .markdown-body:deep(thead) {
   width: auto;
@@ -1452,9 +1425,7 @@ async function scrollThinkToBottom() {
 .markdown-body:deep(pre) {
   scrollbar-width: none;
   background-color: var(--apix-panel-layer-2-background);
-  /* border-radius: var(--apix-panel-border-radius); */
   padding: 16px;
-  /* margin-bottom: 0; */
 }
 
 .markdown-body:deep(blockquote) {

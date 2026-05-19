@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <el-container>
     <el-aside class="aside-area">
       <HomePage />
@@ -77,6 +77,7 @@
                 @quoted="handleQuoteShow"
                 @switch-to-branch="handleBranchSwitch"
               />
+              <ToolMessageCard v-else-if="msg.role === 'tools' || msg.role === 'system'" :msg="msg" />
             </div>
 
             <div key="buttom-div" class="buttom-div"></div>
@@ -118,7 +119,7 @@
 
             <Transition name="fade">
               <div v-if="isWarningShow" class="warning-label">
-                <div style="display: flex; gap: 6px; align-items: center;">
+                <div style="display: flex; gap: 3px; align-items: center;">
                   <svg t="1776752724390" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1671" width="20" height="20"><path d="M558 563c0 24.852-20.148 45-45 45S468 587.852 468 563v-150c0-24.852 20.148-45 45-45s45 20.148 45 45v150z m0 132c0 24.852-20.148 45-45 45S468 719.852 468 695v-1c0-24.852 20.148-45 45-45S558 669.148 558 694v1z m-355.006 65.804a15 15 0 0 0 14.986 15.014l589.36 0.55a15 15 0 0 0 12.916-22.646L525.56 256.376a15 15 0 0 0-25.806-0.006l-294.66 496.796a15 15 0 0 0-2.098 7.638z m-75.31-53.552l294.66-496.794c29.584-49.878 93.998-66.328 143.874-36.746a105 105 0 0 1 36.768 36.784l294.7 497.346c29.56 49.89 13.08 114.298-36.808 143.86a105 105 0 0 1-53.624 14.666l-589.358-0.55c-57.99-0.054-104.956-47.108-104.9-105.1a105 105 0 0 1 14.688-53.466z" fill="var(--apix-warning-button-text)" p-id="1672"></path></svg>
                   <span class="warning-content">{{ WarningContent }}</span>
                 </div>
@@ -132,10 +133,8 @@
 
             <Transition name="fade">
               <div v-if="isQuoteShow && quotedText !== ''" class="quote-label">
-                <div style="display: flex; gap: 6px; align-items: center;">
-                  <div class="quote-icon">
-                    <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" fill="var(--apix-default-button-text)" p-id="1652"></path></svg>
-                  </div>
+                <div style="display: flex; gap: 3px; align-items: center;">
+                  <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" fill="var(--apix-default-button-text)" p-id="1652"></path></svg>
                   <span class="quote-content">{{ quotedText }}</span>
                 </div>
                 <button class="quote-close" @click="handleQuoteClose">
@@ -261,11 +260,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, reactive, watch, onMounted, onBeforeUnmount, h, computed, toRaw } from 'vue'
+import { ref, nextTick, reactive, watch, onActivated, onMounted, onBeforeUnmount, h, computed, toRaw } from 'vue'
 import type { TagProps } from 'element-plus'
 import HomePage from './homePage.vue'
 import HumanMessageBubble from './component/msg_bubble_body/human_message_bubble.vue'
 import AiMessageBubble from './component/msg_bubble_body/ai_message_bubble.vue'
+import ToolMessageCard from './component/msg_bubble_body/tool_message_card.vue'
 import ChatHistoryPanel from './component/dialog_history/history_panel.vue'
 import { type ChatHistory } from './component/dialog_history/history_card.vue'
 import { useAppCacheData } from '../store/app'
@@ -301,29 +301,25 @@ type Role = 'human' | 'ai' | 'system' | 'tools' | 'info'
 interface ToolLabel {
   tool_call_id: string
   tool_name: string
-  content: object
+  content: string
   status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
 }
 
-interface MessageLabel {
-  content: string
-  label_type: 'think' | 'content'
-}
-
-type MessageChunk = MessageLabel | ToolLabel
+type MessageChunk = string | ToolLabel
 
 interface ChatMessage {
   id: string
   cid: string
   hid: string
   role: Role
-
-  node_id?: string
-  parent_id?: string
+  node_id?: number
+  parent_id?: number
   pre_node?: string[]
   next_node?: string[]
 
-  chunks?: MessageChunk[]
+  content?: string | MessageChunk[]
+  think?: string | MessageChunk[]
+  lastField?: 'think' | 'content'
 
   label?: string
   info?: any
@@ -358,84 +354,82 @@ type TodoItem = {
 // ################################
 // Chunk helpers
 // ################################
-// Append string chunk and merge with the last string when possible.
-function ensureChunks(msg: ChatMessage) {
-  if (!Array.isArray(msg.chunks)) {
-    msg.chunks = []
+function ensureArrayField(msg: ChatMessage, field: 'content' | 'think') {
+  if (!Array.isArray(msg[field])) {
+    if (!msg[field]) {
+      msg[field] = []
+    } else {
+      msg[field] = [msg[field] as string]
+    }
   }
 }
 
-function appendMessageLabel(
+// Append string chunk and merge with the last string when possible.
+function appendChunk(
   msg: ChatMessage,
-  labelType: 'think' | 'content',
+  field: 'content' | 'think',
   delta: string,
   guardId?: string
 ) {
   if (!delta) return
   if (guardId && msg.id !== guardId) return
 
-  ensureChunks(msg)
+  ensureArrayField(msg, field)
 
-  const arr = msg.chunks!
+  const arr = msg[field] as MessageChunk[]
   const last = arr[arr.length - 1]
 
-  // Merge same type neighbor chunk
-  if (
-    last
-    && 'label_type' in last
-    && last.label_type === labelType
-  ) {
-    last.content += delta
-    return
+  if (typeof last === 'string') {
+    arr[arr.length - 1] = last + delta
+  } else {
+    arr.push(delta)
   }
-
-  arr.push({
-    label_type: labelType,
-    content: delta,
-  })
 }
 
 // Append or update tool label chunk.
 function appendToolLabel(
   msg: ChatMessage,
+  field: 'content' | 'think',
   label: ToolLabel,
   guardId?: string
 ) {
   if (guardId && msg.id !== guardId) return
 
-  ensureChunks(msg)
+  ensureArrayField(msg, field)
 
-  const arr = msg.chunks!
+  const arr = msg[field] as MessageChunk[]
 
-  const index = arr.findIndex(
-    item =>
-      'tool_call_id' in item
-      && item.tool_call_id === label.tool_call_id
-  )
+  if (label.tool_call_id) {
+    const index = arr.findIndex(
+      (item: any) => item?.tool_call_id === label.tool_call_id
+    )
 
-  if (index !== -1) {
-    const old = arr[index] as ToolLabel
+    if (index !== -1) {
+      const old = arr[index] as ToolLabel
 
-    if (label.tool_name) {
-      old.tool_name = label.tool_name
-    }
-
-    if (label.status) {
-      old.status = label.status
-    }
-
-    if (label.content) {
-      if (!old.content) {
-        old.content = label.content
+      // 原地更新（不要替换对象！）
+      if (label.tool_name) {
+        old.tool_name = label.tool_name
       }
-      else {
-        old.content += label.content
-      }
-    }
 
-    return
+      if (label.status) {
+        old.status = label.status
+      }
+
+      // 防止并发覆盖 + 重复拼接
+      if (label.content) {
+        if (!old.content) {
+          old.content = label.content
+        } else if (!old.content.includes(label.content)) {
+          old.content += '\n\n' + label.content
+        }
+      }
+
+      return
+    }
   }
 
+  // 新增时确保是“干净对象”（避免引用污染）
   arr.push({
     tool_call_id: label.tool_call_id,
     tool_name: label.tool_name,
@@ -448,22 +442,38 @@ function cloneMaybeArray<T>(value: T[] | undefined | null): T[] {
   return Array.isArray(value) ? [...value] : []
 }
 
+function pickToolTargetField(r: any): 'content' | 'think' {
+  if (r?.lastField === 'think' || r?.last_field === 'think') return 'think'
+  if (r?.lastField === 'content' || r?.last_field === 'content') return 'content'
+
+  const hasThink = !!r?.think && String(r.think).length > 0
+  const hasContent = !!r?.content && String(r.content).length > 0
+
+  if (hasThink && !hasContent) return 'think'
+  if (hasContent && !hasThink) return 'content'
+
+  return 'think'
+}
+
 function appendToolCallsFromExtra(
   msg: ChatMessage,
   extra: any,
+  r: any
 ) {
   const toolCalls = extra?.tool_calls
   if (!Array.isArray(toolCalls) || toolCalls.length === 0) return
+
+  const targetField = pickToolTargetField(r)
 
   for (const call of toolCalls) {
     const label: ToolLabel = {
       tool_call_id: call.id,
       tool_name: call.name ?? 'unknown_tool',
-      content: call,
-      status: 'outdated',
+      content: '[已过期]',
+      status: 'pending',
     }
 
-    appendToolLabel(msg, label)
+    appendToolLabel(msg, targetField, label)
   }
 }
 
@@ -515,9 +525,11 @@ function ensureAiMessage(list: ChatMessage[], historyId: string, generationId: s
       hid: historyId,
       role: 'ai',
       label: '已准备',
-      chunks: [],
+      content: [],
+      think: [],
       info: null,
       pending: true,
+      lastField: undefined,
     })
     index = list.length - 1
   }
@@ -587,8 +599,8 @@ function mergeHistoryAiMessage(
   extra: any,
   info: any
 ) {
-  appendMessageLabel(msg, 'think', r.think ?? '')
-  appendMessageLabel(msg, 'content', r.content ?? '')
+  appendChunk(msg, 'content', r.content ?? '')
+  appendChunk(msg, 'think', r.think ?? '')
 
   const prevInfo = msg.info ?? {}
   msg.info = {
@@ -611,7 +623,7 @@ function mergeHistoryAiMessage(
 
   msg.extra = nextExtra
 
-  appendToolCallsFromExtra(msg, extra)
+  appendToolCallsFromExtra(msg, extra, r)
 
   if ((nextExtra.todo_list?.length ?? 0) > 0) {
     msg.todos = cloneMaybeArray(nextExtra.todo_list)
@@ -622,15 +634,44 @@ function mergeHistoryAiMessage(
   }
 
   msg.pending = false
+  msg.lastField = r.think ? 'think' : 'content'
 }
 
 function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
   const list: ChatMessage[] = []
   const aiIndexByGeneration = new Map<string, number>()
+  const systemIndexByTask = new Map<string, number>()
 
   for (const r of raw) {
     const extra = r.extra ?? {}
     const info = r.info ?? {}
+
+    if (r.role === 'system' || r.role === 'tools') {
+      const taskId = String(info?.task_id ?? r.generation_id ?? genUUID())
+      const existingIndex = systemIndexByTask.get(taskId)
+
+      if (existingIndex !== undefined) {
+        const existing = list[existingIndex]
+        existing.content = info?.tool_name ?? existing.content ?? 'Unnamed task'
+        existing.desc = info?.desc ?? existing.desc ?? null
+        existing.status = info?.status ?? existing.status ?? null
+        existing.pending = false
+      } else {
+        const msg: ChatMessage = {
+          id: taskId,
+          cid: cid.value,
+          hid,
+          role: r.role,
+          content: info?.tool_name ?? 'Unnamed task',
+          desc: info?.desc ?? null,
+          status: info?.status ?? null,
+          pending: false,
+        }
+        list.push(msg)
+        systemIndexByTask.set(taskId, list.length - 1)
+      }
+      continue
+    }
 
     if (r.role === 'human') {
       const generationId = String(r.generation_id ?? genUUID())
@@ -643,12 +684,7 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
         parent_id: r.parent_id,
         pre_node: r.pre_node,
         next_node: r.next_node,
-        chunks: [
-          {
-            content: r.content ?? '',
-            label_type: 'content'
-          }
-        ],
+        content: r.content ?? '',
         extra,
         error: false,
         pending: false,
@@ -673,18 +709,17 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
           pre_node: r.pre_node,
           next_node: r.next_node,
           label: '已思考',
-          chunks: [
-            ...(r.think ? [{ label_type: 'think', content: r.think }] : []),
-            ...(r.content ? [{ label_type: 'content', content: r.content }] : []),
-          ],
+          content: r.content ? [r.content] : [],
+          think: r.think ? [r.think] : [],
           info,
           extra,
           todos: cloneMaybeArray(extra?.todo_list ?? []),
           images: cloneMaybeArray(extra?.image_meta ?? []),
           pending: false,
+          lastField: r.think ? 'think' : 'content',
         }
 
-        appendToolCallsFromExtra(newMsg, extra)
+        appendToolCallsFromExtra(newMsg, extra, r)
         list.push(newMsg)
         aiIndexByGeneration.set(generationId, list.length - 1)
       } else {
@@ -911,50 +946,9 @@ const handleRegenerate = async (id: string) => {
     return
   }
 
-  const targetMessage = list[targetIndex]
-
-  // Must regenerate from human message
-  if (!targetMessage || targetMessage.role !== 'human') {
-    ElMessage({
-      type: 'warning',
-      message: '当前节点不是用户消息',
-      plain: true,
-    })
-    return
-  }
-
-  // Chunks validation
-  if (
-    !Array.isArray(targetMessage.chunks)
-    || targetMessage.chunks.length === 0
-  ) {
-    ElMessage({
-      type: 'warning',
-      message: '消息内容为空',
-      plain: true,
-    })
-    return
-  }
-
-  // Find first content chunk
-  const contentChunk = targetMessage.chunks.find(
-    chunk =>
-      'label_type' in chunk
-      && chunk.label_type === 'content'
-  )
-
-  if (!contentChunk || !contentChunk.content) {
-    ElMessage({
-      type: 'warning',
-      message: '消息内容为空',
-      plain: true,
-    })
-    return
-  }
-
-  const inputs = contentChunk.content
-
-  console.log('Resend input: [', targetIndex, '] ', targetMessage)
+  console.log("Resend input: [", targetIndex, "] ", list[targetIndex])
+  const inputs = list[targetIndex].content
+  if (!inputs) return
 
   // remains the parent node
   const remain = list.slice(0, targetIndex + 1)
@@ -986,33 +980,19 @@ const selectMessageBubble = (msgId: string) => {
 
 // Normalize MessageChunk to string
 function chunkToString(chunk: MessageChunk): string {
-  // Message label
-  if ('label_type' in chunk) {
-    return chunk.content
-  }
+  if (typeof chunk === 'string') return chunk
 
-  // Tool label
+  // ToolLabel -> custom display
   return `\n\n[>_ ${chunk.tool_name}]\n\n`
-}
-
-function chunksToString(chunks?: MessageChunk[]): string {
-  if (!Array.isArray(chunks) || chunks.length === 0) {
-    return ''
-  }
-
-  return chunks
-    .map(chunkToString)
-    .join('')
 }
 
 // Todo -> string
 function todosToString(todos?: TodoItem[]): string {
-  if (!Array.isArray(todos) || todos.length === 0) {
-    return ''
-  }
+  if (!Array.isArray(todos) || todos.length === 0) return ''
 
   return todos
     .map(todo => {
+      // Map status to symbol
       const statusMap: Record<TodoItem['status'], string> = {
         pending: '⏳',
         in_progress: '📍',
@@ -1027,21 +1007,30 @@ function todosToString(todos?: TodoItem[]): string {
     .join('\n')
 }
 
+// Normalize field (string | MessageChunk[]) to string
+function fieldToString(field?: string | MessageChunk[]): string {
+  if (!field) return ''
+
+  if (typeof field === 'string') return field
+
+  return field.map(chunkToString).join('')
+}
+
 function handleSelectText(msgId: string, role: string) {
   const msg = messages.value.find(
-    m =>
-      m.id === msgId
-      && m.role === role
-      && m.pending === false
+    m => m.id === msgId && m.role === role && m.pending === false
   )
 
   if (!msg) return
 
-  let mdContent = chunksToString(msg.chunks)
+  let mdContent = fieldToString(msg.think)
 
-  // Append todos
+  if (mdContent !== '') mdContent += '\n\n---\n\n'
+
+  mdContent += fieldToString(msg.content)
+
+  // append todos
   const todosStr = todosToString(msg.todos)
-
   if (todosStr) {
     mdContent += '\n\n---\n\n'
     mdContent += todosStr
@@ -1066,12 +1055,13 @@ const handleHideHistory = (toHide: boolean) => {
   isHistoryHide.value = toHide
 }
 
-const actionMap: Record<string, (payload: any, historyId: string) => any> = {
+const actionMap: Record<string, (payload: any, historyId: string) => void> = {
   msg_stream_start: handleStreamStart,
   think_chunk_rtn: handleThinkChunkRtn,
   content_chunk_rtn: handleContentChunkRtn,
   msg_stream_end: handleStreamEnd,
   msg_stream_abort: handleStreamAbort,
+  async_tool_return: handleAsyncToolRtn,
   tool_exec_chunk_rtn: handleToolChunkRtn,
   token_limit_warning: handleWarning,
 }
@@ -1125,13 +1115,16 @@ function handleStreamStart(payload: any, historyId: string) {
       parent_id: nodeIdData.parent_id ?? '',
       role: 'ai',
       label: '已准备',
-      chunks: [],
+      content: [],
+      think: [],
       info: null,
       pending: true,
+      lastField: undefined,
     })
   } else {
     list[existingIndex].pending = true
     list[existingIndex].label = '已准备'
+    list[existingIndex].lastField = undefined
   }
 
   if (historyId === store.current_history_id) {
@@ -1155,12 +1148,8 @@ function handleThinkChunkRtn(payload: any, historyId: string) {
 
   if (msg.pending === true) {
     msg.label = '正在思考'
-    appendMessageLabel(
-      msg,
-      'think',
-      deltaThink,
-      generationId
-    )
+    appendChunk(msg, 'think', deltaThink, generationId)
+    msg.lastField = 'think'
   }
 }
 
@@ -1180,12 +1169,8 @@ function handleContentChunkRtn(payload: any, historyId: string) {
 
   if (msg.pending === true) {
     msg.label = '回答中...'
-    appendMessageLabel(
-      msg,
-      'content',
-      deltaContent,
-      generationId
-    )
+    appendChunk(msg, 'content', deltaContent, generationId)
+    msg.lastField = 'content'
   }
 }
 
@@ -1203,6 +1188,7 @@ async function handleStreamEnd(payload: any, historyId: string) {
   if (index !== -1 && list[index].pending === true) {
     list[index].label = '已思考'
     list[index].pending = false
+    list[index].lastField = undefined
   }
 
   await syncHistoryMessages(historyId)
@@ -1253,6 +1239,7 @@ async function handleStreamAbort(payload: any, historyId: string) {
   const index = findLatestIndexById(list, generationId, 'ai')
   if (index !== -1 && list[index].pending === true) {
     list[index].pending = false
+    list[index].lastField = undefined
   }
 
   await syncHistoryMessages(historyId)
@@ -1278,6 +1265,33 @@ async function handleStreamAbort(payload: any, historyId: string) {
         console.log("[handleSelectHistory] Update conversation error: " + err)
       }
     }
+  }
+}
+
+function handleAsyncToolRtn(payload: any, historyId: string) {
+  const toolMsg = payload.data?.messages
+  const taskId = payload.data?.task_id
+  if (!toolMsg || !taskId) return
+
+  const list = ensureHistoryMessages(historyId)
+  const index = findLatestIndexById(list, taskId, 'system')
+
+  if (index !== -1) {
+    list[index].content = toolMsg.info?.tool_name ?? null
+    list[index].desc = toolMsg.info?.desc ?? null
+    list[index].status = toolMsg.info?.status ?? null
+    list[index].pending = false
+  } else {
+    list.push({
+      id: taskId,
+      cid: cid.value,
+      hid: historyId,
+      role: 'system',
+      content: toolMsg.info?.tool_name ?? null,
+      desc: toolMsg.info?.desc ?? null,
+      status: toolMsg.info?.status ?? null,
+      pending: false,
+    })
   }
 }
 
@@ -1311,8 +1325,9 @@ function handleToolChunkRtn(payload: any, historyId: string) {
       content: toolContent || '',
       status,
     }
-    
-    appendToolLabel(msg, toolLabel, generationId)
+
+    const field = msg.lastField ?? 'think'
+    appendToolLabel(msg, field, toolLabel, generationId)
   }
 
   if (toolName === 'send_images') {
@@ -1502,7 +1517,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
     }))
 
   if (quotedText.value !== '') {
-    content = `- Quoted Meaasge:  \n> “${quotedText.value}”\n\n` + content
+    content = `> “${quotedText.value}”\n\n` + content
   }
 
   isQuoteShow.value = false
@@ -1525,12 +1540,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       cid: cid.value,
       hid: currentHid,
       role: 'human',
-      chunks: [
-        {
-          content,
-          label_type: 'content'
-        }
-      ],
+      content,
       extra: messagePayload.extra,
       error: false,
       pending: true,
@@ -1767,6 +1777,10 @@ async function handleBranchSwitch(branch_id: string) {
 // ################################
 // Lifecycle
 // ################################
+onActivated(async () => {
+  console.log("Current custom provider config", store.config.activeProvider)
+})
+
 onMounted(async () => {
   window.addEventListener('keydown', globalHandleKeydown)
   try {
@@ -2308,6 +2322,8 @@ const globalHandleKeydown = async (
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLInputElement ||
     target?.isContentEditable
+
+  console.log('Key down:', e.key)
 
   // Escape
   if (e.key === 'Escape') {
@@ -2852,14 +2868,6 @@ const setFullInput = () => {
 
 .warning-close:active {
   background-color: var(--apix-warning-button-active);
-}
-
-.quote-icon:deep(.icon) {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 /* Enter & leave active */
@@ -3448,4 +3456,4 @@ const setFullInput = () => {
 .file-tag:hover {
   transform: scale(1.02);
 }
-</style>
+</style> -->

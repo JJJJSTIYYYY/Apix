@@ -1,5 +1,5 @@
 <template>
-  <div class="tool-chip" :class="`is-${status}`">
+  <div class="tool-chip" :class="`is-${status}`" @click="showTaskInfo">
     <!-- 状态指示器 -->
     <div class="status-indicator">
       <!-- 加载动画 -->
@@ -29,47 +29,59 @@
 
     <!-- 内容区 -->
     <span class="content">{{ tool_name }}</span>
-    
-    <!-- 可选：工具类型标签 -->
-    <span v-if="toolType" class="badge">{{ toolType }}</span>
   </div>
+
+  <taskInfoView
+    v-if="ifShowTaskInfo"
+    :task-info="obj"
+    @close="ifShowTaskInfo=false"
+  />
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { ref } from 'vue'
+import TaskInfoView from './taskInfoView.vue'
+
+const props = defineProps<{
   tool_name: string
   tool_call_id: string
-  content: string
+  content: object
   status: 'pending' | 'in_progress' | 'completed' | 'error' | 'outdated'
-  toolType?: string
+  obj?: object
 }>()
+
+
+
+const ifShowTaskInfo = ref(false)
+const showTaskInfo = () => {
+  if (props.obj) {
+    ifShowTaskInfo.value = true
+    return
+  }
+}
 </script>
 
 <style scoped>
 .tool-chip {
-  margin-left: 12px !important;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   
-  padding: 8px 14px;
-  border-radius: 16px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
+  padding: 0px 1px;
   
   /* 透明背景 + 细边框 */
   background: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: none;
   
   cursor: default;
-  max-width: 160px;
 }
 
 .tool-chip:hover {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: rgba(0, 0, 0, 0.12);
+  background: var(--apix-default-light-color);
 }
 
 /* Pending */
@@ -103,6 +115,7 @@ defineProps<{
   color: #78716c;
   border-color: rgba(120, 113, 108, 0.2);
   font-style: italic;
+  opacity: 0.7;
 }
 
 /* ===== 状态指示器 ===== */
@@ -152,19 +165,6 @@ defineProps<{
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-}
-
-/* ===== 工具类型标签（可选） ===== */
-.badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.06);
-  color: inherit;
-  opacity: 0.7;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 
 /* In Progress 状态下的脉冲效果 */

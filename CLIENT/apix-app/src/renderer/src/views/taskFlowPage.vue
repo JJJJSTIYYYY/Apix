@@ -105,6 +105,15 @@
             </div>
           </el-scrollbar>
         </div>
+
+        <div class="agent-panel" v-if="isAgentPanelShow" :class="{agent_panel_hide: activatedTabMeta.mime === 'aflow'}">
+          <MiniChatPanel
+            :page_id="'taskFlowPage'"
+            :workspace="store.getWorkspace()"
+            :active_file="'/workspace'+activeTab.substring(store.getWorkspace().length)"
+            @quote-file="saveTabContent()"
+          />
+        </div>
       </div>
     </el-main>
   </el-container>
@@ -129,7 +138,8 @@
     <button
       v-if="activatedTabMeta.mime === 'md' || activatedTabMeta.mime === 'py' || activatedTabMeta.mime === 'js' || activatedTabMeta.mime === 'txt' "
       class="submit-btn agent-btn"
-      @click=""
+      :class="{panel_actived: isAgentPanelShow}"
+      @click="showMiniAgentPanel"
     >
       <svg t="1779034242459" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5513" width="20" height="20"><path class="path" d="M741.632 663.296a8.533333 8.533333 0 0 1 15.616 0l23.04 52.266667a42.666667 42.666667 0 0 0 18.602667 20.224l40.746666 22.272a8.533333 8.533333 0 0 1 0 14.933333l-40.746666 22.272a42.666667 42.666667 0 0 0-18.602667 20.224l-23.04 52.266667a8.533333 8.533333 0 0 1-15.616 0l-23.04-52.309334a42.709333 42.709333 0 0 0-18.474667-20.181333l-40.533333-22.272a8.533333 8.533333 0 0 1 0-14.933333l40.533333-22.272a42.666667 42.666667 0 0 0 18.474667-20.181334l23.04-52.309333zM411.136 238.72a21.333333 21.333333 0 0 1 40.106667 0l59.349333 162.986667a85.333333 85.333333 0 0 0 46.122667 49.066666l132.693333 57.728a21.333333 21.333333 0 0 1 0 39.125334l-132.693333 57.728a85.376 85.376 0 0 0-46.08 49.066666l-59.392 163.029334a21.333333 21.333333 0 0 1-40.106667 0l-59.306667-162.986667a85.376 85.376 0 0 0-46.165333-49.066667l-132.693333-57.770666a21.333333 21.333333 0 0 1 0-39.125334l132.693333-57.728a85.333333 85.333333 0 0 0 46.122667-49.066666l59.349333-162.986667zM741.632 188.373333a8.533333 8.533333 0 0 1 15.616 0l23.04 52.309334a42.666667 42.666667 0 0 0 18.602667 20.181333l40.746666 22.272a8.533333 8.533333 0 0 1 0 14.976l-40.746666 22.272a42.666667 42.666667 0 0 0-18.602667 20.181333l-23.04 52.309334a8.533333 8.533333 0 0 1-15.616 0l-23.04-52.352a42.666667 42.666667 0 0 0-18.474667-20.181334l-40.533333-22.186666a8.533333 8.533333 0 0 1 0-14.976l40.533333-22.272a42.666667 42.666667 0 0 0 18.474667-20.181334l23.04-52.352z" fill="currentColor" p-id="5514"></path></svg>
       智能体
@@ -162,6 +172,7 @@ import HomePage from './homePage.vue'
 import TabCardList from './component/tab_card/TabCardList.vue'
 import TabHeaderCard from './component/tab_card/comp/TabHeaderCard.vue'
 import MarkdownEditor from './component/markdown_edit/markdown_editor.vue'
+import MiniChatPanel from './component/mini_chat/MiniChatPanel.vue'
 import { type MarkdownEditorExpose } from './component/markdown_edit/markdown_editor.vue'
 import FilePanel from './component/file_panel/file_explorer.vue'
 import { type NodeBase } from './component/file_panel/file_tree_node.vue'
@@ -240,7 +251,7 @@ const tabs = reactive(store.tabs as TabItem[])
 
 const activeTab = computed({
   get() {
-    return store.activedTabName || tabs[0]?.tabKey
+    return store.activedTabKey || tabs[0]?.tabKey
   },
   set(value: string) {
     const idx = tabs.findIndex(t => t.tabKey === value)
@@ -251,7 +262,7 @@ const activeTab = computed({
       name: tab.title,
       saved: tab.saved
     }
-    store.activedTabName = value
+    store.activedTabKey = value
   }
 })
 
@@ -1226,6 +1237,11 @@ function foldAllCards() {
 
   recurse(tab.content)
 }
+
+const isAgentPanelShow = ref(false)
+function showMiniAgentPanel() {
+  isAgentPanelShow.value = !isAgentPanelShow.value
+}
 </script>
 
 <style scoped>
@@ -1260,6 +1276,7 @@ function foldAllCards() {
   opacity: 0.3;
   width: 0;
   box-shadow: none;
+  overflow: hidden;
 }
 
 .left-panel-title-wrapper {
@@ -1403,6 +1420,11 @@ function foldAllCards() {
     var(--apix-border-radius-base) var(--apix-border-radius-base) 0 0;
 }
 
+.agent-panel.agent_panel_hide {
+  width: 0 !important;
+  overflow: hidden;
+}
+
 .bottom-btn-wrap {
   -webkit-app-region: no-drag;
   
@@ -1462,6 +1484,7 @@ function foldAllCards() {
   background: var(--apix-common-button-hover) !important;
 }
 
+.agent-btn.panel_actived,
 .submit-btn:active {
   color: var(--apix-common-button-text) !important;
   background: var(--apix-common-button-active) !important;

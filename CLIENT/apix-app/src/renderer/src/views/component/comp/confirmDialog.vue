@@ -99,6 +99,15 @@ function afterLeave() {
   animation: opacityFadeIn 0.5s var(--apix-cubic-bezier);
 }
 
+@keyframes opacityFadeIn {
+  0% { 
+    opacity: 0.3; 
+  }
+  100% { 
+    opacity: 1; 
+  }
+}
+
 /* ===== dialog ===== */
 .cd-wrapper {
   width: 420px;

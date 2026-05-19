@@ -509,7 +509,6 @@ const runTask = async () => {
   transform: translate(-50%, -57%);
   height: 70vh;
   z-index: 999999;
-  
 }
 
 </style>
