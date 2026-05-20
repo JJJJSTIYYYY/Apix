@@ -58,7 +58,7 @@ const DEFAULT_CONFIG = {
     definition: '',
   },
 
-  testExpertMode: false,
+  enableTaskFlow: false,
   higherRolePromptPermission: false,
   autoRefreshTask: false,
 

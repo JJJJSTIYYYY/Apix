@@ -1,4 +1,5 @@
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal, Optional
 from pathlib import Path
 import hashlib
 
@@ -6,14 +7,17 @@ from langchain.agents.middleware.todo import WRITE_TODOS_TOOL_DESCRIPTION, Todo
 from langchain.messages import ToolMessage
 from langchain.tools import InjectedState, tool, InjectedToolCallId
 from langgraph.types import Command
+import yaml
 
 from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.commons.file_content_reader import load_from_yaml, update_to_yaml
+from apix_agent.commons.file_content_reader import load_from_yaml
 from apix_agent.global_config import BASE_DIR
+from apix_agent.commons.logger import logger
 
 
 WRITE_MEMO_TOOL_DESCRIPTION = """
+## Write / Overwrite or delete a memory:
 Use this tool to record your important decisions, observations, conclusions or other important information during the current work session.
 This tool helps you record previous information so that you can review them later if you forget.
 ## When to Use This Tool
@@ -22,7 +26,7 @@ Use this tool in these scenarios:
 2. When defining constraints, rules, or policies that must be remembered
 3. When you make a tool call, the summary or conclusion of the call result that must be remembered
 4. When summarizing a important conclusion or observations that must be remembered
-5. When you observe that a memo in your memorandum is outdated and should be deleted (Use a same title and empty content for delete)
+5. When you observe that a memo in your memory is outdated and should be deleted (Use a same title and empty content for delete)
 ## When NOT to Use This Tool
 Do NOT use this tool when:
 1. You are listing tasks or tracking progress (use the todo tool instead)
@@ -33,9 +37,13 @@ Do NOT use this tool when:
 - Do not restate the entire conversation.
 - Focus on what must be remembered for correct future behavior.
 - Avoid duplicating todo content.
+## Args:
+    title (str): Memory title (must not be empty)
+    content (str): Memory content (empty means delete)
 """
 
 READ_MEMO_TOOL_DESCRIPTION = """
+## Read one or more memory(s) content:
 Use this tool to retrieve previously recorded strategic decisions, observations, conclusions or other information for the current work session.
 This tool helps you recall important past information and maintain consistency.
 ## When to Use This Tool
@@ -54,7 +62,78 @@ Do NOT use this tool when:
 ## Important Guidelines
 - Do not use it as a substitute for conversation history or planning context.
 - Avoid unnecessary reads, only use it when prior information affect correctness.
+## Args:
+    title (list[str]): Titles of memories in the `## Available Memories` section to be read.
 """
+
+
+def update_to_yaml(
+    file_path: Path,
+    title: str,
+    content: str,
+    date: str,
+    source: Literal["conversation", "workspace"],
+) -> list[dict]:
+    """
+    Update or delete memo in yaml file.
+
+    Args:
+        file_path (Path): yaml file path
+        title (str): memo title
+        content (str): memo content, if empty -> delete
+        date (str): memo date, e.g. 2025-06-07
+        source (Literal["conversation", "workspace"]): memo source
+
+    Returns:
+        list[dict]: latest full memo list
+    """
+    try:
+        content = content or ""
+        # Load existing data
+        if file_path.exists():
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or []
+        else:
+            data = []
+
+        if not isinstance(data, list):
+            logger.warning(
+                f"[update_to_yaml] Invalid yaml structure in {file_path}, resetting to empty list."
+            )
+            data = []
+
+        # Remove all same-title memos first
+        data = [
+            memo
+            for memo in data
+            if memo.get("title") != title
+        ]
+
+        # Re-insert latest version if content not empty
+        if content.strip():
+            data.append({
+                "title": title,
+                "date": date,
+                "content": content,
+                "source": source,
+            })
+
+        # Write back
+        with open(file_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(
+                data,
+                f,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+
+        logger.info("[update_to_yaml] yaml updated successfully.")
+
+        return data
+
+    except Exception as e:
+        logger.error(f"[update_to_yaml] Error: {e}")
+        raise
 
 
 @tool(description=WRITE_TODOS_TOOL_DESCRIPTION)
@@ -115,21 +194,14 @@ async def write_todos(
 
 
 
-
 @tool(description=WRITE_MEMO_TOOL_DESCRIPTION)
-async def update_memorandum(
+async def update_memory(
     title: str,
-    content: str,
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
+    content: Optional[str] = "",
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Write / Overwrite or delete a memorandum.
 
-    Args:
-        title (str): Memorandum title (must not be empty)
-        content (str): Memorandum content (empty means delete)
-    """
     client_id = state.get("client_id")
     target = state.get("target")
     generation_id = state.get("generation_id")
@@ -142,13 +214,15 @@ async def update_memorandum(
         target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
-            "tool_name": "update_memorandum",
+            "tool_name": "update_memory",
             "tool_call_id": tool_call_id,
-            "content": "Update memorandum",
+            "content": "Update memory",
             "chunk_position": "start",
             "status": "success",
         }
     )
+
+    content = content or ""
 
     # Title must not be empty (content CAN be empty -> delete)
     if not title.strip():
@@ -157,7 +231,7 @@ async def update_memorandum(
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memorandum",
+                "tool_name": "update_memory",
                 "tool_call_id": tool_call_id,
                 "content": "Empty title",
                 "chunk_position": "end",
@@ -184,7 +258,7 @@ async def update_memorandum(
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memorandum",
+                "tool_name": "update_memory",
                 "tool_call_id": tool_call_id,
                 "content": "Missing state keys",
                 "chunk_position": "end",
@@ -203,26 +277,115 @@ async def update_memorandum(
             }
         )
 
-    # Build file path
+    workspace = state.get("config", {}).get("work_dir")
+
+    memo_namespace = (
+        client_id
+        + ":"
+        + (workspace or history_id)
+        + ":"
+        + state.get("agent_role")
+    )
+
+    fallback_memo_namespace = (
+        client_id
+        + ":"
+        + history_id
+        + ":"
+        + state.get("agent_role")
+    )
+
+    existing_memo = next(
+        (
+            memo
+            for memo in (state.get("memorandum") or [])
+            if memo.get("title") == title
+        ),
+        None,
+    )
+
+    # Existing memo keeps its original source namespace
+    if existing_memo:
+        memo_source = existing_memo.get("source") or (
+            "workspace" if workspace else "conversation"
+        )
+    else:
+        memo_source = "workspace" if workspace else "conversation"
+
     memo_dir = Path(BASE_DIR) / "memo"
     memo_dir.mkdir(parents=True, exist_ok=True)
 
-    hash_input = f"{client_id}:{history_id}".encode("utf-8")
-    memo_filename = hashlib.sha256(hash_input).hexdigest()
-    memo_path = memo_dir / f"{memo_filename}.yaml"
+    workspace_hash = hashlib.sha256(
+        memo_namespace.encode("utf-8")
+    ).hexdigest()
+
+    workspace_path = memo_dir / f"{workspace_hash}.yaml"
+
+    fallback_hash = hashlib.sha256(
+        fallback_memo_namespace.encode("utf-8")
+    ).hexdigest()
+
+    fallback_path = memo_dir / f"{fallback_hash}.yaml"
+
+    # Delete must clear both namespaces to avoid stale override resurrection
+    if not content.strip():
+        target_paths = {
+            workspace_path,
+            fallback_path,
+        }
+
+    else:
+        target_path = (
+            workspace_path
+            if memo_source == "workspace"
+            else fallback_path
+        )
+
+        target_paths = {target_path}
 
     try:
-        # Detect previous existence (for action type)
-        previous_titles = set(state.get("memorandum") or [])
-        existed_before = title in previous_titles
+        existed_before = existing_memo is not None
 
-        # Update YAML
-        updated_data = update_to_yaml(memo_path, title, content)
+        # Update target yaml(s)
+        for path in target_paths:
+            update_to_yaml(
+                file_path=path,
+                title=title,
+                content=content,
+                date=datetime.now().strftime("%Y-%m-%d"),
+                source=memo_source,
+            )
 
-        # Always rebuild from YAML (single source of truth)
-        current_memos = list(updated_data.keys())
+        # Reload merged memorandum
+        merged_map = {}
 
-        # Determine action
+        for path in [fallback_path, workspace_path]:
+            if not path.exists():
+                continue
+
+            data = load_from_yaml(path) or []
+
+            if not isinstance(data, list):
+                continue
+
+            for memo in data:
+                memo_title = memo.get("title")
+
+                if not memo_title:
+                    continue
+
+                existing = merged_map.get(memo_title)
+
+                # Keep latest memo by date
+                if (
+                    not existing
+                    or memo.get("date", "")
+                    > existing.get("date", "")
+                ):
+                    merged_map[memo_title] = memo
+
+        merged_memorandum = list(merged_map.values())
+
         if not content.strip():
             action = "deleted"
         elif existed_before:
@@ -230,13 +393,24 @@ async def update_memorandum(
         else:
             action = "created"
 
-        # End event
+        current_memo_titles = [
+            memo["title"]
+            for memo in merged_memorandum
+            if memo.get("title")
+        ]
+        
+        merged_memorandum = sorted(
+            merged_map.values(),
+            key=lambda x: x.get("date", ""),
+            reverse=True,
+        )
+
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END,
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memorandum",
+                "tool_name": "update_memory",
                 "tool_call_id": tool_call_id,
                 "content": action,
                 "chunk_position": "end",
@@ -248,11 +422,12 @@ async def update_memorandum(
             update={
                 "messages": [
                     ToolMessage(
-                        f"Memorandum {action} successfully. \n\n* Current memo titles in your memorandum: {current_memos}.",
+                        f"Memory {action} successfully. "
+                        f"\n\n* Current memorandum titles: {current_memo_titles}.",
                         tool_call_id=tool_call_id,
                     )
                 ],
-                "memorandum": current_memos,
+                "memorandum": merged_memorandum,
             }
         )
 
@@ -262,7 +437,7 @@ async def update_memorandum(
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memorandum",
+                "tool_name": "update_memory",
                 "tool_call_id": tool_call_id,
                 "content": f"Error occurred {str(e)}",
                 "chunk_position": "end",
@@ -274,89 +449,61 @@ async def update_memorandum(
             update={
                 "messages": [
                     ToolMessage(
-                        f"Failed to update memorandum: {str(e)}",
+                        f"Failed to update memory: {str(e)}",
                         tool_call_id=tool_call_id,
                     )
                 ]
             }
         )
-    
-    
+
+
 @tool(description=READ_MEMO_TOOL_DESCRIPTION)
-async def read_memorandum(
-    title: list[str],
+async def read_memory(
+    title: Optional[list[str]],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """
-    Read one or more memorandum(s) content before making a important decision.
 
-    Args:
-        title (list[str]): Titles of memoranda in the `Current Memorandum Title List` to read.
-    """
     client_id = state.get("client_id")
     target = state.get("target")
     generation_id = state.get("generation_id")
 
     event_writer = AgentStreamWriter(generation_id)
+
     event_writer.send_event(
-        event=AgentStreamEvent.TOOL_EXEC_START, 
+        event=AgentStreamEvent.TOOL_EXEC_START,
         target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
-            "tool_name": "read_memorandum",
+            "tool_name": "read_memory",
             "tool_call_id": tool_call_id,
-            "content": "Read memorandum",
+            "content": "Read memory",
             "chunk_position": "start",
             "status": "success",
         }
     )
 
     history_id = state.get("history_id")
+
     if not client_id or not history_id:
         event_writer.send_event(
-            event=AgentStreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "read_memorandum",
+                "tool_name": "read_memory",
                 "tool_call_id": tool_call_id,
                 "content": "Error occurred",
                 "chunk_position": "end",
                 "status": "fail",
             }
         )
-        return Command(
-            update={
-                "messages": [
-                    ToolMessage("[SYSTEM LEVEL] Error: Essential key not found in state.", tool_call_id=tool_call_id)
-                ]
-            }
-        )
 
-    memo_dir = Path(BASE_DIR) / "memo"
-    hash_input = f"{client_id}:{history_id}".encode("utf-8")
-    memo_filename = hashlib.sha256(hash_input).hexdigest()
-    memo_path = memo_dir / f"{memo_filename}.yaml"
-
-    if not memo_path.exists():
-        event_writer.send_event(
-            event=AgentStreamEvent.TOOL_EXEC_END, 
-            target=target,
-            data={
-                "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "read_memorandum",
-                "tool_call_id": tool_call_id,
-                "content": "Nothing here",
-                "chunk_position": "end",
-                "status": "success",
-            }
-        )
         return Command(
             update={
                 "messages": [
                     ToolMessage(
-                        "No memorandum has been written yet in this session.",
+                        "[SYSTEM LEVEL] Error: Essential key not found in state.",
                         tool_call_id=tool_call_id,
                     )
                 ]
@@ -364,33 +511,75 @@ async def read_memorandum(
         )
 
     try:
-        contents = []
-        if not title:
-            content = str(load_from_yaml(memo_path)) # Load all if no specific title provided
-            contents.append(content.strip() if content else "No content found.")
+        memorandum_list = state.get("memorandum") or []
+
         if isinstance(title, str):
             title = [title]
+
+        contents = []
+
+        if not title:
+            event_writer.send_event(
+                event=AgentStreamEvent.TOOL_EXEC_END,
+                target=target,
+                data={
+                    "event_name": "tool_exec_chunk_rtn",
+                    "tool_name": "read_memory",
+                    "tool_call_id": tool_call_id,
+                    "content": "No title provided.",
+                    "chunk_position": "end",
+                    "status": "fail",
+                }
+            )
+
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            "A title is required.",
+                            tool_call_id=tool_call_id,
+                        )
+                    ]
+                }
+            )
+
+        memorandum_map = {
+            memo.get("title"): memo
+            for memo in memorandum_list
+            if memo.get("title")
+        }
+
         for t in title:
-            content = str(load_from_yaml(memo_path, t))
-            contents.append(content.strip() if content else f"No content found for title: {t}.")
+            memo = memorandum_map.get(t)
+
+            if not memo:
+                contents.append(f"No content found for title: {t}.")
+                continue
+
+            contents.append(
+                f"Title: {memo.get('title', '')}\n"
+                f"Date: {memo.get('date', '')}\n"
+                f"Content:\n{memo.get('content', '')}"
+            )
 
         event_writer.send_event(
-            event=AgentStreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "read_memorandum",
+                "tool_name": "read_memory",
                 "tool_call_id": tool_call_id,
-                "content": f"Read {" ".join(title)}",
+                "content": f"Read {' '.join(title)}",
                 "chunk_position": "end",
                 "status": "success",
             }
         )
+
         return Command(
             update={
                 "messages": [
                     ToolMessage(
-                        "\n".join(contents),
+                        "\n\n---\n\n".join(contents) if contents else "No memory found.",
                         tool_call_id=tool_call_id,
                     )
                 ]
@@ -399,17 +588,18 @@ async def read_memorandum(
 
     except Exception as e:
         event_writer.send_event(
-            event=AgentStreamEvent.TOOL_EXEC_END, 
+            event=AgentStreamEvent.TOOL_EXEC_END,
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "read_memorandum",
+                "tool_name": "read_memory",
                 "tool_call_id": tool_call_id,
                 "content": f"Error occurred {str(e)}",
                 "chunk_position": "end",
                 "status": "fail",
             }
         )
+
         return Command(
             update={
                 "messages": [

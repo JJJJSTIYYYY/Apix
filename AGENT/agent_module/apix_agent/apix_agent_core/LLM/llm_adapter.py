@@ -96,9 +96,6 @@ class LlmNodeAdapter:
         *,
         input,
         reasoning: bool = False,
-        fall_back_provider: str = '',
-        fall_back_model_name: str = '',
-        fall_back_api_key: str = '',
         fall_back_config: AgentConfigSchema = None
     ):
         """
@@ -123,10 +120,15 @@ class LlmNodeAdapter:
             - Pass reasoning if supported
         """
 
+        fall_back_provider=fall_back_config.get("models_provider")
+        fall_back_model_name=fall_back_config.get("model_name")
+        fall_back_api_key=fall_back_config.get("api_key")
         provider = getattr(llm_node, "provider", fall_back_provider)
         model_name = getattr(llm_node, "model_name", fall_back_model_name)
         api_key = getattr(llm_node, "api_key", fall_back_api_key)
-        config = getattr(llm_node, "extra_body", {}) or {}
+        extra_body = getattr(llm_node, "extra_body", {}) or {}
+        config = fall_back_config.copy()
+        config['enable_think'] = reasoning
 
         logger.warning(f"[LlmNodeAdapter] [astream] Get attr: provider={provider}, model_name={model_name}.")
 
@@ -134,12 +136,12 @@ class LlmNodeAdapter:
             model_name and model_name.startswith("deepseek")
         ):
             # If current model not match → rebuild
-            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
-                llm_node = get_llm_node(
+            if ((extra_body.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
+                llm_node = cls.get_atapted_llm_node(
                     provider=provider,
                     model=model_name,
                     api_key=api_key,
-                    config={"enable_think": reasoning},
+                    config=config,
                 )
 
             async for chunk in llm_node.astream(input):
@@ -150,12 +152,12 @@ class LlmNodeAdapter:
             model_name and model_name.startswith("mimo")
         ):
             # If current model not match → rebuild
-            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
-                llm_node = get_llm_node(
+            if ((extra_body.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
+                llm_node = cls.get_atapted_llm_node(
                     provider=provider,
                     model=model_name,
                     api_key=api_key,
-                    config={"enable_think": reasoning},
+                    config=config,
                 )
 
             async for chunk in llm_node.astream(input):
@@ -188,9 +190,6 @@ class LlmNodeAdapter:
         *,
         input,
         reasoning: bool = False,
-        fall_back_provider: str = '',
-        fall_back_model_name: str = '',
-        fall_back_api_key: str = '',
         fall_back_config: AgentConfigSchema = None
     ):
         """
@@ -215,10 +214,15 @@ class LlmNodeAdapter:
             - Keep official LangChain behavior
         """
 
+        fall_back_provider=fall_back_config.get("models_provider")
+        fall_back_model_name=fall_back_config.get("model_name")
+        fall_back_api_key=fall_back_config.get("api_key")
         provider = getattr(llm_node, "provider", fall_back_provider)
         model_name = getattr(llm_node, "model_name", fall_back_model_name)
         api_key = getattr(llm_node, "api_key", fall_back_api_key)
-        config = getattr(llm_node, "extra_body", {}) or {}
+        extra_body = getattr(llm_node, "extra_body", {}) or {}
+        config = fall_back_config.copy()
+        config['enable_think'] = reasoning
 
         logger.warning(f"[LlmNodeAdapter] [ainvoke] Get attr: provider={provider}, model_name={model_name}.")
 
@@ -226,12 +230,12 @@ class LlmNodeAdapter:
             model_name and model_name.startswith("deepseek")
         ):
             # If current model not match → rebuild
-            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
-                llm_node = get_llm_node(
+            if ((extra_body.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
+                llm_node = cls.get_atapted_llm_node(
                     provider="deepseek",
                     model=model_name,
                     api_key=api_key,
-                    config={"enable_think": reasoning},
+                    config=config,
                 )
 
             return await llm_node.ainvoke(input)
@@ -240,12 +244,12 @@ class LlmNodeAdapter:
             model_name and model_name.startswith("mimo")
         ):
             # If current model not match → rebuild
-            if ((config.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
-                llm_node = get_llm_node(
+            if ((extra_body.get("thinking", {}) or {}).get("type", "") == 'enabled') != reasoning:
+                llm_node = cls.get_atapted_llm_node(
                     provider="xiaomimimo",
                     model=model_name,
                     api_key=api_key,
-                    config={"enable_think": reasoning},
+                    config=config,
                 )
 
             return await llm_node.ainvoke(input)
@@ -332,9 +336,7 @@ class LlmNodeAdapter:
                 llm_node,
                 input=messages,
                 reasoning=False,
-                fall_back_provider=provider,
-                fall_back_model_name=model_name,
-                fall_back_api_key=api_key
+                fall_back_config=config
             )
 
             content = resp.content

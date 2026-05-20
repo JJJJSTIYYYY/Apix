@@ -14,7 +14,7 @@ import httpx
 
 from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage, ToolMessage, AIMessage, AnyMessage
 
-from apix_agent.commons.type_def import MainAgentState
+from apix_agent.commons.type_def import MainAgentState, MemoItem
 from apix_agent.global_config import BASE_DIR, FILE_SERVICE_URL, MEMORY_SERVICE_BASE_URL
 from apix_agent.commons.logger import logger
 from apix_agent.commons.file_content_reader import load_from_yaml
@@ -1082,26 +1082,60 @@ class AIContextManager:
     def init_memorandum_list(self, state: MainAgentState):
         client_id = state.get("client_id", "")
         history_id = state.get("history_id", "")
+        workspace = state.get("config", {}).get("work_dir")
+
+        memo_namespace = client_id + ":" + (workspace or history_id) + ":" + state.get("agent_role")
+        fallback_memo_namespace = client_id + ":" + history_id + ":" + state.get("agent_role")
 
         memo_dir = Path(BASE_DIR) / "memo"
-        hash_input = f"{client_id}:{history_id}".encode("utf-8")
-        memo_filename = hashlib.sha256(hash_input).hexdigest()
-        memo_path = memo_dir / f"{memo_filename}.yaml"
-        logger.info(f"[init_memorandum_list] Trying to load memorandum_list from {memo_path}")
 
-        memorandum_list = []
+        def load_memories(namespace: str) -> list[MemoItem]:
+            hash_input = namespace.encode("utf-8")
+            memo_filename = hashlib.sha256(hash_input).hexdigest()
+            memo_path = memo_dir / f"{memo_filename}.yaml"
 
-        if memo_path.exists():
-            memorandum_dict = load_from_yaml(memo_path) or {}
+            logger.info(f"[init_memorandum_list] Trying to load memorandum_list from {memo_path}")
 
-            if not isinstance(memorandum_dict, dict):
+            if not memo_path.exists():
+                return []
+
+            memorandum_list = load_from_yaml(memo_path) or []
+
+            if not isinstance(memorandum_list, list):
                 logger.warning(
-                    f"[init_memorandum_list] Invalid memorandum yaml structure for client_id {client_id}: {memorandum_dict}"
+                    f"[init_memorandum_list] Invalid memorandum yaml structure for client_id {client_id}: {memorandum_list}"
                 )
-            else:
-                memorandum_list = list(memorandum_dict.keys())
+                return []
 
-        logger.info(f"[init_memorandum_list] Initialized memorandum list for client_id {client_id}, history_id {history_id}: {memorandum_list}")
+            return memorandum_list
+
+        merged_memorandum_map = {}
+
+        for memo in load_memories(memo_namespace):
+            title = memo.get("title")
+            if title:
+                merged_memorandum_map[title] = memo
+
+        if memo_namespace != fallback_memo_namespace:
+            for memo in load_memories(fallback_memo_namespace):
+                title = memo.get("title")
+
+                if not title:
+                    continue
+
+                existing = merged_memorandum_map.get(title)
+
+                # Keep newer memo with same title
+                if existing is None or memo.get("date", "") > existing.get("date", ""):
+                    merged_memorandum_map[title] = memo
+
+        memorandum_list = list(merged_memorandum_map.values())
+
+        logger.info(
+            f"[init_memorandum_list] Initialized memorandum list for client_id {client_id}, "
+            f"history_id {history_id}: {memorandum_list}"
+        )
+
         state["memorandum"].clear()
         state["memorandum"].extend(memorandum_list)
         
@@ -1498,19 +1532,22 @@ class AIContextManager:
 
     # Runtime prompt
     def create_memorandum_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
-        memorandum_title_list: List[str] = state.get("memorandum", [])
+        memorandum_list: List[MemoItem] = state.get("memorandum", [])
 
-        if not memorandum_title_list:
-            return "## Memorandum title list is empty.\n\n"
+        if not memorandum_list:
+            return "## No memories available.\n\n"
 
-        lines = ["## Current Memorandum Title List:"]
+        lines = ["## Available Memories:"]
 
-        for index, item in enumerate(memorandum_title_list, start=1):
-            lines.append(f"{index}. {item}")
+        for index, item in enumerate(memorandum_list, start=1):
+            title = item.get("title", "").strip()
+            date = item.get("date", "").strip()
 
-        formatted = "\n".join(lines)
+            lines.append(
+                f"{index}. title: {title} | date: {date}"
+            )
 
-        return formatted + "\n\n"
+        return "\n".join(lines) + "\n\n"
 
     
     def create_system_prompt_list(self, state: MainAgentState, agent_role: str = None):

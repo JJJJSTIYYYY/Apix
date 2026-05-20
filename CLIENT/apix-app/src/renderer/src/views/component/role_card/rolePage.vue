@@ -108,26 +108,26 @@
         </div>
 
         <div class="setting-card">
-          <div class="setting-title">开启测试专家模式</div>
+          <div class="setting-title">允许Agent访问任务流</div>
           <div class="setting-control">
             <div class="setting-info">
-              开启测试专家模式，给Agent提供更多的工具来搭建测试工作流，需要开启测试任务管理服务器。
+              允许Agent访问任务流，需要先提交任务流文件至服务器。
             </div>
             <div class="mode-switch">
-              <div class="slider" :class="{ right: store.config.testExpertMode }" />
+              <div class="slider" :class="{ right: store.config.enableTaskFlow }" />
 
               <button
                 class="off-select"
-                :class="{ active: !store.config.testExpertMode }"
-                @click="switchMode('testExpertMode', 'off')"
+                :class="{ active: !store.config.enableTaskFlow }"
+                @click="switchMode('enableTaskFlow', 'off')"
               >
                 Off
               </button>
 
               <button
                 class="on-select"
-                :class="{ active: store.config.testExpertMode }"
-                @click="switchMode('testExpertMode', 'on')"
+                :class="{ active: store.config.enableTaskFlow }"
+                @click="switchMode('enableTaskFlow', 'on')"
               >
                 On
               </button>

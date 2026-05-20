@@ -5,6 +5,7 @@
         v-if="type === 'ai' || type === 'human' || type === 'tool'" 
         class="menu-item"
         @click="copyValue"
+        tabindex="0"
       >
         <svg t="1776756262130" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10157" width="20" height="20"><path d="M585.142857 365.714286a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V438.857143a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238z m0 73.142857H195.047619v390.095238h390.095238V438.857143z m-73.142857 219.428571v73.142857H268.190476v-73.142857h243.809524zM828.952381 121.904762a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857h-121.904762v-73.142857h121.904762V195.047619H438.857143v121.904762h-73.142857V195.047619a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238zM512 536.380952v73.142858H268.190476v-73.142858h243.809524z" p-id="10158" fill="var(--apix-default-dark-color)"></path></svg>
         <span>复制文本</span>
@@ -124,6 +125,11 @@ function showDetail() {
 </script>
 
 <style scoped>
+.popup-menu-wrapper :deep(*:focus-visible) {
+  outline: 2px solid var(--apix-primary-color) !important;
+  outline-offset: 2px;
+}
+
 .popup-menu-wrapper {
   z-index: 999999;
   position: relative;

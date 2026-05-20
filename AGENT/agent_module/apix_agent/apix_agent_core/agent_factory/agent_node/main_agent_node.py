@@ -310,9 +310,7 @@ class MainAgentNode(AgentNodeBase):
                     llm_node=self.llm,
                     input=summary_prompt,
                     reasoning=True,
-                    fall_back_provider=config.get("models_provider"),
-                    fall_back_model_name=config.get("model_name"),
-                    fall_back_api_key=config.get("api_key")
+                    fall_back_config=config
                 )
             except Exception as e:
                 logger.error(f"[context_summary] Summary failed: {e}")
@@ -491,8 +489,10 @@ class MainAgentNode(AgentNodeBase):
             threshold=llm_calls_warning_threshold,
         )
         if need_alert:
+            logger.warning(f"[agent.py] [AI_Agent] [llm_call] Inject `SYSTEM_ALERT_PROMPT`: {self.SYSTEM_ALERT_PROMPT}")
             llm_input = llm_input + [SystemMessage(self.SYSTEM_ALERT_PROMPT)]
         if state.get("error_detail"):
+            logger.warning(f"[agent.py] [AI_Agent] [llm_call] Inject `CRITICAL WARN`: {state.get("error_detail")}")
             llm_input = llm_input + [SystemMessage(f"CRITICAL WARN: {state.get("error_detail")}. If you are trying to do that, stop immediately any way!")]
 
         # Start streaming
@@ -500,9 +500,7 @@ class MainAgentNode(AgentNodeBase):
             llm_node=self.llm,
             input=llm_input,
             reasoning=enable_think,
-            fall_back_provider=config.get("models_provider"),
-            fall_back_model_name=config.get("model_name"),
-            fall_back_api_key=config.get("api_key")
+            fall_back_config=config
         )
 
         event_writer.send_event(

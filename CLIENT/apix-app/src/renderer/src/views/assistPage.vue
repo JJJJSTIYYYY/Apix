@@ -261,7 +261,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, reactive, watch, onMounted, onBeforeUnmount, h, computed, toRaw } from 'vue'
+import { ref, nextTick, reactive, watch, onMounted, onBeforeUnmount, h, computed, toRaw, onActivated, onDeactivated } from 'vue'
 import type { TagProps } from 'element-plus'
 import HomePage from './homePage.vue'
 import HumanMessageBubble from './component/msg_bubble_body/human_message_bubble.vue'
@@ -270,6 +270,7 @@ import ChatHistoryPanel from './component/dialog_history/history_panel.vue'
 import { type ChatHistory } from './component/dialog_history/history_card.vue'
 import { useAppCacheData } from '../store/app'
 import { useAuthStore } from '../store/auth'
+import { messageCache, generatingState } from '../store/globalData.js'
 import { ElMessage } from 'element-plus'
 import { NAvatar, NSelect } from 'naive-ui'
 import { InputDialog } from './component/comp/inputDialog'
@@ -470,7 +471,7 @@ function appendToolCallsFromExtra(
 // ################################
 // Message cache by history
 // ################################
-const messageCache = reactive<Record<string, ChatMessage[]>>({})
+// const messageCache = reactive<Record<string, ChatMessage[]>>({})
 const loadedHistorySet = reactive(new Set<string>())
 const loadingHistorySet = reactive(new Set<string>())
 
@@ -1077,6 +1078,7 @@ const actionMap: Record<string, (payload: any, historyId: string) => any> = {
 }
 
 function handleWsMessage(payload: any) {
+  if (!websocketGateSwitch) return
   const historyId = getPayloadHistoryId(payload)
   if (!historyId) return
 
@@ -1502,7 +1504,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
     }))
 
   if (quotedText.value !== '') {
-    content = `- Quoted Meaasge:  \n> “${quotedText.value}”\n\n` + content
+    content = `Referenced Message:  \n> “${quotedText.value}”\n\n` + content
   }
 
   isQuoteShow.value = false
@@ -1600,7 +1602,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
         higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        enable_task_flow: store.config.testExpertMode,
+        enable_task_flow: store.config.enableTaskFlow,
       }
     )
   } catch (err) {
@@ -1767,7 +1769,17 @@ async function handleBranchSwitch(branch_id: string) {
 // ################################
 // Lifecycle
 // ################################
+let websocketGateSwitch = false
+onActivated(() => {
+  websocketGateSwitch = true
+})
+
+onDeactivated(() => {
+  websocketGateSwitch = false
+})
+
 onMounted(async () => {
+  websocketGateSwitch = true
   window.addEventListener('keydown', globalHandleKeydown)
   try {
     unsubscribeWs = window.api.onWsMessage((payload: any) => {
@@ -2671,13 +2683,6 @@ const setFullInput = () => {
   min-width: 840px;
   height: calc(100vh - 190px);
   scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 12px,
-    black calc(100% - 12px),
-    transparent 100%
-  );
   mask-image: linear-gradient(
     to bottom,
     transparent 0%,

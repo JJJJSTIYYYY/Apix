@@ -195,7 +195,7 @@ async function triggerExpand() {
 <style scoped>
 .search-panel {
   position: absolute;
-  top: 6px !important;
+  top: 46px !important;
   right: 12px !important;
   left: unset !important;
   bottom: unset !important;

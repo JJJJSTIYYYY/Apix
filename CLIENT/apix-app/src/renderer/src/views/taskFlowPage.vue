@@ -278,7 +278,7 @@ function onLeftDragStart(card: PresetCard) {
 // ------------------------
 // 删除左侧卡片
 // ------------------------
-async function removeLeftCard(id: string) {
+async function removeLeftCard(id: String) {
   try {
     await ConfirmDialog.confirm(
       '要删除此卡片吗？删除后不可撤销',

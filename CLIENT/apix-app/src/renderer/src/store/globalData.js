@@ -35,6 +35,11 @@ export function getSupportFileSVG (path) {
   }
 }
 
+// const messageCache = reactive<Record<string, ChatMessage[]>>({})
+// const generatingState = reactive<Record<string, GeneratingState[]>>({})
+
+export const messageCache = reactive({})
+export const generatingState = reactive({})
 export const tabContentCache = {}
 
 export const globalSelection = reactive({

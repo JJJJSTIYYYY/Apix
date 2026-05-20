@@ -82,13 +82,11 @@
               </button>
             </div>
 
-            <transition name="scale-fade-height">
-              <div
-                v-show="isThinkExpanded(item.key)"
-                v-html="item.html"
-                class="markdown-body think selectable"
-              ></div>
-            </transition>
+            <div
+              v-show="isThinkExpanded(item.key)"
+              v-html="item.html"
+              class="markdown-body think selectable"
+            ></div>
           </template>
 
           <!-- Tool -->
@@ -820,8 +818,17 @@ onBeforeUnmount(() => {
   background-color: transparent !important;
   font-size: 14px;
   width: calc(100% - 32px);
+  max-height: 300px;
+  overflow: scroll;
   padding: 6px 16px 6px 16px;
   color: var(--think-color);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
 }
 
 .expend-think-btn {
@@ -1017,6 +1024,7 @@ onBeforeUnmount(() => {
   background-color: var(--branch-bg);
   border-radius: 24px;
   border: 1px solid var(--branch-border);
+  margin-bottom: 12px;
 }
 
 .branch-switch-wrapper:hover {
@@ -1076,17 +1084,6 @@ onBeforeUnmount(() => {
 .opacity-fade-leave-active {
   animation: opacityFadeOut 0.2s var(--apix-cubic-bezier);
 }
-
-.scale-fade-height-enter-active,
-.scale-fade-height-leave-active {
-  transition: opacity 0.25s var(--apix-cubic-bezier), transform 0.25s var(--apix-cubic-bezier);
-  transform-origin: top center;
-  overflow: hidden;
-}
-.scale-fade-height-enter-from { opacity: 0; }
-.scale-fade-height-enter-to { opacity: 1; }
-.scale-fade-height-leave-from { opacity: 1; }
-.scale-fade-height-leave-to { opacity: 0; }
 
 @keyframes scaleFadeIn {
   0% { opacity: 0; transform: scale(0.9) translateY(6px); }
@@ -1165,8 +1162,8 @@ onBeforeUnmount(() => {
 
 :deep(.code-copy-btn) {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 0px;
+  right: 0px;
   padding: 0px;
   font-size: 12px;
   border-radius: 8px;

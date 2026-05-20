@@ -108,6 +108,13 @@ class RoleSchema(TypedDict):
     definition: str
 
 
+class MemoItem(TypedDict):
+    title: str
+    date: str # 2025-06-07
+    content: str
+    source: Literal["conversation", "workspace"]
+
+
 class AgentConfigSchema(TypedDict):
     """
     Config for a single AI agent.
@@ -209,7 +216,7 @@ class MainAgentState(GraphRuntimeContext):
     context_fold_split_mark: NotRequired[str] # Split by completed | in_progress & pending todos, store with message id
     sandbox: str # Docker container id
     todos: NotRequired[list[Todo]]
-    memorandum: NotRequired[list[str]]
+    memorandum: NotRequired[list[MemoItem]]
     skills: list # Include available skills name and description
     loaded_skills_cache: list[tuple[str, bool, str]] # (name, injected, content): Skill name, injection status, and SKILL.md content
     documents: list # Include available documents name and description

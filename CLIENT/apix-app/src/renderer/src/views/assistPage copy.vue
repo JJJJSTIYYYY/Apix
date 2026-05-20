@@ -1610,7 +1610,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
         higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        enable_task_flow: store.config.testExpertMode,
+        enable_task_flow: store.config.enableTaskFlow,
       }
     )
   } catch (err) {

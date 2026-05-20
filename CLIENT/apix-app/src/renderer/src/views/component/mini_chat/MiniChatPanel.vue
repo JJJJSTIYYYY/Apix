@@ -3,9 +3,18 @@
     class="chat-wrapper-header"
   >
     <div class="chat-wrapper-title-wrapper">
-      <button
+      <div
+        v-if="!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1'"
         class="page-rtn-btn"
-        :disabled="!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1'"
+      >
+        <svg t="1777805499661" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13418" width="18" height="18">
+          <path d="M479.8464 111.7184c44.7744 0 87.9616 6.8864 128.6144 19.6096v81.792a350.7712 350.7712 0 0 0-128.6144-24.2944c-192.896 0-350.72 156.16-350.72 347.0336v250.624c0 53.9904 42.88 96.4096 97.4336 96.4096h253.2864c192.896 0 350.72-156.16 350.72-347.0336 0-36.9408-5.888-72.576-16.8448-106.0352h81.152c8.8832 33.92 13.6192 69.4528 13.6192 106.0352 0 233.2672-192.896 424.1408-428.6464 424.1408H226.56C129.1264 960 51.2 882.8928 51.2 786.4832v-250.624C51.2 302.592 244.096 111.7184 479.8464 111.7184z m19.4816 491.6224c21.4528 0 38.9632 17.3568 38.9632 38.5536s-17.5104 38.5536-38.9632 38.5536h-175.36a38.8864 38.8864 0 0 1-38.9632-38.5536c0-21.1968 17.536-38.5536 38.9632-38.5536h175.36z m136.3968-173.5168c21.4272 0 38.9632 17.3568 38.9632 38.5536 0 21.2224-17.536 38.5536-38.9632 38.5536H323.968a38.8864 38.8864 0 0 1-38.9632-38.5536c0-21.1968 17.536-38.5536 38.9632-38.5536h311.7568zM822.784 64c20.7104 0 37.504 16.7936 37.504 37.504l-0.0256 73.8304h75.4176a37.12 37.12 0 0 1 0 74.24l-75.4176-0.0256v73.856a37.504 37.504 0 0 1-75.008 0V249.5488h-75.392a37.12 37.12 0 1 1 0-74.2144h75.392V101.504c0-20.7104 16.7936-37.504 37.5296-37.504z" fill="var(--apix-default-dark-color)" p-id="13419"></path>
+        </svg>
+      </div>
+
+      <button
+        v-else
+        class="page-rtn-btn"
         @click="handleRtnPageClick"
       >
         <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16">
@@ -16,7 +25,7 @@
       <div 
         class="chat-wrapper-title"
       >
-        会话
+        {{!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1' ? '新聊天' : '会话' }}
       </div>
     </div>
 
@@ -251,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, reactive, watch, onActivated, onMounted, onBeforeUnmount, h, computed, toRaw } from 'vue'
+import { ref, nextTick, reactive, watch, onActivated, onMounted, onBeforeUnmount, h, computed, toRaw, onDeactivated } from 'vue'
 import HumanMessageBubble from './mini_msg_bubble_body/human_message_bubble.vue'
 import AiMessageBubble from './mini_msg_bubble_body/ai_message_bubble.vue'
 import HistoryPanel from './mini_history_panel/history_panel.vue'
@@ -271,7 +280,7 @@ import moonshotIcon from '../../../assets/icons/llm_providers/moonshot.svg'
 import qwenIcon from '../../../assets/icons/llm_providers/qwen.svg'
 import xiaomiIcon from '../../../assets/icons/llm_providers/xiaomimimo.svg'
 import customIcon from '../../../assets/icons/llm_providers/custom.svg'
-import { getSupportFileSVG } from '../../../store/globalData.js'
+import { getSupportFileSVG, messageCache, generatingState } from '../../../store/globalData.js'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()
@@ -523,7 +532,7 @@ function appendToolCallsFromExtra(
 // ################################
 // Message cache by history
 // ################################
-const messageCache = reactive<Record<string, ChatMessage[]>>({})
+// const messageCache = reactive<Record<string, ChatMessage[]>>({})
 const loadedHistorySet = reactive(new Set<string>())
 const loadingHistorySet = reactive(new Set<string>())
 
@@ -544,8 +553,6 @@ const messages = computed<ChatMessage[]>(() => {
 // ################################
 // Generating state by history
 // ################################
-const generatingState = reactive<Record<string, GeneratingState>>({})
-
 function ensureGeneratingState(hid: string): GeneratingState {
   if (!hid || hid === '-1') {
     return { isGenerating: false, streamStateText: '' }
@@ -1111,6 +1118,7 @@ const actionMap: Record<string, (payload: any, historyId: string) => void> = {
 }
 
 function handleWsMessage(payload: any) {
+  if (!websocketGateSwitch) return
   const historyId = getPayloadHistoryId(payload)
   if (!historyId) return
 
@@ -1494,11 +1502,11 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
   loadedHistorySet.add(currentHid)
 
   if (isQuoteShow.value && quotedText.value !== '') {
-    content = `- Quoted Meaasge:  \n> “${quotedText.value}”\n\n` + content
+    content = `Referenced Message:  \n> “${quotedText.value}”\n\n` + content
   }
 
   if (isFileQuoteShow.value && props.active_file && props.active_file !== '') {
-    content = `- Current Works On:  \n> “${props.active_file}”\n\n` + content
+    content = `Active File:  \n> “${props.active_file}”\n\n` + content
   }
 
   isQuoteShow.value = false
@@ -1591,7 +1599,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
         higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        enable_task_flow: store.config.testExpertMode,
+        enable_task_flow: store.config.enableTaskFlow,
       }
     )
   } catch (err) {
@@ -1683,7 +1691,7 @@ const handleDeleteMessages = async () => {
   selectMode.value = false
 }
 
-const isQuoteShow = ref(store.config.alwaysQuoteFile)
+const isQuoteShow = ref(false)
 const quotedText = ref('')
 
 function handleQuoteClose() {
@@ -1691,7 +1699,7 @@ function handleQuoteClose() {
   quotedText.value = ''
 }
 
-const isFileQuoteShow = ref(false)
+const isFileQuoteShow = ref(store.config.alwaysQuoteFile)
 
 function handleQuoteFileClick() {
   emit('quoteFile')
@@ -1775,6 +1783,15 @@ async function handleBranchSwitch(branch_id: string) {
 // ################################
 // Lifecycle
 // ################################
+let websocketGateSwitch = false
+onActivated(() => {
+  websocketGateSwitch = true
+})
+
+onDeactivated(() => {
+  websocketGateSwitch = false
+})
+
 const optionKeyPress = ref(false)
 
 onActivated(async () => {
@@ -1782,6 +1799,7 @@ onActivated(async () => {
 })
 
 onMounted(async () => {
+  websocketGateSwitch = true
   window.addEventListener('keydown', globalHandleKeydown)
   window.addEventListener('keyup', globalHandleKeyup)
   try {
@@ -2337,6 +2355,7 @@ const setFullInput = () => {
   height: calc(100vh - 36px - 38.5px);
   align-items: center;
   position: relative;
+  background-color: var(--apix-panel-layer-1-background);
 }
 
 /* Resize */
@@ -2388,13 +2407,6 @@ const setFullInput = () => {
   width: 400px;
   height: calc(100vh - 190px);
   scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 12px,
-    black calc(100% - 12px),
-    transparent 100%
-  );
   mask-image: linear-gradient(
     to bottom,
     transparent 0%,

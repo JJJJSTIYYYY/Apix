@@ -585,6 +585,7 @@ onBeforeUnmount(() => {
   background-color: var(--branch-bg);
   border-radius: 24px;
   border: 1px solid var(--branch-border);
+  margin-bottom: 12px;
 }
 
 .branch-switch-wrapper:hover {
