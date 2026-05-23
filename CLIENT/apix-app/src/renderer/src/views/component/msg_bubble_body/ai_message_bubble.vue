@@ -333,7 +333,8 @@ type TodoItem = {
 type QuestionItem = {
   question: string
   options?: string[]
-  response?: string
+  response?: string[]
+  multiselection?: boolean
 }
 
 type QuestionsView = {

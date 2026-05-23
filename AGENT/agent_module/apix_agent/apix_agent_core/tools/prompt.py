@@ -475,6 +475,8 @@ Request one or more answers, confirmations, selections, or decisions directly fr
     - question (str): The question shown to the user. Must not be empty.
     - options (list[str]): Optional predefined selectable options for the user.
         Use an empty list if free-form input is expected.
+    - multiselection (bool): Whether the user is allowed to select multiple options from the list.
+        If `True`, multiple choices are permitted; if `False`, only a single choice is allowed.
 
 ## Returns
 - str | None:

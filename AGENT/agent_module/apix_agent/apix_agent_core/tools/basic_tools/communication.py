@@ -14,6 +14,7 @@ from apix_agent.apix_agent_core.tools.prompt import REQUEST_USER_INPUT_PROMPT
 class Question(TypedDict):
     question: str
     options: list[str]
+    multiselection: Optional[bool]
 
 
 @tool(description=REQUEST_USER_INPUT_PROMPT)
@@ -50,8 +51,14 @@ async def request_user_input(
     if isinstance(result, list):
         parsed_result = []
         for r in result:
-            line0 = 'QUESTION: ' + (r.get('question', 'The question text is missing.') or 'The question text is missing.') + '  \n'
-            line1 = 'RESPONSE: ' + (r.get('response', '[User did not provide an answer]') or '[User did not provide an answer]')
+            line0 = 'QUESTION:  \n' + (r.get('question', 'The question text is missing.') or 'The question text is missing.') + '  \n'
+            resp = r.get('response', '[User did not provide an answer]') or '[User did not provide an answer]'
+            parsed_resp = resp
+            if isinstance(resp, list):
+                parsed_resp = ''
+                for ur in resp:
+                    parsed_resp = parsed_resp + '- ' + str(ur) + '  \n'
+            line1 = 'RESPONSE:  \n' + parsed_resp
             parsed_result.append(line0+line1)
         parsed_result = '\n\n'.join(parsed_result)
     

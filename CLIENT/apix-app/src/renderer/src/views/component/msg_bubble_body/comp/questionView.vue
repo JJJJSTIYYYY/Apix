@@ -47,7 +47,7 @@
         v-for="option in currentQuestion.options"
         :key="option"
         class="qv-option"
-        :class="{ active: currentQuestion.response === option }"
+        :class="{ active: selectedOptions.includes(option) }"
         @click="selectOption(option)"
       >
         {{ option }}
@@ -90,7 +90,8 @@ import { computed, ref, watch } from 'vue'
 export type QuestionItem = {
   question: string
   options?: string[]
-  response?: string
+  response?: string | string[]
+  multiselection?: boolean
 }
 
 const props = defineProps<{
@@ -110,26 +111,65 @@ const currentQuestion = computed(() => {
   return props.questions[currentIndex.value]
 })
 
+const isMultiple = computed(() => {
+  return !!currentQuestion.value.multiselection
+})
+
+const selectedOptions = computed(() => {
+
+  const response = currentQuestion.value?.response
+
+  if (Array.isArray(response)) {
+    return response
+  }
+
+  if (typeof response === 'string' && response) {
+    return [response]
+  }
+
+  return []
+})
+
 const isCustomMode = computed(() => {
 
   const response = currentQuestion.value?.response
+  const options = currentQuestion.value.options || []
 
   if (!response) {
     return false
   }
 
-  return !(currentQuestion.value.options || []).includes(response)
+  // Multi selection
+  if (Array.isArray(response)) {
+    return response.some(item => !options.includes(item))
+  }
+
+  // Single selection
+  return !options.includes(response)
 })
 
 watch(
   currentQuestion,
   (question) => {
 
-    const response = question?.response || ''
+    const response = question?.response
+    const options = question?.options || []
 
+    // Multi selection
+    if (Array.isArray(response)) {
+
+      const customValues = response.filter(
+        item => !options.includes(item)
+      )
+
+      customInput.value = customValues.join('\n')
+      return
+    }
+
+    // Single selection
     if (
       response &&
-      !(question.options || []).includes(response)
+      !options.includes(response)
     ) {
       customInput.value = response
       return
@@ -164,6 +204,25 @@ function prevQuestion() {
 
 function selectOption(option: string) {
 
+  // Multi selection
+  if (isMultiple.value) {
+
+    const current = [...selectedOptions.value]
+    const index = current.indexOf(option)
+
+    if (index >= 0) {
+      current.splice(index, 1)
+    } else {
+      current.push(option)
+    }
+
+    currentQuestion.value.response = current
+
+    emitChange()
+    return
+  }
+
+  // Single selection
   currentQuestion.value.response = option
 
   emitChange()
@@ -171,13 +230,40 @@ function selectOption(option: string) {
 
 function activateCustomInput() {
 
-  currentQuestion.value.response = customInput.value
-
-  emitChange()
+  updateCustomResponse()
 }
 
 function onCustomInput() {
 
+  updateCustomResponse()
+}
+
+function updateCustomResponse() {
+
+  // Multi selection
+  if (isMultiple.value) {
+
+    const options = currentQuestion.value.options || []
+
+    const customValues = customInput.value
+      .split('\n')
+      .map(item => item.trim())
+      .filter(Boolean)
+
+    const selectedBuiltinOptions = selectedOptions.value.filter(
+      item => options.includes(item)
+    )
+
+    currentQuestion.value.response = [
+      ...selectedBuiltinOptions,
+      ...customValues
+    ]
+
+    emitChange()
+    return
+  }
+
+  // Single selection
   currentQuestion.value.response = customInput.value
 
   emitChange()
