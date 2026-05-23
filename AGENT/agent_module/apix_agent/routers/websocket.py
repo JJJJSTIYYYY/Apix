@@ -47,7 +47,7 @@ async def ws_endpoint(websocket: WebSocket, platform: str, client_id: str):
 
             if action == "chat_with_llm":
                 try:
-                    generation_id = await generation_manager.create_generation(client_id, history_id)
+                    generation_id = await generation_manager.create_generation(client_id, history_id, platform)
                 except Exception as e:
                     logger.error(f"[ws] create_generation failed client={client_id}: {e}")
                     continue
@@ -57,18 +57,23 @@ async def ws_endpoint(websocket: WebSocket, platform: str, client_id: str):
                     f"client={client_id}, generation={generation_id}"
                 )
                 asyncio.create_task(action_handler.chat_with_llm(generation_id, data))
+
             elif action == "abort_generation":
                 try:
-                    await generation_manager.abort_by_history_id(client_id, history_id)
-
-                    logger.warning(
-                        f"[ws] abort_generation: client={client_id}, history={history_id}"
-                    )
+                    await generation_manager.abort_by_history_id(client_id, history_id, platform)
                 except Exception as e:
-                    logger.error(f"[ws] create_generation failed client={client_id}: {e}")
+                    logger.error(f"[ws] abort_generation failed client={client_id}: {e}")
                     continue
 
-                logger.warning(f"[ws] abort_generation by client={client_id}")
+                logger.warning(f"[ws] abort_generation by client={client_id}, history={history_id}")
+
+            elif action == "resolve_block":
+                try:
+                    await action_handler.resolve_block(data)
+                except Exception as e:
+                    logger.error(f"[ws] resolve_block failed client={client_id}: {e}")
+                    continue
+
             else:
                 raise ValueError(f"unknown action: {action}")
 

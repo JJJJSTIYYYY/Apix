@@ -54,33 +54,6 @@
           <div class="group-divider">
             <span class="group-label">界面设置</span>
           </div>
-          <!-- Brightness -->
-          <div class="setting-card">
-            <div class="setting-title">背景亮度</div>
-            <div class="setting-control">
-              <el-slider
-                v-model="store.config.lightValue"
-                :min="0"
-                :max="100"
-                @change="changeLightValue"
-              />
-              <span class="setting-value">{{ store.config.lightValue }}%</span>
-            </div>
-          </div>
-
-          <!-- Transparency -->
-          <div class="setting-card">
-            <div class="setting-title">背景透明度</div>
-            <div class="setting-control"> 
-              <el-slider
-                v-model="store.config.transparencyValue"
-                :min="0"
-                :max="100"
-                @change="changeTransparencyValue"
-              />
-              <span class="setting-value">{{ store.config.transparencyValue }}%</span>
-            </div>
-          </div>
       
           <div class="setting-card">
             <div class="setting-title">在AI消息中显示工具调用标签</div>
@@ -826,6 +799,19 @@
               </div>
             </div>
           </div>
+          
+          <div class="setting-card">
+            <div class="setting-title">模型温度百分比</div>
+            <div class="setting-control">
+              <el-slider
+                v-model="store.config.modelTemp"
+                :min="0"
+                :max="100"
+                @change="changeModelTemp"
+              />
+              <span class="setting-value">{{ store.config.modelTemp }}%</span>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -882,12 +868,8 @@ onBeforeUnmount(() => {
 })
 
 /* Settings */
-const changeLightValue = (value) => {
-  store.saveAppConfig('lightValue', value)
-}
-
-const changeTransparencyValue = (value) => {
-  store.saveAppConfig('transparencyValue', value)
+const changeModelTemp = (value) => {
+  store.saveAppConfig('modelTemp', value)
 }
 
 /* Proxy */
@@ -1575,6 +1557,10 @@ span.el-popper__arrow {
   transform: translateX(87%);
 }
 /* ---------------------------------- */
+
+:deep(.el-slider__runway) {
+  background-color: var(--apix-panel-layer-0-background);
+}
 
 /* Logout */
 .logout-btn-wrapper {

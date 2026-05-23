@@ -12,49 +12,16 @@ from langchain_core.messages import ToolMessage
 
 from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.global_config import FILE_SERVICE_URL
+from apix_agent.apix_agent_core.tools.prompt import LOAD_SKILL_PROMPT
 
 
-@tool
+@tool(description=LOAD_SKILL_PROMPT)
 async def load_skill(
     name: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """
-    Load the guide for one or more skill.
-
-    Skills provide reusable capabilities that help you accomplish tasks.
-    Each skill contains documentation (SKILL.md) that explains:
-    - how to use it
-    - what commands or tools it provides
-    - usage examples
-
-    When this tool is called, the skill package will be downloaded and
-    extracted into the sandbox at:
-
-        /workspace/SKILL/{skill_name}
-
-    You should read the SKILL.md file in that directory at first to understand
-    how to use the skill.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    - the user's task clearly requires the capability provided by that skill
-    - you need more detailed instructions to proceed
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    - skill package has already exists in workspace.
-    - you do not need a skill to compelete current task.
-    ## Important Guidelines
-    Avoid loading skills unnecessarily, as this may waste time and resources.
-    This tool will automatically inject a system message to show the content of SKILL.md.
-
-    Args:
-        name (str): The name of the skill to load.
-
-    Returns:
-        str: The skill guide (SKILL.md content) if successful, or an error message if loading fails.
-    """
+    
     if isinstance(name, str):
         skill_names = [name]
     else:

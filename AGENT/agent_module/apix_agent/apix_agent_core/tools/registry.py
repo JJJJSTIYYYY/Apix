@@ -4,7 +4,7 @@ from apix_agent.apix_agent_core.tools import *
 from apix_agent.global_config import CHECK_SERVER_HEALTH
 
 
-def get_available_tools(permission: str | list[str] = "", filter_by_name: list[str] = []) -> list[BaseTool]:
+def get_available_tools(permission: str | list[str] = "", agent_role: str = "", filter_by_name: list[str] = []) -> list[BaseTool]:
     """
     Return a list of LangChain Tool objects.
     Must return @tool-decorated objects ONLY.
@@ -54,7 +54,8 @@ def get_available_tools(permission: str | list[str] = "", filter_by_name: list[s
             read_memory, 
             update_memory,  
             ocr_analysis, 
-            send_images
+            send_images,
+            request_user_input
         ],
         "task_flow": [
             update_test_task,
@@ -83,6 +84,9 @@ def get_available_tools(permission: str | list[str] = "", filter_by_name: list[s
     for tool in tools:
         if filter_by_name and tool.name not in filter_by_name:
             continue
+        if agent_role in ['sub_agent', 'team_worker']:
+            if tool.name in forbiden_for_sub_agent:
+                continue
         filter_tools[tool.name] = tool
 
     return list(filter_tools.values())
@@ -90,3 +94,4 @@ def get_available_tools(permission: str | list[str] = "", filter_by_name: list[s
 
 # Tools in this set are not allowed to be called simultaneously in one tool_calls
 conflict_tool_set = {"write_todos", "update_memory", "load_skill"}
+forbiden_for_sub_agent = {"request_user_input", "send_images", "assign_sub_assistant", "query_sub_assistant", "stop_sub_assistant"}

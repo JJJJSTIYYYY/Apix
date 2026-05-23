@@ -15,6 +15,7 @@ from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import age
 from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelopeTarget, MainAgentState, MinimalEnvelopeData, ApixEventEnvelope, PlatformNotRegister, ProviderNoFound
 from apix_agent.commons.file_content_reader import load_from_yaml, write_to_yaml
 from apix_agent.global_config import BASE_DIR, BASE_URL, MEMORY_SERVICE_BASE_URL
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter
 
 
 # =========================
@@ -314,6 +315,20 @@ class ActionHandler:
         finally:
             await ai_agent.done(agent)
             await agent_sandbox.done(client_id=client_id, conversation_id=history_id, work_dir=work_dir)
+
+
+    async def resolve_block(self, payload: ApixEntryDataSchema):
+        data = payload.get('data')
+        block_id = data.get('block_id')
+        message = data.get('messages')
+        target: ApixEventEnvelopeTarget = {
+            'id': data.get('client_id'),
+            'platform': data.get('platform'),
+            'conversation_id': data.get('history_id')
+        }
+        if not block_id: return
+        AgentStreamWriter.resolve_block(target=target, block_id=block_id, result=message)
+
 
 
 action_handler = ActionHandler(generation_manager)

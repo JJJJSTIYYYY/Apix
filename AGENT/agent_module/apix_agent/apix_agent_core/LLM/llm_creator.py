@@ -12,6 +12,14 @@ from apix_agent.commons.type_def import AgentConfigSchema
 from apix_agent.commons.logger import logger
 
 
+def get_temperature(config: AgentConfigSchema | None) -> float:
+    config = config or {}
+    t = config.get("model_temperature", 1)
+    if t > 2: t = 3
+    elif t < 0: t = 0
+    return t
+
+
 def get_ollama_model(
     model: str,
     api_key: str,
@@ -31,6 +39,7 @@ def get_ollama_model(
         api_key=api_key,
         base_url=base_url,
         max_retries=3,
+        temperature=get_temperature(config)
     )
 
 
@@ -99,7 +108,7 @@ class PatchedChatOpenAI(ChatOpenAI):
                 if reasoning:
                     reasoning_content_map[i] = reasoning
                 elif isinstance(self.extra_body, dict) and (self.extra_body.get("thinking", {}) or {}).get("type", "enabled") != 'disabled':
-                    reasoning_content_map[i] = 'Continue.'
+                    reasoning_content_map[i] = '...'
 
         # Call original implementation
         payload = super()._get_request_payload(
@@ -161,6 +170,7 @@ def get_openai_model(
             base_url=base_url,
             max_retries=3,
             use_responses_api=False,
+            temperature=get_temperature(config)
         )
     
     return ChatOpenAI(
@@ -169,6 +179,7 @@ def get_openai_model(
         base_url=base_url,
         max_retries=3,
         use_responses_api=False,
+        temperature=get_temperature(config)
     )
 
 
@@ -191,6 +202,7 @@ def get_google_model(
         google_api_key=api_key,
         base_url=base_url,
         max_retries=3,
+        temperature=get_temperature(config)
     )
 
 class PatchedChatDeepSeek(ChatDeepSeek):
@@ -224,7 +236,7 @@ class PatchedChatDeepSeek(ChatDeepSeek):
                 if reasoning:
                     reasoning_content_map[i] = reasoning
                 elif isinstance(self.extra_body, dict) and (self.extra_body.get("thinking", {}) or {}).get("type", "enabled") != 'disabled':
-                    reasoning_content_map[i] = 'Continue.'
+                    reasoning_content_map[i] = '...'
 
         # Call original implementation
         payload = super()._get_request_payload(
@@ -283,7 +295,8 @@ def get_deepseek_model(
         api_key=api_key,
         base_url=base_url,
         max_retries=3,
-        extra_body={"thinking": {"type": "enabled" if enable_think else "disabled"}}
+        extra_body={"thinking": {"type": "enabled" if enable_think else "disabled"}},
+        temperature=get_temperature(config)
     )
 
 
@@ -419,6 +432,7 @@ def get_moonshot_model(
         base_url=base_url,
         max_retries=3,
         use_responses_api=False,
+        temperature=get_temperature(config)
     )
 
 
@@ -540,5 +554,6 @@ def get_xiaomi_model(
         base_url=base_url,
         max_retries=3,
         use_responses_api=False,
-        extra_body={"thinking": {"type": "enabled" if enable_think else "disabled"}}
+        extra_body={"thinking": {"type": "enabled" if enable_think else "disabled"}},
+        temperature=get_temperature(config)
     )

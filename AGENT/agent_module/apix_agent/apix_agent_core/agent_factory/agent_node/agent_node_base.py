@@ -50,7 +50,8 @@ class AgentNodeBase(ABC):
             tool_list_text = "No tools available."
 
         tools_block = DEFAULT_TOOLS_PROMPT.format(
-            tool_list=tool_list_text
+            tool_list=tool_list_text,
+            conflict_tool_list = str(conflict_tool_set)
         )
 
         time_msg = get_date_natural_language()
@@ -88,7 +89,7 @@ class AgentNodeBase(ABC):
         tool_calls = agent_message.tool_calls
         content = agent_message.content
         think = agent_message.additional_kwargs.get('reasoning_content')
-        fallback_content = "Continue."
+        fallback_content = "..."
         if tool_calls: 
             fallback_content = fallback_content + " Call tools: "
             seen = set()
@@ -107,13 +108,14 @@ class AgentNodeBase(ABC):
             fallback_content = fallback_content + ', '.join(tool_names) + '.'
 
             if has_error:
-                raise ConflictToolCalls(f"Tool {', '.join(seen)} are not allowed to be called simultaneously in one tool_calls")
+                raise ConflictToolCalls(f"Tool {', '.join(seen)} are not allowed to be called simultaneously in one tool_calls", errors=seen)
             
-        if not content and not think and tool_calls: 
+        # if not content and not think and tool_calls: 
+        if not think and tool_calls: 
             if reasoning: 
                 agent_message.additional_kwargs['reasoning_content'] = fallback_content
-            else:
-                agent_message.content = fallback_content
+            # else:
+            #     agent_message.content = fallback_content
         elif not content and not think and not tool_calls: 
             raise InvalidOutputsError("Empty ai message detected")
 

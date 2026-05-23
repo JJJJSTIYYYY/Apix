@@ -9,8 +9,6 @@ import { setHighlightTheme } from './globalData'
 const DEFAULT_CONFIG = {
   // ----- app ui -----
   dark_theme: false,
-  lightValue: 95,
-  transparencyValue: 90,
   backgroundImage: '',
   showToolLabels: false,
 
@@ -33,6 +31,7 @@ const DEFAULT_CONFIG = {
   keepNotSummary: 0,
   pureChat: false,
   agentSwarm: false,
+  modelTemp: 50,
 
   // ----- ai permissions -----
   fileOpration: false,

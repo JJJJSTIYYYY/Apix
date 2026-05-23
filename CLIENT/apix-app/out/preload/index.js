@@ -46,6 +46,7 @@ const api = {
   },
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, re_generate, chat_config) => electron.ipcRenderer.invoke("api:chat", cid, sid, hid, content, re_generate, chat_config),
+  sendWsEvent: (cid, action, ws_event) => electron.ipcRenderer.invoke("api:send_event", cid, action, ws_event),
   stopGeneration: (cid, sid, hid) => electron.ipcRenderer.invoke("api:stop", cid, sid, hid),
   newChat: (cid, workspace = "") => electron.ipcRenderer.invoke("api:new_chat", cid, workspace),
   updateConversation: (cid, sid, hid, new_info) => electron.ipcRenderer.invoke("api:update_conversation", cid, sid, hid, new_info),

@@ -75,6 +75,7 @@
                 @selected="selectMessageBubble"
                 @delete="selectMessageBubble"
                 @quoted="handleQuoteShow"
+                @complete-questions="handleCompleteQuestions"
                 @switch-to-branch="handleBranchSwitch"
               />
             </div>
@@ -120,7 +121,7 @@
               <div v-if="isWarningShow" class="warning-label">
                 <div style="display: flex; gap: 6px; align-items: center;">
                   <svg t="1776752724390" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1671" width="20" height="20"><path d="M558 563c0 24.852-20.148 45-45 45S468 587.852 468 563v-150c0-24.852 20.148-45 45-45s45 20.148 45 45v150z m0 132c0 24.852-20.148 45-45 45S468 719.852 468 695v-1c0-24.852 20.148-45 45-45S558 669.148 558 694v1z m-355.006 65.804a15 15 0 0 0 14.986 15.014l589.36 0.55a15 15 0 0 0 12.916-22.646L525.56 256.376a15 15 0 0 0-25.806-0.006l-294.66 496.796a15 15 0 0 0-2.098 7.638z m-75.31-53.552l294.66-496.794c29.584-49.878 93.998-66.328 143.874-36.746a105 105 0 0 1 36.768 36.784l294.7 497.346c29.56 49.89 13.08 114.298-36.808 143.86a105 105 0 0 1-53.624 14.666l-589.358-0.55c-57.99-0.054-104.956-47.108-104.9-105.1a105 105 0 0 1 14.688-53.466z" fill="var(--apix-warning-button-text)" p-id="1672"></path></svg>
-                  <span class="warning-content">{{ WarningContent }}</span>
+                  <span class="warning-content" :title="WarningContent">{{ WarningContent }}</span>
                 </div>
                 <button class="warning-close" @click="handleWarningClose">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -270,7 +271,7 @@ import ChatHistoryPanel from './component/dialog_history/history_panel.vue'
 import { type ChatHistory } from './component/dialog_history/history_card.vue'
 import { useAppCacheData } from '../store/app'
 import { useAuthStore } from '../store/auth'
-import { messageCache, generatingState } from '../store/globalData.js'
+import { messageCache, generatingState, loadingHistorySet, loadedHistorySet } from '../store/globalData.js'
 import { ElMessage } from 'element-plus'
 import { NAvatar, NSelect } from 'naive-ui'
 import { InputDialog } from './component/comp/inputDialog'
@@ -284,6 +285,7 @@ import moonshotIcon from '../assets/icons/llm_providers/moonshot.svg'
 import qwenIcon from '../assets/icons/llm_providers/qwen.svg'
 import xiaomiIcon from '../assets/icons/llm_providers/xiaomimimo.svg'
 import customIcon from '../assets/icons/llm_providers/custom.svg'
+import { QuestionItem } from './component/msg_bubble_body/comp/questionView.vue'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()
@@ -330,6 +332,7 @@ interface ChatMessage {
   info?: any
   extra?: any
   todos?: any[]
+  questions?: any[]
   images?: any[]
   pending?: boolean
   error?: boolean
@@ -430,7 +433,7 @@ function appendToolLabel(
         old.content = label.content
       }
       else {
-        old.content += label.content
+        old.content = old.content + '\n\n' + label.content
       }
     }
 
@@ -472,8 +475,8 @@ function appendToolCallsFromExtra(
 // Message cache by history
 // ################################
 // const messageCache = reactive<Record<string, ChatMessage[]>>({})
-const loadedHistorySet = reactive(new Set<string>())
-const loadingHistorySet = reactive(new Set<string>())
+// const loadedHistorySet = reactive(new Set<string>())
+// const loadingHistorySet = reactive(new Set<string>())
 
 function ensureHistoryMessages(hid: string): ChatMessage[] {
   if (!hid || hid === '-1') return []
@@ -1067,7 +1070,7 @@ const handleHideHistory = (toHide: boolean) => {
   isHistoryHide.value = toHide
 }
 
-const actionMap: Record<string, (payload: any, historyId: string) => any> = {
+const actionMap: Record<string, (payload: any, historyId: string) => void> = {
   msg_stream_start: handleStreamStart,
   think_chunk_rtn: handleThinkChunkRtn,
   content_chunk_rtn: handleContentChunkRtn,
@@ -1075,6 +1078,10 @@ const actionMap: Record<string, (payload: any, historyId: string) => any> = {
   msg_stream_abort: handleStreamAbort,
   tool_exec_chunk_rtn: handleToolChunkRtn,
   token_limit_warning: handleWarning,
+  conflict_tool_calls_warning: handleWarning,
+  invalid_outputs_warning: handleWarning,
+  bad_request_warning: handleWarning,
+  rate_limit_warning: handleWarning,
 }
 
 function handleWsMessage(payload: any) {
@@ -1205,6 +1212,8 @@ async function handleStreamEnd(payload: any, historyId: string) {
   if (index !== -1 && list[index].pending === true) {
     list[index].label = '已思考'
     list[index].pending = false
+    list[index].questions = undefined
+    await nextTick()
   }
 
   await syncHistoryMessages(historyId)
@@ -1254,7 +1263,10 @@ async function handleStreamAbort(payload: any, historyId: string) {
 
   const index = findLatestIndexById(list, generationId, 'ai')
   if (index !== -1 && list[index].pending === true) {
+    list[index].label = '思考中断'
     list[index].pending = false
+    list[index].questions = undefined
+    await nextTick()
   }
 
   await syncHistoryMessages(historyId)
@@ -1323,10 +1335,13 @@ function handleToolChunkRtn(payload: any, historyId: string) {
   else if (toolName === 'write_todos') {
     handleTodoChunkRtn(generationId, toolData, historyId)
   }
+  else if (toolName === 'request_user_input') {
+    handleQuestChunkRtn(generationId, toolData, historyId)
+  }
 }
 
 const isWarningShow = ref(false)
-const WarningContent = ref('警告标签内容')
+const WarningContent = ref('')
 
 function handleWarning(payload: any, historyId: string) {
   const generationId = payload.generation_id
@@ -1336,6 +1351,25 @@ function handleWarning(payload: any, historyId: string) {
   if (event_name === 'token_limit_warning') {
     console.warn('Token limit warning received for generationId: ', generationId)
     WarningContent.value = '当前选择的模型上下文窗口过小，请及时更换。'
+  }
+  else if (event_name === 'conflict_tool_calls_warning') {
+    const tool_name = payload.data?.messages?.content.tool_name
+    const retry = payload.data?.messages?.content.retry
+    WarningContent.value = `（${retry}）模型使用 ${tool_name} 时产生竞争态.`
+  }
+  else if (event_name === 'invalid_outputs_warning') {
+    const retry = payload.data?.messages?.content.retry
+    WarningContent.value = `（${retry}）模型产生了不合法输出.`
+  }
+  else if (event_name === 'bad_request_warning') {
+    const retry = payload.data?.messages?.content.retry
+    const message = payload.data?.messages?.content.message
+    WarningContent.value = `（${retry}）模型接口请求失败. ${message}`
+  }
+  else if (event_name === 'rate_limit_warning') {
+    const retry = payload.data?.messages?.content.retry
+    const message = payload.data?.messages?.content.message
+    WarningContent.value = `（${retry}）模型接口请求速率限制. ${message}`
   }
 
   isWarningShow.value = true
@@ -1362,6 +1396,28 @@ function handleTodoChunkRtn(generationId: string, data: any, historyId: string) 
 
   if (list[index].pending === true) {
     list[index].todos = cloneMaybeArray(todos)
+  }
+}
+
+function handleQuestChunkRtn(generationId: string, data: any, historyId: string) {
+  // console.log("Quest data: ", data)
+  if (!data || !generationId) return
+
+  const list = ensureHistoryMessages(historyId)
+  const state = ensureGeneratingState(historyId)
+  const index = ensureAiMessage(list, historyId, generationId)
+  const questions = data.content
+
+  if (!questions) return
+  if (data.chunk_position !== 'start' || data.status !== 'success') return
+
+  state.isGenerating = true
+
+  if (list[index].pending === true) {
+    list[index].questions = {
+      questions: cloneMaybeArray(questions),
+      qid: data.block_id
+    }
   }
 }
 
@@ -1590,6 +1646,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         summary_exempt_tail_length: store.config.keepNotSummary,
         pure_chat_on: store.config.pureChat,
         use_model_vision: store.config.visionOn,
+        model_temperature: store.config.modelTemp*0.02,
 
         enable_file_opration: store.config.fileOpration,
         enable_web_search: store.config.webSearch,
@@ -1618,6 +1675,19 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       list[index].pending = false
       list[index].error = true
     }
+  }
+}
+
+async function sendEvent(action: string, event: any) {
+  try {
+    await window.api.sendWsEvent(cid.value, action, event)
+  } catch (err) {
+    console.error('[sendEvent] Request failed', err)
+    ElMessage({
+      type: 'error',
+      message: '事件发送失败',
+      plain: true,
+    })
   }
 }
 
@@ -1706,6 +1776,24 @@ function handleQuoteShow(id: string, content: string) {
   if (id !== store.current_history_id) return
   isQuoteShow.value = true
   quotedText.value = content
+}
+
+async function handleCompleteQuestions(id: string, qid: string, resp: QuestionItem) {
+  // console.log("[handleCompleteQuestions] Questions finished: ", qid, resp)
+  const event = {
+    client_id: cid.value,
+    platform: 'default',
+    history_id: store.current_history_id,
+    block_id: qid,
+    messages: toRaw(resp)
+  }
+  await sendEvent('resolve_block', event)
+
+  const list = ensureHistoryMessages(store.current_history_id)
+  const index = findLatestIndexById(list, id, 'ai')
+  if (index !== -1) {
+    list[index].questions = undefined
+  }
 }
 
 async function handleBranchSwitch(branch_id: string) {

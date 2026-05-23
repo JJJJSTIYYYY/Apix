@@ -10,50 +10,16 @@ from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, Ag
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
+from apix_agent.apix_agent_core.tools.prompt import SEARCH_KNOWLEDGE_BASE_PROMPT
 
 
-@tool
+@tool(description=SEARCH_KNOWLEDGE_BASE_PROMPT)
 async def search_knowledge_base(
     query: str,
     document_ids: list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
-    """
-    Retrieve relevant document chunks from the knowledge base based on one query sentence,
-    and return the matched text snippets together with their source information.
-
-    This tool performs knowledge base retrieval only.
-    It does NOT fetch information on internet, and it does NOT generate a final answer.
-
-    Args:
-        query (str): One retrieval query sentence used to search the knowledge base.
-        document_ids (list[str]): The IDs of the target documents to retrieve.
-
-    Returns:
-        str: A tool message containing relevant document chunks and their source metadata.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    1. When the user asks questions that may be answered from the internal knowledge base.
-    2. When you need supporting document snippets before answering.
-    3. When you want grounded evidence with source attribution.
-    4. When you need to search across one or more queries for relevant knowledge.
-
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    1. The question can be answered reliably without knowledge base retrieval.
-    2. The user only wants a generic response with no need for grounding.
-    3. The task requires full-document reading rather than snippet-level retrieval.
-    4. The relevant content has already been provided directly in the conversation.
-
-    ## Important Guidelines
-    - The results returned by this tool are retrieved document chunks, not full documents.
-    - Each chunk should include or be associated with its source information.
-    - Do NOT assume missing context beyond the retrieved snippets.
-    - If more context is required, use a follow-up tool or workflow to read the full source document.
-    - Never fabricate retrieved content or source references.
-    """
 
     logger.trace('[retrieval_tool.py] [tool] [knowledge_base_retrieval] Enter')
 

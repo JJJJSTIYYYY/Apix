@@ -15,6 +15,7 @@ from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, Ag
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
+from apix_agent.apix_agent_core.tools.prompt import OCR_ANALYSIS_PROMPT, SEND_IMAGE_PROMPT
 
 
 DEFAULT_OCR_PROMPT = """
@@ -118,49 +119,14 @@ def get_reader():
     return _OCR_READER
 
 
-@tool
+@tool(description=OCR_ANALYSIS_PROMPT)
 async def ocr_analysis(
     prompt: str,
     file_path: str | list[str] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Analyze one or more image files and return the recognized text or image analysis result.
-    Supported file type: {".png", ".jpg", ".jpeg", ".bmp", ".webp"}.
-    Maximum number of input images at a time: 5.
-
-    Args:
-        prompt: A prompt describing what should be analyzed. This parameter will be ignored when EasyOCR is used.
-        file_path: File path / URL of a single image, or a list of image paths / URLs.
-
-    Returns:
-        str: The OCR result produced by EasyOCR or the image analysis result produced by a vision sub-model.
-
-    Note:
-        - This tool internally chooses to use EasyOCR or a vision sub-model.
-        - EasyOCR is used for text recognition only.
-        - A vision sub-model can return recognized text, image description, or other analysis results.
-        - The prompt parameter is only effective when a vision sub-model is used.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    1. When the user wants to understand the content of one or more images.
-    2. When the task requires reading or interpreting images.
-    3. When images need to be described for reasoning purposes.
-    4. When downstream processing depends on textual or visual information from images.
-
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    1. The file is not a supported image.
-    2. The task can be solved without viewing the image.
-
-    ## Important Guidelines
-    - Ensure the file path or URL is valid before calling this tool.
-    - Provide a clear prompt when image understanding or structured analysis is needed.
-    - If structured output is required, explicitly specify the expected format.
-    - Do not assume the content of an image without analysis.
-    """
+    
     target = state.get("target")
     generation_id = state.get("generation_id")
 
@@ -369,23 +335,13 @@ async def ocr_analysis(
         })
     
 
-@tool
+@tool(description=SEND_IMAGE_PROMPT)
 async def send_images(
     file_path: str | list[str] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Send one or more image files to user.
-    Supported file type: {".png", ".jpg", ".jpeg", ".bmp", ".webp"}.
-    Maximum number of input images at a time: 5.
 
-    Args:
-        file_path: File path / URL of a single image, or a list of image paths / URLs.
-
-    Returns:
-        str: The OCR result produced by EasyOCR or the image analysis result produced by a vision sub-model.
-    """
     client_id = state.get("client_id")
     target = state.get("target")
     generation_id = state.get("generation_id")

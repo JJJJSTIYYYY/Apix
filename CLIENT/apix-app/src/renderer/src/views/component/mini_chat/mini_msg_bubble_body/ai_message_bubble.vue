@@ -133,7 +133,7 @@
         </button>
       </div>
 
-      <transition name="fade">
+      <transition name="opacity-fade">
         <div
           v-if="msg.todos && msg.todos.length > 0 && isTodosVisiable"
           class="todos-block"
@@ -149,6 +149,19 @@
               :pending="msg.pending"
             />
           </div>
+        </div>
+      </transition>
+
+      <transition name="opacity-fade">
+        <div
+          v-if="msg.questions?.questions && msg.questions?.questions.length > 0"
+          class="questions-block"
+        >
+          <QuestionView
+            :questions="msg.questions?.questions"
+            :qid="msg.questions?.qid"
+            @complete="handleCompleteQuestions"
+          />
         </div>
       </transition>
 
@@ -222,6 +235,7 @@ import msgBubbleMenu from '../../msg_bubble_body/comp/msgBubbleMenu.vue'
 import msgSelectionBubble from '../../msg_bubble_body/comp/msgSelectionBubble.vue'
 import ToolLabelCard from '../../msg_bubble_body/comp/toolLabelCard.vue'
 import TodoCard from '../../msg_bubble_body/comp/todoCard.vue'
+import QuestionView from '../../msg_bubble_body/comp/questionView.vue'
 import MarkdownIt from 'markdown-it'
 import 'github-markdown-css/github-markdown.css'
 import hljs from 'highlight.js'
@@ -235,6 +249,7 @@ const emit = defineEmits<{
   selected: [id: string]
   delete: [id: string]
   quoted: [hid: string, content: string]
+  completeQuestions: [id: string, qid: string, resp: QuestionItem[]]
   switchToBranch: [id: string]
 }>()
 
@@ -267,6 +282,17 @@ type TodoItem = {
   status: 'pending' | 'in_progress' | 'completed' | 'error'
 }
 
+type QuestionItem = {
+  question: string
+  options?: string[]
+  response?: string
+}
+
+type QuestionsView = {
+  questions: QuestionItem[]
+  qid: string
+}
+
 type MsgBubbleData = {
   id: string
   cid: string
@@ -279,6 +305,7 @@ type MsgBubbleData = {
   label: string
   chunks: MessageChunk[]
   todos?: TodoItem[]
+  questions?: QuestionsView
   images?: string[]
   info?: InfoTag
   extra?: any
@@ -516,6 +543,14 @@ function handleQuoteContent() {
   emit('quoted', props.msg.hid, globalSelection.content)
 }
 
+
+
+const handleCompleteQuestions = (qid: string, resp: QuestionItem[]) => {
+  emit('completeQuestions', props.msg.id, qid, resp)
+}
+
+
+
 const isShowMenu = ref(false)
 const menuStyle = ref<Record<string, string>>({})
 const menuRef = ref<any>(null)
@@ -698,7 +733,8 @@ function postProcessHtml(html: string): string {
   if (!html) return html
 
   if (html.includes('[Conversation Abort]')) {
-    html = html.replace('[Conversation Abort]', abortLabel)
+    html = html.replace('[Conversation Abort]', '')
+    html += abortLabel
   }
 
   return html
@@ -1087,7 +1123,7 @@ onBeforeUnmount(() => {
 
 @keyframes scaleFadeIn {
   0% { opacity: 0; transform: scale(0.9) translateY(6px); }
-  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  60% { opacity: 1; transform: scale(1.01) translateY(0); }
   100% { opacity: 1; transform: scale(1); }
 }
 @keyframes scaleFadeOut {
@@ -1096,7 +1132,6 @@ onBeforeUnmount(() => {
 }
 @keyframes opacityFadeIn {
   0% { opacity: 0; transform: scale(0.9); }
-  60% { opacity: 1; transform: scale(1.03); }
   100% { opacity: 1; transform: scale(1); }
 }
 @keyframes opacityFadeOut {

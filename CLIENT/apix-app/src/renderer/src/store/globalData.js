@@ -40,6 +40,9 @@ export function getSupportFileSVG (path) {
 
 export const messageCache = reactive({})
 export const generatingState = reactive({})
+export const loadedHistorySet = reactive(new Set())
+export const loadingHistorySet = reactive(new Set())
+
 export const tabContentCache = {}
 
 export const globalSelection = reactive({

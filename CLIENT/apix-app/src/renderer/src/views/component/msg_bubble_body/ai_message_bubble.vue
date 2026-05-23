@@ -133,7 +133,7 @@
         </button>
       </div>
 
-      <transition name="fade">
+      <transition name="opacity-fade">
         <div
           v-if="msg.todos && msg.todos.length > 0 && isTodosVisiable"
           class="todos-block"
@@ -149,6 +149,19 @@
               :pending="msg.pending"
             />
           </div>
+        </div>
+      </transition>
+
+      <transition name="opacity-fade">
+        <div
+          v-if="msg.questions?.questions && msg.questions?.questions.length > 0"
+          class="questions-block"
+        >
+          <QuestionView
+            :questions="msg.questions?.questions"
+            :qid="msg.questions?.qid"
+            @complete="handleCompleteQuestions"
+          />
         </div>
       </transition>
 
@@ -269,6 +282,7 @@ import { nextTick, ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import msgBubbleMenu from './comp/msgBubbleMenu.vue'
 import msgSelectionBubble from './comp/msgSelectionBubble.vue'
 import ToolLabelCard from './comp/toolLabelCard.vue'
+import QuestionView from './comp/questionView.vue'
 import MarkdownIt from 'markdown-it'
 import 'github-markdown-css/github-markdown.css'
 import hljs from 'highlight.js'
@@ -283,6 +297,7 @@ const emit = defineEmits<{
   selected: [id: string]
   delete: [id: string]
   quoted: [hid: string, content: string]
+  completeQuestions: [id: string, qid: string, resp: QuestionItem[]]
   switchToBranch: [id: string]
 }>()
 
@@ -315,6 +330,17 @@ type TodoItem = {
   status: 'pending' | 'in_progress' | 'completed' | 'error'
 }
 
+type QuestionItem = {
+  question: string
+  options?: string[]
+  response?: string
+}
+
+type QuestionsView = {
+  questions: QuestionItem[]
+  qid: string
+}
+
 type ImageItem = {
   fileId: string
   src?: string
@@ -336,6 +362,7 @@ type MsgBubbleData = {
   label: string
   chunks: MessageChunk[]
   todos?: TodoItem[]
+  questions?: QuestionsView
   images?: string[]
   info?: InfoTag
   extra?: any
@@ -572,6 +599,14 @@ function closeSelectionBubble() {
 function handleQuoteContent() {
   emit('quoted', props.msg.hid, globalSelection.content)
 }
+
+
+
+const handleCompleteQuestions = (qid: string, resp: QuestionItem[]) => {
+  emit('completeQuestions', props.msg.id, qid, resp)
+}
+
+
 
 const imageItems = ref<ImageItem[]>([])
 const imageObjectUrls = new Set<string>()
@@ -842,11 +877,6 @@ function onCodeCopyClick(e: Event) {
   }, 2000)
 }
 
-const isThinkVisiable = ref(false)
-const triggerThinkVisiable = () => {
-  isThinkVisiable.value = !isThinkVisiable.value
-}
-
 const isTodosVisiable = ref(false)
 const triggerTodosVisiable = () => {
   isTodosVisiable.value = !isTodosVisiable.value
@@ -862,7 +892,8 @@ function postProcessHtml(html: string): string {
   if (!html) return html
 
   if (html.includes('[Conversation Abort]')) {
-    html = html.replace('[Conversation Abort]', abortLabel)
+    html = html.replace('[Conversation Abort]', '')
+    html += abortLabel
   }
 
   return html
@@ -1365,7 +1396,7 @@ onBeforeUnmount(() => {
 
 @keyframes scaleFadeIn {
   0% { opacity: 0; transform: scale(0.9) translateY(6px); }
-  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  60% { opacity: 1; transform: scale(1.01) translateY(0); }
   100% { opacity: 1; transform: scale(1); }
 }
 @keyframes scaleFadeOut {
@@ -1374,7 +1405,6 @@ onBeforeUnmount(() => {
 }
 @keyframes opacityFadeIn {
   0% { opacity: 0; transform: scale(0.9); }
-  60% { opacity: 1; transform: scale(1.03); }
   100% { opacity: 1; transform: scale(1); }
 }
 @keyframes opacityFadeOut {

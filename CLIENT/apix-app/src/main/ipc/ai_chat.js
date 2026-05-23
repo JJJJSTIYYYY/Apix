@@ -41,6 +41,30 @@ export function registerAiIpc() {
     return true
   })
 
+  ipcMain.handle('api:send_event', async (event, cid, action, ws_event) => {
+    // Ensure WS is connecting / connected
+    let ws = initWS(cid)
+    try {
+      await waitForOpen(ws)
+    } catch (err) {
+      throw new Error('WebSocket not connected, please try again!')
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected, please try again!')
+    }
+
+    ws.send(
+      JSON.stringify({
+        action: action,
+        data: ws_event
+      })
+    )
+
+    // Renderer awaits this, real messages come via ws:message
+    return true
+  })
+
   ipcMain.handle('api:stop', async (event, cid, sid, hid) => {
     // Ensure WS is connecting / connected
     let ws = initWS(cid)

@@ -59,6 +59,8 @@ const api = {
   // Send chat request (fire-and-forget, result comes from WS push)
   chatComplations: (cid, sid, hid, content, re_generate, chat_config) =>
     ipcRenderer.invoke('api:chat', cid, sid, hid, content, re_generate, chat_config),
+  sendWsEvent: (cid, action, ws_event) =>
+    ipcRenderer.invoke('api:send_event', cid, action, ws_event),
   stopGeneration: (cid, sid, hid) =>
     ipcRenderer.invoke('api:stop', cid, sid, hid),
   newChat: (cid, workspace = "") =>

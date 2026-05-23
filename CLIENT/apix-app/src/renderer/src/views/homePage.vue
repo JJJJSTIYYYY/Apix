@@ -17,6 +17,7 @@
       :index="page.path"
       class="menu-item"
       :show-tooltip="false"
+      :title="page.title"
     >
       <el-icon>
         <component :is="page.icon" />

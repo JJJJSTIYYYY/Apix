@@ -1421,7 +1421,7 @@ function showMiniAgentPanel() {
 }
 
 .agent-panel.agent_panel_hide {
-  width: 0 !important;
+  width: 0;
   overflow: hidden;
 }
 

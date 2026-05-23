@@ -61,7 +61,7 @@ from apix_agent.apix_agent_core.tools.vector_search.retrieval_tool import (
 # Execution tools (high privilege)
 # -------------------------
 from apix_agent.apix_agent_core.tools.code_runner.python_code_runner import run_python_code
-from apix_agent.apix_agent_core.tools.basic_tools.cmd import run_workspace_command
+from apix_agent.apix_agent_core.tools.code_runner.cmd import run_workspace_command
 from apix_agent.apix_agent_core.tools.basic_tools.server_check import check_server
 
 # -------------------------
@@ -81,6 +81,12 @@ from apix_agent.apix_agent_core.tools.basic_tools.task_flow import (
     get_test_task
 )
 
+# -------------------------
+# Communication
+# -------------------------
+from apix_agent.apix_agent_core.tools.basic_tools.communication import (
+    request_user_input
+)
 
 
 __all__ = [
@@ -127,5 +133,8 @@ __all__ = [
 
     # Task flow
     "update_test_task",
-    "get_test_task"
+    "get_test_task",
+
+    # Communication
+    "request_user_input"
 ]

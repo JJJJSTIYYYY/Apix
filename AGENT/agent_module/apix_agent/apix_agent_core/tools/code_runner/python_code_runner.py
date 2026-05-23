@@ -12,48 +12,17 @@ from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, Ag
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
 from apix_agent.global_config import TOOLS_MAX_OUTPUT_LENGTH
+from apix_agent.apix_agent_core.tools.prompt import RUN_PYTHON_CODE_PROMPT
 
 
-@tool
+@tool(description=RUN_PYTHON_CODE_PROMPT)
 async def run_python_code(
     code: str,
-    run_args: Optional[List[str]] = None,
+    run_args: Optional[list[str]] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Execute Python code immediately inside the sandbox environment.
 
-    This tool runs Python code as a temporary script.
-    The code is executed once and is NOT saved as a persistent workspace file.
-
-    Args:
-        code: Python code as a string.
-        run_args: Optional command-line arguments passed to the script.
-
-    Returns:
-        Command output including stdout or error messages.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    1. When a task requires quick computation or data processing.
-    2. When temporary Python code needs to be executed immediately.
-    3. When performing one-off analysis, transformations, or calculations.
-    4. When the code does not need to persist after execution.
-    5. When you want to sleep and wait for something to finish, using sleep().
-
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    1. The Python program needs to be modified or reused later.
-    2. The code should be saved as part of the workspace.
-    3. The task requires iterative development or repeated execution of the same script.
-
-    ## Important Guidelines
-    - Code executed by this tool is ephemeral and will not be kept as a normal workspace source file.
-    - If the program should persist in the workspace, write it to a file first.
-    - Ensure required input files exist before execution.
-    - Return outputs that help progress the task.
-    """
     target = state.get("target")
     generation_id = state.get("generation_id")
 

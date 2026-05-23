@@ -5,10 +5,11 @@ from dataclasses import dataclass, field
 from typing import Dict, Literal, Optional
 from uuid import uuid4
 
+from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter
 from apix_agent.commons.resource_cleaner import resource_cleaner
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.commons.type_def import ApixEventEnvelope
+from apix_agent.commons.type_def import ApixEventEnvelope, ApixEventEnvelopeTarget
 from apix_agent.global_config import GENERATION_TTL
 
 
@@ -77,7 +78,8 @@ class GenerationManager:
     async def create_generation(
         self,
         client_id: str,
-        history_id: str
+        history_id: str,
+        platform: str = 'default'
     ) -> str:
 
         new_gen_id = str(uuid4())
@@ -86,7 +88,7 @@ class GenerationManager:
             gens = self._get_client_generations(client_id)
             active_generation_ids = self._get_active_list(client_id)
 
-            self.abort_by_history_id(client_id, history_id)
+            self.abort_by_history_id(client_id, history_id, platform)
 
             gens[new_gen_id] = GenerationState(
                 history_id=history_id,
@@ -238,7 +240,14 @@ class GenerationManager:
                 except ValueError:
                     pass
 
-    async def abort_by_history_id(self, client_id: str, history_id: str):
+    async def abort_by_history_id(self, client_id: str, history_id: str, platform: str = 'default'):
+        target: ApixEventEnvelopeTarget = {
+            'id': client_id,
+            'conversation_id': history_id,
+            'platform': platform
+        }
+        AgentStreamWriter.clear_all_block(target)
+        
         async with self._get_lock(client_id):
             gens = self._connections.get(client_id, {})
             active_generation_ids = self._active_generation_ids.get(client_id, [])

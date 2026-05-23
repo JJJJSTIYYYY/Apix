@@ -563,6 +563,17 @@ class MainAgentNode(AgentNodeBase):
         except ConflictToolCalls as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
             logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            event_writer.send_event(
+                event=AgentStreamEvent.RUNTIME_WARNING, 
+                target=target,
+                data={
+                    "event_name": "conflict_tool_calls_warning",
+                    "content": {
+                        "tool_name": " ".join(e.errors),
+                        "retry": llm_retry_count
+                    }
+                }
+            )
             if llm_retry_count < MAX_RETRY:
                 return Command(
                     update={
@@ -577,6 +588,16 @@ class MainAgentNode(AgentNodeBase):
         except InvalidOutputsError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
             logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            event_writer.send_event(
+                event=AgentStreamEvent.RUNTIME_WARNING, 
+                target=target,
+                data={
+                    "event_name": "invalid_outputs_warning",
+                    "content": {
+                        "retry": llm_retry_count
+                    }
+                }
+            )
             if llm_retry_count < MAX_RETRY:
                 return Command(
                     update={
@@ -591,6 +612,17 @@ class MainAgentNode(AgentNodeBase):
             llm_retry_count = state.get("llm_retry_count", 0) + 1
             context_compress_level = state.get("context_compress_level", 0) + 1
             logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            event_writer.send_event(
+                event=AgentStreamEvent.RUNTIME_WARNING, 
+                target=target,
+                data={
+                    "event_name": "bad_request_warning",
+                    "content": {
+                        "message": e.message,
+                        "retry": llm_retry_count
+                    }
+                }
+            )
             if llm_retry_count < MAX_RETRY and  LlmNodeAdapter.guess_exception_type(str(e)) == 'token_exceed':
                 return Command(
                     update={
@@ -605,6 +637,17 @@ class MainAgentNode(AgentNodeBase):
         except RateLimitError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
             logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            event_writer.send_event(
+                event=AgentStreamEvent.RUNTIME_WARNING, 
+                target=target,
+                data={
+                    "event_name": "rate_limit_warning",
+                    "content": {
+                        "message": e.message,
+                        "retry": llm_retry_count
+                    }
+                }
+            )
             if llm_retry_count < MAX_RETRY and  LlmNodeAdapter.guess_exception_type(str(e)) == 'rate_limit':
                 return Command(
                     update={

@@ -33,6 +33,8 @@ class DefaultPlatform(WebsocketPlatform):
         platform = target.get("platform", "default")
         history_id = target.get("conversation_id", "")
 
+        block_id = envelope.get("block_id", "")
+
         return {
             "action": event,
             "ts": int(ts * 1000) if ts else 0,
@@ -42,7 +44,8 @@ class DefaultPlatform(WebsocketPlatform):
             "data": {
                 "history_id": history_id,
                 "messages": data
-            }
+            },
+            "block_id": block_id
         }
 
 

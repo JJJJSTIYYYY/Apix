@@ -17,6 +17,7 @@ from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, Ag
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.sandbox_manager.file_system_manager import file_system
+from apix_agent.apix_agent_core.tools.prompt import FETCH_FILE_PROMPT, READ_WORKSPACE_FILE_PROMPT, WRITE_WORKSPACE_FILE_PROMPT, DELETE_WORKSPACE_FILE_PROMPT, MOVE_WORKSPACE_FILE_PROMPT, LIST_WORKSPACE_FILES_PROMPT
 
 
 # ------------------------------------------------------
@@ -70,36 +71,13 @@ def open_unique_file_atomic(directory: str, filename: str):
 # main tool
 # ------------------------------------------------------
 
-@tool
+@tool(description=FETCH_FILE_PROMPT)
 async def fetch_files(
-    file_ids: List[str],
+    file_ids: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """
-    Download user uploaded file(s) into sandbox workspace.
 
-    Files will be stored in:
-        /workspace/download_cache/
-
-    This tool only downloads files.
-    It does NOT validate file type or size.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    1. When the user explicitly asks to read, analyze, inspect, or process a previously uploaded file
-    2. When the file user uploaded is necessary before continuing the task
-    3. When the file must exist inside the sandbox workspace for execution
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    1. You do not have a valid file ID provided by the system
-    2. The task can be completed without accessing the file
-    3. User has not uploaded any file or the file is irrelevant to the current task
-    4. You want to download a file from the internet
-    ## Important Guidelines
-    - Only download files that are necessary for the current objective.
-    - Avoid redundant downloads of the same file.
-    """
     target = state.get("target")
     generation_id = state.get("generation_id")
 
@@ -194,7 +172,7 @@ async def fetch_files(
             ]
         })
 
-    download_cache_dir = os.path.join(base_path, "download_cache")
+    download_cache_dir = os.path.join(base_path, "user_uploaded")
     os.makedirs(download_cache_dir, exist_ok=True)
 
     base_url = global_config.FILE_SERVICE_URL.rstrip("/")
@@ -354,26 +332,15 @@ async def fetch_files(
 
     
 
-@tool
+@tool(description=READ_WORKSPACE_FILE_PROMPT)
 async def read_workspace_file(
     file_path: str,
-    start_line: int = 0,
-    end_line: int = 0,
+    start_line: Optional[int] = 0,
+    end_line: Optional[int] = 0,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Read a text file inside sandbox (/workspace).
 
-    Args:
-        file_path (str): File path inside container workspace
-        start_line (int): 1-based inclusive start line. Use 0 to start from the beginning of the file.
-        end_line (int): 1-based inclusive end line. Use 0 to read until the end of the file.
-
-    Returns:
-        File content with line numbers.
-        Content format: [line_count_prefix] line_content
-    """
     target = state.get("target")
     generation_id = state.get("generation_id")
 
@@ -489,25 +456,15 @@ async def read_workspace_file(
         })
     
 
-@tool
+@tool(description=WRITE_WORKSPACE_FILE_PROMPT)
 async def write_workspace_file(
     file_path: str,
     content: str,
-    replace: int = False,
+    exist_ok: Optional[bool] = False,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Create a new file or rewrite a exist file inside sandbox workspace.
 
-    Args:
-        file_path: File path inside container workspace
-        content: File content
-        replace: Replace entire file if already exist (False -> append)
-
-    Returns:
-        Success or error message
-    """
     target = state.get("target")
     generation_id = state.get("generation_id")
 
@@ -567,15 +524,12 @@ async def write_workspace_file(
             host_path.parent.mkdir(parents=True, exist_ok=True)
 
             if host_path.exists():
-                if replace:
+                if exist_ok:
                     # overwrite file
                     host_path.write_text(content, encoding="utf-8")
                     action = "overwritten"
                 else:
-                    # append to existing file
-                    with host_path.open("a", encoding="utf-8") as f:
-                        f.write(content)
-                    action = "appended"
+                    raise FileExistsError(f"File already exists: {file_path}")
             else:
                 # create new file
                 host_path.write_text(content, encoding="utf-8")
@@ -602,6 +556,27 @@ async def write_workspace_file(
                 ToolMessage(log_line, tool_call_id=tool_call_id)
             ]
         })
+    
+    except FileExistsError as e:
+
+        event_writer.send_event(
+            event=AgentStreamEvent.TOOL_EXEC_END, 
+            target=target, 
+            data={
+                "event_name": "tool_exec_chunk_rtn",
+                "tool_name": "write_workspace_file",
+                "tool_call_id": tool_call_id,
+                "content": str(e),
+                "chunk_position": "end",
+                "status": "fail",
+            }
+        )
+
+        return Command(update={
+            "messages": [
+                ToolMessage(f"File already exists: {file_path}", tool_call_id=tool_call_id)
+            ]
+        })
 
     except Exception as e:
 
@@ -625,21 +600,13 @@ async def write_workspace_file(
         })
     
 
-@tool
+@tool(description=DELETE_WORKSPACE_FILE_PROMPT)
 async def delete_workspace_file(
     file_path: str,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Delete a file or directory inside sandbox workspace.
 
-    Args:
-        file_path: File or directory path inside container workspace
-
-    Returns:
-        Success or error message
-    """
     target = state.get("target")
     generation_id = state.get("generation_id")
 
@@ -750,29 +717,15 @@ async def delete_workspace_file(
         })
     
 
-@tool
+@tool(description=MOVE_WORKSPACE_FILE_PROMPT)
 async def move_workspace_file(
     source_path: str,
     target_path: str,
-    delete_source: bool = True,
+    delete_source: Optional[bool] = True,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    Move or copy a file inside sandbox workspace.
 
-    Args:
-        source_path: Source file path inside container workspace
-        target_path: Target file path inside container workspace
-        delete_source: Whether to remove the source file after the operation.
-          - True: move the file (delete the source after copying)
-          - False: copy the file (keep the source file)
-
-        Note: If the source file is undeletable, the operation will behave like a copy even.
-
-    Returns:
-        Success or error message
-    """
     target = state.get("target")
     generation_id = state.get("generation_id")
 
@@ -892,24 +845,14 @@ async def move_workspace_file(
         })
     
 
-@tool
+@tool(description=LIST_WORKSPACE_FILES_PROMPT)
 async def list_workspace_files(
     path: Optional[str] = '/workspace',
     recursively_scan: Optional[bool] = False,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command:
-    """
-    List files and directories inside workspace.
-
-    Args:
-        path: Sub directory inside workspace, make sure the path start with '/workspace' (None means root)
-        recursively_scan: Whether to recursively scan subdirectories (None means false)
-
-    Returns:
-        A tree-formatted directory listing of files and folders.
-        The result is limited to a maximum of 500 items and a depth of 6 levels.
-    """
+    
     target = state.get("target")
     generation_id = state.get("generation_id")
 

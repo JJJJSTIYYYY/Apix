@@ -124,6 +124,7 @@ class AgentConfigSchema(TypedDict):
     models_provider: str
     model_name: str
     api_key: str
+    model_temperature: float
     custom_provider_id: NotRequired[str]
 
     enable_think: bool
@@ -182,7 +183,7 @@ class ApixPayloadSchema(TypedDict):
 
 class ApixEntryDataSchema(TypedDict):
     action: str
-    data: ApixPayloadSchema
+    data: ApixPayloadSchema | Any
 
 
 class GraphRuntimeContext(TypedDict):
@@ -244,3 +245,5 @@ class ApixEventEnvelope(TypedDict):
     generation_id: str
     data: MinimalEnvelopeData          # main payload
     timestamp: float
+    blocking: bool
+    block_id: NotRequired[str]

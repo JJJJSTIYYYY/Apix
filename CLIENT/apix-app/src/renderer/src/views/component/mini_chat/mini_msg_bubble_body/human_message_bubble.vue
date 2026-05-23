@@ -59,7 +59,6 @@
         <div class="send-state-tag">
           <svg t="1772620030116" v-if="msg.error" @click="reSendMsg" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5818" width="200" height="200"><path d="M512 0C229.205333 0 0 229.205333 0 512s229.205333 512 512 512 512-229.205333 512-512S794.794667 0 512 0z m0 796.458667A56.917333 56.917333 0 1 1 511.957333 682.666667 56.917333 56.917333 0 0 1 512 796.458667z m54.186667-227.797334h0.128a60.501333 60.501333 0 0 1-53.802667 55.893334c2.048 0.256 3.882667 1.152 5.973333 1.152h-11.818666c2.048 0 3.84-0.981333 5.845333-1.109334a59.093333 59.093333 0 0 1-53.162667-55.893333l-13.056-284.16a54.314667 54.314667 0 0 1 54.613334-57.045333h26.282666a52.992 52.992 0 0 1 54.186667 57.002666l-15.146667 284.16z" fill="#d81e06" p-id="5819"></path></svg>
           <svg v-else-if="msg.pending" t="1772618878456" class="icon rotate-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4818" width="200" height="200"><path d="M469.333333 85.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".8" p-id="4819"></path><path d="M469.333333 725.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".4" p-id="4820"></path><path d="M938.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".2" p-id="4821"></path><path d="M298.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".6" p-id="4822"></path><path d="M783.530667 180.138667m30.169889 30.169889l0 0q30.169889 30.169889 0 60.339779l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339779l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".1" p-id="4823"></path><path d="M330.965333 632.661333m30.16989 30.16989l0 0q30.169889 30.169889 0 60.339778l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339778l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".5" p-id="4824"></path><path d="M843.861333 783.530667m-30.169889 30.169889l0 0q-30.169889 30.169889-60.339779 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339779 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".3" p-id="4825"></path><path d="M391.338667 330.965333m-30.16989 30.16989l0 0q-30.169889 30.169889-60.339778 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339778 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".7" p-id="4826"></path></svg>
-
         </div>
         <div
           key="bubble"
@@ -67,7 +66,26 @@
           @mousedown="handleMouseDown"
           @mouseup="handleMouseUp"
         >
-          <div class="bubble-content markdown-body" v-html="renderedContent"></div>
+          <div
+            ref="bubbleContentRef"
+            class="bubble-content markdown-body"
+            :class="{ collapsed: shouldCollapse && !isExpanded }"
+            v-html="renderedContent"
+          ></div>
+
+          <div
+            v-if="shouldCollapse"
+            class="collapse-action"
+          >
+            <button
+              class="collapse-btn"
+              @click.stop="toggleCollapse"
+            >
+              <span>{{ isExpanded ? '收起' : '展开全文' }}</span>
+              <svg v-if="isExpanded" t="1779348484868" class="c-icon icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6631" width="20" height="20"><path d="M902.5 749.2l57.5-57.5-421.6-416.9h-52.7L64 691.7l57.5 57.5 388.1-392.9 392.9 392.9z" fill="currentColor" p-id="6632"></path></svg>
+              <svg v-else t="1779348528205" class="e-icon icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6844" width="20" height="20"><path d="M121.5 274.8L64 332.3l421.6 416.9h52.7l421.6-416.9-57.5-57.5-388.1 392.9-392.8-392.9z" fill="currentColor" p-id="6845"></path></svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -123,7 +141,7 @@
 
 
 <script setup lang="ts">
-import { nextTick, ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { nextTick, ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import msgBubbleMenu from '../../msg_bubble_body/comp/msgBubbleMenu.vue'
 import MarkdownIt from 'markdown-it'
 import msgSelectionBubble from '../../msg_bubble_body/comp/msgSelectionBubble.vue'
@@ -183,6 +201,84 @@ const uploadedFiles = computed<UploadedFile[]>(() => {
   return props.msg.extra?.user_meta_data?.uploaded_files ?? []
 })
 
+
+// 折叠/展开
+const bubbleContentRef = ref<HTMLElement | null>(null)
+
+const isExpanded = ref(false)
+const shouldCollapse = ref(false)
+
+const COLLAPSE_HEIGHT = 220
+
+async function toggleCollapse() {
+  const wrapper = bubbleContentRef.value
+
+  if (!wrapper) {
+    isExpanded.value = !isExpanded.value
+    return
+  }
+
+  // 展开
+  if (!isExpanded.value) {
+    isExpanded.value = true
+    return
+  }
+
+  // 收起
+  isExpanded.value = false
+
+  await nextTick()
+
+  const rect = wrapper.getBoundingClientRect()
+
+  const viewportTop = 0
+  const viewportBottom = window.innerHeight
+
+  // 元素完全可见
+  const fullyVisible =
+    rect.top >= viewportTop &&
+    rect.bottom <= viewportBottom
+
+  if (fullyVisible) return
+
+  // 顶部超出
+  if (rect.top < viewportTop) {
+    wrapper.scrollIntoView({
+      block: 'start',
+      behavior: 'smooth',
+    })
+    return
+  }
+
+  // 底部超出
+  if (rect.bottom > viewportBottom) {
+    wrapper.scrollIntoView({
+      block: 'end',
+      behavior: 'smooth',
+    })
+  }
+}
+
+function checkNeedCollapse() {
+  nextTick(() => {
+    const el = bubbleContentRef.value
+    if (!el) return
+
+    shouldCollapse.value = el.scrollHeight > COLLAPSE_HEIGHT
+  })
+}
+
+watch(
+  () => props.msg.chunks[0].content,
+  () => {
+    isExpanded.value = false
+    checkNeedCollapse()
+  },
+  { immediate: true }
+)
+
+
+// 菜单
 const isShowMenu = ref(false)
 const menuStyle = ref<Record<string, string>>({})
 const menuRef = ref<any>(null)
@@ -384,6 +480,7 @@ function handleQuoteContent() {
 }
 
 onMounted(() => {
+  checkNeedCollapse()
   // document.addEventListener('click', onDocumentClick, true)
   document.addEventListener('selectionchange', handleSelectionChange)
   window.addEventListener('mousedown', handleClickOutside)
@@ -576,6 +673,64 @@ onBeforeUnmount(() => {
 
 .human-bubble:hover .bubble-content {
   color: var(--content-hover-color);
+}
+
+.bubble-content.collapsed {
+  max-height: 320px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bubble-content.collapsed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 72px;
+  width: 100%;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0),
+    var(--apix-default-light-color)
+  );
+}
+
+.collapse-action {
+  display: flex;
+  width: 100%;
+  bottom: 1px;
+}
+
+.collapse-btn {
+  padding: 8px 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px !important;
+  color: var(--apix-link-color);
+  opacity: 0.6;
+}
+
+.collapse-btn:hover {
+  opacity: 1;
+  box-shadow: inset 0 -1px 0 0 var(--apix-link-color);
+}
+
+.c-icon {
+  width: 14px;
+  height: 14px;
+  padding-bottom: 3px;
+}
+
+.e-icon {
+  width: 14px;
+  height: 14px;
+  padding-top: 4px;
 }
 
 /* ==================== 分支切换器（与 AI 气泡统一） ==================== */

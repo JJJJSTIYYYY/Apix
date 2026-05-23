@@ -9,48 +9,15 @@ from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, Ag
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.tools.web_search.manager import manager
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
+from apix_agent.apix_agent_core.tools.prompt import SEARCH_WEB_BY_KEYWORDS_PROMPT, SEARCH_WEB_BY_URLS_PROMPT
 
 
-@tool
+@tool(description=SEARCH_WEB_BY_KEYWORDS_PROMPT)
 async def search_web_by_keywords(
     key_word: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
-    """
-    Search the web for pages related to given keyword(s) and return a list of results
-    containing the page title, URL, and a short description snippet.
-    The search results may contain images.
-
-    This tool only provides search results (metadata).
-    It does NOT retrieve the full content of webpages.
-
-    Args:
-        key_word (str | list[str]): One or more search keywords.
-            
-    Returns:
-        str: A tool message containing formatted webpage results and optional image results.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    1. When the user explicitly asks to search for information on the internet.
-    2. When the task requires up-to-date or external information not in your knowledge.
-    3. When you need to discover relevant webpages before reading their content.
-    4. When you want to get some images from internet.
-
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    1. The question can be answered using existing knowledge.
-    2. The user already provided specific URLs.
-    3. The task requires reading webpage content by url directly.
-
-    ## Important Guidelines
-    - The results returned by this tool are only summaries.
-    - The images returned by this tool include metadata such as image URLs.
-    - Do NOT assume the full content of a webpage based on the title or description.
-    - If detailed information is required, call `search_web_by_urls` with the returned URLs.
-    - Never fabricate search results or URLs.
-    """
 
     logger.trace('[search_tool.py] [tool] [search_web_by_keywords] Enter')
 
@@ -182,42 +149,12 @@ async def search_web_by_keywords(
         })
     
 
-@tool
+@tool(description=SEARCH_WEB_BY_URLS_PROMPT)
 async def search_web_by_urls(
     urls: str | list[str],
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
-    """
-    Fetch and extract the main readable content from one or more webpages.
-    The search results are not contain image.
-
-    This tool retrieves and processes webpage content from the provided URLs.
-    It extracts the primary textual content of the page for analysis.
-
-    Args:
-        urls (str | list[str]): One or more webpage URLs.
-
-    Returns:
-        str: Extracted textual content from each webpage.
-
-    ## When to Use This Tool
-    Use this tool in these scenarios:
-    1. When the user asks to analyze or summarize specific webpages.
-    2. When `search_web_by_keywords` returned relevant URLs and you need their full content.
-    3. When detailed webpage information is required beyond titles and descriptions.
-
-    ## When NOT to Use This Tool
-    Do NOT use this tool when:
-    1. You do not have a valid URL.
-    2. You only need webpage titles or search results descriptions.
-    3. The task does not require reading webpage content.
-
-    ## Important Guidelines
-    - Only fetch URLs provided by the user or returned from `search_web_by_keywords`.
-    - Never fabricate or guess webpage content.
-    - Avoid fetching unnecessary webpages.
-    """
 
     logger.trace('[search_tool.py] [tool] [search_web_by_urls] Enter')
 

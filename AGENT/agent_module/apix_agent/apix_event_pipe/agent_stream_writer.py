@@ -1,11 +1,21 @@
-from enum import Enum
+import asyncio
+import hashlib
+import json
 import time
 import uuid
+
+from enum import Enum
 from typing import Any, Optional
+
 from langgraph.config import get_stream_writer
 
-from apix_agent.commons.type_def import ApixEventEnvelope, MinimalEnvelopeData, ApixEventEnvelopeTarget
-# from apix_agent.apix_event_pipe.apix_stream_writer import ApixStreamWriter
+from apix_agent.commons.type_def import (
+    ApixEventEnvelope,
+    MinimalEnvelopeData,
+    ApixEventEnvelopeTarget,
+)
+
+from apix_agent.commons.logger import logger
 
 
 class AgentStreamEvent(str, Enum):
@@ -24,13 +34,9 @@ class AgentStreamEvent(str, Enum):
 
 
 class AgentStreamWriter:
-    """
-    Event sender for LangGraph streaming.
 
-    - Single public method: send_event
-    - Internally wraps LangGraph writer
-    - Provides extension hook (no plugin logic yet)
-    """
+    # target_hash -> block_id -> future
+    _blocking_futures: dict[str, dict[str, asyncio.Future]] = {}
 
     def __init__(
         self,
@@ -38,6 +44,29 @@ class AgentStreamWriter:
     ):
         self._writer = get_stream_writer()
         self._generation_id = generation_id or str(uuid.uuid4())
+
+    @staticmethod
+    def _target_hash(
+        target: ApixEventEnvelopeTarget,
+    ) -> str:
+        """
+        Build stable hash key for target.
+
+        Notes:
+        - Use sorted json serialization to ensure stable order
+        - Avoid Python built-in hash(), because it is process-randomized
+        """
+
+        target_json = json.dumps(
+            target,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+
+        return hashlib.sha256(
+            target_json.encode("utf-8")
+        ).hexdigest()
 
     # Public API
     def send_event(
@@ -48,15 +77,11 @@ class AgentStreamWriter:
         data: MinimalEnvelopeData = None,
         generation_id: Optional[str] = None,
         timestamp: Optional[float] = None,
+        block_id: Optional[str] = None,
+        blocking: bool = False,
     ):
         """
-        Send a structured event.
-
-        :param event: event name
-        :param target: event target
-        :param data: payload
-        :param generation_id: optional override
-        :param timestamp: optional override
+        Send structured event.
         """
 
         envelope: ApixEventEnvelope = {
@@ -65,36 +90,222 @@ class AgentStreamWriter:
             "data": data,
             "generation_id": generation_id or self._generation_id,
             "timestamp": timestamp or time.time(),
+            "blocking": blocking,
+            "block_id": block_id,
         }
 
-        # Extension Hook (pre-send)
         envelope = self._before_send(envelope)
 
-        # Core send
         self._writer(envelope)
 
-        # Extension Hook (post-send)
         self._after_send(envelope)
 
+    async def send_blocking_event(
+        self,
+        *,
+        event: AgentStreamEvent,
+        target: ApixEventEnvelopeTarget,
+        data: MinimalEnvelopeData = None,
+        timeout: Optional[float] = None,
+    ) -> Any:
+        """
+        Send blocking event and wait for acknowledgment result.
+        """
+
+        block_id = uuid.uuid4().hex
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        target_hash = self._target_hash(target)
+        # logger.debug(f"[send_blocking_event] Target is {target}")
+
+        if target_hash not in self._blocking_futures:
+            self._blocking_futures[target_hash] = {}
+
+        self._blocking_futures[target_hash][block_id] = future
+
+        data = data or {}
+        data["block_id"] = block_id
+
+        self.send_event(
+            event=event,
+            target=target,
+            data=data,
+            block_id=block_id,
+            blocking=True,
+        )
+
+        logger.warning(
+            f"[send_blocking_event] "
+            f"Block and wait... "
+            f"target={target_hash} "
+            f"block_id={block_id}"
+        )
+
+        try:
+            if timeout:
+                result = await asyncio.wait_for(future, timeout)
+            else:
+                result = await future
+
+            logger.success(
+                f"[send_blocking_event] "
+                f"Get result. "
+                f"target={target_hash} "
+                f"block_id={block_id}"
+            )
+
+            return result
+
+        finally:
+
+            target_futures = self._blocking_futures.get(target_hash)
+
+            if target_futures:
+                target_futures.pop(block_id, None)
+
+                # Auto cleanup empty target bucket
+                if not target_futures:
+                    self._blocking_futures.pop(target_hash, None)
+
+    async def block_for_permission(
+        self,
+        *,
+        event: AgentStreamEvent,
+        target: ApixEventEnvelopeTarget,
+        data: MinimalEnvelopeData = None,
+        timeout: Optional[float] = None,
+    ) -> bool:
+        """
+        Send blocking event and wait for user's agreement.
+        """
+
+        pass
+
+    @classmethod
+    def resolve_block(
+        cls,
+        *,
+        target: ApixEventEnvelopeTarget,
+        block_id: str,
+        result: Any = None,
+    ) -> bool:
+        """
+        Resolve blocking event by target + block_id.
+        """
+
+        target_hash = cls._target_hash(target)
+
+        future = (
+            cls._blocking_futures
+            .get(target_hash, {})
+            .get(block_id)
+        )
+
+        if not future:
+            return False
+
+        if future.done():
+            return False
+
+        future.set_result(result)
+
+        return True
+
+    @classmethod
+    def cancel_block(
+        cls,
+        *,
+        target: ApixEventEnvelopeTarget,
+        block_id: str,
+    ) -> bool:
+        """
+        Release blocking future with None result.
+
+        Semantic:
+        - blocking wait ends
+        - no result received
+        - coroutine continues execution
+        """
+
+        target_hash = cls._target_hash(target)
+
+        future = (
+            cls._blocking_futures
+            .get(target_hash, {})
+            .get(block_id)
+        )
+
+        if not future:
+            return False
+
+        if future.done():
+            return False
+
+        # Continue execution with empty result
+        future.set_result(None)
+
+        return True
+
+    @classmethod
+    def clear_all_block(
+        cls,
+        target: ApixEventEnvelopeTarget,
+    ) -> int:
+        """
+        Release all blocking futures with None result.
+
+        Returns:
+            int: released future count
+        """
+
+        target_hash = cls._target_hash(target)
+
+        logger.warning(
+            f"[clear_all_block] "
+            f"Clear block... "
+            f"target={target_hash} "
+        )
+
+        # logger.debug(f"[clear_all_block] Target is {target}")
+
+        target_futures = cls._blocking_futures.get(target_hash)
+
+        if not target_futures:
+            return 0
+
+        cleared_count = 0
+
+        for future in target_futures.values():
+
+            if future.done():
+                continue
+
+            # Continue execution with empty result
+            future.set_result(None)
+
+            cleared_count += 1
+
+        cls._blocking_futures.pop(target_hash, None)
+
+        logger.warning(
+            f"[clear_all_block] "
+            f"Released {cleared_count} blocking futures "
+            f"for target={target_hash}"
+        )
+
+        return cleared_count
 
     # Extension hooks
-    def _before_send(self, envelope: ApixEventEnvelope) -> ApixEventEnvelope:
-        """
-        Hook before sending event.
-
-        Can be overridden in subclass for:
-        - logging
-        - mutation
-        - filtering
-        """
+    def _before_send(
+        self,
+        envelope: ApixEventEnvelope,
+    ) -> ApixEventEnvelope:
         return envelope
 
-    def _after_send(self, envelope: ApixEventEnvelope) -> None:
-        """
-        Hook after sending event.
-
-        Can be overridden in subclass for:
-        - metrics
-        - side effects
-        """
+    def _after_send(
+        self,
+        envelope: ApixEventEnvelope,
+    ) -> None:
         pass

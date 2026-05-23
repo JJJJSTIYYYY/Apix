@@ -75,7 +75,7 @@
                     @click="onItemClick(item, colIndex)"
                   >
                     <div class="kv-key">
-                      {{ item.key }}
+                      {{ item.displayKey ?? item.key }}
                     </div>
 
                     <div class="kv-value" v-if="!item.hasChildren">
@@ -169,7 +169,7 @@ const forwardStack = ref([])  // history forward
 // ------------------------
 // Utils
 // ------------------------
-function isObject(val) {
+function isExpandable(val) {
   return val !== null && typeof val === 'object'
 }
 
@@ -178,29 +178,45 @@ function normalizeValue(value) {
   if (typeof value === 'string') {
     try {
       return JSON.parse(value)
-    } catch {
+    }
+    catch {
       return value
     }
   }
+
   return value
 }
 
 function buildColumn(data, depth = 0, basePath = '') {
-  if (!isObject(data)) return []
+  if (!isExpandable(data)) return []
 
   // Array support
   if (Array.isArray(data)) {
     return data.map((value, index) => {
       const rawValue = normalizeValue(value)
-      const keyPath = basePath ? `${basePath}.${index}` : `${index}`
+      const keyPath = basePath
+        ? `${basePath}.${index}`
+        : `${index}`
 
       return {
-        key: `[${index}]`,
+        // Logic key
+        key: `${index}`,
+
+        // UI display key
+        displayKey: `[${index}]`,
+
         keyPath,
-        value: isObject(rawValue) ? null : rawValue,
+
+        value: isExpandable(rawValue)
+          ? null
+          : rawValue,
+
         rawValue,
+
         depth,
-        hasChildren: isObject(rawValue),
+
+        hasChildren: isExpandable(rawValue),
+
         active: false,
       }
     })
@@ -208,15 +224,26 @@ function buildColumn(data, depth = 0, basePath = '') {
 
   return Object.keys(data).map((key) => {
     const rawValue = normalizeValue(data[key])
-    const keyPath = basePath ? `${basePath}.${key}` : key
+
+    const keyPath = basePath
+      ? `${basePath}.${key}`
+      : key
 
     return {
       key,
+
       keyPath,
-      value: isObject(rawValue) ? null : rawValue,
+
+      value: isExpandable(rawValue)
+        ? null
+        : rawValue,
+
       rawValue,
+
       depth,
-      hasChildren: isObject(rawValue),
+
+      hasChildren: isExpandable(rawValue),
+
       active: false,
     }
   })
@@ -253,13 +280,25 @@ function updateFooterPath(path) {
 // Core navigation (NO history side effects)
 // ------------------------
 function jumpToKeyPath(path) {
-  const pathKeys = path.split('.')
+  const pathKeys = path ? path.split('.') : []
+
   const newColumns = []
 
   // Root is taskInfo itself
   let currentData = props.taskInfo
 
   let lastItem = null
+
+  // Empty path -> root
+  if (!pathKeys.length) {
+    columns.value = [
+      buildColumn(props.taskInfo, 0),
+    ]
+
+    updateFooterPath('')
+
+    return
+  }
 
   for (let depth = 0; depth < pathKeys.length; depth++) {
     const key = pathKeys[depth]
@@ -271,10 +310,13 @@ function jumpToKeyPath(path) {
     )
 
     const item = column.find(i => i.key === key)
+
     if (!item) break
 
     newColumns.push(column)
+
     currentData = item.rawValue
+
     lastItem = item
   }
 
@@ -298,6 +340,7 @@ function jumpToKeyPath(path) {
   }
 
   columns.value = newColumns
+
   updateFooterPath(path)
 }
 
@@ -342,16 +385,22 @@ function initColumns() {
 // ------------------------
 function onItemClick(item, colIndex) {
   const column = columns.value[colIndex]
+
   if (!column) return
 
-  if (!item.hasChildren && item.rawValue) {
+  // Primitive value preview
+  if (!item.hasChildren) {
     mdDisplayer.show(
       '**' + item.key + '**\n\n' +
       '`Path: ' + item.keyPath + '`\n\n' +
-      '```\n' + item.rawValue + '\n```'
+      '```\n' +
+      String(item.rawValue) +
+      '\n```'
     )
+
     return
   }
+
   navigateTo(item.keyPath)
 }
 

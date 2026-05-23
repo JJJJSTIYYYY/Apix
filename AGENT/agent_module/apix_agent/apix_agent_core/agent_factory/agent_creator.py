@@ -152,7 +152,7 @@ class AgentCreator:
             return f"{e}"
 
         # Tools
-        tools = get_available_tools(agent_permission)
+        tools = get_available_tools(agent_permission, agent_role)
         tool_set = [tool.name for tool in tools]
 
         if not pure_chat_on:

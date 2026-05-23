@@ -1798,6 +1798,24 @@ function registerAiIpc() {
     );
     return true;
   });
+  electron.ipcMain.handle("api:send_event", async (event, cid, action, ws_event) => {
+    let ws2 = initWS(cid);
+    try {
+      await waitForOpen(ws2);
+    } catch (err) {
+      throw new Error("WebSocket not connected, please try again!");
+    }
+    if (!ws2 || ws2.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected, please try again!");
+    }
+    ws2.send(
+      JSON.stringify({
+        action,
+        data: ws_event
+      })
+    );
+    return true;
+  });
   electron.ipcMain.handle("api:stop", async (event, cid, sid, hid) => {
     let ws2 = initWS(cid);
     try {
