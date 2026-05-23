@@ -322,6 +322,12 @@ function submitAll() {
   border: 0;
   cursor: pointer;
   color: var(--apix-default-dark-color);
+  transition: 
+    transform 0.35s var(--apix-cubic-bezier);
+}
+
+.qv-nav-btn:not(:disabled):hover {
+  transform: scale(1.08);
 }
 
 .qv-nav-btn:disabled {

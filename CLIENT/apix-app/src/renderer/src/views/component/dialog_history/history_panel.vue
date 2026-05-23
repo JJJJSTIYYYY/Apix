@@ -428,7 +428,7 @@ const handleRenameHistory = async (history_id: string, new_title: string) => {
     )
     ElMessage({ type: 'success', message: '已更新', plain: true })
   } catch (err) {
-    console.log("对话删除失败：" + err)
+    console.error("[handleRenameHistory error]:" + err)
     ElMessage({ type: 'error', message: '更新失败', plain: true })
   }
   emit('rename', history_id, new_title)
@@ -464,7 +464,7 @@ const handleDeleteHistory = async (history_id: string) => {
     ElMessage({ type: 'success', message: '已删除', plain: true })
     emit('delete', history_id)
   } catch (err) {
-    console.log("对话删除失败：" + err)
+    console.error("[handleDeleteHistory error]:" + err)
     ElMessage({ type: 'error', message: '删除失败', plain: true })
   }
 }

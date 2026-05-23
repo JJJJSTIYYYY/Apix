@@ -106,7 +106,7 @@ onMounted(async () => {
     cid.value = authStore.user.user_uid
     skillList.value = await getAvailableSkills(cid.value)
   } catch (err) {
-    console.error('初始化失败', err)
+    console.error('[Skill page onMounted error]:', err)
   }
 })
 

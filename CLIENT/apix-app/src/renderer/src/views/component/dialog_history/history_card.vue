@@ -170,7 +170,7 @@ async function onStarClick() {
       { star: props.history.star }
     )
   } catch (err) {
-    console.log("对话收藏失败："+err)
+    console.error("[onStarClick error]:"+err)
   }
 }
 

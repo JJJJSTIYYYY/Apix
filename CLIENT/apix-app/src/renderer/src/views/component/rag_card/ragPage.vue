@@ -134,7 +134,7 @@ onMounted(async () => {
     cid.value = authStore.user.user_uid
     docList.value = await getAvailableDocuments(cid.value)
   } catch (err) {
-    console.error('初始化失败', err)
+    console.error('[Rag page onMounted error]:', err)
   }
 })
 

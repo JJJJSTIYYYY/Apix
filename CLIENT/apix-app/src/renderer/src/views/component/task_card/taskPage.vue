@@ -201,7 +201,7 @@ onMounted(async () => {
     await authStore.restore()
     cid.value = authStore.user?.user_uid || ''
   } catch (err) {
-    console.error('初始化失败', err)
+    console.error('[Task page onMounted error]:', err)
   }
 
   await loadTasks(false)
@@ -298,7 +298,7 @@ const loadTasks = async (showError = true) => {
   try {
     taskList.value = await getTaskList(false)
   } catch (err) {
-    console.error('加载任务失败:', err)
+    console.error('[loadTasks error]:', err)
     if (showError) {
       ElMessage.error('加载任务列表失败')
     }
@@ -323,7 +323,7 @@ const handleTerminate = async (history_id:string, taskId: string) => {
     ElMessage.success('任务已终止')
     await loadTasks(false)
   } catch (err) {
-    console.error('终止任务失败:', err)
+    console.error('[handleTerminate error]:', err)
     ElMessage.error('终止任务失败')
   }
 }
@@ -338,7 +338,7 @@ const clearCompleted = async () => {
     try {
       taskList.value = await getTaskList(true)
     } catch (err) {
-      console.error('加载任务失败:', err)
+      console.error('[clearCompleted error]:', err)
       if (showError) {
         ElMessage.error('加载任务列表失败')
       }
@@ -346,7 +346,7 @@ const clearCompleted = async () => {
     ElMessage.success('已完成任务已清理')
   } catch (err) {
     if (err !== 'cancel') {
-      console.error('清理任务失败:', err)
+      console.error('[clearCompleted error]:', err)
     }
   }
 }
@@ -365,7 +365,7 @@ const startAutoRefresh = () => {
     try {
       await loadTasks(false)
     } catch (err) {
-      console.error('自动刷新任务失败:', err)
+      console.error('[startAutoRefresh error]:', err)
     } finally {
       isAutoRefreshing.value = false
     }

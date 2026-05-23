@@ -313,7 +313,7 @@ async function removeLeftCard(id: String) {
     await store.saveCards()
     ElMessage({ type: 'success', message: '已删除', plain: true })
   } catch (err: any) {
-    console.log('删除卡片被取消或出错:', err?.message)
+    console.error('[removeLeftCard error]:', err?.message)
   }
 }
 

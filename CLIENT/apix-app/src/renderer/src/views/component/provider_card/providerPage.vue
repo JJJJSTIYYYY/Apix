@@ -124,7 +124,7 @@ onMounted(async () => {
     cid.value = authStore.user.user_uid
     providerList.value = await getProviders(cid.value)
   } catch (err) {
-    console.error('初始化失败', err)
+    console.error('[Provider page onMounted error]:', err)
   }
 })
 
