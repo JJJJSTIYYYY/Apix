@@ -40,6 +40,7 @@
               </div>
             </div>
           </Transition>
+
           <div 
             class="work-dir-label" 
             :class="{no_work_dir: show_work_dir===''}"
@@ -2609,9 +2610,9 @@ async function handleFilePaths(filePaths: string[]) {
   isUploading.value = false
 }
 
-// ################################
+// ------------------------
 // Maximize input
-// ################################
+// ------------------------
 const fullInput = ref(false)
 const setFullInput = () => {
   fullInput.value = !fullInput.value
@@ -2710,12 +2711,14 @@ const setFullInput = () => {
   align-items: center;
   align-content: center;
   text-align: center;
-  border-radius: 24px;
+  border-radius:  0 0 8px 8px;
   height: 24px;
-  top: 12px;
+  top: 0;
   backdrop-filter: saturate(220%) blur(3px);
   background-color: #ffffff12;
-  border: 1px solid #324c4f2e;
+  border-width: 0 1px 1px 1px;
+  border-color: #324c4f2e;
+  border-style: solid;
   color: var(--apix-info-dark-text);
   padding: 0px 12px 0px 0px;
   font-weight: bold;
@@ -2730,11 +2733,13 @@ const setFullInput = () => {
 
 .work-dir-label.no_work_dir {
   width: 28px;
-  height: 16px;
+  height: 20px;
   backdrop-filter: saturate(220%) blur(3px);
   color: transparent;
   background-color: #d1d1d130;
-  border: 1px solid #a6a6a623;
+  border-width: 0 1px 1px 1px;
+  border-color: #a6a6a623;
+  border-style: solid;
 }
 
 .work-dir-label.no_work_dir::before {
@@ -2751,7 +2756,9 @@ const setFullInput = () => {
   height: 24px;
   color: var(--apix-danger-dark-text);
   background-color: #ebb7b757;
-  border: 1px solid #c82c2c23;
+  border-width: 0 1px 1px 1px;
+  border-color: #c82c2c23;
+  border-style: solid;
 }
 
 .work-dir-label.no_work_dir:hover::before {

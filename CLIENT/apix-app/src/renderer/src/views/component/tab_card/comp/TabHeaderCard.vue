@@ -1,4 +1,3 @@
-<!-- EditorTabItem.vue -->
 <template>
   <div
     :title="tab.tabKey"

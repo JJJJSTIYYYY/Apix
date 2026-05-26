@@ -1832,7 +1832,8 @@ function registerAiIpc() {
         data: {
           client_id: cid,
           session_id: sid,
-          history_id: hid
+          history_id: hid,
+          platform: "default"
         }
       })
     );

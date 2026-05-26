@@ -381,9 +381,9 @@ function isThinkExpanded(key: string) {
   return Boolean(expandedThinkMap.value[key])
 }
 
-function buildRenderItems(chunks: MessageChunk[] = []): RenderItem[] {
-  const items: RenderItem[] = []
+const renderedChunkMap = shallowRef<Record<string, string>>({})
 
+function buildRenderItems(chunks: MessageChunk[] = []): RenderItem[] {
   // Step 1: filter tool chunks
   const filteredChunks = chunks.filter((chunk) => {
     if (!isMessageLabel(chunk)) {
@@ -425,18 +425,43 @@ function buildRenderItems(chunks: MessageChunk[] = []): RenderItem[] {
     mergedChunks.push(chunk)
   }
 
-  // Step 3: render
+  // Step 3: render strategy
+  const lastChunk = mergedChunks.at(-1)
+
+  if (lastChunk && isMessageLabel(lastChunk)) {
+    const lastKey = `msg-${mergedChunks.length - 1}`
+
+    let html = lastChunk.content.length
+      ? md.render(lastChunk.content)
+      : ''
+
+    html = postProcessHtml(html)
+
+    renderedChunkMap.value[lastKey] = html
+  }
+
+  // Step 4: build items
   return mergedChunks.map((chunk, index) => {
     if (isMessageLabel(chunk)) {
-      let html = chunk.content.length
-        ? md.render(chunk.content)
-        : ''
+      const key = `msg-${index}`
 
-      html = postProcessHtml(html)
+      // Reuse cached html
+      let html = renderedChunkMap.value[key]
+
+      // First render fallback
+      if (html == null) {
+        html = chunk.content.length
+          ? md.render(chunk.content)
+          : ''
+
+        html = postProcessHtml(html)
+
+        renderedChunkMap.value[key] = html
+      }
 
       return {
         kind: 'message',
-        key: `msg-${index}`,
+        key,
         html,
         label_type: chunk.label_type,
       }

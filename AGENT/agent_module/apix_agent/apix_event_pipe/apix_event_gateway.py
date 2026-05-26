@@ -166,7 +166,7 @@ class ActionHandler:
         return self.cached_config
         
 
-    async def chat_with_llm(self, generation_id, payload: ApixEntryDataSchema):
+    async def chat_with_llm(self, payload: ApixEntryDataSchema):
         logger.trace('[ActionHandler] chat_with_llm Enter')
 
         data = payload.get("data") or {}
@@ -179,6 +179,11 @@ class ActionHandler:
             "platform": platform,
             "conversation_id": history_id,
         }
+
+        try:
+            generation_id = await generation_manager.create_generation(client_id, history_id, platform)
+        except Exception as e:
+            logger.error(f"[chat_with_llm] create_generation failed client={client_id}: {e}")
 
         gen = self.gen_mgr.get_generation(client_id, generation_id)
         if not gen:
@@ -318,6 +323,8 @@ class ActionHandler:
 
 
     async def resolve_block(self, payload: ApixEntryDataSchema):
+        logger.trace('[ActionHandler] resolve_block Enter')
+
         data = payload.get('data')
         block_id = data.get('block_id')
         message = data.get('messages')
@@ -326,8 +333,24 @@ class ActionHandler:
             'platform': data.get('platform'),
             'conversation_id': data.get('history_id')
         }
-        if not block_id: return
+        if not block_id: 
+            raise ValueError(f"[abort_generation] Missing required fields in payload: {data}")
+        
         AgentStreamWriter.resolve_block(target=target, block_id=block_id, result=message)
+
+
+    async def abort_generation(self, payload: ApixEntryDataSchema):
+        logger.trace('[ActionHandler] abort_generation Enter')
+
+        data = payload.get("data") or {}
+        client_id = data.get("client_id")
+        history_id = data.get("history_id", "")
+        platform = data.get("platform", "")
+
+        if not client_id or not history_id or not platform:
+            raise ValueError(f"[abort_generation] Missing required fields in payload: {data}")
+
+        await generation_manager.abort_by_history_id(client_id, history_id, platform)
 
 
 

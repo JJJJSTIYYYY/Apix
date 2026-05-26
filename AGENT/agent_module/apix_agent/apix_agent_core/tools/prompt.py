@@ -467,16 +467,16 @@ Do NOT use this tool when:
 
 
 REQUEST_USER_INPUT_PROMPT = """
-Request one or more answers, confirmations, selections, or decisions directly from the user.
+Request one or more answers, confirmations, selections, or decisions directly from the user
 
 ## Args
-- questions (list[Question]): List of questions to send to the user.
+- questions (list[Question]): List of questions to send to the user
     Each question item must contain:
-    - question (str): The question shown to the user. Must not be empty.
-    - options (list[str]): Optional predefined selectable options for the user.
+    - question (str): The question shown to the user. Must not be empty
+    - options (list[str]): Optional predefined selectable options for the user
         Use an empty list if free-form input is expected.
-    - multiselection (bool): Whether the user is allowed to select multiple options from the list.
-        If `True`, multiple choices are permitted; if `False`, only a single choice is allowed.
+    - multiselection (bool): Whether the user is allowed to select multiple options from the list
+        If `True`, multiple choices are permitted; if `False`, only a single choice is allowed
 
 ## Returns
 - str | None:
@@ -502,6 +502,7 @@ Use this tool in these scenarios:
 4. When execution depends on user preferences or configuration choices
 5. When tool results are ambiguous and require user interpretation
 6. When the current task cannot continue reliably without user input
+7. When you want to display a confirmation dialog to the user before performing an operation
 
 ## When NOT to Use This Tool
 Do NOT use this tool when:
@@ -674,33 +675,33 @@ Do NOT use this tool when:
 """
 
 SEARCH_WEB_BY_URLS_PROMPT = """
-Fetch and extract the main readable content from one or more webpages.
+Fetch and extract the main readable content from one or more webpages
 
 ## Args
-- urls (str | list[str]): One or more webpage URLs.
+- urls (str | list[str]): One or more webpage URLs
 
 ## Returns
-- str: Extracted textual content from each webpage.
+- str: Extracted textual content from each webpage
 
 ## Note
-- The search results are not contain image or any binary data.
-- This tool retrieves and processes webpage content from the provided URLs.
-- It extracts the primary textual content of the page for analysis.
+- The search results are not contain image or any binary data
+- This tool retrieves and processes webpage content from the provided URLs
+- It extracts the primary textual content of the page for analysis
 
 ## When to Use This Tool
 Use this tool in these scenarios:
-1. When the user asks to analyze or summarize specific webpages.
-2. When `search_web_by_keywords` returned relevant URLs and you need their full content.
-3. When detailed webpage information is required beyond titles and descriptions.
+1. When the user asks to analyze or summarize specific webpages
+2. When `search_web_by_keywords` returned relevant URLs and you need their full content
+3. When detailed webpage information is required beyond titles and descriptions
 
 ## When NOT to Use This Tool
 Do NOT use this tool when:
-1. You do not have a valid URL.
-2. You only need webpage titles or search results descriptions.
-3. The task does not require reading webpage content.
+1. You do not have a valid URL
+2. You only need webpage titles or search results descriptions
+3. The task does not require reading webpage content
 
 ## Important Guidelines
-- Only fetch URLs provided by the user or returned from `search_web_by_keywords`.
-- Never fabricate or guess webpage content.
-- Avoid fetching unnecessary webpages.
+- Only fetch URLs provided by the user or returned from `search_web_by_keywords`
+- Never fabricate or guess webpage content
+- Avoid fetching unnecessary webpages
 """

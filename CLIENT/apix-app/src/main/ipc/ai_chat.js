@@ -85,6 +85,7 @@ export function registerAiIpc() {
           client_id: cid,
           session_id: sid,
           history_id: hid,
+          platform: 'default',
         }
       })
     )

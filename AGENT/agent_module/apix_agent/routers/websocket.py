@@ -46,21 +46,11 @@ async def ws_endpoint(websocket: WebSocket, platform: str, client_id: str):
             # Trigger AI invoke (async / background)
 
             if action == "chat_with_llm":
-                try:
-                    generation_id = await generation_manager.create_generation(client_id, history_id, platform)
-                except Exception as e:
-                    logger.error(f"[ws] create_generation failed client={client_id}: {e}")
-                    continue
-
-                logger.info(
-                    f"[ws] new generation created: "
-                    f"client={client_id}, generation={generation_id}"
-                )
-                asyncio.create_task(action_handler.chat_with_llm(generation_id, data))
+                asyncio.create_task(action_handler.chat_with_llm(data))
 
             elif action == "abort_generation":
                 try:
-                    await generation_manager.abort_by_history_id(client_id, history_id, platform)
+                    await action_handler.abort_generation(data)
                 except Exception as e:
                     logger.error(f"[ws] abort_generation failed client={client_id}: {e}")
                     continue

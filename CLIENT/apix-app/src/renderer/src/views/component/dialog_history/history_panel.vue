@@ -102,7 +102,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, onActivated, watch, nextTick } from 'vue'
 import type { ElScrollbar } from 'element-plus'
 import { ElMessage } from 'element-plus'
-
 import HistoryCard, { type ChatHistory } from './history_card.vue'
 import { ConfirmDialog } from '../comp/confirmDialog.js'
 import { useAuthStore } from '../../../store/auth.js'

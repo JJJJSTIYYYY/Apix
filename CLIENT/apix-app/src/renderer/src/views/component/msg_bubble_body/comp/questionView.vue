@@ -76,7 +76,7 @@
     <div class="qv-footer">
 
       <button class="qv-confirm" type="primary" @click="submitAll">
-        <svg t="1777266449849" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9749" width="24" height="24"><path class="confirm-icon-path" d="M512 76.8C271.36 76.8 76.8 271.36 76.8 512s194.56 435.2 435.2 435.2 435.2-194.56 435.2-435.2S752.64 76.8 512 76.8z m0 768c-184.32 0-332.8-148.48-332.8-332.8S327.68 179.2 512 179.2s332.8 148.48 332.8 332.8-148.48 332.8-332.8 332.8z" p-id="9750" fill="#ffffff"></path></svg>
+        <svg t="1777266449849" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9749" width="24" height="24"><path class="confirm-icon-path" d="M512 76.8C271.36 76.8 76.8 271.36 76.8 512s194.56 435.2 435.2 435.2 435.2-194.56 435.2-435.2S752.64 76.8 512 76.8z m0 768c-184.32 0-332.8-148.48-332.8-332.8S327.68 179.2 512 179.2s332.8 148.48 332.8 332.8-148.48 332.8-332.8 332.8z" p-id="9750" fill="currentColor"></path></svg>
       </button>
 
     </div>
@@ -410,6 +410,7 @@ function submitAll() {
 .qv-footer {
   display: flex;
   flex-direction: column;
+  padding-top: 6px;
 }
 
 .qv-confirm {
@@ -418,7 +419,7 @@ function submitAll() {
   height: 36px;
   font-size: 20px;
   border-radius: 100px;
-  background-color: var(--apix-default-light-color);
+  background-color: var(--apix-primary-color);
   color: var(--apix-primary-text);
   border: none;
   cursor: pointer;

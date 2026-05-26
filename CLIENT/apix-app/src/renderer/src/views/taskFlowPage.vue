@@ -64,7 +64,7 @@
                   @update:content-change="handleContentChange(tab.tabKey)"
                 />
 
-                <MarkdownEditor
+                <CodeEditor
                   v-else-if="tab.content_mime === 'md' || tab.content_mime === 'py' || tab.content_mime === 'js' || tab.content_mime === 'txt' "
                   :ref="el => { if (el) { editorRefs[tab.tabKey] = el } else { delete editorRefs[tab.tabKey] } }"
                   v-model="tab.content"
@@ -171,9 +171,9 @@ import { ElMessage } from 'element-plus'
 import HomePage from './homePage.vue'
 import TabCardList from './component/tab_card/TabCardList.vue'
 import TabHeaderCard from './component/tab_card/comp/TabHeaderCard.vue'
-import MarkdownEditor from './component/markdown_edit/markdown_editor.vue'
+import CodeEditor from './component/code_edit/code_editor.vue'
 import MiniChatPanel from './component/mini_chat/MiniChatPanel.vue'
-import { type MarkdownEditorExpose } from './component/markdown_edit/markdown_editor.vue'
+import { type CodeEditorExpose } from './component/code_edit/code_editor.vue'
 import FilePanel from './component/file_panel/file_explorer.vue'
 import { type NodeBase } from './component/file_panel/file_tree_node.vue'
 import { useAppCacheData } from '../store/app.js'
@@ -946,7 +946,7 @@ const editorRefs =
   shallowRef<
     Record<
       string,
-      MarkdownEditorExpose
+      CodeEditorExpose
     >
   >({})
 
