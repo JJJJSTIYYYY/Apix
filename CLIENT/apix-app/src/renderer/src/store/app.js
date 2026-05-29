@@ -51,6 +51,7 @@ const DEFAULT_CONFIG = {
   // ----- extra -----
   embeddingModel: '',
   alwaysQuoteFile: false,
+  autoSaveConfig: false,
 
   rolePrompt: {
     name: '',

@@ -527,4 +527,9 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
   background-color: color-mix(in srgb, var(--apix-primary-color) 20%, transparent) !important;
 }
+
+:deep(.cm-focused) {
+  box-shadow: none !important;
+  border: none !important;
+}
 </style>

@@ -114,10 +114,6 @@ const handleSelect = (key: string) => {
   left: calc(var(--apix-left-side-bar-width, 66px) - 66px);
 }
 
-.el-menu-vertical :deep(.el-icon svg path) {
-  fill: var(--apix-primary-dark) !important;
-}
-
 .el-menu-vertical:not(.el-menu--collapse) {
   width: 140px;
   min-height: 400px;
@@ -157,11 +153,5 @@ const handleSelect = (key: string) => {
 
 .el-menu-item.is-active {
   color: rgb(0, 173, 155);
-  background: radial-gradient(
-    circle at center,
-    rgba(79, 223, 208, 0.16) 0%, 
-    rgba(79, 223, 208, 0.08) 20%, 
-    rgba(79, 223, 208, 0) 40% 
-  );
 }
 </style>

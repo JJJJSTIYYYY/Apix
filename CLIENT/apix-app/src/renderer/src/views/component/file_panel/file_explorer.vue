@@ -374,7 +374,7 @@ onBeforeUnmount(() => {
 
   z-index: 20;
 
-  background-color: var(--apix-panel-layer-2-background);
+  background-color: var(--apix-default-light-color);
   transition: background 0.15s ease;
 }
 

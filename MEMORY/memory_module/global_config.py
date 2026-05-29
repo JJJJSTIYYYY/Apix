@@ -3,7 +3,6 @@ DEBUG = True
 AI_SERVICE_URL = "http://localhost:5091"
 
 MEMO_REDIS_URL = "redis://localhost:6379"
-TASK_REDIS_URL = "redis://localhost:6380"
 REDIS_POOL_SIZE = 3
 DEFAULT_EXPIRE_SECONDS = 60
 

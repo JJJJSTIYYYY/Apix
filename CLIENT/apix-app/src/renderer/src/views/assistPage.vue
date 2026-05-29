@@ -1560,13 +1560,6 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       file_id: f.id!,
     }))
 
-  if (quotedText.value !== '') {
-    content = `Referenced Message:  \n> “${quotedText.value}”\n\n` + content
-  }
-
-  isQuoteShow.value = false
-  quotedText.value = ''
-
   const messagePayload = {
     role: 'human',
     content,
@@ -1575,9 +1568,11 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       user_meta_data: {
         uploaded_files: uploadedFiles,
       },
+      referenced_message: (isQuoteShow.value && quotedText.value !== '') ? quotedText.value : '',
+      active_file: '',
     },
   }
-
+  
   if (pushToList) {
     list.push({
       id: genUUID(),
@@ -1595,7 +1590,9 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       pending: true,
     })
   }
-
+  
+  isQuoteShow.value = false
+  quotedText.value = ''
   inputText.value = ''
   selectedFiles.value = []
   scrollToBottom()
@@ -1647,7 +1644,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         summary_exempt_tail_length: store.config.keepNotSummary,
         pure_chat_on: store.config.pureChat,
         use_model_vision: store.config.visionOn,
-        model_temperature: store.config.modelTemp*0.02,
+        model_temperature: Number((store.config.modelTemp * 0.02).toFixed(2)),
 
         enable_file_opration: store.config.fileOpration,
         enable_web_search: store.config.webSearch,
@@ -1656,11 +1653,12 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         enable_skill_load: store.config.skillLoad,
         enable_agent_assign: store.config.agentAssign,
         enable_agent_swarm: store.config.agentSwarm,
+        enable_task_flow: store.config.enableTaskFlow,
 
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
         higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        enable_task_flow: store.config.enableTaskFlow,
+        auto_save_config: store.config.autoSaveConfig,
       }
     )
   } catch (err) {

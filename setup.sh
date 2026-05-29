@@ -62,24 +62,12 @@ popd >/dev/null
 echo "[2/7] Starting Redis..."
 
 Ensure_Dir "$ROOT/MEMORY/memory_module/data/redis/data-redis-memo"
-Ensure_Dir "$ROOT/MEMORY/memory_module/data/redis/data-redis-task"
-Ensure_Dir "$ROOT/AGENT/agent_module/data/redis/data-redis-longterm-memory"
 
 docker pull redis:7
 
 Docker_Run_Safe "redis-memo" \
 docker run -d --name redis-memo -p 6379:6379 \
 -v "$ROOT/MEMORY/memory_module/data/redis/data-redis-memo:/data" \
---restart unless-stopped redis:7
-
-Docker_Run_Safe "redis-task" \
-docker run -d --name redis-task -p 6380:6379 \
--v "$ROOT/MEMORY/memory_module/data/redis/data-redis-task:/data" \
---restart unless-stopped redis:7
-
-Docker_Run_Safe "redis-longterm-memory" \
-docker run -d --name redis-longterm-memory -p 6378:6379 \
--v "$ROOT/AGENT/agent_module/data/redis/data-redis-longterm-memory:/data" \
 --restart unless-stopped redis:7
 
 # =========================
@@ -126,7 +114,6 @@ modules=(
   "AGENT/agent_module"
   "MEMORY/memory_module"
   "FILE/file_service"
-  "TOOLS/tools_module"
   "TASK/task_flow_module"
 )
 

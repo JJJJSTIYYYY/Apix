@@ -627,7 +627,7 @@ body, * {
   padding: 5px !important;
   margin-bottom: 8px;
 
-  color: var(--apix-secondary-dark-color);
+  color: var(--apix-secondary-dark-color) !important;
   overflow: hidden;
   border: 1px solid var(--apix-panel-layer-5-background) !important;
   backdrop-filter: saturate(180%) blur(16px);
@@ -662,7 +662,7 @@ body, * {
 }
 
 span.el-popper__arrow {
-    display: none;
+  display: none;
 }
 
 .el-dialog {

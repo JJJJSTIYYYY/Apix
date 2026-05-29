@@ -187,62 +187,7 @@ class AIContextManager:
             "generation_id": generation_id
         }
         await self.append_to_messages(client_id, history_id, message, parent_id)
-        
-        
-    async def update_longterm_memory(self, client_id: str, memorys: dict):
-        """
-        Insert, modefy or deprecate series of memories to memory service.
 
-        Args:
-            client_id: "Id to indicate which user the data is from.",
-            memorys (dict): Format:
-                {
-                    "updates": [
-                        {
-                            "action": "deprecate",
-                            "target_id": "1111-2222",
-                            "confidence": 0.96,
-                            "reason": "User switched from MySQL to PostgreSQL"
-                        },
-                        {
-                            "action": "insert",
-                            "type": "factual",
-                            "confidence": 0.95,
-                            "content": "User uses PostgreSQL as primary database"
-                        },
-                        {
-                            "action": "modify",
-                            "target_id": "3333-4444",
-                            "type": "preference",
-                            "confidence": 0.94,
-                            "content": "User prefers handling locks at the cache layer"
-                        }
-                    ]
-                }
-
-        Returns:
-            None
-        """
-        logger.trace('[context_process.py] [AIContextManager] [append_to_messages] Enter')
-        if not memorys: return
-        messages = memorys.get('updates', [])
-        if not messages: return
-        payload = {
-            "client_id": client_id,
-            "messages": messages,
-        }
-
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/update_longterm",
-                json=payload,
-            )
-
-        if resp.status_code != 200 or not resp.json().get('success'):
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to append memory: {resp.text}",
-            )
         
     async def insert_shortterm_memory(self, client_id: str, history_id: str, memory_id: str, content: str):
         """
@@ -279,6 +224,7 @@ class AIContextManager:
                 status_code=resp.status_code,
                 detail=f"Failed to append memory: {resp.text}",
             )
+        
         
     async def fetch_messages(
         self,
@@ -328,143 +274,7 @@ class AIContextManager:
         logger.info(f"[fetch_messages] fetched {len(messages)} messages")
 
         return messages, messages[-1].get('node_id')
-        
-    async def fetch_summary(
-        self,
-        client_id: str,
-        history_id: str,
-    ) -> dict:
-        """
-        Deprecated Method.
-        Fetch messages summary from memory service.
-
-        Args:
-            client_id: Id to indicate which user the data is from.
-            history_id: Id to indicate which history the data belong to.
-
-        Returns:
-            dict: Messages summary dict returned by memory service. Format: 
-            {
-                "content": "...", // Summarization content.
-            }
-        """
-        logger.trace('[context_process.py] [AIContextManager] [fetch_summary] Enter')
-        logger.info(
-            f"[fetch_summary] client_id={client_id}, history_id={history_id}"
-        )
-
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/summary",
-                json={
-                    "client_id": client_id,
-                    "history_id": history_id,
-                },
-            )
-
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to get summary: {resp.text}",
-            )
-
-        resp_content = resp.json()
-        messages = resp_content.get("messages", {})
-
-        return messages
-        
-    async def update_summary(
-        self,
-        client_id: str,
-        history_id: str,
-        message: dict
-    ):
-        """
-        Deprecated Method.
-        Fetch messages summary from memory service.
-
-        Args:
-            client_id: Id to indicate which user the data is from.
-            history_id: Id to indicate which history the data belong to.
-            message: Dict witn format:
-            {
-                "content": "...", // Summarization content.
-                "message_remains": int, // Message num that not be summarized.
-            }
-        """
-        logger.trace('[context_process.py] [AIContextManager] [update_summary] Enter')
-        logger.info(
-            f"[update_summary] client_id={client_id}, history_id={history_id}"
-        )
-
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/summary",
-                json={
-                    "client_id": client_id,
-                    "history_id": history_id,
-                    "message": message
-                },
-            )
-
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to update summary: {resp.text}",
-            )
-
-        resp_content = resp.json()
-        messages = resp_content.get("messages", {})
-
-        return messages
-
-    async def fetch_longterm_memory(self, client_id: str, count: int = 10, verbose: bool = True) -> list[dict]:
-        """
-        Fetch longterm memory from memory service.
-
-        Args:
-            client_id: Id to indicate which user the data is to get.
-            count: How many records will be fetch at most.
-            verbose: If return the full dict.
-
-        Returns:
-            list[dict]: Memory message dict list returned by memory service. With format 
-            [
-                {
-                    "memory_id": str,
-                    "memory_type": str,
-                    "content": str,
-                    "confidence": float, // if verbose
-                    "created_at": str, // if verbose
-                    "updated_at": str, // if verbose
-                },
-                ...
-            ]
-        """
-        logger.trace('[context_process.py] [AIContextManager] [fetch_longterm_memory] Enter')
-        logger.info(
-            f"[fetch_longterm_memory] client_id={client_id}"
-        )
-
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/longterm",
-                json={
-                    "client_id": client_id,
-                    "count": count,
-                },
-            )
-
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to get memory: {resp.text}",
-            )
-
-        resp_content = resp.json()
-        messages = resp_content.get("messages", []) or []
-
-        return messages
+    
 
     async def fetch_shortterm_memory(self, client_id: str, history_id: str) -> list[dict]:
         """
@@ -508,6 +318,7 @@ class AIContextManager:
         messages = resp_content.get("messages", []) or []
 
         return messages
+    
     
     def _ensure_tool_message(self, agent_messages: list[AnyMessage]):
         if not agent_messages:
@@ -557,6 +368,7 @@ class AIContextManager:
                 cursor = scan_index
             else:
                 cursor += 1
+
 
     def create_agent_messages(
         self,
@@ -613,21 +425,15 @@ class AIContextManager:
                 if not isinstance(extra, dict) and extra:
                     extra = json.loads(extra)
 
-                image_data = extra.get("image_data", []) or []
-                audio_data = extra.get("audio_data", []) or []
-                video_data = extra.get("video_data", []) or []
-                file_data  = extra.get("file_data", []) or []
+                active_file = extra.get("active_file", '') or ''
+                referenced_message = extra.get("referenced_message", '') or ''
 
-                # Normalize text blocks
-                if isinstance(raw_text, str) and raw_text:
-                    text_blocks = [{"type": "text", "text": raw_text}]
-                elif isinstance(raw_text, list):
-                    text_blocks = raw_text
-                else:
-                    text_blocks = [{"type": "text", "text": str(raw_text)}]
+                if referenced_message:
+                    raw_text = f"Referenced Message:  \n> \"{referenced_message}\"\n\n{raw_text}"
+                if active_file:
+                    raw_text = f"Active File:  \n> \"{active_file}\"\n\n{raw_text}"
 
-                content = text_blocks + image_data + audio_data + video_data + file_data
-                msg = HumanMessage(content=content, name=name)
+                msg = HumanMessage(content=raw_text, name=name)
                 messages.append(msg)
                 if begin_to_append: messages_after_index.append(msg)
 
@@ -715,6 +521,7 @@ class AIContextManager:
             return messages_after_index
         self._ensure_tool_message(messages)
         return messages
+    
     
     def create_dict_message(
         self,
@@ -1371,98 +1178,7 @@ class AIContextManager:
                 + guidelines
                 + "\n\n"
             )
-
-
-    # Brfore graph prompt
-    def create_memory_prompt(self, messages: list[dict]) -> str:
-        '''
-        Create a human-like message that softly provides long-term context,
-        without exposing system structure, timestamps, or internal records.
-
-        Args:
-            messages (list[dict]): List of memory messages.
-        '''
-
-        # --- build human-readable memory impressions ---
-        impressions: list[str] = []
-
-        # Current time anchor (used only for relative comparison)
-        now = datetime.now(timezone.utc)
-
-        for msg in messages:
-            content = msg.get("content")
-            if not content:
-                continue
-
-            memory_type = msg.get("memory_type", "")
-            updated_ts = msg.get("updated_timestamp")
-
-            # --- build vague relative time description (no numbers) ---
-            time_hint = ""
-            if isinstance(updated_ts, (int, float)):
-                try:
-                    ts_s = updated_ts / 1_000_000.0
-                    then = datetime.fromtimestamp(ts_s, timezone.utc)
-                    delta_seconds = (now - then).total_seconds()
-
-                    day = 24 * 3600
-                    week = 7 * day
-                    month = 30 * day
-
-                    if delta_seconds < day:
-                        time_hint = "today"
-                    elif delta_seconds < week:
-                        time_hint = "a few days ago"
-                    elif delta_seconds < month:
-                        time_hint = "several weeks ago"
-                    else:
-                        time_hint = "months ago"
-                except Exception:
-                    time_hint = ""
-
-            content = content.strip()
-
-            # --- align time wording with memory_type semantics ---
-            if not time_hint:
-                impressions.append(content)
-
-            elif memory_type in ("fact", "rule"):
-                # Stable memories: never imply expiration
-                impressions.append(
-                    f"{content} — noted {time_hint}."
-                )
-
-            elif memory_type == "preference":
-                # Preferences may change, but should not be assumed expired
-                impressions.append(
-                    f"{content} — noted {time_hint}."
-                )
-
-            elif memory_type in ("event", "transient"):
-                # Time-sensitive memories: time is part of the meaning
-                impressions.append(
-                    f"{time_hint.capitalize()}, {content}"
-                )
-
-            else:
-                # Safe fallback
-                impressions.append(
-                    f"{content} — noted {time_hint}."
-                )
-
-        if not impressions:
-            logger.info("[create_memory_prompt] no longterm memory found")
-            return ""
-
-        # --- merge into a natural, markdown-structured context ---
-        memory = (
-            "## Long-term Context\n\n"
-            "The following background information may be helpful:\n\n"
-            + "\n".join(f"- {i}" for i in impressions)
-            + "\n\nAs of today."
-        )
-
-        return memory + "\n\n"
+        
     
     # Runtime prompt
     def create_shortterm_prompt(self, messages: list[dict]) -> str:
@@ -1483,6 +1199,7 @@ class AIContextManager:
         )
         return memory
     
+    
     # Runtime prompt
     def create_workspace_prompt(
         self,
@@ -1492,7 +1209,6 @@ class AIContextManager:
         work_dir = state.get("work_dir", "")
         sandbox = state.get("sandbox", "")
         config = state.get("config", {})
-        no_sandbox = bool(config.get("no_sandbox", False))
 
         if not work_dir:
             return "## No work_dir has been specified by the user.\n\n"
@@ -1502,15 +1218,14 @@ class AIContextManager:
                 "## Error: The configured work_dir path does not exist on the filesystem. "
                 "Please ask the user to configure a valid existing directory.\n\n"
             )
-
-        if no_sandbox:
-            prompt = f"## Your workspace is {work_dir}"
-        elif sandbox:
-            prompt = "## [Ubuntu] Sandbox has been configured. \n- The user will share access to this sandbox with you."
+        
+        if sandbox:
+            prompt = "## [Ubuntu] Sandbox has been configured. \n** The user will share access to this sandbox with you. **"
         else:
             prompt = "## Sandbox configure failed."
 
         return f"{prompt}\n\n"
+    
 
     # Runtime prompt
     def create_todo_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
@@ -1529,22 +1244,37 @@ class AIContextManager:
         formatted = "\n".join(lines)
 
         return formatted + "\n\n"
+    
 
     # Runtime prompt
-    def create_memorandum_prompt(self, state: MainAgentState, agent_role: str = None) -> str:
+    def create_memorandum_prompt(
+        self,
+        state: MainAgentState,
+        agent_role: str = None,
+    ) -> str:
         memorandum_list: List[MemoItem] = state.get("memorandum", [])
 
         if not memorandum_list:
             return "## No memories available.\n\n"
 
-        lines = ["## Available Memories:"]
+        lines = [
+            "## Available Memories:\n",
+            "| # | Title | Date | Abstract |",
+            "|---|---|---|---|",
+        ]
 
         for index, item in enumerate(memorandum_list, start=1):
+
             title = item.get("title", "").strip()
             date = item.get("date", "").strip()
+            abstract = item.get("abstract", "").strip()
+
+            # Escape markdown table separators
+            title = title.replace("|", "\\|")
+            abstract = abstract.replace("|", "\\|")
 
             lines.append(
-                f"{index}. title: {title} | date: {date}"
+                f"| {index} | {title} | {date} | {abstract or 'None'} |"
             )
 
         return "\n".join(lines) + "\n\n"

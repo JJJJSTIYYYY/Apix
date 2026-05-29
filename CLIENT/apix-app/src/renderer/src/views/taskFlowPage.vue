@@ -111,14 +111,15 @@
             :page_id="'taskFlowPage'"
             :workspace="store.getWorkspace()"
             :active_file="'/workspace'+activeTab.substring(store.getWorkspace().length)"
-            @quote-file="saveTabContent()"
+            @quote-file="saveTabContent"
+            @open-actived-file="handleOpenActivedFile"
           />
         </div>
       </div>
     </el-main>
   </el-container>
 
-  <div class="bottom-btn-wrap">
+  <div class="top-btn-wrap">
     <button
       v-if="activatedTabMeta.mime === 'aflow'"
       class="commom-btn"
@@ -939,6 +940,19 @@ const saveTabContent = async () => {
   }
 }
 
+const handleOpenActivedFile = async (file_path: string) => {
+  if (file_path.startsWith('/workspace')) {
+    if (activeTab.value.substring(store.getWorkspace().length) === file_path.substring('/workspace'.length)) {
+      return
+    }
+    else {
+      const path = store.getWorkspace() + file_path.substring('/workspace'.length)
+      const name = path.split('/').pop()
+      await openFile(path, name)
+    }
+  }
+}
+
 // ------------------------
 // Markdown
 // ------------------------
@@ -1425,7 +1439,7 @@ function showMiniAgentPanel() {
   overflow: hidden;
 }
 
-.bottom-btn-wrap {
+.top-btn-wrap {
   -webkit-app-region: no-drag;
   
   opacity: 0.65;
@@ -1451,7 +1465,7 @@ function showMiniAgentPanel() {
   transition: opacity .25s var(--apix-cubic-bezier);
 }
 
-.bottom-btn-wrap:hover {
+.top-btn-wrap:hover {
   opacity: 1;
 }
 

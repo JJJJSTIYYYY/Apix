@@ -230,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { nextTick, ref, shallowRef, onMounted, onBeforeUnmount, computed } from 'vue'
 import msgBubbleMenu from '../../msg_bubble_body/comp/msgBubbleMenu.vue'
 import msgSelectionBubble from '../../msg_bubble_body/comp/msgSelectionBubble.vue'
 import ToolLabelCard from '../../msg_bubble_body/comp/toolLabelCard.vue'

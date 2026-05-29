@@ -16,10 +16,10 @@ from apix_agent.global_config import BASE_DIR
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.tools.prompt import READ_MEMORY_PROMPT, UPDATE_MEMORY_PROMPT, WRITE_TODOS_PROMPT
 
-
-def update_to_yaml(
+def update_memory_to_yaml(
     file_path: Path,
     title: str,
+    abstract: str | None,
     content: str,
     date: str,
     source: Literal["conversation", "workspace"],
@@ -30,6 +30,7 @@ def update_to_yaml(
     Args:
         file_path (Path): yaml file path
         title (str): memo title
+        abstract (str | None): brief summary of the memory
         content (str): memo content, if empty -> delete
         date (str): memo date, e.g. 2025-06-07
         source (Literal["conversation", "workspace"]): memo source
@@ -39,6 +40,17 @@ def update_to_yaml(
     """
     try:
         content = content or ""
+
+        # Normalize abstract
+        abstract = (
+            abstract.strip()
+            if isinstance(abstract, str)
+            else None
+        )
+
+        if not abstract:
+            abstract = None
+
         # Load existing data
         if file_path.exists():
             with open(file_path, "r", encoding="utf-8") as f:
@@ -48,7 +60,7 @@ def update_to_yaml(
 
         if not isinstance(data, list):
             logger.warning(
-                f"[update_to_yaml] Invalid yaml structure in {file_path}, resetting to empty list."
+                f"[update_memory_to_yaml] Invalid yaml structure in {file_path}, resetting to empty list."
             )
             data = []
 
@@ -63,6 +75,7 @@ def update_to_yaml(
         if content.strip():
             data.append({
                 "title": title,
+                "abstract": abstract,
                 "date": date,
                 "content": content,
                 "source": source,
@@ -77,12 +90,12 @@ def update_to_yaml(
                 sort_keys=False,
             )
 
-        logger.info("[update_to_yaml] yaml updated successfully.")
+        logger.info("[update_memory_to_yaml] yaml updated successfully.")
 
         return data
 
     except Exception as e:
-        logger.error(f"[update_to_yaml] Error: {e}")
+        logger.error(f"[update_memory_to_yaml] Error: {e}")
         raise
 
 
@@ -144,6 +157,7 @@ async def write_todos(
 
 class Memory(TypedDict):
     title: str
+    abstract: Optional[str]
     content: Optional[str]
 
 
@@ -281,7 +295,12 @@ async def update_memory(
         for memory in memories:
 
             title = memory["title"]
+            abstract = memory.get("abstract")
             content = memory.get("content") or ""
+
+            # Delete operation should not keep abstract
+            if not content.strip():
+                abstract = None
 
             existing_memo = next(
                 (
@@ -323,9 +342,10 @@ async def update_memory(
             existed_before = existing_memo is not None
 
             for path in target_paths:
-                update_to_yaml(
+                update_memory_to_yaml(
                     file_path=path,
                     title=title,
+                    abstract=abstract,
                     content=content,
                     date=datetime.now().strftime("%Y-%m-%d"),
                     source=memo_source,

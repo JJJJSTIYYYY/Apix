@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { initWS, waitForOpen } from '../ws/wsClient'
 const WebSocket = require('ws')
 
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // =====================================================
 //                      Ai chat
@@ -232,82 +232,6 @@ export function registerAiIpc() {
       return data
     } catch (err) {
       console.error("Delete messages error:", err)
-      throw err
-    }
-  })
-
-  ipcMain.handle('api:start_task', async (event, tid) => {
-    try {
-      const res = await fetch(`${TOOLS_API_BASE}/task/start`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          task_id: tid,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        return "fail"
-      }
-
-      return data
-    } catch (err) {
-      console.error("Start task error:", err)
-      throw err
-    }
-  })
-
-  ipcMain.handle('api:kill_task', async (event, tname, tid, cid, hid) => {
-    try {
-      const res = await fetch(`${TOOLS_API_BASE}/task/kill`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tool_name: tname,
-          task_id: tid,
-          client_id: cid,
-          history_id: hid,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Kill task failed.")
-      }
-
-      return data
-    } catch (err) {
-      console.error("Kill task error:", err)
-      throw err
-    }
-  })
-
-  ipcMain.handle('api:fetch_task_info', async (event, tid) => {
-    try {
-      const res = await fetch(`${MEMORY_API_BASE}/memory/task/info`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          task_id: tid,
-          task_hash: "",
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Fetch task info failed.")
-      }
-
-      return data
-    } catch (err) {
-      console.error("Fetch task info error:", err)
       throw err
     }
   })

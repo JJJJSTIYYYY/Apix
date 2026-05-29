@@ -1,67 +1,10 @@
 <template>
   <div
-    class="chat-wrapper-header"
-  >
-    <div class="chat-wrapper-title-wrapper">
-      <div
-        v-if="!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1'"
-        class="page-rtn-btn"
-      >
-        <svg t="1777805499661" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13418" width="18" height="18">
-          <path d="M479.8464 111.7184c44.7744 0 87.9616 6.8864 128.6144 19.6096v81.792a350.7712 350.7712 0 0 0-128.6144-24.2944c-192.896 0-350.72 156.16-350.72 347.0336v250.624c0 53.9904 42.88 96.4096 97.4336 96.4096h253.2864c192.896 0 350.72-156.16 350.72-347.0336 0-36.9408-5.888-72.576-16.8448-106.0352h81.152c8.8832 33.92 13.6192 69.4528 13.6192 106.0352 0 233.2672-192.896 424.1408-428.6464 424.1408H226.56C129.1264 960 51.2 882.8928 51.2 786.4832v-250.624C51.2 302.592 244.096 111.7184 479.8464 111.7184z m19.4816 491.6224c21.4528 0 38.9632 17.3568 38.9632 38.5536s-17.5104 38.5536-38.9632 38.5536h-175.36a38.8864 38.8864 0 0 1-38.9632-38.5536c0-21.1968 17.536-38.5536 38.9632-38.5536h175.36z m136.3968-173.5168c21.4272 0 38.9632 17.3568 38.9632 38.5536 0 21.2224-17.536 38.5536-38.9632 38.5536H323.968a38.8864 38.8864 0 0 1-38.9632-38.5536c0-21.1968 17.536-38.5536 38.9632-38.5536h311.7568zM822.784 64c20.7104 0 37.504 16.7936 37.504 37.504l-0.0256 73.8304h75.4176a37.12 37.12 0 0 1 0 74.24l-75.4176-0.0256v73.856a37.504 37.504 0 0 1-75.008 0V249.5488h-75.392a37.12 37.12 0 1 1 0-74.2144h75.392V101.504c0-20.7104 16.7936-37.504 37.5296-37.504z" fill="var(--apix-default-dark-color)" p-id="13419"></path>
-        </svg>
-      </div>
-
-      <button
-        v-else
-        class="page-rtn-btn"
-        @click="handleRtnPageClick"
-      >
-        <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16">
-          <path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="var(--apix-default-dark-color)" p-id="1148"></path>
-        </svg>
-      </button>
-
-      <div 
-        class="chat-wrapper-title"
-      >
-        {{!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1' ? '新聊天' : '会话' }}
-      </div>
-    </div>
-
-    <div class="chat-wrapper-ctn-wrapper">
-      {{ agentName }}
-    </div>
-
-    <div class="chat-wrapper-btn-wrapper">
-      <button
-        v-if="!optionKeyPress"
-        class="quote-file-btn"
-        @click="handleQuoteFileClick"
-      >
-        引用此文件
-      </button>
-      <div
-        v-else
-        class="always-quote-file-selection"
-      >
-        <div
-          class="message-select-box"
-          :class="{ checked: store.config.alwaysQuoteFile }"
-          @click.stop="toggleSelect"
-        ></div>
-
-        <span>总是引用当前文件</span>
-      </div>
-    </div>
-  </div>
-  <div 
-    class="mini-chat-wrapper"
+    class="mini-chat-panel"
     :style="{
       width: `${miniChatWidth}px`
     }"
   >
-
     <!-- Resize handle -->
     <div
       class="resize-handle"
@@ -69,193 +12,255 @@
     ></div>
 
     <div 
-      class="chat-wrapper"
+      class="mini-chat-wrapper"
     >
-
       <div
-        class="history-panel"
-        v-if="!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1'"
+        class="chat-wrapper-header"
       >
-        <HistoryPanel
-          :histories="historyList"
-          @select="handleSelectHistory"
-          @delete="handleDeleteHistory"
-        />
-      </div>
-    
-      <div class="message-list">
-        <div
-          v-for="msg in messages"
-          :key="msg.id"
-          class="message-item"
-          :class="msg.role"
-        >
-          <HumanMessageBubble 
-            v-if="msg.role === 'human'" 
-            :msg="msg" 
-            :is_selecting="selectMode"
-            @edit=""
-            @edit-finish="handleEditFinish"
-            @select-text="handleSelectText"
-            @selected="selectMessageBubble"
-            @delete="selectMessageBubble"
-            @quoted="handleQuoteShow"
-            @switch-to-branch="handleBranchSwitch"
-          />
-          <AiMessageBubble 
-            v-else-if="msg.role === 'ai'" 
-            :msg="msg" 
-            :is_selecting="selectMode"
-            @re-generate="handleRegenerate"
-            @select-text="handleSelectText"
-            @selected="selectMessageBubble"
-            @delete="selectMessageBubble"
-            @quoted="handleQuoteShow"
-            @complete-questions="handleCompleteQuestions"
-            @switch-to-branch="handleBranchSwitch"
-          />
+        <div class="chat-wrapper-title-wrapper">
+          <div
+            v-if="!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1'"
+            class="page-rtn-btn"
+          >
+            <svg t="1777805499661" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13418" width="18" height="18">
+              <path d="M479.8464 111.7184c44.7744 0 87.9616 6.8864 128.6144 19.6096v81.792a350.7712 350.7712 0 0 0-128.6144-24.2944c-192.896 0-350.72 156.16-350.72 347.0336v250.624c0 53.9904 42.88 96.4096 97.4336 96.4096h253.2864c192.896 0 350.72-156.16 350.72-347.0336 0-36.9408-5.888-72.576-16.8448-106.0352h81.152c8.8832 33.92 13.6192 69.4528 13.6192 106.0352 0 233.2672-192.896 424.1408-428.6464 424.1408H226.56C129.1264 960 51.2 882.8928 51.2 786.4832v-250.624C51.2 302.592 244.096 111.7184 479.8464 111.7184z m19.4816 491.6224c21.4528 0 38.9632 17.3568 38.9632 38.5536s-17.5104 38.5536-38.9632 38.5536h-175.36a38.8864 38.8864 0 0 1-38.9632-38.5536c0-21.1968 17.536-38.5536 38.9632-38.5536h175.36z m136.3968-173.5168c21.4272 0 38.9632 17.3568 38.9632 38.5536 0 21.2224-17.536 38.5536-38.9632 38.5536H323.968a38.8864 38.8864 0 0 1-38.9632-38.5536c0-21.1968 17.536-38.5536 38.9632-38.5536h311.7568zM822.784 64c20.7104 0 37.504 16.7936 37.504 37.504l-0.0256 73.8304h75.4176a37.12 37.12 0 0 1 0 74.24l-75.4176-0.0256v73.856a37.504 37.504 0 0 1-75.008 0V249.5488h-75.392a37.12 37.12 0 1 1 0-74.2144h75.392V101.504c0-20.7104 16.7936-37.504 37.5296-37.504z" fill="var(--apix-default-dark-color)" p-id="13419"></path>
+            </svg>
+          </div>
+
+          <button
+            v-else
+            class="page-rtn-btn"
+            @click="handleRtnPageClick"
+          >
+            <svg t="1777025380440" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1147" width="16" height="16">
+              <path d="M412.128 512l293.28-285.248c9.312-9.056 14.592-21.6 14.592-34.752 0-26.496-21.056-48-47.008-48-12.064 0-23.68 4.736-32.416 13.248l-317.12 308.416Q304 484.544 304 512q0 27.424 19.456 46.336l317.12 308.384c8.736 8.544 20.352 13.28 32.416 13.28 25.952 0 47.008-21.504 47.008-48 0-13.12-5.28-25.696-14.592-34.752L412.16 512z" fill="var(--apix-default-dark-color)" p-id="1148"></path>
+            </svg>
+          </button>
+
+          <div 
+            class="chat-wrapper-title"
+          >
+            {{!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1' ? '新聊天' : '会话' }}
+          </div>
         </div>
 
-        <div key="buttom-div" class="buttom-div"></div>
+        <div class="chat-wrapper-ctn-wrapper">
+          {{ agentName }}
+        </div>
+
+        <div class="chat-wrapper-btn-wrapper">
+          <button
+            v-if="!optionKeyPress"
+            class="quote-file-btn"
+            @click="handleQuoteFileClick"
+          >
+            引用此文件
+          </button>
+          <div
+            v-else
+            class="always-quote-file-selection"
+          >
+            <div
+              class="message-select-box"
+              :class="{ checked: store.config.alwaysQuoteFile }"
+              @click.stop="toggleSelect"
+            ></div>
+
+            <span>总是引用当前文件</span>
+          </div>
+        </div>
       </div>
 
       <div 
-        class="ctrl-area"
-        v-if="!selectMode"
+        class="chat-wrapper"
       >
-        <Transition name="fade">
-          <div v-if="isWarningShow" class="warning-label">
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <svg t="1776752724390" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1671" width="20" height="20"><path d="M558 563c0 24.852-20.148 45-45 45S468 587.852 468 563v-150c0-24.852 20.148-45 45-45s45 20.148 45 45v150z m0 132c0 24.852-20.148 45-45 45S468 719.852 468 695v-1c0-24.852 20.148-45 45-45S558 669.148 558 694v1z m-355.006 65.804a15 15 0 0 0 14.986 15.014l589.36 0.55a15 15 0 0 0 12.916-22.646L525.56 256.376a15 15 0 0 0-25.806-0.006l-294.66 496.796a15 15 0 0 0-2.098 7.638z m-75.31-53.552l294.66-496.794c29.584-49.878 93.998-66.328 143.874-36.746a105 105 0 0 1 36.768 36.784l294.7 497.346c29.56 49.89 13.08 114.298-36.808 143.86a105 105 0 0 1-53.624 14.666l-589.358-0.55c-57.99-0.054-104.956-47.108-104.9-105.1a105 105 0 0 1 14.688-53.466z" fill="var(--apix-warning-button-text)" p-id="1672"></path></svg>
-              <span class="warning-content" :title="WarningContent">{{ WarningContent }}</span>
-            </div>
-            <button class="warning-close" @click="handleWarningClose">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-              </svg>
-            </button>
-          </div>
-        </Transition>
 
-        <Transition name="fade">
-          <div v-if="isQuoteShow && quotedText !== ''" class="quote-label">
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <div class="quote-icon">
-                <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" fill="var(--apix-default-button-text)" p-id="1652"></path></svg>
-              </div>
-              <span class="quote-content">{{ quotedText }}</span>
-            </div>
-            <button class="quote-close" @click="handleQuoteClose">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-              </svg>
-            </button>
-          </div>
-        </Transition>
-
-        <Transition name="fade">
-          <div v-if="isFileQuoteShow && active_file && active_file !== ''" class="quote-label">
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <div class="quote-icon" v-html="getSupportFileSVG(active_file)"></div>
-              <span class="quote-content">{{ active_file }}</span>
-            </div>
-            <button class="quote-close" @click="handleFileQuoteClose">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-              </svg>
-            </button>
-          </div>
-        </Transition>
-
-        <div class="input-bar">
-          <el-input
-            v-model="inputText"
-            type="textarea"
-            placeholder="Inputs..."
-            :autosize="{ minRows: 1, maxRows: fullInput?20:9 }"
-            class="chat-input"
-            style="display: flex; align-items: center;"
-            resize="none"
+        <div
+          class="history-panel"
+          v-if="!store.mini_chat_current_history_id[props.page_id] || store.mini_chat_current_history_id[props.page_id] === '-1'"
+        >
+          <HistoryPanel
+            :histories="historyList"
+            @select="handleSelectHistory"
+            @delete="handleDeleteHistory"
           />
-
-          <el-button
-            class="input-full-screen-button"
-            @click="setFullInput"
+        </div>
+      
+        <div class="message-list">
+          <div
+            v-for="msg in messages"
+            :key="msg.id"
+            class="message-item"
+            :class="msg.role"
           >
-            <svg t="1768828244015" class="icon" :class="{ isFullInput: fullInput }" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4761" width="200" height="200"><path d="M776.533333 896h-113.066666c-23.466667 0-42.666667-19.2-42.666667-42.666667s19.2-42.666667 42.666667-42.666666h113.066666c19.2 0 34.133333-14.933333 34.133334-34.133334v-113.066666c0-23.466667 19.2-42.666667 42.666666-42.666667s42.666667 19.2 42.666667 42.666667v113.066666c0 66.133333-53.333333 119.466667-119.466667 119.466667z m-416 0h-113.066666C181.333333 896 128 842.666667 128 776.533333v-113.066666c0-23.466667 19.2-42.666667 42.666667-42.666667s42.666667 19.2 42.666666 42.666667v113.066666c0 19.2 14.933333 34.133333 34.133334 34.133334h113.066666c23.466667 0 42.666667 19.2 42.666667 42.666666s-19.2 42.666667-42.666667 42.666667zM853.333333 403.2c-23.466667 0-42.666667-19.2-42.666666-42.666667v-113.066666c0-19.2-14.933333-34.133333-34.133334-34.133334h-113.066666c-23.466667 0-42.666667-19.2-42.666667-42.666666s19.2-42.666667 42.666667-42.666667h113.066666c66.133333 0 119.466667 53.333333 119.466667 119.466667v113.066666c0 23.466667-19.2 42.666667-42.666667 42.666667z m-682.666666 0c-23.466667 0-42.666667-19.2-42.666667-42.666667v-113.066666C128 181.333333 181.333333 128 247.466667 128h113.066666c23.466667 0 42.666667 19.2 42.666667 42.666667s-19.2 42.666667-42.666667 42.666666h-113.066666c-19.2 0-34.133333 14.933333-34.133334 34.133334v113.066666c0 23.466667-19.2 42.666667-42.666666 42.666667z" p-id="4762"></path></svg>
-          </el-button>
-          
-          <div class="chat-config">
-            <n-select
-              v-model:value="store.config.modelProvider"
-              :options="modelPoviderOptions"
-              class="model-provider"
-              :render-label="renderLabel"
-              :render-tag="renderSingleSelectTag"
-              :show-arrow="false"
-              :consistent-menu-width="false"
+            <HumanMessageBubble 
+              v-if="msg.role === 'human'" 
+              :msg="msg" 
+              :is_selecting="selectMode"
+              @edit=""
+              @edit-finish="handleEditFinish"
+              @select-text="handleSelectText"
+              @selected="selectMessageBubble"
+              @delete="selectMessageBubble"
+              @quoted="handleQuoteShow"
+              @switch-to-branch="handleBranchSwitch"
+              @open-actived-file="handleOpenActivedFile"
             />
-
-            <el-button
-              class="apikey-button"
-              :class="{ errorKey: !store.config.apiKey }"
-              @click="editApiKey"
-            >
-              <svg t="1773422089722" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="16943" width="200" height="200"><path d="M682.666667 256a256 256 0 1 1-216.490667 392.704L460.928 640H230.997333a42.666667 42.666667 0 0 1-25.941333-8.789333l-4.224-3.712-85.333333-85.333334a42.666667 42.666667 0 0 1-3.541334-56.32l3.541334-4.010666 85.290666-85.333334a42.666667 42.666667 0 0 1 24.576-12.117333L230.954667 384h229.973333A255.914667 255.914667 0 0 1 682.666667 256z m0 64a191.914667 191.914667 0 0 0-166.357334 96.042667 64 64 0 0 1-55.381333 31.957333H239.786667L175.829333 512l64 64h221.098667a64 64 0 0 1 55.381333 31.957333A192 192 0 1 0 682.666667 320z" :fill="store.config.apiKey?'var(--apix-tertiary-dark-color)':'var(--apix-input-error-border)'" p-id="16944"></path><path d="M682.666667 426.666667a85.333333 85.333333 0 1 1 0 170.666666 85.333333 85.333333 0 0 1 0-170.666666z m0 64a21.333333 21.333333 0 1 0 0 42.666666 21.333333 21.333333 0 0 0 0-42.666666z" :fill="store.config.apiKey?'var(--apix-tertiary-dark-color)':'var(--apix-input-error-border)'" p-id="16945"></path></svg>
-            </el-button>
-
-            <n-select
-              v-model:value="store.config.modelName"
-              :options="modelSelectOptions"
-              class="model-select"
-              :class="{ errorServer: errorServer }"
-              :consistent-menu-width="false"
-              :show-arrow="false"
+            <AiMessageBubble 
+              v-else-if="msg.role === 'ai'" 
+              :msg="msg" 
+              :is_selecting="selectMode"
+              @re-generate="handleRegenerate"
+              @select-text="handleSelectText"
+              @selected="selectMessageBubble"
+              @delete="selectMessageBubble"
+              @quoted="handleQuoteShow"
+              @complete-questions="handleCompleteQuestions"
+              @switch-to-branch="handleBranchSwitch"
             />
-
-            <el-button
-              class="thinking-button"
-              :class="{ yes: store.config.deepThink }"
-              @click="setDeepThink"
-            >
-              <svg t="1768788522926" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9133" width="200" height="200"><path d="M882.176 882.176c-53.8368 53.8368-136.832 59.3408-249.0368 16.4864A705.1008 705.1008 0 0 1 512 837.9136a705.1008 705.1008 0 0 1-121.1392 60.7744c-112.1792 42.8288-195.2 37.3248-249.0112-16.512-53.8368-53.8112-59.3408-136.832-16.512-249.0112A705.1008 705.1008 0 0 1 186.112 512a705.1264 705.1264 0 0 1-60.7744-121.1904c-42.8288-112.1792-37.3248-195.2 16.4864-249.0368 53.8368-53.8112 136.8576-59.3152 249.0368-16.4864A705.1264 705.1264 0 0 1 512 186.112a705.1264 705.1264 0 0 1 121.1648-60.7488c112.1792-42.8544 195.1744-37.3504 249.0112 16.4864 53.8368 53.8368 59.3408 136.832 16.4864 249.0112a705.152 705.152 0 0 1-60.7744 121.1904 705.1264 705.1264 0 0 1 60.7488 121.1392c42.8288 112.1792 37.3504 195.1744-16.4864 249.0112zM194.304 194.304c-31.1552 31.1552-31.0272 87.8336 0.3584 170.0608 10.2656 26.88 22.8864 53.6832 37.888 80.4608a1115.8784 1115.8784 0 0 1 99.3536-112.9472 1115.904 1115.904 0 0 1 112.896-99.328 609.1776 609.1776 0 0 0-80.4608-37.888c-82.2016-31.3856-138.88-31.488-170.0352-0.3584z m635.392 0c-31.1296-31.1296-87.808-31.0272-170.0352 0.384-26.88 10.24-53.6832 22.8864-80.4608 37.888a1115.904 1115.904 0 0 1 112.896 99.328 1115.8784 1115.8784 0 0 1 99.3536 112.896 609.1776 609.1776 0 0 0 37.888-80.4352c31.3856-82.2272 31.5136-138.9056 0.384-170.0608z m-445.2864 190.08c-42.4448 42.4448-78.8224 84.992-109.1328 127.6416 30.3104 42.6496 66.688 85.1712 109.1072 127.5904 42.4192 42.4448 84.992 78.8224 127.616 109.1328 42.6752-30.3104 85.1968-66.688 127.6416-109.1328 42.4192-42.4192 78.7968-84.9408 109.1072-127.5904-30.336-42.6752-66.7136-85.2224-109.1328-127.6416-42.4192-42.4192-84.9664-78.7968-127.616-109.1072-42.624 30.3104-85.1712 66.688-127.5904 109.1072zM435.2 512a76.8 76.8 0 1 1 153.6 0 76.8 76.8 0 0 1-153.6 0z m-202.624 67.2256a609.1776 609.1776 0 0 0-37.888 80.4096c-31.3856 82.2272-31.488 138.9056-0.3584 170.0608 31.1552 31.1552 87.8336 31.0272 170.0608-0.3584 26.8544-10.2656 53.6576-22.8864 80.4096-37.888a1115.8784 1115.8784 0 0 1-112.9216-99.328 1115.9552 1115.9552 0 0 1-99.328-112.896z m597.0944 250.4704c31.1552-31.1552 31.0272-87.8336-0.3584-170.0608a609.1776 609.1776 0 0 0-37.888-80.4096 1115.9296 1115.9296 0 0 1-99.2768 112.896 1115.8784 1115.8784 0 0 1-112.9216 99.328 609.1264 609.1264 0 0 0 80.384 37.888c82.2528 31.36 138.9312 31.488 170.0608 0.3584z" :fill="store.config.deepThink?'var(--apix-common-button-text)':'var(--apix-tertiary-dark-color)'" p-id="9134"></path></svg>
-              深度思考
-            </el-button>
-
           </div>
-          <div class="send-and-stop-btn-wrapper">
-            <el-button v-if="generatingState?.[store.mini_chat_current_history_id[props.page_id]]?.isGenerating ?? false" class="stop-button" type="primary" @click="stopGenerating">
-              <svg t="1779159856052" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17438" width="20" height="20"><path d="M348.16 307.2h327.68c22.621184 0 40.96 18.338816 40.96 40.96v327.68c0 22.621184-18.338816 40.96-40.96 40.96H348.16c-22.621184 0-40.96-18.338816-40.96-40.96V348.16c0-22.621184 18.338816-40.96 40.96-40.96z" fill="var(--apix-primary-text)" p-id="17439"></path></svg>
+
+          <div key="buttom-div" class="buttom-div"></div>
+        </div>
+
+        <div 
+          class="ctrl-area"
+          v-if="!selectMode"
+        >
+          <Transition name="fade">
+            <div v-if="isWarningShow" class="warning-label">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <svg t="1776752724390" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1671" width="20" height="20"><path d="M558 563c0 24.852-20.148 45-45 45S468 587.852 468 563v-150c0-24.852 20.148-45 45-45s45 20.148 45 45v150z m0 132c0 24.852-20.148 45-45 45S468 719.852 468 695v-1c0-24.852 20.148-45 45-45S558 669.148 558 694v1z m-355.006 65.804a15 15 0 0 0 14.986 15.014l589.36 0.55a15 15 0 0 0 12.916-22.646L525.56 256.376a15 15 0 0 0-25.806-0.006l-294.66 496.796a15 15 0 0 0-2.098 7.638z m-75.31-53.552l294.66-496.794c29.584-49.878 93.998-66.328 143.874-36.746a105 105 0 0 1 36.768 36.784l294.7 497.346c29.56 49.89 13.08 114.298-36.808 143.86a105 105 0 0 1-53.624 14.666l-589.358-0.55c-57.99-0.054-104.956-47.108-104.9-105.1a105 105 0 0 1 14.688-53.466z" fill="var(--apix-warning-button-text)" p-id="1672"></path></svg>
+                <span class="warning-content" :title="WarningContent">{{ WarningContent }}</span>
+              </div>
+              <button class="warning-close" @click="handleWarningClose">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+          </Transition>
+
+          <Transition name="fade">
+            <div v-if="isQuoteShow && quotedText !== ''" class="quote-label">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <div class="quote-icon">
+                  <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" fill="var(--apix-default-button-text)" p-id="1652"></path></svg>
+                </div>
+                <span class="quote-content">{{ quotedText }}</span>
+              </div>
+              <button class="quote-close" @click="handleQuoteClose">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+          </Transition>
+
+          <Transition name="fade">
+            <div v-if="isFileQuoteShow && active_file && active_file !== ''" class="quote-label">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <div class="quote-icon" v-html="getSupportFileSVG(active_file)"></div>
+                <span class="quote-content">{{ active_file }}</span>
+              </div>
+              <button class="quote-close" @click="handleFileQuoteClose">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+          </Transition>
+
+          <div class="input-bar">
+            <el-input
+              v-model="inputText"
+              type="textarea"
+              placeholder="Inputs..."
+              :autosize="{ minRows: 1, maxRows: fullInput?20:9 }"
+              class="chat-input"
+              style="display: flex; align-items: center;"
+              resize="none"
+            />
+
+            <el-button
+              class="input-full-screen-button"
+              @click="setFullInput"
+            >
+              <svg t="1768828244015" class="icon" :class="{ isFullInput: fullInput }" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4761" width="200" height="200"><path d="M776.533333 896h-113.066666c-23.466667 0-42.666667-19.2-42.666667-42.666667s19.2-42.666667 42.666667-42.666666h113.066666c19.2 0 34.133333-14.933333 34.133334-34.133334v-113.066666c0-23.466667 19.2-42.666667 42.666666-42.666667s42.666667 19.2 42.666667 42.666667v113.066666c0 66.133333-53.333333 119.466667-119.466667 119.466667z m-416 0h-113.066666C181.333333 896 128 842.666667 128 776.533333v-113.066666c0-23.466667 19.2-42.666667 42.666667-42.666667s42.666667 19.2 42.666666 42.666667v113.066666c0 19.2 14.933333 34.133333 34.133334 34.133334h113.066666c23.466667 0 42.666667 19.2 42.666667 42.666666s-19.2 42.666667-42.666667 42.666667zM853.333333 403.2c-23.466667 0-42.666667-19.2-42.666666-42.666667v-113.066666c0-19.2-14.933333-34.133333-34.133334-34.133334h-113.066666c-23.466667 0-42.666667-19.2-42.666667-42.666666s19.2-42.666667 42.666667-42.666667h113.066666c66.133333 0 119.466667 53.333333 119.466667 119.466667v113.066666c0 23.466667-19.2 42.666667-42.666667 42.666667z m-682.666666 0c-23.466667 0-42.666667-19.2-42.666667-42.666667v-113.066666C128 181.333333 181.333333 128 247.466667 128h113.066666c23.466667 0 42.666667 19.2 42.666667 42.666667s-19.2 42.666667-42.666667 42.666666h-113.066666c-19.2 0-34.133333 14.933333-34.133334 34.133334v113.066666c0 23.466667-19.2 42.666667-42.666666 42.666667z" p-id="4762"></path></svg>
             </el-button>
             
-            <el-button v-else class="send-button" type="primary" @click="handleSendMessage">
-              <svg t="1776519512558" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11362" width="26" height="26"><path d="M481.834667 183.168a42.666667 42.666667 0 0 1 60.330666 0l298.666667 298.666667a42.666667 42.666667 0 0 1-60.330667 60.330666L554.666667 316.330667V810.666667a42.666667 42.666667 0 1 1-85.333334 0V316.330667l-225.834666 225.834666a42.666667 42.666667 0 0 1-60.330667-60.330666l298.666667-298.666667z" fill="var(--apix-primary-text)" p-id="11363"></path></svg>
-            </el-button>
+            <div class="chat-config">
+              <n-select
+                v-model:value="store.config.modelProvider"
+                :options="modelPoviderOptions"
+                class="model-provider"
+                :render-label="renderLabel"
+                :render-tag="renderSingleSelectTag"
+                :show-arrow="false"
+                :consistent-menu-width="false"
+              />
+
+              <el-button
+                class="apikey-button"
+                :class="{ errorKey: !store.config.apiKey }"
+                @click="editApiKey"
+              >
+                <svg t="1773422089722" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="16943" width="200" height="200"><path d="M682.666667 256a256 256 0 1 1-216.490667 392.704L460.928 640H230.997333a42.666667 42.666667 0 0 1-25.941333-8.789333l-4.224-3.712-85.333333-85.333334a42.666667 42.666667 0 0 1-3.541334-56.32l3.541334-4.010666 85.290666-85.333334a42.666667 42.666667 0 0 1 24.576-12.117333L230.954667 384h229.973333A255.914667 255.914667 0 0 1 682.666667 256z m0 64a191.914667 191.914667 0 0 0-166.357334 96.042667 64 64 0 0 1-55.381333 31.957333H239.786667L175.829333 512l64 64h221.098667a64 64 0 0 1 55.381333 31.957333A192 192 0 1 0 682.666667 320z" :fill="store.config.apiKey?'var(--apix-tertiary-dark-color)':'var(--apix-input-error-border)'" p-id="16944"></path><path d="M682.666667 426.666667a85.333333 85.333333 0 1 1 0 170.666666 85.333333 85.333333 0 0 1 0-170.666666z m0 64a21.333333 21.333333 0 1 0 0 42.666666 21.333333 21.333333 0 0 0 0-42.666666z" :fill="store.config.apiKey?'var(--apix-tertiary-dark-color)':'var(--apix-input-error-border)'" p-id="16945"></path></svg>
+              </el-button>
+
+              <n-select
+                v-model:value="store.config.modelName"
+                :options="modelSelectOptions"
+                class="model-select"
+                :class="{ errorServer: errorServer }"
+                :consistent-menu-width="false"
+                :show-arrow="false"
+              />
+
+              <el-button
+                class="thinking-button"
+                :class="{ yes: store.config.deepThink }"
+                @click="setDeepThink"
+              >
+                <svg t="1768788522926" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9133" width="200" height="200"><path d="M882.176 882.176c-53.8368 53.8368-136.832 59.3408-249.0368 16.4864A705.1008 705.1008 0 0 1 512 837.9136a705.1008 705.1008 0 0 1-121.1392 60.7744c-112.1792 42.8288-195.2 37.3248-249.0112-16.512-53.8368-53.8112-59.3408-136.832-16.512-249.0112A705.1008 705.1008 0 0 1 186.112 512a705.1264 705.1264 0 0 1-60.7744-121.1904c-42.8288-112.1792-37.3248-195.2 16.4864-249.0368 53.8368-53.8112 136.8576-59.3152 249.0368-16.4864A705.1264 705.1264 0 0 1 512 186.112a705.1264 705.1264 0 0 1 121.1648-60.7488c112.1792-42.8544 195.1744-37.3504 249.0112 16.4864 53.8368 53.8368 59.3408 136.832 16.4864 249.0112a705.152 705.152 0 0 1-60.7744 121.1904 705.1264 705.1264 0 0 1 60.7488 121.1392c42.8288 112.1792 37.3504 195.1744-16.4864 249.0112zM194.304 194.304c-31.1552 31.1552-31.0272 87.8336 0.3584 170.0608 10.2656 26.88 22.8864 53.6832 37.888 80.4608a1115.8784 1115.8784 0 0 1 99.3536-112.9472 1115.904 1115.904 0 0 1 112.896-99.328 609.1776 609.1776 0 0 0-80.4608-37.888c-82.2016-31.3856-138.88-31.488-170.0352-0.3584z m635.392 0c-31.1296-31.1296-87.808-31.0272-170.0352 0.384-26.88 10.24-53.6832 22.8864-80.4608 37.888a1115.904 1115.904 0 0 1 112.896 99.328 1115.8784 1115.8784 0 0 1 99.3536 112.896 609.1776 609.1776 0 0 0 37.888-80.4352c31.3856-82.2272 31.5136-138.9056 0.384-170.0608z m-445.2864 190.08c-42.4448 42.4448-78.8224 84.992-109.1328 127.6416 30.3104 42.6496 66.688 85.1712 109.1072 127.5904 42.4192 42.4448 84.992 78.8224 127.616 109.1328 42.6752-30.3104 85.1968-66.688 127.6416-109.1328 42.4192-42.4192 78.7968-84.9408 109.1072-127.5904-30.336-42.6752-66.7136-85.2224-109.1328-127.6416-42.4192-42.4192-84.9664-78.7968-127.616-109.1072-42.624 30.3104-85.1712 66.688-127.5904 109.1072zM435.2 512a76.8 76.8 0 1 1 153.6 0 76.8 76.8 0 0 1-153.6 0z m-202.624 67.2256a609.1776 609.1776 0 0 0-37.888 80.4096c-31.3856 82.2272-31.488 138.9056-0.3584 170.0608 31.1552 31.1552 87.8336 31.0272 170.0608-0.3584 26.8544-10.2656 53.6576-22.8864 80.4096-37.888a1115.8784 1115.8784 0 0 1-112.9216-99.328 1115.9552 1115.9552 0 0 1-99.328-112.896z m597.0944 250.4704c31.1552-31.1552 31.0272-87.8336-0.3584-170.0608a609.1776 609.1776 0 0 0-37.888-80.4096 1115.9296 1115.9296 0 0 1-99.2768 112.896 1115.8784 1115.8784 0 0 1-112.9216 99.328 609.1264 609.1264 0 0 0 80.384 37.888c82.2528 31.36 138.9312 31.488 170.0608 0.3584z" :fill="store.config.deepThink?'var(--apix-common-button-text)':'var(--apix-tertiary-dark-color)'" p-id="9134"></path></svg>
+                深度思考
+              </el-button>
+
+            </div>
+            <div class="send-and-stop-btn-wrapper">
+              <el-button v-if="generatingState?.[store.mini_chat_current_history_id[props.page_id]]?.isGenerating ?? false" class="stop-button" type="primary" @click="stopGenerating">
+                <svg t="1779159856052" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17438" width="20" height="20"><path d="M348.16 307.2h327.68c22.621184 0 40.96 18.338816 40.96 40.96v327.68c0 22.621184-18.338816 40.96-40.96 40.96H348.16c-22.621184 0-40.96-18.338816-40.96-40.96V348.16c0-22.621184 18.338816-40.96 40.96-40.96z" fill="var(--apix-primary-text)" p-id="17439"></path></svg>
+              </el-button>
+              
+              <el-button v-else class="send-button" type="primary" @click="handleSendMessage">
+                <svg t="1776519512558" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="11362" width="26" height="26"><path d="M481.834667 183.168a42.666667 42.666667 0 0 1 60.330666 0l298.666667 298.666667a42.666667 42.666667 0 0 1-60.330667 60.330666L554.666667 316.330667V810.666667a42.666667 42.666667 0 1 1-85.333334 0V316.330667l-225.834666 225.834666a42.666667 42.666667 0 0 1-60.330667-60.330666l298.666667-298.666667z" fill="var(--apix-primary-text)" p-id="11363"></path></svg>
+              </el-button>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div
-        class="ctrl-btns-area"
-        v-if="selectMode"
-      >
-        <div class="cd-actions">
-          <button
-            class="cancel-btn"
-            @click="handleCancel"
-          >
-            取消
-          </button>
+        
+        <div
+          class="ctrl-btns-area"
+          v-if="selectMode"
+        >
+          <div class="cd-actions">
+            <button
+              class="cancel-btn"
+              @click="handleCancel"
+            >
+              取消
+            </button>
 
-          <button
-            class="delete-btn"
-            @click="handleDeleteMessages"
-          >
-            删除
-          </button>
+            <button
+              class="delete-btn"
+              @click="handleDeleteMessages"
+            >
+              删除
+            </button>
+          </div>
         </div>
-      </div>
 
+      </div>
     </div>
   </div>
 </template>
@@ -357,6 +362,7 @@ type TodoItem = {
 
 const emit = defineEmits<{
   quoteFile: void
+  openActivedFile: [file_path: string]
 }>()
 
 // ------------------------
@@ -394,7 +400,7 @@ function handleResize(e) {
   const delta = startX - e.clientX
 
   const minWidth = 460
-  const maxWidth = 720
+  const maxWidth = 520
 
   miniChatWidth.value = Math.min(
     maxWidth,
@@ -1558,22 +1564,14 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
   ensureGeneratingState(currentHid)
   loadedHistorySet.add(currentHid)
 
-  if (isQuoteShow.value && quotedText.value !== '') {
-    content = `Referenced Message:  \n> “${quotedText.value}”\n\n` + content
-  }
-
-  if (isFileQuoteShow.value && props.active_file && props.active_file !== '') {
-    content = `Active File:  \n> “${props.active_file}”\n\n` + content
-  }
-
-  isQuoteShow.value = false
-  quotedText.value = ''
-
   const messagePayload = {
     role: 'human',
     content,
     parent_id,
-    extra: {},
+    extra: {
+      referenced_message: (isQuoteShow.value && quotedText.value !== '') ? quotedText.value : '',
+      active_file: (isFileQuoteShow.value && props.active_file && props.active_file !== '') ? props.active_file : '',
+    },
   }
 
   if (pushToList) {
@@ -1594,6 +1592,8 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
     })
   }
 
+  isQuoteShow.value = false
+  quotedText.value = ''
   inputText.value = ''
   scrollToBottom()
 
@@ -1644,6 +1644,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         summary_exempt_tail_length: store.config.keepNotSummary,
         pure_chat_on: store.config.pureChat,
         use_model_vision: store.config.visionOn,
+        model_temperature: Number((store.config.modelTemp * 0.02).toFixed(2)),
 
         enable_file_opration: store.config.fileOpration,
         enable_web_search: store.config.webSearch,
@@ -1652,11 +1653,12 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         enable_skill_load: store.config.skillLoad,
         enable_agent_assign: store.config.agentAssign,
         enable_agent_swarm: store.config.agentSwarm,
+        enable_task_flow: store.config.enableTaskFlow,
 
         embed_model: store.config.embeddingModel,
         role_prompt: toRaw(store.config.rolePrompt),
         higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        enable_task_flow: store.config.enableTaskFlow,
+        auto_save_config: store.config.autoSaveConfig,
       }
     )
   } catch (err) {
@@ -1865,6 +1867,11 @@ async function handleBranchSwitch(branch_id: string) {
       plain: true,
     })
   }
+}
+
+function handleOpenActivedFile(file_path: string) {
+  if (!file_path || file_path === '') return
+  emit('openActivedFile', file_path)
 }
 
 
@@ -2304,9 +2311,15 @@ const setFullInput = () => {
 </script>
 
 <style scoped>
+.mini-chat-panel {
+  display: grid;
+  grid-template-columns: 2px auto;
+}
+
 .chat-wrapper-header {
   position: relative;
   height: 38px;
+  width: 100%;
 
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -2314,6 +2327,7 @@ const setFullInput = () => {
 
   padding: 0 10px;
   gap: 6px;
+  box-sizing: border-box;
 
   flex-shrink: 0;
 
@@ -2441,9 +2455,9 @@ const setFullInput = () => {
 }
 
 .mini-chat-wrapper {
-  display: grid;
-  grid-template-columns: 2px auto;
-  height: calc(100vh - 36px - 38.5px);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 36px);
   align-items: center;
   position: relative;
   background-color: var(--apix-panel-layer-1-background);
@@ -2458,7 +2472,7 @@ const setFullInput = () => {
 
   z-index: 20;
 
-  background-color: var(--apix-panel-layer-2-background);
+  background-color: var(--apix-default-light-color);
   transition: background 0.15s ease;
 }
 

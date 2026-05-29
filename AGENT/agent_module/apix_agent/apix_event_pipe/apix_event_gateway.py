@@ -7,12 +7,11 @@ import traceback
 import httpx
 
 from apix_agent.apix_platform.register import PLATFORM_REGISTRY
-from apix_agent.commons.resource_cleaner import resource_cleaner
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.generation_manager import generation_manager, GenerationManager
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
-from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelopeTarget, MainAgentState, MinimalEnvelopeData, ApixEventEnvelope, PlatformNotRegister, ProviderNoFound
+from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelopeTarget, MainAgentState, MinimalEnvelopeData, ApixEventEnvelope, PlatformNotRegister, ProviderNotFound
 from apix_agent.commons.file_content_reader import load_from_yaml, write_to_yaml
 from apix_agent.global_config import BASE_DIR, BASE_URL, MEMORY_SERVICE_BASE_URL
 from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter
@@ -26,7 +25,7 @@ class ActionHandler:
     def __init__(self, gen_mgr: GenerationManager):
         self.gen_mgr = gen_mgr
 
-        self.cached_config = None
+        self.cached_config: AgentConfigSchema | None = None
         self._config_lock = asyncio.Lock()
 
     def _build_envelope(
@@ -94,7 +93,7 @@ class ActionHandler:
             if provider_metas:
                 provider_meta = provider_metas[0]
             else:
-                raise ProviderNoFound(provider=provider_id)
+                raise ProviderNotFound(provider=provider_id)
             
             provider = 'custom-' + (provider_meta.get("type", "openai") or "openai") + '-' + provider_id
             endpoint = provider_meta.get("endpoint", "")
@@ -121,7 +120,7 @@ class ActionHandler:
                     else:
                         base[k] = copy.deepcopy(v)
 
-            if self.cached_config != old_config:
+            if self.cached_config != old_config and (self.cached_config.get("auto_save_config", False) or not old_config):
                 await asyncio.to_thread(
                     write_to_yaml,
                     cache_file_path,
@@ -151,7 +150,7 @@ class ActionHandler:
                 logger.info(f"[ensure_config]: restore custom provider meta: {provider_metas}")
 
                 if not provider_metas:
-                    raise ProviderNoFound(provider=p_id)
+                    raise ProviderNotFound(provider=p_id)
 
                 provider_meta = provider_metas[0]
                 endpoint = provider_meta.get("endpoint", "")

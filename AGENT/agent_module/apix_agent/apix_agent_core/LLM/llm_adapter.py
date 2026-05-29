@@ -5,7 +5,7 @@ from typing import Any, Literal
 from langchain.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-from apix_agent.commons.type_def import AgentConfigSchema, ProviderNoFound
+from apix_agent.commons.type_def import AgentConfigSchema, ProviderNotFound
 from apix_agent.commons.logger import logger
 
 from .llm_factory import get_llm_node
@@ -78,7 +78,7 @@ class LlmNodeAdapter:
         To adapt different model provider.
         """
         if provider not in ['ollama:local', 'ollama', 'openai', 'deepseek', 'moonshot', 'xiaomimimo'] and not provider.startswith("custom-"):
-            raise ProviderNoFound(f"LLM provider: {provider} is Unsupported at now.", provider=provider)
+            raise ProviderNotFound(f"LLM provider: {provider} is Unsupported at now.", provider=provider)
         # if provider == 'deepseek':
         #     # enable_think = bool(config.get("enable_think", False))
         #     # if enable_think: model = 'deepseek-reasoner'

@@ -432,10 +432,10 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">开启长期记忆</div>
+            <div class="setting-title">自动整理会话或工作区中的记忆</div>
             <div class="setting-control">
               <div class="setting-info"  :class="{ danger_info: store.config.longtermMemory }">
-                不推荐在个人PC本地部署时开启, 算力不足时可能导致Agent运行缓慢。
+                让Agent自动整理会话中或工作区中保存的记忆，开启后，当记忆数量达到一定阈值时将自动触发。
               </div>
               <div class="mode-switch">
                 <div class="slider" :class="{ right: store.config.longtermMemory }" />
@@ -462,7 +462,7 @@
           <div class="setting-card">
             <div class="setting-title">当上下文达到窗口大小限制时自动总结上下文</div>
             <div class="setting-control">
-              <div class="setting-info">需同步设置上下文总结触发阈值与保留的窗口长度</div>
+              <div class="setting-info">需同步设置上下文总结触发阈值与保留的窗口长度，若不进行设置，系统将在上下文达到窗口大小供应商限制时自动触发总结。</div>
               <div class="mode-switch">
                 <div class="slider" :class="{ right: store.config.shorttermMemory }" />
 
@@ -485,11 +485,10 @@
             </div>
           </div>
 
-          <div class="setting-card">
+          <div class="setting-card" title="过小的触发阈值可能导致Agent陷入死循环，最小生效值为16">
             <div v-if="store.config.shorttermMemory" class="setting-title">上下文总结触发阈值</div>
             <div v-else class="setting-title">上下文截断触发阈值</div>
             <div class="setting-control">
-              <div class="setting-info">过小的触发阈值可能导致Agent陷入死循环，最小生效值为16</div>
               <el-input-number 
                 v-model="summaryMessages"
                 controls-position="right" 
@@ -507,11 +506,10 @@
             </div>
           </div>
 
-          <div class="setting-card">
+          <div class="setting-card" title="过小的保留长度可能导致Agent陷入死循环，最小生效值为4">
             <div v-if="store.config.shorttermMemory" class="setting-title">总结时保留的上下文长度</div>
             <div v-else class="setting-title">截断时保留的上下文长度</div>
             <div class="setting-control">
-              <div class="setting-info">过小的保留长度可能导致Agent陷入死循环，最小生效值为4</div>
               <el-input-number 
                 v-model="keepMessages"
                 controls-position="right" 
@@ -799,8 +797,36 @@
               </div>
             </div>
           </div>
-          
+
           <div class="setting-card">
+            <div class="setting-title">自动同步设置至APIX后台</div>
+            <div class="setting-control">
+              <div class="setting-info" :class="{ danger_info: store.config.autoSaveConfig }">
+                开启后，每次对话时将自动保存设置至APIX后台，包括但不限于工具调用权限、记忆设置、联网搜索配置以及选择的模型、密钥。
+              </div>
+              <div class="mode-switch">
+                <div class="slider" :class="{ right: store.config.autoSaveConfig }" />
+
+                <button
+                  class="off-select"
+                  :class="{ active: !store.config.autoSaveConfig }"
+                  @click="switchMode('autoSaveConfig', 'off')"
+                >
+                  Off
+                </button>
+
+                <button
+                  class="on-select"
+                  :class="{ active: store.config.autoSaveConfig }"
+                  @click="switchMode('autoSaveConfig', 'on')"
+                >
+                  On
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="setting-card" title="模型温度越高，其输出的下一个Token越随机">
             <div class="setting-title">模型温度百分比</div>
             <div class="setting-control">
               <el-slider
@@ -809,7 +835,7 @@
                 :max="100"
                 @change="changeModelTemp"
               />
-              <span class="setting-value">{{ store.config.modelTemp }}%</span>
+              <span class="setting-value">{{ (store.config.modelTemp * 0.02).toFixed(2) }}</span>
             </div>
           </div>
         </div>
@@ -818,6 +844,12 @@
 
       <!-- Logout -->
       <div class="logout-btn-wrapper">
+        <button
+          class="sync-config-btn"
+        >
+          同步设置至APIX后台
+        </button>
+
         <el-button
           type="danger"
           off
@@ -1565,10 +1597,38 @@ span.el-popper__arrow {
 /* Logout */
 .logout-btn-wrapper {
   position: fixed;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
   right: 36px;
   bottom: 22px;
   z-index: 999;
   border-radius: var(--apix-button-border-radius) !important;
+}
+.logout-btn-wrapper:deep(.el-button) {
+  height: 36px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: saturate(580%) blur(16px);
+  border-radius: var(--apix-button-border-radius) !important;
+  background-color: color-mix(in srgb, var(--apix-danger-color) 70%, transparent) !important;
+}
+
+.sync-config-btn {
+  height: 36px;
+  padding: 8px 16px;
+  background: var(--apix-primary-lighter);
+  border: none;
+  border-radius: var(--apix-button-border-radius) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  color: var(--apix-primary-dark);
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: saturate(280%) blur(16px);
+  transition: all 0.3s var(--apix-cubic-bezier);
+  background-color: color-mix(in srgb, var(--apix-panel-layer-5-background) 50%, transparent) !important;
 }
 </style>
 
@@ -1578,27 +1638,13 @@ span.el-popper__arrow {
 .apix-banner {
   width: 100%;
   max-width: 900px;
-  background: linear-gradient(145deg, #0b1220 0%, #151d2e 100%);
   border-radius: 20px;
   padding: 48px;
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(136, 202, 197, 0.2);
-  box-shadow: 
-      0 20px 60px -15px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-/* 简化光效 - 更纯净 */
-.apix-banner::before {
-  content: '';
-  position: absolute;
-  top: -40%;
-  right: -20%;
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(136, 202, 197, 0.12) 0%, transparent 70%);
-  pointer-events: none;
+  box-shadow: var(--apix-shadow-md);
+  background-color: var(--apix-panel-layer-5-background);
 }
 
 /* 内容布局 - 关键修复：垂直居中对齐 */

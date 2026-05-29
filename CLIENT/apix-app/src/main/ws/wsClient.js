@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 const WebSocket = require('ws')
 
-import { WS_AI_API_BASE, AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { WS_AI_API_BASE, AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 let ws = null
 

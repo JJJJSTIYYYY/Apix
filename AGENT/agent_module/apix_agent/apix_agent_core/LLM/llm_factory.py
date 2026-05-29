@@ -2,7 +2,7 @@ from typing import Any
 
 from langchain.chat_models import BaseChatModel
 
-from apix_agent.commons.type_def import AgentConfigSchema, ProviderNoFound
+from apix_agent.commons.type_def import AgentConfigSchema, ProviderNotFound
 from apix_agent.commons.logger import logger
 from apix_agent.global_config import BASE_URL
 from .llm_creator import *
@@ -36,7 +36,7 @@ def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfig
         if p_type == "openai":
             llm_model = get_openai_model(model, api_key, BASE_URL.get(provider), config)
         else:
-            raise ProviderNoFound(f"Unsupport provider type: {p_type}.", provider=p_id)
+            raise ProviderNotFound(f"Unsupport provider type: {p_type}.", provider=p_id)
     else:
         logger.error(f"[get_llm_node] Failed to get {model} from {provider}...")
         raise ValueError(f"Unsupported LLM service type: {provider}")

@@ -401,6 +401,7 @@ Write / overwrite / delete a memory
 - memories (list[Memory]): List of memory operations to perform in batch.
     Each memory item must contain:
     - title (str): Memory title, must not be empty.
+    - abstract (Optional[str]): Brief summary of the memory.
     - content (str): Memory content. If empty or only whitespace, the memory will be deleted. Otherwise, the memory will be created or updated.
 
 ## Returns

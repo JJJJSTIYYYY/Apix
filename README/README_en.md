@@ -42,7 +42,6 @@ docker pull redis:7
 
 ```bash
 mkdir -p ./MEMORY/memory_module/data/redis/data-redis-memo
-mkdir -p ./MEMORY/memory_module/data/redis/data-redis-task
 cd ./MEMORY/memory_module/data
 
 # Redis for memo service
@@ -50,29 +49,6 @@ docker run -d \
   --name redis-memo \
   -p 6379:6379 \
   -v ./redis/data-redis-memo:/data \
-  --restart unless-stopped \
-  redis:7
-
-# Redis for task service
-docker run -d \
-  --name redis-task \
-  -p 6380:6379 \
-  -v ./redis/data-redis-task:/data \
-  --restart unless-stopped \
-  redis:7
-```
-
-* Redis cache for long-term memory extraction tasks
-
-```bash
-mkdir -p ./AGENT/agent_module/data/redis/data-redis-longterm-memory
-cd ./AGENT/agent_module/data
-
-# Redis for long-term memory service
-docker run -d \
-  --name redis-longterm-memory \
-  -p 6378:6379 \
-  -v ./redis/data-redis-longterm-memory:/data \
   --restart unless-stopped \
   redis:7
 ```

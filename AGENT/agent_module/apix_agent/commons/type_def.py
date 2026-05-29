@@ -5,7 +5,7 @@ from langchain_core.messages import AnyMessage
 from langchain.agents.middleware.todo import Todo
 
 
-class ProviderNoFound(Exception):
+class ProviderNotFound(Exception):
     
     def __init__(self, message="Custom provider not found.", provider=None):
         """        
@@ -164,6 +164,7 @@ class AgentConfigSchema(TypedDict):
     content_api_key: str
     embed_model: str  # The embed model for knowledge retrieval.
     web_cleaner_mode: str
+    auto_save_config: bool  # If true, the agent config will auto save when changed.
 
 
     # Agent Identity / Prompt

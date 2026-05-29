@@ -63,13 +63,31 @@
         </div>
         <div
           key="bubble"
-          class="human-bubble selectable"
+          class="human-bubble"
           @mousedown="handleMouseDown"
           @mouseup="handleMouseUp"
         >
           <div
+            v-if="activedFile && activedFile !== ''"
+            class="actived-file noselect"
+            :title="activedFile"
+          >
+            <svg t="1780037117744" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6619" width="20" height="20"><path d="M64 254.638v176.34c0 38.128 13.504 69.901 40.511 95.319 27.007 25.418 57.986 38.128 92.936 38.128h614.808L669.277 707.404l61.957 61.957 228.766-224v-52.426L731.234 264.17l-61.957 66.723 142.979 142.979H197.447c-12.709 0-23.035-3.972-30.979-11.915-7.943-7.943-11.915-18.27-11.915-30.979v-176.34H64z" fill="currentColor" p-id="6620"></path></svg>
+            <span class="actived-file-name noselect">{{ activedFile }}</span>
+          </div>
+
+          <div 
+            v-if="referencedMessage && referencedMessage !== ''"
+            class="referenced-message noselect"
+            :title="referencedMessage"
+          >
+            <svg t="1780037117744" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6619" width="20" height="20"><path d="M64 254.638v176.34c0 38.128 13.504 69.901 40.511 95.319 27.007 25.418 57.986 38.128 92.936 38.128h614.808L669.277 707.404l61.957 61.957 228.766-224v-52.426L731.234 264.17l-61.957 66.723 142.979 142.979H197.447c-12.709 0-23.035-3.972-30.979-11.915-7.943-7.943-11.915-18.27-11.915-30.979v-176.34H64z" fill="currentColor" p-id="6620"></path></svg>
+            <span class="reference-message-content noselect">{{ referencedMessage }}</span>
+          </div>
+
+          <div
             ref="bubbleContentRef"
-            class="bubble-content markdown-body"
+            class="bubble-content markdown-body selectable"
             :class="{ collapsed: shouldCollapse && !isExpanded }"
             v-html="renderedContent"
           ></div>
@@ -202,6 +220,14 @@ const uploadedFiles = computed<UploadedFile[]>(() => {
   return props.msg.extra?.user_meta_data?.uploaded_files ?? []
 })
 
+const referencedMessage = computed<string>(() => {
+  return props.msg.extra?.referenced_message ?? ''
+})
+
+const activedFile = computed<string>(() => {
+  return props.msg.extra?.active_file ?? ''
+})
+
 
 // 折叠/展开
 const bubbleContentRef = ref<HTMLElement | null>(null)
@@ -209,7 +235,7 @@ const bubbleContentRef = ref<HTMLElement | null>(null)
 const isExpanded = ref(false)
 const shouldCollapse = ref(false)
 
-const COLLAPSE_HEIGHT = 220
+const COLLAPSE_HEIGHT = 195
 
 async function toggleCollapse() {
   const wrapper = bubbleContentRef.value
@@ -630,6 +656,9 @@ onBeforeUnmount(() => {
   word-break: break-word;
   border: 0px;
   background-color: var(--apix-default-light-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .human-bubble-content-wrapper {
@@ -671,12 +700,12 @@ onBeforeUnmount(() => {
   transition: color 0.2s var(--apix-cubic-bezier);
 }
 
-.human-bubble:hover .bubble-content {
+.bubble-content:hover {
   color: var(--content-hover-color);
 }
 
 .bubble-content.collapsed {
-  max-height: 320px;
+  max-height: 195px;
   overflow: hidden;
   position: relative;
 }
@@ -704,7 +733,7 @@ onBeforeUnmount(() => {
 }
 
 .collapse-btn {
-  padding: 8px 0 0 0;
+  padding: 0;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -731,6 +760,37 @@ onBeforeUnmount(() => {
   width: 14px;
   height: 14px;
   padding-top: 4px;
+}
+
+.referenced-message,
+.actived-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0px 6px;
+  border-radius: 8px;
+  color: var(--apix-tertiary-dark-color);
+}
+
+.referenced-message:hover,
+.actived-file:hover {
+  color: var(--apix-secondary-dark-color);
+}
+
+.actived-file-name,
+.reference-message-content {
+  font-size: 0.85rem;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actived-file:deep(.icon),
+.referenced-message:deep(.icon) {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
 }
 
 /* ==================== 分支切换器（与 AI 气泡统一） ==================== */

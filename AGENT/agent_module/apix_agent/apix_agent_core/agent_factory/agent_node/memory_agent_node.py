@@ -10,7 +10,6 @@ from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.apix_agent_core.context_manager.longterm_memory import longterm_memory_manager
 from apix_agent.commons.type_def import InvalidOutputsError, MainAgentState, ConflictToolCalls
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent_factory.agent_node.agent_node_base import AgentNodeBase
@@ -124,10 +123,7 @@ class MainAgentNode(AgentNodeBase):
 
             # Long-term memory
             if enable_longterm_memory:
-                memory = await ai_context_manager.fetch_longterm_memory(client_id)
-                longterm_memory_prompt = ai_context_manager.create_memory_prompt(memory)
-                # Extract long-term memory from current message
-                await longterm_memory_manager.submit_memory(client_id, [client_message], memory, config)
+                pass
 
             # Short-term memory
             if enable_shortterm_memory:

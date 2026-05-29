@@ -5,9 +5,7 @@ from typing import Callable, Dict
 import redis.asyncio as redis
 
 from core.commons.logger import logger
-from global_config import MEMO_REDIS_URL, TASK_REDIS_URL, REDIS_POOL_SIZE, DEFAULT_EXPIRE_SECONDS
-from public import TASK_RUNNING_STATUS, TASK_FINISHING_STATUS
-from core.commons.type_def import TaskInfo
+from global_config import MEMO_REDIS_URL, REDIS_POOL_SIZE, DEFAULT_EXPIRE_SECONDS
 from core.commons.decorator import task_handler
 
 
@@ -34,7 +32,6 @@ class RedisService:
     def __init__(
         self,
         memo_redis_url: str = MEMO_REDIS_URL,
-        task_redis_url: str = TASK_REDIS_URL,
     ):
         self._memo_redis = redis.from_url(
             memo_redis_url,
@@ -43,17 +40,9 @@ class RedisService:
             socket_keepalive=True,
         )
 
-        self._task_redis = redis.from_url(
-            task_redis_url,
-            decode_responses=True,
-            max_connections=REDIS_POOL_SIZE,
-            socket_keepalive=True,
-        )
-
 
     async def _close(self) -> None:
         await self._memo_redis.aclose()
-        await self._task_redis.aclose()
 
     # ------------------------------------------------------------------
     # Handler Export
@@ -242,68 +231,6 @@ class RedisService:
                 "success": False,
                 "messages": f"fail: {e}"
             }
-
-    @task_handler("_redis.memo.backfill_messages")
-    async def _backfill_messages(self, payload: dict) -> dict:
-        """
-        Append message whether redis key already exists. If not exist, create and append, else append only.
-        This method should only be called after querying messages in MySQL and then backfilling Redis.
-
-        Args:
-            payload: Dict, the format is {
-                "client_id": "{{ cid }} : to indicate which user the data is from.",
-                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
-                "session_id": "{{ sid }} : to indicate which tab the data belong to",
-                "messages": [  # list of message dicts
-                    {
-                        "role": 'human', 'ai', 'system', 'tool',
-                        "content": "message content",
-                        "extra": {...}  # optional extra metadata
-                        "cursor": int # Unique monotonic increasing index in Mysql
-                        "created_at": "date string"
-                    },
-                    ...
-                ]
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}",
-            }
-        """
-        logger.info(f"[RedisService][backfill_messages] enter.")
-        try:
-            key = self._build_memo_key(payload)
-            messages = payload.get("messages", [])
-            
-            if not isinstance(messages, list):
-                raise ValueError("[RedisService][backfill_messages] messages must be a list")
-            
-            if not messages:
-                return {
-                    "success": True,
-                    "messages": "success",
-                }
-
-            async with self._memo_redis.pipeline() as pipe:
-                for msg in messages:
-                    pipe.rpush(key, json.dumps(msg, ensure_ascii=False))
-                
-                pipe.expire(key, DEFAULT_EXPIRE_SECONDS)
-                await pipe.execute()
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][backfill_messages] error: {e}")
-            return {
-                "success": False, 
-                "messages": f"fail: {e}"
-            }
         
     @task_handler("redis.memo.get_recent_messages")
     async def get_recent_messages(self, payload: dict) -> dict:
@@ -357,506 +284,6 @@ class RedisService:
                 "messages": f"fail: {e}",
             }
 
-    @task_handler("_redis.memo.get_recent_messages")
-    async def _get_recent_messages(self, payload: dict) -> dict:
-        """
-        Incremental fetch from Redis cache.
-        Redis miss should be handled by caller (fallback to MySQL and then backfill to redis and set TTL).
-        last_cursor indicates the next expected message cursor in a monotonic stream.
-        It is a logical cursor persisted in storage (e.g. MySQL), NOT a Redis list index.
-        Semantically equivalent to an ACK / offset in a reliable streaming protocol.
-
-        Args:
-            payload: Dict, the format is {
-                "client_id": "{{ cid }} : to indicate which user the data is from.",
-                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
-                "session_id": "{{ sid }} : to indicate which tab the data belong to",
-                "cursor": int / str, the last consumed message index.
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "fail: {e}" or [...] (list of message dicts),
-                "next_cursor": int,
-                "cache_hit": bool
-            }
-        """
-        logger.info("[RedisService][get_recent_messages] enter.")
-
-        try:
-            # ---- Normalize cursor ----
-            last_cursor = payload.get("cursor", 0)
-            if last_cursor == "all":
-                last_cursor = 0
-
-            last_cursor = max(int(last_cursor), 0)
-            key = self._build_memo_key(payload)
-
-            # ---- Single Redis fetch (entire window) ----
-            raw = await self._memo_redis.lrange(key, 0, -1)
-            if not raw:
-                # Redis miss: empty or expired
-                return {
-                    "success": True,
-                    "messages": [],
-                    "next_cursor": last_cursor,
-                    "cache_hit": False,
-                }
-
-            # Decode first and last only (cheap bounds check)
-            first_msg = json.loads(raw[0])
-            last_msg = json.loads(raw[-1])
-            oldest_cursor = first_msg["msg_cursor"]
-            latest_cursor = last_msg["msg_cursor"] + 1
-
-            # No new messages logically
-            if last_cursor >= latest_cursor:
-                return {
-                    "success": True,
-                    "messages": [],
-                    "next_cursor": last_cursor,
-                    "cache_hit": True,
-                }
-
-            # Cursor older than redis window -> return full window
-            if last_cursor < oldest_cursor:
-                msgs = [json.loads(m) for m in raw]
-                return {
-                    "success": True,
-                    "messages": msgs,
-                    "next_cursor": latest_cursor,
-                    "cache_hit": True,
-                }
-
-            # ---- Incremental decode (only what we need) ----
-            recent_msgs = []
-            next_cursor = last_cursor
-
-            for m in raw:
-                msg = json.loads(m)
-                if msg["msg_cursor"] >= last_cursor:
-                    recent_msgs.append(msg)
-                    next_cursor = msg["msg_cursor"] + 1
-
-            return {
-                "success": True,
-                "messages": recent_msgs,
-                "next_cursor": next_cursor,
-                "cache_hit": True,
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][get_recent_messages] error: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-    # ------------------------------------------------------------------
-    # Task Redis (Runtime Lock)
-    # ------------------------------------------------------------------
-
-    @task_handler("redis.task.create_task")
-    async def create_task(self, payload: dict) -> dict:
-        """
-        Create a new tools calling task in redis.
-        A task exists in Redis if and only if it is active (with status pending or running).
-        Redis task key created with NX (atomic) and have TTL.
-
-        Args:
-            payload: Dict, the format is {
-                "task_hash": "Hash (cilent_id + history_id + tool_id) for each tool in tools service, to identify task in Redis"
-                "task_id": "{{ tid }} : to identify task in MySQL",
-                "client_id": "{{ cid }} : to indicate which user the data is from.",
-                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
-                "payload": {...}, // dict to store task info, such as tool(task) name, params, etc.
-                "status": "pending/running",
-                "result": [...], // the result of the task, it is empty when task created.
-                "created_at": "...",
-                "finished_at": "..."
-            }
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}"
-            }
-        """
-        logger.info(f"[RedisService][create_task] enter.")
-        try:
-            key = self._build_task_key(payload)
-
-            task_info = {
-                "task_id": payload["task_id"],
-                "client_id": payload.get("client_id", ""),
-                "history_id": payload.get("history_id", ""),
-                "payload": payload.get("payload", {}),   # keep as dict
-                "status": payload.get("status", "pending"),
-                "result": [],                            # JSON string list
-                "created_at": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
-                "finished_at": "",
-            }
-
-            if task_info.get('status') not in (TASK_RUNNING_STATUS):
-                raise RuntimeError(f"[RedisService][create_task] invalid runtime status: {task_info.get('status')}")
-
-            # Atomic create: SET NX EX
-            created = await self._task_redis.set(
-                key,
-                json.dumps(task_info, ensure_ascii=False),
-                nx=True,
-                ex=DEFAULT_EXPIRE_SECONDS,
-            )
-
-            if not created:
-                raise RuntimeError("[RedisService][create_task] Last task does not finish.")
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][create_task] error: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
-
-    @task_handler("redis.task.update_task")
-    async def update_task(self, payload: dict) -> dict:
-        """
-        Update runtime task.
-        Always return updated task info after update,
-        regardless of whether task is finished or not.
-
-        Args:
-            payload: Dict, the format is {
-                "task_hash": "Hash (cilent_id + history_id + tool_id) for each tool in tools service, to identify task in Redis"
-                "status": "pending/running/done/failed",
-                "result": {...}, // optional, task result, it should be dict.
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": task info dict or error message
-            }
-        """
-        logger.info(f"[RedisService][update_task] enter.")
-        try:
-            key = self._build_task_key(payload)
-
-            raw = await self._task_redis.get(key)
-            if not raw:
-                raise RuntimeError("[RedisService][update_task] Task is not running or has expired.")
-
-            task_info = json.loads(raw)
-
-            status = payload.get("status")
-            result = payload.get("result")
-
-            if status not in (TASK_RUNNING_STATUS | TASK_FINISHING_STATUS):
-                raise RuntimeError(f"[RedisService][update_task] invalid runtime status: {status}")
-
-            # update status
-            task_info["status"] = status
-
-            # result must be dict, append to result list
-            if result is not None:
-                if isinstance(result, str):
-                    result = json.loads(result, ensure_ascii=False)
-                task_info["result"].append(result)
-
-            # finishing state
-            if status in TASK_FINISHING_STATUS:
-                task_info["finished_at"] = time.strftime(
-                    '%Y-%m-%d %H:%M:%S', time.localtime()
-                )
-
-                # delete after fetch (caller persists to MySQL)
-                deleted = await self._task_redis.delete(key)
-                if deleted == 0:
-                    raise RuntimeError("[RedisService][update_task] Task already finished.")
-
-            else:
-                # running / pending update (SET XX to ensure key exists)
-                updated = await self._task_redis.set(
-                    key,
-                    json.dumps(task_info, ensure_ascii=False),
-                    xx=True,
-                    ex=DEFAULT_EXPIRE_SECONDS,
-                )
-                if not updated:
-                    raise RuntimeError("[RedisService][update_task] Task not running.")
-
-            # unified return: always return updated task info
-            return {
-                "success": True,
-                "messages": task_info,
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][update_task] error: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
-
-    @task_handler("redis.task.get_task_info")
-    async def get_task_info(self, payload: dict) -> dict:
-        """
-        Query runtime task info. Finished task has already been deleted when update.
-        Redis miss means task already finished or not create.
-        Query redis by task_hash, if not found, Query mysql.
-
-        Args:
-            payload: Dict, the format is {
-                "task_hash": "Hash (cilent_id + history_id + tool_id) for each tool in tools service, to identify task in Redis"
-                "task_id": "{{ tid }} : to identify task"
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": TaskInfo dictionary / "fail: {e}"
-            }
-        """
-        logger.info(f"[RedisService][get_task_info] enter.")
-        try:
-            key = self._build_task_key(payload)
-            raw = await self._task_redis.get(key)
-
-            if not raw:
-                raise RuntimeError("[RedisService][get_task_info] Task is not running.")
-
-            task_info = json.loads(raw)
-
-            # messages must be dict (NOT JSON string)
-            return {
-                "success": True,
-                "messages": task_info,
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][get_task_info] error: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
-
-    # ------------------------------------------------------------------
-    # Longterm Memory
-    # ------------------------------------------------------------------
-
-    @task_handler("redis.task.expire_longterm_memory")
-    async def expire_longterm_memory(self, payload: dict) -> dict:
-        """
-        ** Expire ** longterm memory ONLY IF redis key already exists.
-        This method should only be called when backfilling Redis after update to mysql.
-
-        Args:
-            payload: Dict, the format is 
-            {
-                "client_id": str,
-                "messages": { # Return value from task_handler("mysql.memo.update_longterm_memory")
-                    "inserted": int,
-                    "modified": int,
-                    "deprecated": int,
-                    "refreshed": int,
-                }
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "fail: {e}" or "success",
-            }
-        """
-        logger.info(f"[RedisService][expire_longterm_memory] enter.")
-        try:
-            key = self._build_longterm_key(payload)
-
-            # Redis miss → skip silently
-            if not await self._memo_redis.exists(key):
-                return {
-                    "success": True,
-                    "messages": "success",
-                }
-
-            messages = payload.get("messages", {})
-            if not isinstance(messages, dict):
-                raise ValueError(
-                    f"[RedisService][expire_longterm_memory] messages must be a dict: {messages}"
-                )
-            
-            if (not messages) or (not messages['inserted']+messages['modified']+messages['deprecated']+messages['refreshed']):
-                return {
-                    "success": True,
-                    "messages": "success",
-                }
-
-            # expire immediately 
-            await self._memo_redis.expire(key, 0)
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][expire_longterm_memory] error: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-    @task_handler("redis.memo.backfill_longterm_memory")
-    async def backfill_longterm_memory(self, payload: dict) -> dict:
-        """
-        Append longterm memory ignore if redis key is already existing.
-        This method should only be called when backfilling Redis after querying longterm memory in MySQL.
-
-        Args:
-            payload: Dict, the format is {
-                "client_id": "{{ cid }} : to indicate which user the data is from.",
-                "messages": [
-                    {
-                        "memory_id": str,
-                        "memory_type": str,
-                        "content": str,
-                        "confidence": float,
-                        "created_at": str,
-                        "updated_at": str,
-                    },
-                    ...
-                ]
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}",
-            }
-        """
-        logger.info(f"[RedisService][backfill_longterm_memory] enter.")
-        try:
-            key = self._build_longterm_key(payload)
-            messages = payload.get("messages", [])
-
-            if not isinstance(messages, list):
-                raise ValueError(
-                    "[RedisService][backfill_longterm_memory] messages must be a list"
-                )
-
-            if await self._memo_redis.exists(key):
-                logger.debug(
-                    "[RedisService][backfill_longterm_memory] redis key already exists, skip backfill."
-                )
-                return {
-                    "success": True,
-                    "messages": "success",
-                }
-
-            value = json.dumps(messages, ensure_ascii=False)
-
-            async with self._memo_redis.pipeline() as pipe:
-                pipe.set(key, value)
-                pipe.expire(key, DEFAULT_EXPIRE_SECONDS)
-                await pipe.execute()
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"[RedisService][backfill_longterm_memory] error: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-    async def fetch_longterm_memory(self, payload: dict) -> dict:
-        """
-        Fetch longterm memory from Redis.
-
-        Args:
-            payload: Dict, the format is {
-                "client_id": "{{ cid }} : to indicate which user the data is from.",
-                "count": int, // max number of messages to fetch
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [...] (list of message dicts),
-                "cache_hit": bool,
-            }
-        """
-        logger.info("[RedisService][fetch_longterm_memory] enter.")
-
-        try:
-            key = self._build_longterm_key(payload)
-            count = payload.get("count")
-
-            # 1. Redis miss → explicit cache miss
-            if not await self._memo_redis.exists(key):
-                return {
-                    "success": True,
-                    "cache_hit": False,
-                }
-
-            # 2. Fetch raw value
-            raw = await self._memo_redis.get(key)
-            if not raw:
-                # Key exists but value missing → treat as miss
-                return {
-                    "success": True,
-                    "cache_hit": False,
-                }
-
-            # 3. Decode JSON payload
-            try:
-                data = json.loads(raw)
-            except Exception as e:
-                logger.warning(
-                    f"[RedisService][fetch_longterm_memory] invalid json, key={key}, err={e}"
-                )
-                return {
-                    "success": True,
-                    "cache_hit": False,
-                }
-            
-            if not data or not isinstance(data, dict):
-                await self._memo_redis.expire(key, 0)
-                return {
-                    "success": True,
-                    "cache_hit": False,
-                }
-
-            messages = data.get("messages")
-            if not isinstance(messages, list):
-                await self._memo_redis.expire(key, 0)
-                logger.warning(
-                    f"[RedisService][fetch_longterm_memory] invalid messages format, key={key}"
-                )
-                return {
-                    "success": True,
-                    "cache_hit": False,
-                }
-
-            # 4. Apply count limit (Redis layer responsibility)
-            if isinstance(count, int) and count > 0:
-                messages = messages[:count]
-
-            # 5. Cache hit
-            return {
-                "success": True,
-                "cache_hit": True,
-                "messages": messages,
-            }
-
-        except Exception as e:
-            logger.exception(
-                f"[RedisService][fetch_longterm_memory] error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
     # ------------------------------------------------------------------
     # TTL
     # ------------------------------------------------------------------
@@ -871,14 +298,9 @@ class RedisService:
         """
         logger.info(f"[RedisService][set_expire] enter.")
         try:
-            if 'task_hash' in payload:
-                await self._task_redis.expire(
-                    self._build_task_key(payload), ttl_seconds
-                )
-            else:
-                await self._memo_redis.expire(
-                    self._build_memo_key(payload), ttl_seconds
-                )
+            await self._memo_redis.expire(
+                self._build_memo_key(payload), ttl_seconds
+            )
         except Exception as e:
             logger.exception(f"[RedisService][set_expire] error: {e}")
             return {"success": False, "messages": f"fail: {e}"}
@@ -898,39 +320,14 @@ class RedisService:
         """
         logger.info(f"[RedisService][expire_immediately] enter.")
         try:
-            # ------------------------
-            # Expire task
-            # ------------------------
-            if 'task_hash' in payload:
-                key = self._build_task_key(payload)
+            await self._memo_redis.delete(
+                self._build_memo_key(payload)
+            )
 
-                raw = await self._task_redis.get(key)
-                if not raw:
-                    raise RuntimeError("[RedisService][expire_immediately] Task not found.")
-
-                task_info = json.loads(raw)
-
-                deleted = await self._task_redis.delete(key)
-                if deleted == 0:
-                    raise RuntimeError("[RedisService][expire_immediately] Task already expired.")
-
-                return {
-                    "success": True,
-                    "messages": task_info,
-                }
-
-            # ------------------------
-            # Expire memo
-            # ------------------------
-            else:
-                await self._memo_redis.delete(
-                    self._build_memo_key(payload)
-                )
-
-                return {
-                    "success": True,
-                    "messages": "success",
-                }
+            return {
+                "success": True,
+                "messages": "success",
+            }
 
         except Exception as e:
             logger.exception(f"[RedisService][expire_immediately] error: {e}")
@@ -940,4 +337,4 @@ class RedisService:
             }
 
 
-redis_server = RedisService(MEMO_REDIS_URL, TASK_REDIS_URL)
+redis_server = RedisService(MEMO_REDIS_URL)
