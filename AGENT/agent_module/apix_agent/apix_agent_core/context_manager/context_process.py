@@ -468,19 +468,25 @@ class AIContextManager:
                 if remain_tool_message:
                     if not isinstance(tool_calls, list) and tool_calls:
                         tool_calls = json.loads(tool_calls)
-                    msg.tool_calls = tool_calls
-                    if not content and not think and tool_calls:
-                        called_tools = [call.get("name") for call in (tool_calls or []) if isinstance(call, dict)]
-                        inject_content = 'Call tools: ' + ", ".join(called_tools)
-                        content = ''
-                        additional_kwargs = {}
-                        if not reasoning: content = inject_content
-                        else: additional_kwargs["reasoning_content"] = inject_content
-                        msg = AIMessage(
-                            content=content,
-                            additional_kwargs=additional_kwargs,
-                            tool_calls=tool_calls
-                        )
+                    if tool_calls:
+                        msg.tool_calls = tool_calls
+
+                # if remain_tool_message:
+                #     if not isinstance(tool_calls, list) and tool_calls:
+                #         tool_calls = json.loads(tool_calls)
+                #     msg.tool_calls = tool_calls
+                #     if not content and not think and tool_calls:
+                #         called_tools = [call.get("name") for call in (tool_calls or []) if isinstance(call, dict)]
+                #         inject_content = 'Call tools: ' + ", ".join(called_tools)
+                #         content = ''
+                #         additional_kwargs = {}
+                #         if not reasoning: content = inject_content
+                #         else: additional_kwargs["reasoning_content"] = inject_content
+                #         msg = AIMessage(
+                #             content=content,
+                #             additional_kwargs=additional_kwargs,
+                #             tool_calls=tool_calls
+                #         )
 
                 messages.append(msg)
                 if not begin_to_append and index == after_index: 

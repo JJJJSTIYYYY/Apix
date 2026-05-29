@@ -365,13 +365,13 @@ class PatchedChatMoonshot(ChatOpenAI):
                 and (msg.tool_calls or msg.invalid_tool_calls)
                 and not msg.content
             ):
-                reasoning_content_map[i] = "."
+                reasoning_content_map[i] = "..."
                 logger.warning("[PatchedChatMoonshot] Empty message with tool calls.")
             if (
                 isinstance(msg, (AIMessage, AIMessageChunk))
                 and not msg.content
             ):
-                msg.content = '.'
+                msg.content = '...'
 
         # Call original implementation
         payload = super()._get_request_payload(
