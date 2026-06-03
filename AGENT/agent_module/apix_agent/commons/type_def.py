@@ -120,6 +120,12 @@ class AgentConfigSchema(TypedDict):
     Config for a single AI agent.
     """
 
+    # User / Session Info
+    client_id: str
+    session_id: str
+    history_id: str
+    platform: str
+
     # LLM Runtime
     models_provider: str
     model_name: str
@@ -248,3 +254,12 @@ class ApixEventEnvelope(TypedDict):
     timestamp: float
     blocking: bool
     block_id: NotRequired[str]
+
+
+
+class McpMetaSchema(TypedDict):
+    mcp_id: str
+    mcp_name: str
+    transport: Literal["stdio", "http", "streamable_http", "websocket", "sse"]
+    endpoint: str # For stdio, it's the command to start the MCP server. For http/websocket/sse, it's the URL to connect.
+    config: dict[str, Any]

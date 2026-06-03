@@ -597,6 +597,38 @@ body, * {
   border-color: var(--apix-tertiary-dark-color) !important;
 }
 
+.el-radio__input.is-checked .el-radio__inner {
+  border-color: var(--apix-primary-active) !important;
+  background: var(--apix-primary-active) !important;
+}
+
+.el-radio__input.is-checked+.el-radio__label {
+  color: var(--apix-primary-active) !important;
+}
+
+.el-radio__inner:hover {
+  border-color: var(--apix-primary-hover) !important;
+}
+
+.el-radio__inner {
+  background-color: var(--apix-lightest-color) !important;
+  border: 1px solid var(--apix-secondary-light-color) !important;
+}
+
+.el-checkbox__input.is-checked+.el-checkbox__label {
+  color: var(--apix-primary-active) !important;
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: var(--apix-primary-active) !important;
+  border-color: var(--apix-primary-active) !important;
+}
+
+.el-checkbox__inner {
+  background-color: var(--apix-lightest-color) !important;
+  border: 1px solid var(--apix-secondary-light-color) !important;
+}
+
 /* 基础表格样式 */
 .markdown-body table {
   border-collapse: collapse;

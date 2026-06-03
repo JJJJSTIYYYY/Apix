@@ -29,7 +29,7 @@
               <span>角色卡</span>
             </el-menu-item>
             <el-menu-item index="4">
-              <el-icon><SetUp /></el-icon>
+              <el-icon><Help /></el-icon>
               <span>M C P</span>
             </el-menu-item>
           </el-menu>
@@ -41,6 +41,7 @@
           <RagPage v-else-if="currentPage==='RagPage'" />
           <SkillPage v-else-if="currentPage==='SkillPage'" />
           <RolePage v-else-if="currentPage==='RolePage'" />
+          <McpPage v-else-if="currentPage==='McpPage'" />
         </el-main>
   </el-main>
 </el-container>
@@ -55,6 +56,7 @@ import ProviderPage from './component/provider_card/providerPage.vue'
 import RagPage from './component/rag_card/ragPage.vue'
 import RolePage from './component/role_card/rolePage.vue'
 import SkillPage from './component/skill_card/skillPage.vue'
+import McpPage from './component/mcp_card/mcpPage.vue'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()

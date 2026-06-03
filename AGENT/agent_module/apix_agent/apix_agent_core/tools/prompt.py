@@ -641,11 +641,16 @@ Do NOT use this tool when:
 """
 
 SEARCH_WEB_BY_KEYWORDS_PROMPT = """
-Search the web for pages related to given keyword(s) and return a list of results containing the page title, URL, and a short description snippet
+Search the web for pages related to given keyword(s) and return a list of results containing the page title, URL, and a short description snippet.
 
 ## Args
-- key_word (str | list[str]): One or more search keywords
-        
+- key_word (str | list[str]): One or more search keywords.
+
+### Keyword Usage
+- If `key_word` is a string, it is used directly as the search query.
+- If `key_word` is a `list[str]`, all keywords are treated as parts of the same search intent and will be combined into a single search query.
+- Keywords in the list should be semantically related and describe the same target, concept, entity, or topic.
+
 ## Returns
 - str: A string containing formatted webpage results and optional image results
 
@@ -653,6 +658,17 @@ Search the web for pages related to given keyword(s) and return a list of result
 - This tool only provides search results (metadata)
 - This tool does NOT retrieve the full content of webpages
 - The search results may contain images
+
+## Examples:
+- `["apix", "Agent"]` → searches for `"apix Agent"` because the intent is to find an Agent named Apix.
+- `["python", "asyncio"]` → searches for `"python asyncio"` because the keywords describe a related topic.
+- `["OpenAI", "GPT-5"]` → searches for `"OpenAI GPT-5"` because the keywords belong to the same subject.
+
+Avoid using a list when keywords represent unrelated search intents:
+- Bad: `["weather", "Tesla"]`
+- Bad: `["pizza", "quantum computing"]`
+
+For unrelated topics, perform separate searches instead of combining them into a single keyword list.
 
 ## When to Use This Tool
 Use this tool in these scenarios:

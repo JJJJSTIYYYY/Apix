@@ -11,7 +11,6 @@ const FormData = require("form-data");
 const yaml = require("js-yaml");
 const WS_AI_API_BASE = "ws://127.0.0.1:5091";
 const AI_API_BASE = "http://127.0.0.1:5091";
-const TOOLS_API_BASE = "http://127.0.0.1:5092";
 const MEMORY_API_BASE = "http://127.0.0.1:5093";
 const FILE_API_BASE = "http://127.0.0.1:5094";
 const WebSocket$1 = require("ws");
@@ -1963,73 +1962,6 @@ function registerAiIpc() {
       throw err;
     }
   });
-  electron.ipcMain.handle("api:start_task", async (event, tid) => {
-    try {
-      const res = await fetch(`${TOOLS_API_BASE}/task/start`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          task_id: tid
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return "fail";
-      }
-      return data;
-    } catch (err) {
-      console.error("Start task error:", err);
-      throw err;
-    }
-  });
-  electron.ipcMain.handle("api:kill_task", async (event, tname, tid, cid, hid) => {
-    try {
-      const res = await fetch(`${TOOLS_API_BASE}/task/kill`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          tool_name: tname,
-          task_id: tid,
-          client_id: cid,
-          history_id: hid
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Kill task failed.");
-      }
-      return data;
-    } catch (err) {
-      console.error("Kill task error:", err);
-      throw err;
-    }
-  });
-  electron.ipcMain.handle("api:fetch_task_info", async (event, tid) => {
-    try {
-      const res = await fetch(`${MEMORY_API_BASE}/memory/task/info`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          task_id: tid,
-          task_hash: ""
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Fetch task info failed.");
-      }
-      return data;
-    } catch (err) {
-      console.error("Fetch task info error:", err);
-      throw err;
-    }
-  });
 }
 function attachSiblingLinks(messages, branches) {
   if (!messages || !messages.length) return messages;
@@ -2317,6 +2249,118 @@ function registerAiConfigIpc() {
       return ids;
     } catch (err) {
       console.error("[ipc:auto_fetch_model_list] error:", err);
+      throw err;
+    }
+  });
+  electron.ipcMain.handle("api:create_mcp_server", async (event, cid, mcp_meta) => {
+    try {
+      const res = await fetch(`${MEMORY_API_BASE}/mcp/create_mcp_server`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: cid,
+          ...mcp_meta
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail || data.messages || "Create mcp server failed."
+        );
+      }
+      return data.messages;
+    } catch (err) {
+      console.error(
+        "[ipc:create_mcp_server] error:",
+        err
+      );
+      throw err;
+    }
+  });
+  electron.ipcMain.handle("api:get_mcp_servers", async (event, cid) => {
+    try {
+      const res = await fetch(`${MEMORY_API_BASE}/mcp/get_mcp_servers`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: cid
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail || data.messages || "Get mcp servers failed."
+        );
+      }
+      return data.messages;
+    } catch (err) {
+      console.error(
+        "[ipc:get_mcp_servers] error:",
+        err
+      );
+      throw err;
+    }
+  });
+  electron.ipcMain.handle("api:update_mcp_server", async (event, mcp_id, cid, new_meta) => {
+    try {
+      const res = await fetch(
+        `${MEMORY_API_BASE}/mcp/update_mcp_server`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            mcp_id,
+            client_id: cid,
+            ...new_meta
+          })
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail || data.messages || "Update mcp server failed."
+        );
+      }
+      return data.messages;
+    } catch (err) {
+      console.error(
+        "[ipc:update_mcp_server] error:",
+        err
+      );
+      throw err;
+    }
+  });
+  electron.ipcMain.handle("api:get_mcp_tools", async (event, mcp_id, cid, mcp_meta) => {
+    try {
+      const res = await fetch(`${AI_API_BASE}/api/v1/get_mcp_tools`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          mcp_id,
+          client_id: cid,
+          mcp_meta
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail || data.messages || "Get mcp tools failed."
+        );
+      }
+      return data.messages;
+    } catch (err) {
+      console.error(
+        "[ipc:get_mcp_tools] error:",
+        err
+      );
       throw err;
     }
   });
@@ -2770,10 +2814,10 @@ if (isWin) {
   }
 }
 const baseWindowOptions = {
-  width: 1400,
-  height: 900,
-  minWidth: 1400,
-  minHeight: 900,
+  width: 1570,
+  height: 970,
+  minWidth: 1570,
+  minHeight: 970,
   show: false,
   autoHideMenuBar: true,
   icon,

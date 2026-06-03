@@ -77,12 +77,13 @@
           </div>
 
           <div 
-            v-if="referencedMessage && referencedMessage !== ''"
+            v-if="referencedMessage && referencedMessage.content && referencedMessage.content !== ''"
             class="referenced-message noselect"
-            :title="referencedMessage"
+            :title="referencedMessage.content"
+            @click="emit('jumpTo', referencedMessage.msg_id, referencedMessage.role)"
           >
             <svg t="1780037117744" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6619" width="20" height="20"><path d="M64 254.638v176.34c0 38.128 13.504 69.901 40.511 95.319 27.007 25.418 57.986 38.128 92.936 38.128h614.808L669.277 707.404l61.957 61.957 228.766-224v-52.426L731.234 264.17l-61.957 66.723 142.979 142.979H197.447c-12.709 0-23.035-3.972-30.979-11.915-7.943-7.943-11.915-18.27-11.915-30.979v-176.34H64z" fill="currentColor" p-id="6620"></path></svg>
-            <span class="reference-message-content noselect">{{ referencedMessage }}</span>
+            <span class="reference-message-content noselect">{{ referencedMessage.content }}</span>
           </div>
 
           <div
@@ -124,7 +125,7 @@
       </transition>
 
       <msgSelectionBubble
-        v-if="isShowSelectionBubble"
+        v-if="isShowSelectionBubble && globalSelection.role === 'human'"
         :style="{
           left: bubblePosition.x + 'px',
           top: bubblePosition.y + 'px'
@@ -172,7 +173,8 @@ const emit = defineEmits<{
   selectText: [id: string, role: string]
   selected: [id: string]
   delete: [id: string]
-  quoted: [hid: string, content: string]
+  quoted: [hid: string, mid: string, role: string, content: string]
+  jumpTo: [id: string, role: string]
   switchToBranch: [id: string]
 }>()
 
@@ -220,8 +222,8 @@ const uploadedFiles = computed<UploadedFile[]>(() => {
   return props.msg.extra?.user_meta_data?.uploaded_files ?? []
 })
 
-const referencedMessage = computed<string>(() => {
-  return props.msg.extra?.referenced_message ?? ''
+const referencedMessage = computed<object>(() => {
+  return props.msg.extra?.referenced_message ?? {}
 })
 
 const activedFile = computed<string>(() => {
@@ -432,6 +434,7 @@ const reSendMsg = () => {
 function handleMouseDown(e: MouseEvent) {
   globalSelection.id = ''
   globalSelection.content = ''
+  globalSelection.role = ''
   globalSelection.rect = null
 }
 
@@ -441,6 +444,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!selection || selection.isCollapsed) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     return
   }
 
@@ -448,6 +452,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!text) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     return
   }
 
@@ -459,6 +464,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!wrapper.contains(container) || props.msg.pending) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     return
   }
 
@@ -466,6 +472,7 @@ function handleMouseUp(e: MouseEvent) {
 
   globalSelection.content = text
   globalSelection.id = props.msg.id
+  globalSelection.role = 'human'
   globalSelection.rect = rect
 }
 
@@ -493,6 +500,7 @@ function handleSelectionChange() {
   if (!selection || selection.isCollapsed) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     globalSelection.rect = null
   }
 }
@@ -502,8 +510,7 @@ function closeSelectionBubble() {
 }
 
 function handleQuoteContent() {
-
-  emit("quoted", props.msg.hid, globalSelection.content)
+  emit('quoted', props.msg.hid, props.msg.id, 'human', globalSelection.content)
 }
 
 onMounted(() => {
@@ -651,7 +658,7 @@ onBeforeUnmount(() => {
   padding: 8px 16px;
   font-size: 16px !important;
   overflow: hidden;
-  border-radius: 16px 16px 6px 16px;
+  border-radius: 16px 16px 3px 16px;
   line-height: 1.6;
   word-break: break-word;
   border: 0px;

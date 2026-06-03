@@ -62,7 +62,7 @@
             >
               <div
                 class="q-slider"
-                :class="{ 'is-missing': !isActiveInFiltered && !isActiveInHistories }"
+                :class="{ 'is-missing': !isActiveInFiltered }"
                 :style="sliderStyle"
 
               />

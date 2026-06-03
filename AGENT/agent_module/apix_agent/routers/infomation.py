@@ -1,7 +1,7 @@
-import time
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection, StdioConnection, StreamableHttpConnection, WebsocketConnection
 
 from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
 from apix_agent.commons.logger import logger
@@ -262,3 +262,140 @@ async def stop_task(request_data: Request):
             "messages": res
         }
     )
+
+
+
+@router.post("/api/v1/get_mcp_tools")
+async def get_mcp_tools(request_data: Request):
+    """
+    Get MCP tools.
+
+    Args:
+        request_data (Request):
+            JSON structure:
+            {
+                "client_id": str,
+                "mcp_id": str,
+                "mcp_meta": {
+                    "mcp_name": str,
+                    "transport": str,
+                    "config": dict
+                },
+            }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": list[str],
+        }
+    """
+    body = await request_data.json()
+    client_id = body.get("client_id")
+    mcp_id = body.get("mcp_id")
+    mcp_meta = body.get("mcp_meta", {})
+    transport = mcp_meta.get("transport")
+    config = mcp_meta.get("config", {})
+    if transport not in ["stdio", "http", "websocket", "streamable_http", "sse"]:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "messages": f"Unsupported transport: {transport}"
+            }
+        )
+    elif transport == 'http':
+        transport = 'streamable_http'  # For backward compatibility, treat 'http' as 'streamable_http'
+
+    try:
+        tools = []
+        if transport == "stdio":
+            connection: StdioConnection = {
+                mcp_meta.get("mcp_name"): {
+                    "transport": "stdio",
+                    "command": config.get("command"),
+                    "args": config.get("args", []),
+                    "env": config.get("env", {}),
+                    "cwd": config.get("cwd"),
+                    "encoding": config.get("encoding", "utf-8"),
+                    "session_kwargs": config.get("session_kwargs", {}),
+                }
+            }
+            mcp_client = MultiServerMCPClient(connection)
+            tools = await mcp_client.get_tools()
+            logger.info(f"[get_mcp_tools] MCP tools from stdio transport: {tools}")
+
+        elif transport == "streamable_http":
+            connection: StreamableHttpConnection = {
+                mcp_meta.get("mcp_name"): {
+                    "transport": "streamable_http",
+                    "url": config.get("url"),
+                    "headers": config.get("headers", {}),
+                    "timeout": 30,
+                    "sse_read_timeout": 30,
+                    "terminate_on_close": True,
+                    "session_kwargs": config.get("session_kwargs", {}),
+                }
+            }
+            mcp_client = MultiServerMCPClient(connection)
+            tools = await mcp_client.get_tools()
+            logger.info(f"[get_mcp_tools] MCP tools from {transport} transport: {tools}")
+
+        elif transport == "websocket":
+            connection: WebsocketConnection = {
+                mcp_meta.get("mcp_name"): {
+                    "transport": "websocket",
+                    "url": config.get("url"),
+                    "session_kwargs": config.get("session_kwargs", {}),
+                }
+            }
+            mcp_client = MultiServerMCPClient(connection)
+            tools = await mcp_client.get_tools()
+            logger.info(f"[get_mcp_tools] MCP tools from {transport} transport: {tools}")
+
+        elif transport == "sse":
+            connection: SSEConnection = {
+                mcp_meta.get("mcp_name"): {
+                    "transport": "sse",
+                    "url": config.get("url"),
+                    "headers": config.get("headers", {}),
+                    "timeout": 30,
+                    "sse_read_timeout": 30,
+                    "session_kwargs": config.get("session_kwargs", {}),
+                }
+            }
+            mcp_client = MultiServerMCPClient(connection)
+            tools = await mcp_client.get_tools()
+            logger.info(f"[get_mcp_tools] MCP tools from {transport} transport: {tools}")
+
+
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.post(
+                f"{MEMORY_SERVICE_BASE_URL}/mcp/update_mcp_server",
+                json={
+                    "mcp_id": mcp_id,
+                    "client_id": client_id,
+                    "tool_count": len(tools),
+                },
+            )
+
+        if resp.status_code != 200 or not resp.json().get('success'):
+            logger.warning(f"[get_mcp_tools] Failed to update MCP server info to memory service: {resp.text}")
+
+    except Exception as e:
+        logger.error(f"[get_mcp_tools] Error while getting MCP tools: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "messages": f"Error while getting MCP tools: {e}"
+            }
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "success": True,
+            "messages": [tool.name for tool in tools]
+        }
+    )
+

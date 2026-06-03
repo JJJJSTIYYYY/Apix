@@ -2,7 +2,7 @@
 import { ipcMain } from "electron"
 import crypto from "crypto"
 
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // AES-128-CBC config must match server
 const AES_KEY = Buffer.from("0123456789abcdef")

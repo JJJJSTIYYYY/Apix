@@ -47,7 +47,7 @@ export const pageRegistry = [
     path: '/settingPage',
     name: 'setting-page',
     title: '设置',
-    icon: 'SetUp',
+    icon: 'Setting',
     component: () => import('@renderer/views/settingPage.vue')
   }
 ]

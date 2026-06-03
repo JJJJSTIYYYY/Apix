@@ -222,6 +222,12 @@ const handleRoleToggle = ({ id, enabled }: { id: string; enabled: boolean }) => 
           definition: role.roleDefinition,
         }
       }
+      else {
+        activeRole = {
+          name: '',
+          definition: '',
+        }
+      }
     } else {
       role.enabled = false
     }

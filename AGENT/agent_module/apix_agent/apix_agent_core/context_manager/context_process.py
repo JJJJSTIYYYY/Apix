@@ -426,10 +426,13 @@ class AIContextManager:
                     extra = json.loads(extra)
 
                 active_file = extra.get("active_file", '') or ''
-                referenced_message = extra.get("referenced_message", '') or ''
+                referenced_message = extra.get("referenced_message", {}) or {}
 
-                if referenced_message:
-                    raw_text = f"Referenced Message:  \n> \"{referenced_message}\"\n\n{raw_text}"
+                if referenced_message and isinstance(referenced_message, dict):
+                    raw_text = f"Referenced Message:  \n" \
+                        f"> Role: {referenced_message.get("role", "`[unknow]`") or '`[unknow]`'}  " \
+                        f"Content: \"{referenced_message.get("content", "`[content missed]`") or '`[content missed]`'}\""\
+                        f"\n\n{raw_text}"
                 if active_file:
                     raw_text = f"Active File:  \n> \"{active_file}\"\n\n{raw_text}"
 
@@ -587,7 +590,7 @@ class AIContextManager:
                 "tool_name": message.name,
                 "task_id": message.tool_call_id,
             }
-            content = message.content
+            content = str(message.content)
             if filter:
                 messages = {
                     "role": "tools",
@@ -1217,13 +1220,10 @@ class AIContextManager:
         config = state.get("config", {})
 
         if not work_dir:
-            return "## No work_dir has been specified by the user.\n\n"
+            return "## No workspace directory has been specified by the user.\n\n"
 
         if not os.path.exists(work_dir):
-            return (
-                "## Error: The configured work_dir path does not exist on the filesystem. "
-                "Please ask the user to configure a valid existing directory.\n\n"
-            )
+            raise FileNotFoundError(f"Workspace directory does not exist: {work_dir}")
         
         if sandbox:
             prompt = "## [Ubuntu] Sandbox has been configured. \n** The user will share access to this sandbox with you. **"

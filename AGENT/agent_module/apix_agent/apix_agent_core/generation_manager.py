@@ -84,11 +84,11 @@ class GenerationManager:
 
         new_gen_id = str(uuid4())
 
+        await self.abort_by_history_id(client_id, history_id, platform)
+
         async with self._get_lock(client_id):
             gens = self._get_client_generations(client_id)
             active_generation_ids = self._get_active_list(client_id)
-
-            self.abort_by_history_id(client_id, history_id, platform)
 
             gens[new_gen_id] = GenerationState(
                 history_id=history_id,

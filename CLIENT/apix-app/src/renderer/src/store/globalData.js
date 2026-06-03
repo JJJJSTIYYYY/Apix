@@ -47,6 +47,7 @@ export const tabContentCache = {}
 
 export const globalSelection = reactive({
   id: '',
+  role: '',
   content: '',
   rect: null
 })

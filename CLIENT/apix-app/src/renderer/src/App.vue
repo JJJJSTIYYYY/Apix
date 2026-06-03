@@ -4,7 +4,7 @@
       <div class="common-layout">
         <el-container class="root-container">
           <!-- 自定义标题栏 -->
-          <el-header class="title-bar" height="30px">
+          <el-header class="title-bar">
             <div class="window-controls">
               <button class="no-drag win-btn close-btn" type="danger" size="small" @click="close" >
               </button>
@@ -27,11 +27,13 @@
           </el-header>
 
           <el-main class="main-window">
-            <router-view v-slot="{ Component }">
-              <keep-alive>
-                <component :is="Component" />
-              </keep-alive>
-            </router-view>
+            <div v-show="!isResizing">
+              <router-view v-slot="{ Component }">
+                <keep-alive>
+                  <component :is="Component" />
+                </keep-alive>
+              </router-view>
+            </div>
           </el-main>
         </el-container>
       </div>
@@ -40,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, getCurrentInstance } from 'vue'
+import { ref, getCurrentInstance, onMounted, onBeforeUnmount } from 'vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { ConfirmDialog } from './views/component/comp/confirmDialog.js'
 import { useAppCacheData } from './store/app.js';
@@ -97,6 +99,35 @@ async function showAppInfo() {
   )
 }
 
+const isResizing = ref(false)
+
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
+
+function handleWindowResize() {
+  isResizing.value = true
+
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+  }
+
+  resizeTimer = setTimeout(() => {
+    isResizing.value = false
+    resizeTimer = null
+  }, 150)
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleWindowResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleWindowResize)
+
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+    resizeTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -232,6 +263,8 @@ async function showAppInfo() {
   padding: 0%;
   border-radius: var(--apix-border-radius-base);
   position: relative;
+  min-height: calc(100vh - 30px);
+  max-height: calc(100vh - 30px);
 }
 
 .icon {

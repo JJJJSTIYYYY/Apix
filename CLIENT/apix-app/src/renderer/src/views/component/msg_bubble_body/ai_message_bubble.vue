@@ -226,7 +226,7 @@
           <div class="tag-name">Model:</div>
           <div>{{ msg.info?.model }}</div>
         </div>
-        <div class="tag-wrapper">
+        <div class="tag-wrapper" title="Token统计仅供参考，实际用量请以控制台为准！">
           <div class="tag-name">Tokens:</div>
           <div>{{ msg.info?.total_tokens ?? 'N/A' }}</div>
         </div>
@@ -264,7 +264,7 @@
       </transition>
 
       <msgSelectionBubble
-        v-if="isShowSelectionBubble"
+        v-if="isShowSelectionBubble && globalSelection.role === 'ai'"
         :style="{
           left: bubblePosition.x + 'px',
           top: bubblePosition.y + 'px'
@@ -296,7 +296,7 @@ const emit = defineEmits<{
   selectText: [id: string, role: string]
   selected: [id: string]
   delete: [id: string]
-  quoted: [hid: string, content: string]
+  quoted: [hid: string, mid: string, role: string, content: string]
   completeQuestions: [id: string, qid: string, resp: QuestionItem[]]
   switchToBranch: [id: string]
 }>()
@@ -558,6 +558,7 @@ function normalizeToString(input?: MessageChunk[]) {
 function handleMouseDown() {
   globalSelection.id = ''
   globalSelection.content = ''
+  globalSelection.role = ''
   globalSelection.rect = null
 }
 
@@ -567,6 +568,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!selection || selection.isCollapsed) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     return
   }
 
@@ -574,6 +576,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!text) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     return
   }
 
@@ -584,6 +587,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!wrapper.contains(container) || props.msg.pending) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     return
   }
 
@@ -591,6 +595,7 @@ function handleMouseUp(e: MouseEvent) {
 
   globalSelection.content = text
   globalSelection.id = props.msg.id
+  globalSelection.role = 'ai'
   globalSelection.rect = rect
 }
 
@@ -614,6 +619,7 @@ function handleSelectionChange() {
   if (!selection || selection.isCollapsed) {
     globalSelection.content = ''
     globalSelection.id = ''
+    globalSelection.role = ''
     globalSelection.rect = null
   }
 }
@@ -623,7 +629,7 @@ function closeSelectionBubble() {
 }
 
 function handleQuoteContent() {
-  emit('quoted', props.msg.hid, globalSelection.content)
+  emit('quoted', props.msg.hid, props.msg.id, 'ai', globalSelection.content)
 }
 
 
@@ -757,7 +763,7 @@ const showLinks = async () => {
       <div class="section">
         <div class="section-title">[关键词]</div>
         <div class="section-body">
-          ${e.key_word.split('\n').join(' ')}
+          ${e.key_word.split('\n').join('、')}
         </div>
       </div>
     `)

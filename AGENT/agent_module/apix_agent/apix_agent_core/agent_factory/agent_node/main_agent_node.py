@@ -553,6 +553,21 @@ class MainAgentNode(AgentNodeBase):
                             "content": tool_calls
                         }
                     )
+
+            if ai_msg_chunk.tool_calls:
+                for tool_call in ai_msg_chunk.tool_calls:
+                    event_writer.send_event(
+                        event=AgentStreamEvent.TOOL_EXEC_START, 
+                        target=target,
+                        data={
+                            "event_name": "tool_exec_chunk_rtn",
+                            "tool_name": tool_call.get("name"),
+                            "tool_call_id": tool_call.get("id"),
+                            "content": "Args: "+str(tool_call.get("args")),
+                            "chunk_position": "pending",
+                            "status": "success",
+                        }
+                    )
             
             ai_msg_chunk = self._ensure_agent_message(ai_msg_chunk, reasoning=enable_think)
 

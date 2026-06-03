@@ -3,7 +3,7 @@ import fs from 'fs'
 import axios from 'axios'
 import FormData from 'form-data'
 
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // =====================================================
 //                      Ai config

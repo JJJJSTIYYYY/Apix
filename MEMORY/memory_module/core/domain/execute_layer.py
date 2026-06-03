@@ -618,6 +618,7 @@ class DataExecutors:
     # --------------------------------------------------
     # Short-term Memory
     # --------------------------------------------------
+    
     @task_handler("fetch_shortterm_memory")
     async def fetch_shortterm_memory(self, payload: dict) -> dict:
         """
@@ -663,6 +664,7 @@ class DataExecutors:
     # --------------------------------------------------
     # LLM Provider
     # --------------------------------------------------
+
     @task_handler("create_llm_provider")
     async def create_llm_provider(self, payload: dict) -> dict:
         """
@@ -762,6 +764,143 @@ class DataExecutors:
             logger.exception(
                 f"[DataExecutors][update_llm_provider] error: {e}"
             )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    # --------------------------------------------------
+    # MCP Server
+    # --------------------------------------------------
+
+    @task_handler("create_mcp_server")
+    async def create_mcp_server(self, payload: dict) -> dict:
+        """
+        Insert a mcp server meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][create_mcp_server] enter.")
+
+            mcp_id = str(uuid4().hex)
+            payload["mcp_id"] = mcp_id
+
+            return await self.mysql.create_mcp_server(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][create_mcp_server] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+
+    @task_handler("get_mcp_servers")
+    async def get_mcp_servers(self, payload: dict) -> dict:
+        """
+        Get all mcp server meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_mcp_servers] enter.")
+
+            mysql_res = await self.mysql.get_mcp_servers(payload)
+
+            if not mysql_res.get("success"):
+                return mysql_res
+
+            parsed = []
+
+            servers = mysql_res.get("messages", []) or []
+
+            for server in servers:
+
+                config = server.get("config")
+
+                if config and not isinstance(config, (dict, list)):
+                    try:
+                        server["config"] = json.loads(config)
+                    except Exception:
+                        server["config"] = {}
+
+                parsed.append(server)
+
+            mysql_res["messages"] = parsed
+
+            return mysql_res
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_mcp_servers] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+
+    @task_handler("get_enabled_mcp_servers")
+    async def get_enabled_mcp_servers(self, payload: dict) -> dict:
+        """
+        Get enabled mcp server meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_enabled_mcp_servers] enter.")
+
+            mysql_res = await self.mysql.get_enabled_mcp_servers(payload)
+
+            if not mysql_res.get("success"):
+                return mysql_res
+
+            parsed = []
+
+            servers = mysql_res.get("messages", []) or []
+
+            for server in servers:
+
+                config = server.get("config")
+
+                if config and not isinstance(config, (dict, list)):
+                    try:
+                        server["config"] = json.loads(config)
+                    except Exception:
+                        server["config"] = {}
+
+                parsed.append(server)
+
+            mysql_res["messages"] = parsed
+
+            return mysql_res
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_enabled_mcp_servers] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+
+    @task_handler("update_mcp_server")
+    async def update_mcp_server(self, payload: dict) -> dict:
+        """
+        Update a mcp server meta in database,
+        include enabled/tool_count/is_deleted status.
+        """
+        try:
+            logger.info("[DataExecutors][update_mcp_server] enter.")
+
+            return await self.mysql.update_mcp_server(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][update_mcp_server] error: {e}"
+            )
+
             return {
                 "success": False,
                 "messages": f"fail: {e}",

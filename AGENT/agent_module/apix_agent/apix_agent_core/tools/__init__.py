@@ -62,7 +62,6 @@ from apix_agent.apix_agent_core.tools.vector_search.retrieval_tool import (
 # -------------------------
 from apix_agent.apix_agent_core.tools.code_runner.python_code_runner import run_python_code
 from apix_agent.apix_agent_core.tools.code_runner.cmd import run_workspace_command
-from apix_agent.apix_agent_core.tools.basic_tools.server_check import check_server
 
 # -------------------------
 # Sub-Agent
@@ -87,6 +86,11 @@ from apix_agent.apix_agent_core.tools.basic_tools.task_flow import (
 from apix_agent.apix_agent_core.tools.basic_tools.communication import (
     request_user_input
 )
+
+# -------------------------
+# MCP
+# -------------------------
+from apix_agent.apix_agent_core.tools.mcp.mcp_tool import mcp_mgr
 
 
 __all__ = [
@@ -128,13 +132,13 @@ __all__ = [
     "query_sub_assistant",
     "stop_sub_assistant",
 
-    # Dev / test
-    "check_server",
-
     # Task flow
     "update_test_task",
     "get_test_task",
 
     # Communication
-    "request_user_input"
+    "request_user_input",
+
+    # MCP
+    "mcp_mgr",
 ]

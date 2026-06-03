@@ -53,9 +53,6 @@ const api = {
   getChatlist: (cid) => electron.ipcRenderer.invoke("api:fetch_chat_list", cid),
   getChatMsgs: (cid, sid, hid, branch_id = "-") => electron.ipcRenderer.invoke("api:fetch_chat_messages", cid, sid, hid, branch_id),
   deleteMsgs: (cid, hid, node_ids) => electron.ipcRenderer.invoke("api:delete_messages", cid, hid, node_ids),
-  startTask: (tid) => electron.ipcRenderer.invoke("api:start_task", tid),
-  killTask: (tname, tid, cid, hid) => electron.ipcRenderer.invoke("api:kill_task", tname, tid, cid, hid),
-  getTaskInfo: (tid) => electron.ipcRenderer.invoke("api:fetch_task_info", tid),
   // AI Task
   getAiTaskList: (clear) => electron.ipcRenderer.invoke("api:get_ai_task_list", clear),
   terminateAiTask: (history_id, task_id) => electron.ipcRenderer.invoke("api:stop_task", history_id, task_id),
@@ -67,6 +64,10 @@ const api = {
   getLlmProviders: (cid) => electron.ipcRenderer.invoke("api:get_llm_providers", cid),
   updateLlmProvider: (provider_id, cid, new_meta) => electron.ipcRenderer.invoke("api:update_llm_provider", provider_id, cid, new_meta),
   autoFetchModelList: (endpoint, api_key) => electron.ipcRenderer.invoke("api:auto_fetch_model_list", endpoint, api_key),
+  createMcpServer: (cid, mcp_meta) => electron.ipcRenderer.invoke("api:create_mcp_server", cid, mcp_meta),
+  getMcpServers: (cid) => electron.ipcRenderer.invoke("api:get_mcp_servers", cid),
+  updateMcpServer: (mcp_id, cid, new_meta) => electron.ipcRenderer.invoke("api:update_mcp_server", mcp_id, cid, new_meta),
+  getMcpTools: (mcp_id, cid, mcp_meta) => electron.ipcRenderer.invoke("api:get_mcp_tools", mcp_id, cid, mcp_meta),
   // AI files
   loadResource: (cid, file_id) => electron.ipcRenderer.invoke("api:load_resource", cid, file_id),
   getEmbedList: (model_provider, api_key) => electron.ipcRenderer.invoke("api:get_embed_list", model_provider, api_key),

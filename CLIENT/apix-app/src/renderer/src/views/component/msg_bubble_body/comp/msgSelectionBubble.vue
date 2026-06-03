@@ -24,24 +24,6 @@ const emit = defineEmits<{
 
 const wrapperRef = ref<HTMLElement | null>(null)
 
-const handleClickOutside = (e: MouseEvent) => {
-  console.log("handleClickOutside")
-  if (wrapperRef.value && !wrapperRef.value.contains(e.target as Node)) {
-    globalSelection.content = ''
-    globalSelection.id = ''
-    globalSelection.rect = null
-    emit("closeBubble")
-  }
-}
-
-// onMounted(() => {
-//   window.addEventListener('mousedown', handleClickOutside)
-// })
-
-// onBeforeUnmount(() => {
-//   window.removeEventListener('mousedown', handleClickOutside)
-// })
-
 function onAsk() {
   console.log("Ask quated: ", globalSelection.content)
   if (globalSelection.content !== '') {
@@ -50,6 +32,7 @@ function onAsk() {
 
   globalSelection.content = ''
   globalSelection.id = ''
+  globalSelection.role = ''
   globalSelection.rect = null
 
   emit("closeBubble")
@@ -63,6 +46,7 @@ function onCpoy() {
 
   globalSelection.content = ''
   globalSelection.id = ''
+  globalSelection.role = ''
   globalSelection.rect = null
 
   emit("closeBubble")

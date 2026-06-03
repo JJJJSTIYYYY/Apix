@@ -317,7 +317,7 @@ const handleSave = () => {
 :deep(.el-dialog) {
   --el-dialog-border-radius: 32px !important;
   overflow: hidden;
-  margin-top: 3.5vh !important;
+  margin-top: 5.5vh !important;
   background-color: var(--apix-panel-layer-5-background);
 }
 

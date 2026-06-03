@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 import { FileSystemManager } from '../modules/file_service/FileSystemManager'
 
 // =====================================================

@@ -8,7 +8,6 @@ OPERATION_SYSTEM = platform.system().lower()
 
 DEBUG = True
 TRACE = True
-CHECK_SERVER_HEALTH = False  # Enable or disable services health checks
 
 OUTPUT_GRAPH_PNG = False  # Whether to output the agent graph as a PNG file
 

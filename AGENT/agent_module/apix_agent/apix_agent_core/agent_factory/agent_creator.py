@@ -13,6 +13,7 @@ from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.agent_factory.agent_node import *
 from apix_agent.apix_agent_core.tools.registry import get_available_tools
+from apix_agent.apix_agent_core.tools.tool_node import ApixToolNode
 from apix_agent.global_config import BASE_DIR, OUTPUT_GRAPH_PNG, GRAPH_CACHE_TTL
 from apix_agent.commons.type_def import MainAgentState, SubAgentState, AgentConfigSchema
 from apix_agent.commons.logger import logger
@@ -152,7 +153,12 @@ class AgentCreator:
             return f"{e}"
 
         # Tools
-        tools = get_available_tools(agent_permission, agent_role)
+        tools = await get_available_tools(
+            agent_permission, 
+            agent_role, 
+            workspace_configured=config.get("work_dir", "") or "" != "",
+            client_id=config.get("client_id", "")
+        )
         tool_set = [tool.name for tool in tools]
 
         if not pure_chat_on:
@@ -195,7 +201,7 @@ class AgentCreator:
         )
 
         if not pure_chat_on:
-            graph.add_node("tools", ToolNode(tools))
+            graph.add_node("tools", ApixToolNode(tools))
             graph.add_conditional_edges(
                 "messages_persist",
                 agent_node.should_continue,

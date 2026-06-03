@@ -95,7 +95,15 @@ const api = {
     ipcRenderer.invoke('api:update_llm_provider', provider_id, cid, new_meta),
   autoFetchModelList: (endpoint, api_key) =>
     ipcRenderer.invoke('api:auto_fetch_model_list', endpoint, api_key),
-  
+  createMcpServer: (cid, mcp_meta) =>
+    ipcRenderer.invoke('api:create_mcp_server', cid, mcp_meta),
+  getMcpServers: (cid) =>
+    ipcRenderer.invoke('api:get_mcp_servers', cid),
+  updateMcpServer: (mcp_id, cid, new_meta) =>
+    ipcRenderer.invoke('api:update_mcp_server', mcp_id, cid, new_meta),
+  getMcpTools: (mcp_id, cid, mcp_meta) =>
+    ipcRenderer.invoke('api:get_mcp_tools', mcp_id, cid, mcp_meta),
+
   // AI files
   loadResource: (cid, file_id) =>
     ipcRenderer.invoke('api:load_resource', cid, file_id),

@@ -1,12 +1,14 @@
 import { ipcMain } from 'electron'
 
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // =====================================================
 //                      Ai config
 // =====================================================
 export function registerAiConfigIpc() {
   console.log('registerAiConfigIpc...')
+
+  // Get models list for predefined providers
   ipcMain.handle('api:get_models_list', async (event, model_provider, api_key, config) => {
     try {
       const res = await fetch(`${AI_API_BASE}/api/v1/get_models_list`, {
@@ -170,51 +172,205 @@ export function registerAiConfigIpc() {
     }
   })
 
-ipcMain.handle('api:auto_fetch_model_list', async (event, endpoint, api_key) => {
-  try {
-    const base = endpoint.replace(/\/+$/, '')
-    const url = `${base}/models`
+  // Fetch models list for custom provider based on endpoint and api key
+  ipcMain.handle('api:auto_fetch_model_list', async (event, endpoint, api_key) => {
+    try {
+      const base = endpoint.replace(/\/+$/, '')
+      const url = `${base}/models`
 
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(api_key ? { Authorization: `Bearer ${api_key}` } : {})
-      },
-    })
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(api_key ? { Authorization: `Bearer ${api_key}` } : {})
+        },
+      })
 
-    const data = await res.json()
+      const data = await res.json()
 
-    if (!res.ok) {
-      throw new Error(
-        data?.error?.message ||
-        data?.detail ||
-        "Fetch models failed."
+      if (!res.ok) {
+        throw new Error(
+          data?.error?.message ||
+          data?.detail ||
+          "Fetch models failed."
+        )
+      }
+
+      let models = []
+
+      if (Array.isArray(data)) {
+        models = data
+      } else if (Array.isArray(data.data)) {
+        models = data.data
+      } else if (Array.isArray(data.models)) {
+        models = data.models
+      } else {
+        throw new Error("Unexpected response format.")
+      }
+
+      const ids = models
+        .map((m) => m?.id || m?.name)
+        .filter((id) => typeof id === "string" && id.length > 0)
+
+      return ids
+
+    } catch (err) {
+      console.error("[ipc:auto_fetch_model_list] error:", err)
+      throw err
+    }
+  })
+
+  ipcMain.handle('api:create_mcp_server', async (event, cid, mcp_meta) => {
+    try {
+      const res = await fetch(`${MEMORY_API_BASE}/mcp/create_mcp_server`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: cid,
+          ...mcp_meta,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail ||
+          data.messages ||
+          'Create mcp server failed.'
+        )
+      }
+
+      return data.messages
+
+    } catch (err) {
+
+      console.error(
+        '[ipc:create_mcp_server] error:',
+        err
       )
+
+      throw err
+
     }
+  })
 
-    let models = []
+  ipcMain.handle('api:get_mcp_servers', async (event, cid) => {
+    try {
+      const res = await fetch(`${MEMORY_API_BASE}/mcp/get_mcp_servers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: cid,
+        }),
+      })
 
-    if (Array.isArray(data)) {
-      models = data
-    } else if (Array.isArray(data.data)) {
-      models = data.data
-    } else if (Array.isArray(data.models)) {
-      models = data.models
-    } else {
-      throw new Error("Unexpected response format.")
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail ||
+          data.messages ||
+          'Get mcp servers failed.'
+        )
+      }
+
+      return data.messages
+
+    } catch (err) {
+
+      console.error(
+        '[ipc:get_mcp_servers] error:',
+        err
+      )
+
+      throw err
+
     }
+  })
 
-    const ids = models
-      .map((m) => m?.id || m?.name)
-      .filter((id) => typeof id === "string" && id.length > 0)
+  ipcMain.handle('api:update_mcp_server', async (event, mcp_id, cid, new_meta) => {
+    try {
+      const res = await fetch(
+        `${MEMORY_API_BASE}/mcp/update_mcp_server`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mcp_id,
+            client_id: cid,
+            ...new_meta,
+          }),
+        }
+      )
 
-    return ids
+      const data = await res.json()
 
-  } catch (err) {
-    console.error("[ipc:auto_fetch_model_list] error:", err)
-    throw err
-  }
-})
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail ||
+          data.messages ||
+          'Update mcp server failed.'
+        )
+      }
+
+      return data.messages
+
+    } catch (err) {
+
+      console.error(
+        '[ipc:update_mcp_server] error:',
+        err
+      )
+
+      throw err
+
+    }
+  })
+
+  //Get mcp provided tools list
+  ipcMain.handle('api:get_mcp_tools', async (event, mcp_id, cid, mcp_meta) => {
+    try {
+      const res = await fetch(`${AI_API_BASE}/api/v1/get_mcp_tools`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mcp_id,
+          client_id: cid,
+          mcp_meta
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.detail ||
+          data.messages ||
+          'Get mcp tools failed.'
+        )
+      }
+
+      return data.messages
+
+    } catch (err) {
+
+      console.error(
+        '[ipc:get_mcp_tools] error:',
+        err
+      )
+
+      throw err
+
+    }
+  })
 
 }

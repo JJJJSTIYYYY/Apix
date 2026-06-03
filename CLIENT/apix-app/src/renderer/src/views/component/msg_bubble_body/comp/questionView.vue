@@ -77,6 +77,7 @@
 
       <button class="qv-confirm" type="primary" @click="submitAll">
         <svg t="1777266449849" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9749" width="24" height="24"><path class="confirm-icon-path" d="M512 76.8C271.36 76.8 76.8 271.36 76.8 512s194.56 435.2 435.2 435.2 435.2-194.56 435.2-435.2S752.64 76.8 512 76.8z m0 768c-184.32 0-332.8-148.48-332.8-332.8S327.68 179.2 512 179.2s332.8 148.48 332.8 332.8-148.48 332.8-332.8 332.8z" p-id="9750" fill="currentColor"></path></svg>
+        <span>确认</span>
       </button>
 
     </div>
@@ -285,7 +286,7 @@ function submitAll() {
   box-sizing: border-box;
   background-color: var(--apix-panel-layer-2-background);
   color: var(--apix-default-dark-color);
-  border-radius: var(--apix-panel-border-radius);
+  border-radius: 10px;
   border: 1px solid var(--apix-secondary-light-color);
 }
 
@@ -327,7 +328,7 @@ function submitAll() {
 }
 
 .qv-nav-btn:not(:disabled):hover {
-  transform: scale(1.08);
+  transform: scale(1.2);
 }
 
 .qv-nav-btn:disabled {
@@ -415,15 +416,17 @@ function submitAll() {
 
 .qv-confirm {
   align-self: flex-end;
-  width: 36px;
-  height: 36px;
-  font-size: 20px;
+  width: 68px;
+  height: 30px;
+  font-size: 14px;
   border-radius: 100px;
   background-color: var(--apix-primary-color);
   color: var(--apix-primary-text);
   border: none;
   cursor: pointer;
   display: flex;
+  gap: 3px;
+  padding: 1px 4px;
   align-items: center;
   transition: 
     transform 0.35s var(--apix-cubic-bezier),

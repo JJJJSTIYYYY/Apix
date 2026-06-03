@@ -48,10 +48,13 @@
           >
             {{ show_work_dir===''?'未指定工作目录，继续处理文件相关工作时请先关联项目':show_work_dir }}
           </div>
-          <div class="message-list">
+          <div class="message-list" ref="messageListRef">
             <div
               v-for="msg in messages"
-              :key="msg.id"
+              :key="msg.id+'-'+msg.role"
+              :ref="el => setMessageRef(el, msg.id + '-' + msg.role)"
+              :data-msg-id="msg.id"
+              :data-role="msg.role"
               class="message-item"
               :class="msg.role"
             >
@@ -65,6 +68,7 @@
                 @selected="selectMessageBubble"
                 @delete="selectMessageBubble"
                 @quoted="handleQuoteShow"
+                @jump-to="handleJumpTo"
                 @switch-to-branch="handleBranchSwitch"
               />
               <AiMessageBubble 
@@ -133,12 +137,12 @@
             </Transition>
 
             <Transition name="fade">
-              <div v-if="isQuoteShow && quotedText !== ''" class="quote-label">
+              <div v-if="isQuoteShow && quotedText !== {}" class="quote-label">
                 <div style="display: flex; gap: 6px; align-items: center;">
                   <div class="quote-icon">
                     <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" fill="var(--apix-default-button-text)" p-id="1652"></path></svg>
                   </div>
-                  <span class="quote-content">{{ quotedText }}</span>
+                  <span class="quote-content">{{ quotedText.content }}</span>
                 </div>
                 <button class="quote-close" @click="handleQuoteClose">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -256,6 +260,13 @@
             </div>
           </div>
 
+          <MessageListScrollBar
+            class="msg-scroll-bar"
+            :msg_item="messagePreviewList"
+            :current_position="currentPosition"
+            @scroll-to="handleScrollTo"
+          />
+
         </div>
       </div>
     </el-main>
@@ -287,6 +298,7 @@ import qwenIcon from '../assets/icons/llm_providers/qwen.svg'
 import xiaomiIcon from '../assets/icons/llm_providers/xiaomimimo.svg'
 import customIcon from '../assets/icons/llm_providers/custom.svg'
 import { QuestionItem } from './component/msg_bubble_body/comp/questionView.vue'
+import MessageListScrollBar from './component/msg_bubble_body/comp/messageListScrollBar.vue'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()
@@ -473,12 +485,157 @@ function appendToolCallsFromExtra(
 }
 
 // ################################
+// Message UI
+// ################################
+const messageListRef = ref<HTMLElement | null>(null)
+
+const messageRefMap = new Map<string, HTMLElement>()
+
+function setMessageRef(
+  el: Element | null,
+  key: string,
+) {
+  if (el) {
+    messageRefMap.set(key, el as HTMLElement)
+  } else {
+    messageRefMap.delete(key)
+  }
+}
+
+const isAutoScrolling = ref(false)
+
+async function scrollToMessage(
+  messageId: string,
+  role: 'human' | 'ai',
+) {
+  await nextTick()
+
+  const container = messageListRef.value
+
+  if (!container) {
+    return
+  }
+
+  const key = `${messageId}-${role}`
+  const target = messageRefMap.get(key)
+
+  if (!target) {
+    return
+  }
+
+  isAutoScrolling.value = true
+
+  container.scrollTo({
+    top: target.offsetTop - 20,
+  })
+
+  playJumpHighlight(target)
+}
+
+const messagePreviewList = computed(() =>
+  messages.value
+    .filter(msg => msg.role === 'human')
+    .map(msg => ({
+      msg_id: msg.id,
+      preview: (msg.chunks?.[0].content ?? '').slice(0, 30),
+    })),
+)
+
+const currentPosition = ref('')
+
+function updateCurrentPosition() {
+  if (isAutoScrolling.value) return
+  const container = messageListRef.value
+
+  if (!container) return
+
+  const containerCenter =
+    container.scrollTop +
+    container.clientHeight / 2
+
+  let nearestMsgId = ''
+  let nearestDistance = Number.MAX_SAFE_INTEGER
+
+  for (const [key, el] of messageRefMap.entries()) {
+    const role = el.dataset.role
+
+    // ScrollBar只关心human
+    if (role !== 'human') {
+      continue
+    }
+
+    const msgId = el.dataset.msgId
+
+    if (!msgId) {
+      continue
+    }
+
+    const elementCenter =
+      el.offsetTop +
+      el.offsetHeight / 2
+
+    const distance = Math.abs(
+      elementCenter - containerCenter,
+    )
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance
+      nearestMsgId = msgId
+    }
+  }
+
+  currentPosition.value = nearestMsgId
+}
+
+function handleScrollEnd() {
+  
+  isAutoScrolling.value = false
+  updateCurrentPosition()
+}
+
+function handleScrollTo(msgId: string) {
+  scrollToMessage(msgId, 'human')
+}
+
+function handleJumpTo(msgId: string, role: string) {
+  if (role !== 'ai' && role !== 'human') return
+  scrollToMessage(msgId, role)
+}
+
+function playJumpHighlight(
+  target: HTMLElement,
+) {
+  target.classList.remove(
+    'jump-highlight',
+  )
+
+  // Force reflow
+  void target.offsetWidth
+
+  target.classList.add(
+    'jump-highlight',
+  )
+
+  const handleAnimationEnd = () => {
+    target.classList.remove(
+      'jump-highlight',
+    )
+
+    target.removeEventListener(
+      'animationend',
+      handleAnimationEnd,
+    )
+  }
+
+  target.addEventListener(
+    'animationend',
+    handleAnimationEnd,
+  )
+}
+
+// ################################
 // Message cache by history
 // ################################
-// const messageCache = reactive<Record<string, ChatMessage[]>>({})
-// const loadedHistorySet = reactive(new Set<string>())
-// const loadingHistorySet = reactive(new Set<string>())
-
 function ensureHistoryMessages(hid: string): ChatMessage[] {
   if (!hid || hid === '-1') return []
   if (!messageCache[hid]) {
@@ -731,7 +888,7 @@ const handleSelectHistory = async (id: string | number) => {
   if (nextHid === store.current_history_id) return
   displayText.value = '正在加载'
   isQuoteShow.value = false
-  quotedText.value = ''
+  quotedText.value = {}
 
   store.current_history_id = nextHid
   store.currentWorkDir = store.getWorkDir(nextHid)
@@ -776,7 +933,7 @@ const handleCreateChat = async () => {
   selectMode.value = false
 
   isQuoteShow.value = false
-  quotedText.value = ''
+  quotedText.value = {}
 
   if (messages.value.length === 0 && store.current_history_id !== '-1') return
 
@@ -827,7 +984,7 @@ const handleDeleteHistory = (history_id: string) => {
   if (hid === store.current_history_id) {
     store.current_history_id = '-1'
     isQuoteShow.value = false
-    quotedText.value = ''
+    quotedText.value = {}
   }
 
   store.removeWorkDir(hid)
@@ -1568,7 +1725,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       user_meta_data: {
         uploaded_files: uploadedFiles,
       },
-      referenced_message: (isQuoteShow.value && quotedText.value !== '') ? quotedText.value : '',
+      referenced_message: (isQuoteShow.value && quotedText.value !== {}) ? toRaw(quotedText.value) : {},
       active_file: '',
     },
   }
@@ -1592,7 +1749,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
   }
   
   isQuoteShow.value = false
-  quotedText.value = ''
+  quotedText.value = {}
   inputText.value = ''
   selectedFiles.value = []
   scrollToBottom()
@@ -1622,6 +1779,11 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       messagePayload,
       re_generate,
       {
+        client_id: cid.value,
+        session_id: sid.value,
+        history_id: currentHid,
+        platform: 'default',
+
         models_provider: store.config.modelProvider,
         model_name: store.config.modelName,
         api_key: store.config.apiKey,
@@ -1764,17 +1926,22 @@ const handleDeleteMessages = async () => {
 }
 
 const isQuoteShow = ref(false)
-const quotedText = ref('')
+const quotedText = ref({})
 
 function handleQuoteClose() {
   isQuoteShow.value = false
-  quotedText.value = ''
+  quotedText.value = {}
 }
 
-function handleQuoteShow(id: string, content: string) {
-  if (id !== store.current_history_id) return
+function handleQuoteShow(hid: string, mid: string, role: string, content: string) {
+  if (hid !== store.current_history_id) return
   isQuoteShow.value = true
-  quotedText.value = content
+  console.log("[handleQuoteShow] role:", role, "content:", content)
+  quotedText.value = {
+    msg_id: mid,
+    role,
+    content
+  }
 }
 
 async function handleCompleteQuestions(id: string, qid: string, resp: QuestionItem) {
@@ -1868,6 +2035,7 @@ onDeactivated(() => {
 onMounted(async () => {
   websocketGateSwitch = true
   window.addEventListener('keydown', globalHandleKeydown)
+
   try {
     unsubscribeWs = window.api.onWsMessage((payload: any) => {
       handleWsMessage(payload)
@@ -1889,6 +2057,11 @@ onMounted(async () => {
     console.error('Initialization failed', err)
   }
 
+  const container = messageListRef.value
+  if (container) {
+    container.addEventListener('scrollend', handleScrollEnd)
+  }
+
   startTypewriter()
 
   cursorTimer = window.setInterval(() => {
@@ -1898,6 +2071,12 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', globalHandleKeydown)
+
+  const container = messageListRef.value
+  if (container) {
+    container.removeEventListener('scrollend', handleScrollEnd)
+  }
+
   unsubscribeWs?.()
   unsubscribeWs = null
 
@@ -2717,7 +2896,7 @@ const setFullInput = () => {
   border-width: 0 1px 1px 1px;
   border-color: #324c4f2e;
   border-style: solid;
-  color: var(--apix-info-dark-text);
+  color: var(--apix-primary-active);
   padding: 0px 12px 0px 0px;
   font-weight: bold;
   overflow: hidden;
@@ -2801,7 +2980,56 @@ const setFullInput = () => {
   justify-content: flex-start;
   flex-direction: column;
   height: fit-content;
-  max-width: calc(100% - 24px);
+  /* max-width: calc(100% - 24px); */
+}
+
+@keyframes jump-highlight {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(
+        in srgb,
+        var(--apix-primary-color) 20%,
+        transparent
+      ),
+      inset 0 0 0 0 color-mix(
+        in srgb,
+        var(--apix-primary-color) 10%,
+        transparent
+      );
+  }
+
+  30% {
+    box-shadow:
+      0 0 6px 8px color-mix(
+        in srgb,
+        var(--apix-primary-color) 30%,
+        transparent
+      ),
+      inset 0 0 12px 2px color-mix(
+        in srgb,
+        var(--apix-primary-color) 15%,
+        transparent
+      );
+  }
+
+  100% {
+    box-shadow:
+      0 0 0 0 color-mix(
+        in srgb,
+        var(--apix-primary-color) 20%,
+        transparent
+      ),
+      inset 0 0 0 0 color-mix(
+        in srgb,
+        var(--apix-primary-color) 10%,
+        transparent
+      );
+  }
+}
+
+.message-item.jump-highlight {
+  border-radius: 12px;
+  animation: jump-highlight 1.2s var(--apix-cubic-bezier);
 }
 
 .buttom-div {

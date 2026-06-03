@@ -29,10 +29,10 @@ if (isWin) {
 
 // ---------- Common window options ----------
 const baseWindowOptions = {
-  width: 1400,
-  height: 900,
-  minWidth: 1400,
-  minHeight: 900,
+  width: 1570,
+  height: 970,
+  minWidth: 1570,
+  minHeight: 970,
   show: false,
   autoHideMenuBar: true,
   icon: icon,

@@ -4,7 +4,7 @@ import path from 'path'
 import yaml from 'js-yaml'
 
 const TEST_API_BASE = "http://127.0.0.1:5090"
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // =====================================================
 //              Data write / read handlers

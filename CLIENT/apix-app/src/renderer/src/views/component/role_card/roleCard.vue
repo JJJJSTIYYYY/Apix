@@ -228,6 +228,8 @@ const handleDelete = async () => {
   overflow: hidden;
   max-width: 100%;
   transition: all 0.2s ease;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 1;
 }
 
 .footer-tag:hover {

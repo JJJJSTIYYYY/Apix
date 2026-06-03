@@ -1015,6 +1015,215 @@ class MysqlService:
                 "success": False,
                 "messages": f"fail: {e}",
             }
+        
+    # --------------------------------------------------
+    # MCP Server
+    # --------------------------------------------------
+
+    @task_handler("mysql.mcp.create_mcp_server")
+    async def create_mcp_server(self, payload: dict) -> dict:
+        """
+        Insert a mcp server meta in database. Call procedure create_mcp_server.
+
+        Args:
+            payload: Dict, the format is {
+                "mcp_id": str,
+                "client_id": str,
+                "mcp_name": str,
+                "transport": str,
+                "endpoint": str,
+                "config": dict,
+                "description": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or {
+                    "mcp_id": str
+                },
+            }
+        """
+        logger.info("[MysqlService][create_mcp_server] enter.")
+
+        try:
+            mcp_id = payload["mcp_id"]
+            user_uid = payload["client_id"]
+            mcp_name = payload["mcp_name"]
+            transport = payload["transport"]
+            endpoint = payload["endpoint"]
+            config = payload.get("config", {})
+            description = payload.get("description")
+
+            await self._call_procedure(
+                "create_mcp_server",
+                (mcp_id, user_uid, mcp_name, transport, endpoint, json.dumps(config), description,),
+            )
+
+            return {
+                "success": True,
+                "messages": {
+                    "mcp_id": mcp_id,
+                },
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][create_mcp_server] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+
+    @task_handler("mysql.mcp.get_mcp_servers")
+    async def get_mcp_servers(self, payload: dict) -> dict:
+        """
+        Get all mcp servers in database. Call procedure get_mcp_servers.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": list
+            }
+        """
+        logger.info("[MysqlService][get_mcp_servers] enter.")
+
+        try:
+            user_uid = payload["client_id"]
+
+            rows = await self._call_procedure("get_mcp_servers", (user_uid,),)
+
+            return {
+                "success": True,
+                "messages": rows,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][get_mcp_servers] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+
+    @task_handler("mysql.mcp.get_enabled_mcp_servers")
+    async def get_enabled_mcp_servers(self, payload: dict) -> dict:
+        """
+        Get enabled mcp servers in database. Call procedure get_enabled_mcp_servers.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": list
+            }
+        """
+        logger.info("[MysqlService][get_enabled_mcp_servers] enter.")
+
+        try:
+            user_uid = payload["client_id"]
+
+            rows = await self._call_procedure("get_enabled_mcp_servers", (user_uid,),)
+
+            return {
+                "success": True,
+                "messages": rows,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][get_enabled_mcp_servers] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+
+    @task_handler("mysql.mcp.update_mcp_server")
+    async def update_mcp_server(self, payload: dict) -> dict:
+        """
+        Update a mcp server meta in database. Call procedure update_mcp_server.
+
+        Args:
+            payload: Dict, the format is {
+                "mcp_id": str,
+                "client_id": str,
+
+                "mcp_name": str,
+                "transport": str,
+                "endpoint": str,
+                "config": dict,
+                "description": str,
+
+                "enabled": bool,
+                "tool_count": int,
+
+                "is_deleted": bool,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "success"
+            }
+        """
+        logger.info("[MysqlService][update_mcp_server] enter.")
+
+        try:
+            mcp_id = payload["mcp_id"]
+            user_uid = payload["client_id"]
+
+            mcp_name = payload.get("mcp_name")
+            transport = payload.get("transport")
+            endpoint = payload.get("endpoint")
+
+            config = payload.get("config")
+            if isinstance(config, (dict, list)):
+                config = json.dumps(config)
+
+            description = payload.get("description")
+
+            enabled = payload.get("enabled")
+            tool_count = payload.get("tool_count")
+
+            is_deleted = payload.get("is_deleted")
+
+            await self._call_procedure(
+                "update_mcp_server",
+                ( mcp_id, user_uid, mcp_name, transport, endpoint, config, description, enabled, tool_count, is_deleted,),
+            )
+
+            return {
+                "success": True,
+                "messages": "success",
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][update_mcp_server] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
 
 
 

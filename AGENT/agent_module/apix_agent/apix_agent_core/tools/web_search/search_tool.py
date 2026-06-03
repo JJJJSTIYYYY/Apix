@@ -20,6 +20,7 @@ async def search_web_by_keywords(
 ) -> Command:
 
     logger.trace('[search_tool.py] [tool] [search_web_by_keywords] Enter')
+    key_word_list = key_word if isinstance(key_word, list) else [key_word] # A backup
 
     target = state.get("target")
     generation_id = state.get("generation_id")
@@ -56,7 +57,7 @@ async def search_web_by_keywords(
             state.get("history_id"),
             state.get("timestamp"),
             {
-                "key_word": key_word,
+                "key_word": key_word_list,
                 "provider": provider,
             },
             state.get("parent_node_id")

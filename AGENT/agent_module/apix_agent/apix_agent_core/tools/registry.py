@@ -1,10 +1,15 @@
 from langchain_core.tools.base import BaseTool
 
 from apix_agent.apix_agent_core.tools import *
-from apix_agent.global_config import CHECK_SERVER_HEALTH
 
 
-def get_available_tools(permission: str | list[str] = "", agent_role: str = "", filter_by_name: list[str] = []) -> list[BaseTool]:
+async def get_available_tools(
+        permission: str | list[str] = "", 
+        agent_role: str = "", 
+        filter_by_name: list[str] = [], 
+        workspace_configured: bool = False, 
+        client_id: str = ""
+    ) -> list[BaseTool]:
     """
     Return a list of LangChain Tool objects.
     Must return @tool-decorated objects ONLY.
@@ -51,9 +56,9 @@ def get_available_tools(permission: str | list[str] = "", agent_role: str = "", 
         ],
         "default": [
             write_todos, 
-            read_memory, 
+            read_memory,
             update_memory,  
-            ocr_analysis, 
+            ocr_analysis,
             send_images,
             request_user_input
         ],
@@ -75,9 +80,9 @@ def get_available_tools(permission: str | list[str] = "", agent_role: str = "", 
     for m in modes:
         tools.extend(tool_registry.get(m, []))
 
-    # Optional health check tools
-    if CHECK_SERVER_HEALTH:
-        tools.append(check_server)
+    if client_id:
+        mcp_tools = await mcp_mgr.load_all_mcp_tools(client_id)
+        tools.extend(mcp_tools)
 
     # Deduplicate tools by tool.name
     filter_tools = {}
@@ -87,11 +92,18 @@ def get_available_tools(permission: str | list[str] = "", agent_role: str = "", 
         if agent_role in ['sub_agent', 'team_worker']:
             if tool.name in forbiden_for_sub_agent:
                 continue
+        if tool.name in need_workspace_config_tools and not workspace_configured:
+            continue
         filter_tools[tool.name] = tool
 
     return list(filter_tools.values())
 
-
 # Tools in this set are not allowed to be called simultaneously in one tool_calls
 conflict_tool_set = {"write_todos", "update_memory", "load_skill"}
 forbiden_for_sub_agent = {"request_user_input", "send_images", "assign_sub_assistant", "query_sub_assistant", "stop_sub_assistant"}
+need_workspace_config_tools = {
+    "fetch_files", "read_workspace_file", "list_workspace_files", "write_workspace_file",
+    "move_workspace_file", "delete_workspace_file", 
+    "run_workspace_command", "run_python_code", "load_skill",
+    "ocr_analysis", "send_images",
+}

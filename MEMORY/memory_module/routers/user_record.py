@@ -1,9 +1,8 @@
 import hashlib
 import base64
-import random
-from typing import Optional
+from uuid import uuid4
 
-from fastapi import APIRouter, Request, FastAPI, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
@@ -94,7 +93,7 @@ async def register(req: RegisterRequest):
     # Decrypt and hash password
     plain_password = decrypt_password(req.password)
     password_hash = sha256_hash(plain_password)
-    user_uid = str(random.randint(100_000_000, 999_999_999))
+    user_uid = uuid4().hex[:9]  # Generate random 9-digit user_uid
 
     payload = {
         "client_id": user_uid,
@@ -182,6 +181,9 @@ async def ensure_user_exists(req: Request):
         status_code=200,
     )
 
+# --------------------------------------------------
+# Conversation
+# --------------------------------------------------
 
 @router.post("/memory/user/conversations/list")
 async def fetch_conversation_list(req: Request):
@@ -271,7 +273,9 @@ async def update_conversation(req: Request):
         status_code=200,
     )
 
-
+# --------------------------------------------------
+# Message
+# --------------------------------------------------
 
 @router.post("/memory/user/messages")
 async def get_messages_for_user(req: Request):
@@ -320,7 +324,9 @@ async def get_messages_for_user(req: Request):
         status_code=200,
     )
 
-
+# --------------------------------------------------
+# Provider Management
+# --------------------------------------------------
 
 @router.post("/provider/create_llm_provider")
 async def create_llm_provider(req: Request):
@@ -479,6 +485,188 @@ async def update_llm_provider(req: Request):
     )
     result = await dsm.wait_result(query_id)
     resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+# --------------------------------------------------
+# MCP Server
+# --------------------------------------------------
+
+@router.post("/mcp/create_mcp_server")
+async def create_mcp_server(req: Request):
+    """
+    Insert a mcp server meta in database.
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+            "mcp_name": str,
+            "transport": str,
+            "endpoint": str,
+            "config": dict,
+            "description": str,
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": {
+                "mcp_id": str
+            }
+        }
+    """
+    logger.info("[API][create_mcp_server] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="create_mcp_server",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+@router.post("/mcp/get_mcp_servers")
+async def get_mcp_servers(req: Request):
+    """
+    Fetch all mcp server meta for user.
+
+    Request Body (JSON):
+        {
+            "client_id": str
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "mcp_id": str,
+                    "mcp_name": str,
+                    "transport": str,
+                    "endpoint": str,
+                    "config": dict,
+                    "description": str,
+                    "enabled": bool,
+                    "tool_count": int,
+                    "created_at": str
+                }
+            ]
+        }
+    """
+    logger.info("[API][get_mcp_servers] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_mcp_servers",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+@router.post("/mcp/get_enabled_mcp_servers")
+async def get_enabled_mcp_servers(req: Request):
+    """
+    Fetch enabled mcp servers for user.
+
+    Request Body (JSON):
+        {
+            "client_id": str
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "mcp_id": str,
+                    "mcp_name": str,
+                    "transport": str,
+                    "endpoint": str,
+                    "config": dict
+                }
+            ]
+        }
+    """
+    logger.info("[API][get_enabled_mcp_servers] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_enabled_mcp_servers",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+@router.post("/mcp/update_mcp_server")
+async def update_mcp_server(req: Request):
+    """
+    Update or delete a mcp server meta.
+
+    Request Body (JSON):
+        {
+            "mcp_id": str,
+            "client_id": str,
+
+            "mcp_name": str,      # Optional
+            "transport": str,     # Optional
+            "endpoint": str,      # Optional
+            "config": dict,       # Optional
+            "description": str,   # Optional
+
+            "enabled": bool,      # Optional
+            "tool_count": int,    # Optional
+
+            "is_deleted": bool,   # Optional
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": str
+        }
+    """
+    logger.info("[API][update_mcp_server] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="update_mcp_server",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
     return JSONResponse(
         content=resp,
         status_code=200,

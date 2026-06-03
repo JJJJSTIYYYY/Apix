@@ -1,6 +1,6 @@
 import { ipcMain, clipboard, nativeImage } from 'electron'
 
-import { AI_API_BASE, TOOLS_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
+import { AI_API_BASE, MEMORY_API_BASE, FILE_API_BASE } from '../config'
 
 // =====================================================
 //            Copy text / image to clipboard
