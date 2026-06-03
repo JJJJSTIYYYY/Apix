@@ -110,10 +110,10 @@ If you'd like to customize the deployment process, please refer to our documenta
 
 ## 🗺️ Roadmap
 
-- ✅ Multi-Agent Runtime
-- ✅ MCP Integration
-- ✅ Visual Linear Workflow Editor
-- ✅ Secure Docker Sandbox
+- [x] Multi-Agent Runtime
+- [x] MCP Integration
+- [x] Visual Linear Workflow Editor
+- [x] Secure Docker Sandbox
 - [ ] Graph-Based Workflow Editor
 - [ ] Workspace Time Travel
 - [ ] Scheduled Task Management
