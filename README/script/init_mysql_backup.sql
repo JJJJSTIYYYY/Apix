@@ -272,6 +272,35 @@ CREATE TABLE llm_provider (
 
 
 
+DROP TABLE IF EXISTS mcp_server;
+CREATE TABLE mcp_server (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+    mcp_id VARCHAR(64) UNIQUE NOT NULL,
+    user_uid VARCHAR(64) NOT NULL,
+    mcp_name VARCHAR(64) NOT NULL,
+
+    transport ENUM(
+        'stdio', 'http', 'streamable_http', 'websocket', 'sse'
+    ) NOT NULL,
+    endpoint VARCHAR(512) DEFAULT NULL,
+    config JSON NOT NULL,
+    description TEXT DEFAULT NULL,
+    tool_count INT NOT NULL DEFAULT 0,
+
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT fk_mcp_user_uid
+        FOREIGN KEY (user_uid)
+        REFERENCES users(user_uid)
+        ON DELETE CASCADE
+
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+
 -- Stored Procedure: create_user
 DROP PROCEDURE IF EXISTS create_user;
 DELIMITER $$
@@ -1313,6 +1342,143 @@ BEGIN
       AND is_deleted = FALSE;
 
     SELECT ROW_COUNT() AS affected_rows;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS create_mcp_server;
+DELIMITER $$
+
+CREATE PROCEDURE create_mcp_server (
+    IN p_mcp_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_mcp_name VARCHAR(64),
+    IN p_transport ENUM(
+        'stdio', 'http', 'streamable_http', 'websocket', 'sse'
+    ),
+    IN p_endpoint VARCHAR(512),
+    IN p_config JSON,
+    IN p_description TEXT
+)
+BEGIN
+
+    INSERT INTO mcp_server (
+        mcp_id,
+        user_uid,
+        mcp_name,
+        transport,
+        endpoint,
+        config,
+        description
+    )
+    VALUES (
+        p_mcp_id,
+        p_user_uid,
+        p_mcp_name,
+        p_transport,
+        p_endpoint,
+        p_config,
+        p_description
+    );
+
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_mcp_servers;
+DELIMITER $$
+
+CREATE PROCEDURE get_mcp_servers (
+    IN p_user_uid VARCHAR(64)
+)
+BEGIN
+
+    SELECT
+        mcp_id,
+        mcp_name,
+        transport,
+        endpoint,
+        config,
+        description,
+        enabled,
+        tool_count,
+        created_at
+    FROM mcp_server
+    WHERE user_uid = p_user_uid
+      AND is_deleted = FALSE
+    ORDER BY created_at DESC;
+
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_enabled_mcp_servers;
+DELIMITER $$
+
+CREATE PROCEDURE get_enabled_mcp_servers (
+    IN p_user_uid VARCHAR(64)
+)
+BEGIN
+
+    SELECT
+        mcp_id,
+        mcp_name,
+        transport,
+        endpoint,
+        config
+    FROM mcp_server
+    WHERE user_uid = p_user_uid
+      AND enabled = TRUE
+      AND is_deleted = FALSE
+    ORDER BY created_at ASC;
+
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS update_mcp_server;
+DELIMITER $$
+
+CREATE PROCEDURE update_mcp_server (
+    IN p_mcp_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_mcp_name VARCHAR(64),
+    IN p_transport ENUM(
+        'stdio', 'http', 'streamable_http', 'websocket', 'sse'
+    ),
+    IN p_endpoint VARCHAR(512),
+    IN p_config JSON,
+    IN p_description TEXT,
+    IN p_enabled BOOLEAN,
+    IN p_tool_count INT,
+    IN p_is_deleted BOOLEAN
+)
+BEGIN
+
+    UPDATE mcp_server
+    SET
+        mcp_name = IF(p_mcp_name IS NULL, mcp_name, p_mcp_name),
+        transport = IF(p_transport IS NULL, transport, p_transport),
+        endpoint = IF(p_endpoint IS NULL, endpoint, p_endpoint),
+        config = IF(p_config IS NULL, config, p_config),
+        description = IF(p_description IS NULL, description, p_description),
+        enabled = IF(p_enabled IS NULL, enabled, p_enabled),
+        tool_count = IF(p_tool_count IS NULL, tool_count, p_tool_count),
+        is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted)
+    WHERE mcp_id = p_mcp_id
+      AND user_uid = p_user_uid
+      AND is_deleted = FALSE;
+
+    SELECT ROW_COUNT() AS affected_rows;
+
 END$$
 
 DELIMITER ;

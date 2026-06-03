@@ -1,139 +1,124 @@
-<img src="./README/source/APIX-bar.jpeg" alt="描述" width="300" height="200" style="border-radius: 12px; display: block; margin: 0 auto;">
+<div align="center">
 
-# 🚀 APIX - A full-stack AI agent platform
+<img src="./README/source/APIX-bar.jpeg"  width="300" height="200" style="border-radius: 12px; display: block; margin: 0 auto;">
 
-> A modern, modular AI agent system with extensible architecture and full-stack integration.
+# APIX — 开源 AI Agent 协作平台
 
-*Version 2.0.1*
+中文文档 | [English](./README_en.md)
 
----
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python)
+![Electron](https://img.shields.io/badge/Electron-37-47848F?style=flat&logo=electron)
+![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat&logo=vue.js)
+![License](https://img.shields.io/badge/License-GPL%203.0-blue?style=flat)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/bsTqEzJmJ)
+![QQ群](https://custom-icon-badges.demolab.com/badge/QQ群-639459172-00BFFF?style=flat&logo=tencent-qq)
 
-## ✨ Overview
+**不只是聊天。构建、协作、执行——让 AI Agent 真正为你工作。**
 
-**APIX** is a full-stack AI agent platform designed for building intelligent, scalable, and extensible applications.
-
-It integrates:
-
-* 🧠 Multi-agent runtime system
-* 💾 Memory management (short-term & long-term)
-* 🔧 Tool calling framework
-* 📁 File service support
-* 🔐 Authentication system
-* ⚙️ Task orchestration pipeline
-* 🖥️ Desktop client (Electron + Vue)
-
-The project is built with a modular architecture, making it easy to customize, extend, and deploy in different scenarios.
-
-<img src="./README/source/main-page.png" alt="描述" width="600" height="auto" style="border-radius: 12px; display: block; margin: 0 auto;">
+</div>
 
 ---
 
-## 📦 Project Structure
+## 🎯 这是什么？
 
-```
-APIX/
-├── AGENT/                 # AI agent runtime
-├── MEMORY/                # Memory system (Redis + MySQL)
-├── TOOLS/                 # Tool calling modules
-├── TASK/                  # Task orchestration
-├── FILE/                  # File service
-├── LOGIN_REGISTER/        # Auth system
-├── CLIENT/                # Electron frontend
-└── README/                # Setup & documentation
-```
+APIX 是一个**全栈的 AI Agent 协作平台**。它是一套完整的 Agent 运行时——支持多智能体并行协作、安全代码执行、知识库检索。
+
+它可以帮你完成包括但不限于代码编写、PPT生成、汇报整理以及各种自动化操作。
 
 ---
 
-## 🚀 One-click Setup
+## ✨ 核心特性
 
-For windows:
+<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+  <tr>
+    <td align="center" width="33%">🤖<br><b>多智能体协作</b><br>Leader 调度多个子代理并行工作，复杂任务自动分解，实现Agent文件访问冲突检测</td>
+    <td align="center" width="33%">🔧<br><b>完整工具生态</b><br>代码执行、文件管理、网络搜索、知识检索开箱即用</td>
+    <td align="center" width="33%">🧠<br><b>完善的记忆系统</b><br>以工作区划分记忆容器，人为可控的多级自动上下文压缩机制</td>
+  </tr>
+  <tr>
+    <td align="center">🐳<br><b>代码安全沙箱</b><br>Docker 隔离执行，不用担心代码命令破坏系统</td>
+    <td align="center">🔌<br><b>多模型供应商兼容</b><br>OpenAI / DeepSeek / MoonShot / Ollama / 自定义供应商任意切换</td>
+    <td align="center">🎨<br><b>支持自定义任务流</b><br>卡片化任务流编辑，定制属于您的自动化任务流</td>
+  </tr>
+  <tr>
+    <td align="center">👤<br><b>角色卡支持</b><br>自定义您的助手身份，定制一个独属于您的个人助理</td>
+    <td align="center">⚒️<br><b>多协议MCP兼容</b><br>支持多种协议的MCP服务，并且可以自定义您的会话生命周期</td>
+    <td align="center">💬<br><b>消息节点化管理</b><br>您可以在任意位置编辑或者删除您已发送的信息，并自动生成新的分支</td>
+  </tr>
+</table>
+
+---
+
+## 🖥️ 界面速览
+
+<table border="0" cellpadding="6" cellspacing="6" style="border-collapse: collapse; width: 100%;">
+  <tr>
+    <td align="center" width="50%"><b>聊天界面展示</b><br><img src="./README/source/main-page.png"  style="border-radius: 6px;"></td>
+    <td align="center" width="50%"><b>编辑器页面演示</b><br><img src="./README/source/editor-page.png"  style="border-radius: 6px;"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>资源管理页展示</b><br><img src="./README/source/src-page.png"  style="border-radius: 6px;"></td>
+    <td align="center"><b>设置页展示</b><br><img src="./README/source/setting-page.png"  style="border-radius: 6px;"></td>
+  </tr>
+</table>
+
+---
+
+## 🚀 快速开始
+
+### 一键安装攻略
+
+对于windows用户，我们使用powershell:
 
 ```bash
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\setup.ps1
 ```
 
-For macos or linux:
+对于macos和linux，我们使用命令行终端:
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-## 😎 Manual setup
+> 一键安装过程中请确保网络保持畅通
 
-Please refer to the detailed setup guides:
+### 如果您想自定义安装
 
-* [中文文档](./README/README_zh.md): `./README/README_zh.md`
-* [English Docs](./README/README_en.md): `./README/README_en.md`
+可以参考我们的部署文档:
 
-## 🥳 Start
-
-> Use python3 if you are macos or linux
-
-```bash
-# Start backend server 
-python apix.py up
-
-# Stop backend server
-python apix.py down
-
-# View logs
-python apix.py logs
-
-# Start front
-cd ./CLIENT/apix-app
-npm run dev
-```
+* [中文部署文档](./README/README_zh.md)
+* [English Docs](./README/README_en.md)
 
 ---
 
-## 🌟 Features
+## 🗺️ 路线图
 
-* Modular multi-agent system
-* Streaming response support
-* Persistent memory (short-term & long-term)
-* Tool invocation & extensibility
-* Task-based workflow execution
-* Cross-platform desktop client
-* Docker-based deployment support
-
----
-
-## 🛠️ Tech Stack
-
-* **Backend**: Python 3.12, FastAPI
-* **Frontend**: Electron, Vue 3, Vite
-* **Database**: MySQL, Redis
-* **Vector DB (Optional)**: Milvus
-* **LLM Runtime (Optional)**: Ollama
+- ✅ 多智能体运行时
+- ✅ MCP 集成支持
+- ✅ 可视化线性工作流编辑器
+- ✅ Docker 安全沙箱
+- [ ] 图任务流编辑
+- [ ] 工作区时间旅行
+- [ ] 定时任务管理
+- [ ] 插件市场
+- [ ] 多平台接入
 
 ---
 
-## 📌 Notes
+## 📄 许可证
 
-* This project is under active development
-* Contributions, issues, and discussions are welcome
-
----
-
-## 📄 License
-
-MIT License
+本项目基于 **GNU GPL v3.0** 协议开源。
 
 ---
 
-## 💡 Vision
+__🫵 加入社区__
 
-APIX aims to provide a flexible foundation for building next-generation AI applications, combining agent-based intelligence with robust engineering practices.
+[QQ群](https://qun.qq.com/universal-share/share?ac=1&authKey=ommoQrT2zhzHU%2FUxv8pfGCJbNifW%2BJyUAFBkNdzkHTPUxdxCnlgxm5aNgGslTmdE&busi_data=eyJncm91cENvZGUiOiI2Mzk0NTkxNzIiLCJ0b2tlbiI6Im9ZZkdNUWZnSVV1Y2REeUhKNnlTbWEwc05Bb093djRzUXdXNE55dklBVnlBQk9XbGNpS0ZXSDlzK3orSW1sQ3YiLCJ1aW4iOiIzMTI5NDI0NTcyIn0%3D&data=OGTchcr80RAQg8Z8_GZTdvBb7kZDeM9B3hHcNqLaAX2ZK_KYq260C4CubblEBT1bK5fP6zgtnCk2D8fIoph1ZQ&svctype=4&tempid=h5_group_info) | [Discord](https://discord.gg/bsTqEzJmJ)
 
----
 
-| Broken Feature | Estimated Fix Version |
-|----------------|------------------------|
-| Task service | v2.2 |
-| Async tools service | v2.3 |
+> 🌟 如果您喜欢我们的项目，欢迎您的Star!
 
----
-
-⭐ If you find this project useful, feel free to give it a star!
+> `Tips: 本项目不接受与核心代码相关的PR`  
+已通过ApiFox进行模块测试

@@ -154,12 +154,6 @@ uv run main.py
 ```
 
 ```bash
-cd ./TOOLS/tools_module
-uv sync
-uv run main.py
-```
-
-```bash
 cd ./TASK/task_flow_module
 uv sync
 uv run main.py
