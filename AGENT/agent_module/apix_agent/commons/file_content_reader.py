@@ -59,7 +59,7 @@ def write_to_yaml(dir, data: dict):
     """
     try:
         if not os.path.exists(dir):
-            Path(dir).mkdir(parents=True, exist_ok=True)
+            Path(dir).parent.mkdir(parents=True, exist_ok=True)
         with open(dir, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, allow_unicode=True)
             logger.info("[write_to_yaml] write data to local yaml file successfully.")
