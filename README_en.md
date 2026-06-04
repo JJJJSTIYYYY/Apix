@@ -138,6 +138,4 @@ This project is licensed under the **GNU GPL v3.0 License**.
 
 🌟 If you find APIX useful, consider giving the project a Star!
 
-> **Note:** Pull Requests related to core framework implementation are currently not accepted.
-
 > All modules have been tested using ApiFox.
