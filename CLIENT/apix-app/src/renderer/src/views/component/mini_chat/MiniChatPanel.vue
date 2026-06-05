@@ -294,7 +294,7 @@ import HumanMessageBubble from './mini_msg_bubble_body/human_message_bubble.vue'
 import AiMessageBubble from './mini_msg_bubble_body/ai_message_bubble.vue'
 import HistoryPanel from './mini_history_panel/history_panel.vue'
 import { type ChatHistory } from '../../component/dialog_history/history_card.vue'
-import { useAppCacheData } from '../../../store/app'
+import { currentConfigSet, useAppCacheData } from '../../../store/app'
 import { useAuthStore } from '../../../store/auth'
 import { ElMessage } from 'element-plus'
 import { NAvatar, NSelect } from 'naive-ui'
@@ -1825,43 +1825,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         history_id: currentHid,
         platform: 'default',
 
-        models_provider: store.config.modelProvider,
-        model_name: store.config.modelName,
-        api_key: store.config.apiKey,
-        custom_provider_id: store.config.activeProvider.provider_id,
-
-        enable_think: store.config.deepThink,
-        work_dir: store.mini_chat_currentWorkDir[props.page_id],
-        llm_calls_warning_threshold: store.config.tokenLimit,
-
-        async_tools_invoke: store.config.toolsInvokeAi,
-        link_provider: store.config.linkProvider,
-        link_api_key: store.config.linkApiKey,
-        content_provider: store.config.contentProvider,
-        content_api_key: store.config.contentApiKey,
-        web_cleaner_mode: store.config.webContentFilter,
-        keep_tools_message: store.config.remainToolsCache,
-        enable_longterm_memory: store.config.longtermMemory,
-        enable_shortterm_memory: store.config.shorttermMemory,
-        summary_trigger_threshold: store.config.messageSummary,
-        summary_exempt_tail_length: store.config.keepNotSummary,
-        pure_chat_on: store.config.pureChat,
-        use_model_vision: store.config.visionOn,
-        model_temperature: Number((store.config.modelTemp * 0.02).toFixed(2)),
-
-        enable_file_opration: store.config.fileOpration,
-        enable_web_search: store.config.webSearch,
-        enable_knowledge_retrieval: store.config.knowledgeRetrieval,
-        enable_command_opration: store.config.commandOpration,
-        enable_skill_load: store.config.skillLoad,
-        enable_agent_assign: store.config.agentAssign,
-        enable_agent_swarm: store.config.agentSwarm,
-        enable_task_flow: store.config.enableTaskFlow,
-
-        embed_model: store.config.embeddingModel,
-        role_prompt: toRaw(store.config.rolePrompt),
-        higher_role_prompt_permission: store.config.higherRolePromptPermission,
-        auto_save_config: store.config.autoSaveConfig,
+        ...currentConfigSet(store)
       }
     )
   } catch (err) {

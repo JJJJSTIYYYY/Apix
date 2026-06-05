@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import os
 from pathlib import Path
 import time
 import traceback
@@ -194,6 +195,9 @@ class ActionHandler:
             re_generate = data.get("re_generate", False)
             config = await self._ensure_config(data.get("config", {}) or {})
             work_dir = config.get("work_dir", "")
+
+            if not os.path.exists(dir):
+                raise FileNotFoundError("The workspace is not found on disk, please ensure your settings.")
 
             enable_agent_assign = bool(config.get("enable_agent_assign", False))
             enable_agent_swarm = bool(config.get("enable_agent_swarm", False))
