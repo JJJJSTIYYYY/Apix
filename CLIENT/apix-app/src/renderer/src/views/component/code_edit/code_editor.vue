@@ -1,4 +1,8 @@
 <template>
+  <div class="warn-banner">
+    <el-icon><Warning /></el-icon>
+    <span>编辑文件推荐使用如 VS Code 等专业代码编辑器，此编辑器仅提供部分格式的代码文件与基础文本编辑能力！</span>
+  </div>
   <div class="markdown-editor-root">
     <!-- Search panel -->
     <SearchPanel
@@ -480,6 +484,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.warn-banner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--apix-tertiary-dark-color);
+}
+
 /* CodeMirror root */
 :deep(.cm-editor) {
   height: 100%;

@@ -106,7 +106,7 @@
           </el-scrollbar>
         </div>
 
-        <div class="agent-panel" v-if="isAgentPanelShow" :class="{agent_panel_hide: activatedTabMeta.mime === 'aflow'}">
+        <div class="agent-panel" v-if="isAgentPanelShow">
           <MiniChatPanel
             :page_id="'taskFlowPage'"
             :workspace="store.getWorkspace()"
@@ -137,7 +137,6 @@
     </button>
 
     <button
-      v-if="activatedTabMeta.mime === 'md' || activatedTabMeta.mime === 'py' || activatedTabMeta.mime === 'js' || activatedTabMeta.mime === 'txt' "
       class="submit-btn agent-btn"
       :class="{panel_actived: isAgentPanelShow}"
       @click="showMiniAgentPanel"
@@ -1432,11 +1431,6 @@ function showMiniAgentPanel() {
   margin: 0 auto;
   border-radius:
     var(--apix-border-radius-base) var(--apix-border-radius-base) 0 0;
-}
-
-.agent-panel.agent_panel_hide {
-  width: 0;
-  overflow: hidden;
 }
 
 .top-btn-wrap {

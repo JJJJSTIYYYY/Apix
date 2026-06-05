@@ -85,7 +85,11 @@
               />
             </div>
 
-            <div key="buttom-div" class="buttom-div"></div>
+            <div
+              ref="bottomSentinelRef"
+              key="bottom-div"
+              class="bottom-div"
+            ></div>
           </div>
 
           <div 
@@ -106,19 +110,24 @@
             </div>
 
             <Transition name="fade">
-              <div class="stop-btn-wrapper" v-if="isGenerating">
-                <el-button
-                  class="stop-generate-button"
-                  @click="stopGenerating"
-                >
-                  <div class="wave-container">
-                    <svg t="1769702765976" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg " p-id="9117" width="32" height="32"><path d="M243.611344 62.597687l535.403013 0c98.565876 0 178.464601 80.265068 178.464601 179.283246l0 537.849738c0 99.008968-79.898725 179.283246-178.464601 179.283246L243.611344 959.013917c-98.556667 0-178.455391-80.274278-178.455391-179.283246l0-537.849738C65.155952 142.862755 145.054677 62.597687 243.611344 62.597687z" p-id="9118"></path></svg>
-                    <div class="wave wave-1"></div>
-                    <div class="wave wave-2"></div>
-                    <div class="wave wave-3"></div>
-                  </div>
-                  <div>{{ stream_state_text }}</div>
-                </el-button>
+              <div class="message-ctrl-wrapper" v-if="isGenerating || showScrollToBottom">
+                <div class="stop-btn-wrapper" v-if="isGenerating">
+                  <el-button
+                    class="stop-generate-button"
+                    @click="stopGenerating"
+                  >
+                    <div class="wave-container">
+                      <svg t="1769702765976" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg " p-id="9117" width="32" height="32"><path d="M243.611344 62.597687l535.403013 0c98.565876 0 178.464601 80.265068 178.464601 179.283246l0 537.849738c0 99.008968-79.898725 179.283246-178.464601 179.283246L243.611344 959.013917c-98.556667 0-178.455391-80.274278-178.455391-179.283246l0-537.849738C65.155952 142.862755 145.054677 62.597687 243.611344 62.597687z" p-id="9118"></path></svg>
+                      <div class="wave wave-1"></div>
+                      <div class="wave wave-2"></div>
+                      <div class="wave wave-3"></div>
+                    </div>
+                    <div>{{ stream_state_text }}</div>
+                  </el-button>
+                </div>
+                <div class="scroll-to-bottom-btn" v-if="showScrollToBottom"  @click="scrollToBottom">
+                  <svg t="1780679600441" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6641" width="16" height="16"><path d="M163.6 533.9l310.6 310.6V64h75.7v780.5l310.6-310.6 51.8 55.8L538 960h-51.8L111.8 589.7l51.8-55.8z" p-id="6642" fill="var(--apix-default-button-text)"></path></svg>
+                </div>
               </div>
             </Transition>
 
@@ -631,6 +640,36 @@ function playJumpHighlight(
     'animationend',
     handleAnimationEnd,
   )
+}
+
+const bottomSentinelRef = ref<HTMLElement | null>(null)
+
+const showScrollToBottom = ref(false)
+
+let bottomObserver: IntersectionObserver | null = null
+
+const initBottomSentinelObserver = () => {
+  if (!messageListRef.value || !bottomSentinelRef.value) {
+    return
+  }
+
+  bottomObserver = new IntersectionObserver(
+    ([entry]) => {
+      // Sentinel invisible -> show scroll-to-bottom button
+      showScrollToBottom.value = !entry.isIntersecting
+    },
+    {
+      root: messageListRef.value,
+      threshold: 0,
+    }
+  )
+
+  bottomObserver.observe(bottomSentinelRef.value)
+}
+
+const destroyBottomSentinelObserver = () => {
+  bottomObserver?.disconnect()
+  bottomObserver = null
 }
 
 // ################################
@@ -2035,6 +2074,7 @@ onDeactivated(() => {
 onMounted(async () => {
   websocketGateSwitch = true
   window.addEventListener('keydown', globalHandleKeydown)
+  initBottomSentinelObserver()
 
   try {
     unsubscribeWs = window.api.onWsMessage((payload: any) => {
@@ -2071,6 +2111,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', globalHandleKeydown)
+  destroyBottomSentinelObserver()
 
   const container = messageListRef.value
   if (container) {
@@ -3032,7 +3073,7 @@ const setFullInput = () => {
   animation: jump-highlight 1.2s var(--apix-cubic-bezier);
 }
 
-.buttom-div {
+.bottom-div {
   min-height: 30px;
 }
 
@@ -3230,12 +3271,18 @@ const setFullInput = () => {
   opacity: 1;
 }
 
+.message-ctrl-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+
 .stop-btn-wrapper {
   border-radius: 16px;
   bottom: 20px;
   z-index: 10;
   background: transparent;
-  box-shadow: var(--apix-shadow-layer-3);
+  box-shadow: var(--apix-shadow-layer-2);
   transition: width 0.3s var(--apix-cubic-bezier);
 }
 
@@ -3247,10 +3294,10 @@ const setFullInput = () => {
 .stop-generate-button {
   width: fit-content;
   height: 32px;
+  box-sizing: border-box;
   overflow: hidden;
   color: var(--apix-default-dark-color);
   border-radius: 16px;
-  border: none;
   backdrop-filter: saturate(300%) blur(16px);
   background-color: color-mix(in srgb, var(--apix-panel-layer-5-background) 40%, transparent);
   transition: all 0.22s var(--apix-cubic-bezier);
@@ -3338,6 +3385,28 @@ const setFullInput = () => {
     opacity: 0;
     border-radius: 12px;
   }
+}
+
+.scroll-to-bottom-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 32px;
+  border: 1.5px solid color-mix(in srgb, var(--apix-panel-layer-5-background) 15%, transparent);
+  box-sizing: border-box;
+
+  backdrop-filter: saturate(300%) blur(16px);
+  background-color: color-mix(in srgb, var(--apix-panel-layer-5-background) 40%, transparent);
+  transition: all 0.22s var(--apix-cubic-bezier);
+  box-shadow: var(--apix-shadow-layer-2);
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.scroll-to-bottom-btn:hover {
+  scale: 1.12;
 }
 
 .loading {

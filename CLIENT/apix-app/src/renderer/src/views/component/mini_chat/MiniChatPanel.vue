@@ -124,13 +124,25 @@
             />
           </div>
 
-          <div key="buttom-div" class="buttom-div"></div>
+          <div
+            ref="bottomSentinelRef"
+            key="bottom-div"
+            class="bottom-div"
+          ></div>
         </div>
 
         <div 
           class="ctrl-area"
           v-if="!selectMode"
         >
+          <Transition name="fade">
+            <div class="message-ctrl-wrapper" v-if="showScrollToBottom">
+              <div class="scroll-to-bottom-btn" @click="scrollToBottom">
+                <svg t="1780679600441" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6641" width="16" height="16"><path d="M163.6 533.9l310.6 310.6V64h75.7v780.5l310.6-310.6 51.8 55.8L538 960h-51.8L111.8 589.7l51.8-55.8z" p-id="6642" fill="var(--apix-default-button-text)"></path></svg>
+              </div>
+            </div>
+          </Transition>
+
           <Transition name="fade">
             <div v-if="isWarningShow" class="warning-label">
               <div style="display: flex; gap: 6px; align-items: center;">
@@ -695,6 +707,36 @@ function playJumpHighlight(
     'animationend',
     handleAnimationEnd,
   )
+}
+
+const bottomSentinelRef = ref<HTMLElement | null>(null)
+
+const showScrollToBottom = ref(false)
+
+let bottomObserver: IntersectionObserver | null = null
+
+const initBottomSentinelObserver = () => {
+  if (!messageListRef.value || !bottomSentinelRef.value) {
+    return
+  }
+
+  bottomObserver = new IntersectionObserver(
+    ([entry]) => {
+      // Sentinel invisible -> show scroll-to-bottom button
+      showScrollToBottom.value = !entry.isIntersecting
+    },
+    {
+      root: messageListRef.value,
+      threshold: 0,
+    }
+  )
+
+  bottomObserver.observe(bottomSentinelRef.value)
+}
+
+const destroyBottomSentinelObserver = () => {
+  bottomObserver?.disconnect()
+  bottomObserver = null
 }
 
 // ################################
@@ -2062,6 +2104,7 @@ onMounted(async () => {
   websocketGateSwitch = true
   window.addEventListener('keydown', globalHandleKeydown)
   window.addEventListener('keyup', globalHandleKeyup)
+  initBottomSentinelObserver()
 
   try {
     unsubscribeWs = window.api.onWsMessage((payload: any) => {
@@ -2096,6 +2139,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', globalHandleKeydown)
   window.addEventListener('keyup', globalHandleKeyup)
+  destroyBottomSentinelObserver()
 
   const container = messageListRef.value
   if (container) {
@@ -2765,7 +2809,7 @@ const setFullInput = () => {
   animation: jump-highlight 1.2s var(--apix-cubic-bezier);
 }
 
-.buttom-div {
+.bottom-div {
   min-height: 30px;
 }
 
@@ -2779,6 +2823,34 @@ const setFullInput = () => {
   gap: 12px;
   transition: bottom 0.6s var(--apix-cubic-bezier),
               width 0.6s var(--apix-cubic-bezier);
+}
+
+.message-ctrl-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.scroll-to-bottom-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 32px;
+  border: 1.5px solid color-mix(in srgb, var(--apix-panel-layer-5-background) 15%, transparent);
+  box-sizing: border-box;
+
+  backdrop-filter: saturate(300%) blur(16px);
+  background-color: color-mix(in srgb, var(--apix-panel-layer-5-background) 40%, transparent);
+  transition: all 0.22s var(--apix-cubic-bezier);
+  box-shadow: var(--apix-shadow-layer-2);
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.scroll-to-bottom-btn:hover {
+  scale: 1.12;
 }
 
 .quote-label,

@@ -33,9 +33,7 @@
             />
           </svg>
           <div>
-            请根据实际 MCP 服务填写连接信息。
-            stdio 用于本地进程，
-            streamable_http、websocket、sse 用于远程 MCP 服务。
+            请根据实际 MCP 服务填写连接信息。stdio 用于本地进程，streamable_http、websocket、sse 用于远程 MCP 服务。
           </div>
         </div>
 

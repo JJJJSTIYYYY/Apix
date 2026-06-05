@@ -26,7 +26,7 @@
   </el-menu>
   
   <button
-    class="menu-buttom-item"
+    class="menu-bottom-item"
     :class="{ rotated: !is_side_show }"
     @click="setSideWidth"
   >
@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-.menu-buttom-item {
+.menu-bottom-item {
   opacity: 0.4;
   bottom: 0px;
   left: 22px;
@@ -124,16 +124,16 @@ onBeforeUnmount(() => {
   background-color: transparent;
 }
 
-.menu-buttom-item:hover {
+.menu-bottom-item:hover {
   opacity: 1;
 }
 
-.menu-buttom-item {
+.menu-bottom-item {
   transition: transform 0.3s var(--apix-cubic-bezier);
   transform-origin: 50% 50%;
 }
 
-.menu-buttom-item.rotated {
+.menu-bottom-item.rotated {
   transform: rotate(180deg);
 }
 
