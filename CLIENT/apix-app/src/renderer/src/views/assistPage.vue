@@ -803,7 +803,7 @@ function mergeHistoryAiMessage(
   const nextExtra = {
     ...prevExtra,
     ...extra,
-    key_word: [prevExtra.key_word, extra.key_word].filter(Boolean).join('\n'),
+    key_word: [...(prevExtra.key_word ?? []), ...(extra.key_word ?? [])],
     link_provider: prevExtra.link_provider ?? extra.link_provider,
     content_provider: prevExtra.content_provider ?? extra.content_provider,
     urls: [...(prevExtra.urls ?? []), ...(extra.urls ?? [])],

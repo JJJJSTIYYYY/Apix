@@ -171,31 +171,31 @@
         :class="{ show: !msg.pending }"
       >
         <div class="tag-wrapper">
-          <div class="tag-name">Provider:</div>
+          <div class="tag-name">供应商:</div>
           <div>{{ msg.info?.model_provider }}</div>
         </div>
         <div class="tag-wrapper">
-          <div class="tag-name">Model:</div>
+          <div class="tag-name">已使用模型:</div>
           <div>{{ msg.info?.model }}</div>
         </div>
         <div class="tag-wrapper" title="Token统计仅供参考，实际用量请以控制台为准！">
-          <div class="tag-name">Tokens:</div>
+          <div class="tag-name">令牌数:</div>
           <div>{{ msg.info?.total_tokens ?? 'N/A' }}</div>
         </div>
         <div class="tag-wrapper">
-          <div class="tag-name">Duration:</div>
+          <div class="tag-name">耗时:</div>
           <div>{{ (msg.info?.total_duration / 1000) ?? 'N/A' }}S</div>
         </div>
         <div
           v-if="msg.extra?.link_provider?.length > 0 || msg.extra?.content_provider?.length > 0 || msg.extra?.key_word?.length > 0 || msg.extra?.urls?.length > 0"
           class="tag-wrapper"
         >
-          <button
+          <div
             class="tag-name online-info-btn"
             @click="showLinks"
           >
-            🔍 查看访问的链接
-          </button>
+            <el-icon><Search /></el-icon>已访问互联网
+          </div>
         </div>
       </div>
 
@@ -594,12 +594,17 @@ const showLinks = async () => {
   const e = props.msg.extra ?? {}
   const sections: string[] = []
 
-  if (e.key_word?.trim()) {
+  if (Array.isArray(e.key_word) && e.key_word.length > 0) {
     sections.push(`
       <div class="section">
-        <div class="section-title">[关键词]</div>
+        <div class="section-title">已通过 ${e.link_provider} 搜索关键词</div>
         <div class="section-body">
-          ${e.key_word.split('\n').join('、')}
+          ${e.key_word
+            .map(
+              (kw: string) =>
+                `<div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">• ${kw}</div>`
+            )
+            .join('')}
         </div>
       </div>
     `)
@@ -608,36 +613,14 @@ const showLinks = async () => {
   if (Array.isArray(e.urls) && e.urls.length > 0) {
     sections.push(`
       <div class="section">
-        <div class="section-title">[链接]</div>
+        <div class="section-title">已通过 ${e.content_provider} 浏览 ${e.urls.length} 个页面</div>
         <div class="section-body">
           ${e.urls
             .map(
               (url: string) =>
-                `<div><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></div>`
+                `<div style="display: flex; flex-direction: row; align-items: center; gap: 6px;"><a href="${url}" target="_blank" rel="noopener noreferrer">• ${url}</a></div>`
             )
             .join('')}
-        </div>
-      </div>
-    `)
-  }
-
-  if (e.link_provider?.trim()) {
-    sections.push(`
-      <div class="section">
-        <div class="section-title">[关键词引擎]</div>
-        <div class="section-body">
-          ${e.link_provider.split('\n').join(' ')}
-        </div>
-      </div>
-    `)
-  }
-
-  if (e.content_provider?.trim()) {
-    sections.push(`
-      <div class="section">
-        <div class="section-title">[内容引擎]</div>
-        <div class="section-body">
-          ${e.content_provider.split('\n').join(' ')}
         </div>
       </div>
     `)
@@ -1040,7 +1023,7 @@ onBeforeUnmount(() => {
 .info-tag {
   display: flex;
   flex-direction: row;
-  font-size: 12px;
+  font-size: 11px;
   gap: 16px;
   padding: 2px 4px;
   color: var(--info-tag-color);
@@ -1065,6 +1048,7 @@ onBeforeUnmount(() => {
 .tag-wrapper {
   display: flex;
   flex-direction: row;
+  align-items: center;
   gap: 4px;
   white-space: nowrap;
 }
@@ -1077,8 +1061,11 @@ onBeforeUnmount(() => {
 }
 
 .online-info-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
   color: inherit;
-  font-size: 12px;
 }
 
 .online-info-btn:active {
