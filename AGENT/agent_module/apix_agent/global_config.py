@@ -51,8 +51,6 @@ TASK_SERVER_BASE_URL = "http://localhost:5090"
 
 AGENT_SERVICE_URL = "http://localhost:5091"  # Apix service URL
 
-TOOLS_SERVICE_URL = "http://localhost:5092"  # Tools service URL
-
 MEMORY_SERVICE_BASE_URL = "http://localhost:5093"
 
 FILE_SERVICE_URL = "http://localhost:5094"

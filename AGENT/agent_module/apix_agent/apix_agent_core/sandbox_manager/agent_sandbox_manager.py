@@ -42,7 +42,7 @@ class AgentSandboxManager:
     Global singleton Docker-based sandbox manager.
 
     - Each sandbox is identified by:
-      hash(client_id + conversation_id + work_dir)
+      hash(client_id + work_dir)
 
     - Concurrency safe
     - Async safe
@@ -50,11 +50,6 @@ class AgentSandboxManager:
     """
 
     def __init__(self):
-        # key -> {
-        #     "container_id": str,
-        #     "expire_at": float,
-        #     "status": "running" | "done"
-        # }
         self._containers: Dict[str, Dict] = {}
         self._locks: Dict[str, asyncio.Lock] = {} # key -> lock
         self._global_lock = asyncio.Lock()
@@ -74,7 +69,6 @@ class AgentSandboxManager:
         self,
         *,
         client_id: str,
-        conversation_id: str,
         work_dir: str,
     ) -> str:
         """
@@ -85,7 +79,7 @@ class AgentSandboxManager:
             return ""
 
         work_dir = os.path.abspath(work_dir)
-        key = self._build_key(client_id, conversation_id, work_dir)
+        key = self._build_key(client_id, work_dir)
 
         async with await self._get_lock(key):
 
@@ -117,14 +111,13 @@ class AgentSandboxManager:
         self,
         *,
         client_id: str,
-        conversation_id: str,
         work_dir: str,
     ) -> Optional[str]:
         """
         Get sandbox container id if exists, else None.
         """
         work_dir = os.path.abspath(work_dir)
-        key = self._build_key(client_id, conversation_id, work_dir)
+        key = self._build_key(client_id, work_dir)
 
         async with await self._get_lock(key):
 
@@ -147,7 +140,6 @@ class AgentSandboxManager:
         self,
         *,
         client_id: str,
-        conversation_id: str,
         work_dir: str,
     ):
         """
@@ -156,7 +148,7 @@ class AgentSandboxManager:
         """
 
         work_dir = os.path.abspath(work_dir)
-        key = self._build_key(client_id, conversation_id, work_dir)
+        key = self._build_key(client_id, work_dir)
 
         async with await self._get_lock(key):
 
@@ -176,7 +168,6 @@ class AgentSandboxManager:
         self,
         *,
         client_id: str,
-        conversation_id: str,
         work_dir: str,
     ):
         """
@@ -187,7 +178,7 @@ class AgentSandboxManager:
             - Allows cleanup system to reclaim container later
         """
         work_dir = os.path.abspath(work_dir)
-        key = self._build_key(client_id, conversation_id, work_dir)
+        key = self._build_key(client_id, work_dir)
 
         async with await self._get_lock(key):
             entry = self._containers.get(key)
@@ -263,8 +254,8 @@ class AgentSandboxManager:
     # Internal helpers
     # -------------------------
 
-    def _build_key(self, client_id: str, conversation_id: str, work_dir: str) -> str:
-        raw = f"{client_id}:{conversation_id}:{work_dir}"
+    def _build_key(self, client_id: str, work_dir: str) -> str:
+        raw = f"{client_id}:{work_dir}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
     async def _get_lock(self, key: str) -> asyncio.Lock:

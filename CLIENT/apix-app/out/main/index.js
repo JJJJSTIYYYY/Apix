@@ -2823,9 +2823,12 @@ const baseWindowOptions = {
   icon,
   webPreferences: {
     preload: path.join(__dirname, "../preload/index.js"),
-    nodeIntegration: true,
-    contextIsolation: false,
-    sandbox: false
+    // nodeIntegration: true,
+    // contextIsolation: false,
+    sandbox: false,
+    contextIsolation: true,
+    nodeIntegration: false,
+    webSecurity: true
   }
 };
 const macWindowOptions = {

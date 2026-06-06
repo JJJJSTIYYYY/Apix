@@ -1214,22 +1214,43 @@ class AIContextManager:
         state: MainAgentState,
         agent_role: str = None
     ) -> str:
-        work_dir = state.get("work_dir", "")
         sandbox = state.get("sandbox", "")
         config = state.get("config", {})
+        work_dir = config.get("work_dir", "")
 
         if not work_dir:
             return "## No workspace directory has been specified by the user.\n\n"
 
         if not os.path.exists(work_dir):
             raise FileNotFoundError(f"Workspace directory does not exist: {work_dir}")
-        
-        if sandbox:
-            prompt = "## [Ubuntu] Sandbox has been configured. \n** The user will share access to this sandbox with you. **"
-        else:
-            prompt = "## Sandbox configure failed."
 
-        return f"{prompt}\n\n"
+        if not sandbox:
+            return "## Sandbox configuration failed.\n\n"
+
+        return f"""## Sandbox Environment
+
+An Ubuntu sandbox is available and shared with the user.
+
+Workspace mapping:
+{work_dir} → /workspace
+
+Rules:
+- Use `/workspace` as the workspace root inside the sandbox.
+- Prefer relative paths in project code file whenever possible.
+- Never expose `/workspace` in user-facing responses.
+- When showing file paths to the user, always use `{work_dir}`.
+
+Examples:
+
+Sandbox usage:
+- Read file: /workspace/data/input.csv
+- Write file: /workspace/output/report.pdf
+- Preferred in project code: open("data/input.csv")
+
+User-facing output:
+- Show image in Markdown: ![Image]({work_dir}/images/result.png)
+- Report output file: File saved to: {work_dir}/report.pdf
+"""
     
 
     # Runtime prompt

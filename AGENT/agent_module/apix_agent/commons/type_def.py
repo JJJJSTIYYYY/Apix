@@ -140,7 +140,6 @@ class AgentConfigSchema(TypedDict):
 
     # Agent Runtime Behavior
     work_dir: str
-    async_tools_invoke: bool
     keep_tools_message: bool  # If true, async returns will save to database.
     pure_chat_on: bool  # If true, the agent will be a simple LLM without tools.
 

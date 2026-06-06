@@ -196,7 +196,7 @@ class ActionHandler:
             config = await self._ensure_config(data.get("config", {}) or {})
             work_dir = config.get("work_dir", "")
 
-            if not os.path.exists(work_dir):
+            if work_dir and not os.path.exists(work_dir):
                 raise FileNotFoundError("The workspace is not found on disk, please ensure your settings.")
 
             enable_agent_assign = bool(config.get("enable_agent_assign", False))
@@ -322,7 +322,7 @@ class ActionHandler:
 
         finally:
             await ai_agent.done(agent)
-            await agent_sandbox.done(client_id=client_id, conversation_id=history_id, work_dir=work_dir)
+            await agent_sandbox.done(client_id=client_id, work_dir=work_dir)
 
 
     async def resolve_block(self, payload: ApixEntryDataSchema):

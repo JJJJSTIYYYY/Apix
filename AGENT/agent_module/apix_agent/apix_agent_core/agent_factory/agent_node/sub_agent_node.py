@@ -104,14 +104,12 @@ class SubAgentNode(AgentNodeBase):
         if not state.get("sandbox"):
             sandbox = await agent_sandbox.get_sandbox_container_id(
                 client_id=client_id,
-                conversation_id=history_id,
                 work_dir=work_dir
             )
 
             if not sandbox:
                 sandbox = await agent_sandbox.configure_sandbox(
                     client_id=client_id,
-                    conversation_id=history_id,
                     work_dir=work_dir,
                 )
 

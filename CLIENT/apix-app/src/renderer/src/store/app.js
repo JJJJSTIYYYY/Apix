@@ -10,7 +10,7 @@ const DEFAULT_CONFIG = {
   // ----- app ui -----
   dark_theme: false,
   backgroundImage: '',
-  showToolLabels: false,
+  showToolLabels: true,
 
   // ----- chat config -----
   httpProxyUrl: '',
@@ -21,14 +21,13 @@ const DEFAULT_CONFIG = {
   linkApiKey: '',
   contentProvider: '',
   contentApiKey: '',
-  webContentFilter: 'rule',
+  webContentFilter: 'llm',
   excludeWebUrl: '',
-  toolsInvokeAi: false,
   remainToolsCache: false,
-  longtermMemory: false,
-  shorttermMemory: false,
-  messageSummary: 0,
-  keepNotSummary: 0,
+  longtermMemory: true,
+  shorttermMemory: true,
+  messageSummary: 128,
+  keepNotSummary: 64,
   pureChat: false,
   agentSwarm: false,
   modelTemp: 50,
@@ -40,13 +39,14 @@ const DEFAULT_CONFIG = {
   commandOpration: false,
   skillLoad: false,
   agentAssign: false,
+  enableTaskFlow: false,
 
   // ----- ai page -----
   modelProvider: '',
   modelName: '',
   apiKey: '',
   deepThink: false,
-  visionOn: false,
+  visionOn: true,
 
   // ----- extra -----
   embeddingModel: '',
@@ -58,7 +58,6 @@ const DEFAULT_CONFIG = {
     definition: '',
   },
 
-  enableTaskFlow: false,
   higherRolePromptPermission: false,
   autoRefreshTask: false,
 
@@ -641,7 +640,6 @@ export function currentConfigSet (store) {
     work_dir: store.currentWorkDir,
     llm_calls_warning_threshold: store.config.tokenLimit,
 
-    async_tools_invoke: store.config.toolsInvokeAi,
     link_provider: store.config.linkProvider,
     link_api_key: store.config.linkApiKey,
     content_provider: store.config.contentProvider,

@@ -180,7 +180,44 @@ function createCardByID(cardID: string): TabCardItem {
   }
 }
 
-function findCardFromTree(tree: TabCardItem[], uid: string, deleteFound: boolean = false): TabCardItem | null {
+// function findCardFromTree(tree: TabCardItem[], uid: string, deleteFound: boolean = false, expandPath: boolean = false): TabCardItem | null {
+//   if (!Array.isArray(tree)) {
+//     return null
+//   }
+
+//   let nodePath = []
+
+//   for (let i = 0; i < tree.length; i++) {
+//     const node = tree[i]
+
+//     if (node.uid === uid) {
+//       if (deleteFound) tree.splice(i, 1)
+//       return node
+//     }
+
+//     if (
+//       node.type === 'folder'
+//       &&
+//       Array.isArray(node.content)
+//       &&
+//       node.content.length > 0
+//     ) {
+//       const found = findCardFromTree(node.content, uid, deleteFound)
+
+//       if (found) return found
+//     }
+//   }
+
+//   return null
+// }
+
+function findCardFromTree(
+  tree: TabCardItem[],
+  uid: string,
+  deleteFound: boolean = false,
+  expandPath: boolean = false,
+  nodePath: TabCardItem[] = [],
+): TabCardItem | null {
   if (!Array.isArray(tree)) {
     return null
   }
@@ -189,20 +226,39 @@ function findCardFromTree(tree: TabCardItem[], uid: string, deleteFound: boolean
     const node = tree[i]
 
     if (node.uid === uid) {
-      if (deleteFound) tree.splice(i, 1)
+      if (expandPath) {
+        for (const parent of nodePath) {
+          parent.expanded = true
+        }
+      }
+
+      if (deleteFound) {
+        tree.splice(i, 1)
+      }
+
       return node
     }
 
     if (
       node.type === 'folder'
-      &&
-      Array.isArray(node.content)
-      &&
-      node.content.length > 0
+      && Array.isArray(node.content)
+      && node.content.length > 0
     ) {
-      const found = findCardFromTree(node.content, uid, deleteFound)
+      nodePath.push(node)
 
-      if (found) return found
+      const found = findCardFromTree(
+        node.content,
+        uid,
+        deleteFound,
+        expandPath,
+        nodePath,
+      )
+
+      nodePath.pop()
+
+      if (found) {
+        return found
+      }
     }
   }
 

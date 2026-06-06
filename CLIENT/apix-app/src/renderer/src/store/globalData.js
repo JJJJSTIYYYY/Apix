@@ -79,3 +79,5 @@ export const setHighlightTheme = (isDark) => {
 
   link.href = isDark ? darkCss : lightCss
 }
+
+export const showWarnBannerInCodeEditor = ref(true)

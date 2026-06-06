@@ -1,7 +1,12 @@
 <template>
-  <div class="warn-banner">
-    <el-icon><Warning /></el-icon>
-    <span>编辑文件推荐使用如 VS Code 等专业代码编辑器，此编辑器仅提供部分格式的代码文件与基础文本编辑能力！</span>
+  <div class="warn-banner-wrapper" v-if="showWarnBannerInCodeEditor">
+    <div class="warn-banner">
+      <el-icon><Warning /></el-icon>
+      <span>编辑文件建议使用如 VS Code 等专业代码编辑器，此编辑器仅提供部分格式的代码文件与基础文本编辑能力！</span>
+    </div>
+    <div class="close-banner-btn" @click="showWarnBannerInCodeEditor = false">
+      <svg t="1780741208778" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="8755" width="16" height="16"><path d="M512 570.88l196.864 196.8 58.88-58.88L570.752 512l196.864-196.864-58.816-58.88L512 453.248 315.136 256.32l-58.88 58.88L453.248 512l-196.864 196.864 58.88 58.88z" fill="currentColor" p-id="8756"></path></svg>
+    </div>
   </div>
   <div class="markdown-editor-root">
     <!-- Search panel -->
@@ -93,6 +98,7 @@ import type {
 } from '@codemirror/view'
 
 import SearchPanel from './search_panel.vue'
+import { showWarnBannerInCodeEditor } from '../../../store/globalData'
 
 const props = defineProps<{
   modelValue: string
@@ -484,13 +490,35 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.warn-banner-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--apix-tertiary-dark-color);
+  font-size: 12px;
+}
+
 .warn-banner {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  color: var(--apix-tertiary-dark-color);
+}
+
+.close-banner-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-banner-btn:hover {
+  background-color: var(--apix-default-light-color);
 }
 
 /* CodeMirror root */

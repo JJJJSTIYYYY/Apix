@@ -697,34 +697,6 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">异步工具返回时唤醒AI</div>
-            <div class="setting-control">
-              <div class="setting-info">
-                异步工具返回结果时主动唤醒AI (若AI正在生成, 将会打断)。
-              </div>
-              <div class="mode-switch">
-                <div class="slider" :class="{ right: store.config.toolsInvokeAi }" />
-
-                <button
-                  class="off-select"
-                  :class="{ active: !store.config.toolsInvokeAi }"
-                  @click="switchMode('toolsInvokeAi', 'off')"
-                >
-                  Off
-                </button>
-
-                <button
-                  class="on-select"
-                  :class="{ active: store.config.toolsInvokeAi }"
-                  @click="switchMode('toolsInvokeAi', 'on')"
-                >
-                  On
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="setting-card">
             <div class="setting-title">将过去的思维链以及工具返回内容回传接口</div>
             <div class="setting-control">
               <div class="setting-info">

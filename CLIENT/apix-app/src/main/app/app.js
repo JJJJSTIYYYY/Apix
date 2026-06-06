@@ -38,9 +38,12 @@ const baseWindowOptions = {
   icon: icon,
   webPreferences: {
     preload: join(__dirname, '../preload/index.js'),
-    nodeIntegration: true,
-    contextIsolation: false,
-    sandbox: false
+    // nodeIntegration: true,
+    // contextIsolation: false,
+    sandbox: false,
+    contextIsolation: true,
+    nodeIntegration: false,
+    webSecurity: true
   }
 }
 
