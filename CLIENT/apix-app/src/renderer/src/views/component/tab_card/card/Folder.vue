@@ -218,21 +218,21 @@ import {
   Postcard,
 } from '@element-plus/icons-vue'
 
-import { useAppCacheData } from '../../../store/app'
-import { ConfirmDialog } from './../comp/confirmDialog.js'
-import { InputDialog } from '../comp/inputDialog'
+import { useAppCacheData } from '../../../../store/app.js'
+import { ConfirmDialog } from '../../comp/confirmDialog.js'
+import { InputDialog } from '../../comp/inputDialog.js'
 import {
   globalCardDragState,
   clearGlobalDragState,
   genUUID,
   defaultCards,
   globalDragHoverCard
-} from '../../../store/globalData.js'
-import Task from './../tab_card/Task.vue'
-import Script from './../tab_card/Script.vue'
-import Folder from './../tab_card/Folder.vue'
-import Note from './../tab_card/Note.vue'
-import PopMenu from './comp/PopMenu.vue'
+} from '../../../../store/globalData.js'
+import Task from './Task.vue'
+import Script from './Script.vue'
+import Folder from './Folder.vue'
+import Note from './Note.vue'
+import PopMenu from '../comp/PopMenu.vue'
 
 type CardBase = {
   id: string
@@ -376,7 +376,7 @@ function hideMark() {
 
 async function updateMarkContent() {
   try {
-    const value = await InputDialog.open('请输入文本', '编辑 Mark 内容', {
+    const value = await InputDialog.open('请输入文本', '编辑标记内容', {
       placeholder: props.self.markMessage,
       defaultValue: props.self.markMessage,
     })

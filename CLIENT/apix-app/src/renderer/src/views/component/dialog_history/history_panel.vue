@@ -384,6 +384,7 @@ const handleSearch = () => {
 
 // toggle panel
 const hidePanel = async () => {
+  isSearchFocused.value = false
   isHide.value = !isHide.value
   emit('hide', isHide.value)
 

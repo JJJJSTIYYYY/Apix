@@ -185,13 +185,13 @@ import {
   Postcard,
 } from '@element-plus/icons-vue'
 
-import { InputDialog } from '../comp/inputDialog'
+import { InputDialog } from '../../comp/inputDialog'
 import {
   globalCardDragState,
   globalDragHoverCard,
-} from '../../../store/globalData.js'
+} from '../../../../store/globalData.js'
 
-import PopMenu from './comp/PopMenu.vue'
+import PopMenu from '../comp/PopMenu.vue'
 
 type CardBase = {
   id: string
@@ -349,7 +349,7 @@ async function updateMarkContent() {
   try {
     const value = await InputDialog.open(
       '请输入文本',
-      '编辑 Mark 内容',
+      '编辑标记内容',
       {
         placeholder: props.self.markMessage,
         defaultValue: props.self.markMessage,

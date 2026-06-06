@@ -10,6 +10,7 @@
     <div
       class="resize-handle"
       @mousedown="startResize($event)"
+      @click="showPanel()"
     ></div>
 
     <!-- Header -->
@@ -267,16 +268,18 @@ function handleResize(e) {
 
   const delta = e.clientX - startX
 
-  const minWidth = 180
+  const minWidth = 179
   const maxWidth = 720
 
-  explorerWidth.value = Math.min(
+  let newWid = Math.min(
     maxWidth,
     Math.max(
       minWidth,
       startWidth + delta
     )
   )
+  if (newWid < 180 && delta < 30) newWid = 2
+  explorerWidth.value = newWid
 }
 
 function stopResize() {
@@ -291,6 +294,10 @@ function stopResize() {
     'mouseup',
     stopResize
   )
+}
+
+function showPanel() {
+  if (explorerWidth.value < 180) explorerWidth.value = 200
 }
 
 // ------------------------

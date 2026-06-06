@@ -64,10 +64,10 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAppCacheData } from '../../../store/app.js'
-import Task from './Task.vue'
-import Script from './Script.vue'
-import Folder from './Folder.vue'
-import Note from './Note.vue'
+import Task from './card/Task.vue'
+import Script from './card/Script.vue'
+import Folder from './card/Folder.vue'
+import Note from './card/Note.vue'
 import {
   globalCardDragState,
   genUUID,

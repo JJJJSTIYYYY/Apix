@@ -24,6 +24,35 @@
           @open-file="openFile"
         />
 
+        <!-- 左边拖拽面板 -->
+        <div class="left-panel" :class="{is_hide: (activatedTabMeta.mime !== 'aflow' && activatedTabMeta.mime !== 'agraph')}">
+          <div class="left-panel-title-wrapper">
+            <div class="left-panel-title">任务卡</div>
+          </div>
+
+          <el-scrollbar class="left-card-container">
+            <div
+              v-for="card in cards"
+              :key="card.id"
+              class="draggable-card"
+              draggable="true"
+              @dragstart="onLeftDragStart(card)"
+            >
+              {{ card.title }}
+
+              <button
+                type="primary"
+                class="no-drag fixed-left-card-delete"
+                @click="removeLeftCard(card.id)"
+                @mousedown.stop
+                @dragstart.stop
+              >
+                <svg t="1776755725116" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="8731" width="20" height="20"><path d="M328.777143 377.904762l31.719619 449.657905h310.662095l31.695238-449.657905h73.264762L744.106667 832.707048a73.142857 73.142857 0 0 1-72.94781 67.998476H360.496762a73.142857 73.142857 0 0 1-72.94781-68.022857L255.488 377.904762h73.289143z m159.207619 22.649905v341.333333h-73.142857v-341.333333h73.142857z m133.729524 0v341.333333h-73.142857v-341.333333h73.142857zM146.285714 256h731.428572v73.142857H146.285714v-73.142857z m518.265905-121.904762v73.142857h-292.571429v-73.142857h292.571429z" p-id="8732" fill="var(--apix-tertiary-dark-color)"></path></svg>
+              </button>
+            </div>
+          </el-scrollbar>
+        </div>
+
         <!-- 右边标签页（case列表）窗口 -->
         <div class="right-panel">
           <div class="editor-tabs-root">
@@ -75,35 +104,6 @@
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- 左边拖拽面板 -->
-        <div class="left-panel" :class="{is_hide: (activatedTabMeta.mime !== 'aflow' && activatedTabMeta.mime !== 'agraph')}">
-          <div class="left-panel-title-wrapper">
-            <div class="left-panel-title">任务卡</div>
-          </div>
-
-          <el-scrollbar class="left-card-container">
-            <div
-              v-for="card in cards"
-              :key="card.id"
-              class="draggable-card"
-              draggable="true"
-              @dragstart="onLeftDragStart(card)"
-            >
-              {{ card.title }}
-
-              <button
-                type="primary"
-                class="no-drag fixed-left-card-delete"
-                @click="removeLeftCard(card.id)"
-                @mousedown.stop
-                @dragstart.stop
-              >
-                <svg t="1776755725116" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="8731" width="20" height="20"><path d="M328.777143 377.904762l31.719619 449.657905h310.662095l31.695238-449.657905h73.264762L744.106667 832.707048a73.142857 73.142857 0 0 1-72.94781 67.998476H360.496762a73.142857 73.142857 0 0 1-72.94781-68.022857L255.488 377.904762h73.289143z m159.207619 22.649905v341.333333h-73.142857v-341.333333h73.142857z m133.729524 0v341.333333h-73.142857v-341.333333h73.142857zM146.285714 256h731.428572v73.142857H146.285714v-73.142857z m518.265905-121.904762v73.142857h-292.571429v-73.142857h292.571429z" p-id="8732" fill="var(--apix-tertiary-dark-color)"></path></svg>
-              </button>
-            </div>
-          </el-scrollbar>
         </div>
 
         <div class="agent-panel" v-if="isAgentPanelShow">
@@ -1296,8 +1296,9 @@ function showMiniAgentPanel() {
   height: 38px;
 
   display: flex;
+  flex-direction: row;
+  justify-content: center;
   align-items: center;
-  justify-content: space-between;
 
   padding: 0 10px;
 

@@ -13,23 +13,26 @@
     <div
       class="tab-card-header"
       :class="{ expanded: self.expanded }"
-      :style="{ background: self.cardColor }"
     >
       <div style="display: flex; flex-direction: row;">
         <div style="width: fit-content; height: 16px; align-self: center;">
           <svg
-            t="1774033814393"
+            t="1774033696111"
             class="icon"
             viewBox="0 0 1024 1024"
             version="1.1"
             xmlns="http://www.w3.org/2000/svg"
-            p-id="18411"
+            p-id="17196"
             width="16"
             height="16"
           >
             <path
-              d="M352 384a32 32 0 0 1 32-32h256a32 32 0 0 1 0 64h-256a32 32 0 0 1-32-32z m32 160h256a32 32 0 0 0 0-64h-256a32 32 0 0 0 0 64z m128 64h-128a32 32 0 0 0 0 64h128a32 32 0 0 0 0-64zM896 192v434.752A63.488 63.488 0 0 1 877.248 672L672 877.248a63.36 63.36 0 0 1-45.248 18.752H192a64 64 0 0 1-64-64V192a64 64 0 0 1 64-64h640a64 64 0 0 1 64 64zM192 832h416v-192a32 32 0 0 1 32-32h192V192H192v640z m480-160v114.784L786.752 672H672z"
-              p-id="18412"
+              d="M641.536 382.464l102.4 102.4a38.4 38.4 0 0 1 0 54.272l-102.4 102.4-54.3232-54.272 75.264-75.264-75.264-75.264 54.272-54.272zM280.064 539.136l102.4 102.4 54.3232-54.272L361.5232 512l75.264-75.264-54.272-54.272-102.4 102.4a38.4 38.4 0 0 0 0 54.272z"
+              p-id="17197"
+            />
+            <path
+              d="M870.4 921.6H153.6a25.6 25.6 0 0 1-25.6-25.6v-768A25.6 25.6 0 0 1 153.6 102.4h513.3312a25.6 25.6 0 0 1 18.1248 7.4752l203.4688 203.4688a25.6 25.6 0 0 1 7.4752 18.1248V896a25.6 25.6 0 0 1-25.6 25.6z m-51.2-76.8V352.6656L645.7344 179.2H204.8v665.6h614.4z"
+              p-id="17198"
             />
           </svg>
         </div>
@@ -37,7 +40,7 @@
         <input
           v-model="self.title"
           class="tab-title-input no-drag"
-          placeholder="注记卡片"
+          placeholder="任务卡"
           @change="onTabCardTitleChange"
           @mouseup="onMouseUpInput"
           @focusout="onMouseUpInput"
@@ -99,7 +102,6 @@
         @mouseenter="markBtnRight = false"
         @mouseleave="markBtnRight = true"
       >
-        <!-- More 按钮 -->
         <el-button
           ref="menuBtnRef"
           type="info"
@@ -133,35 +135,38 @@
       </div>
     </div>
 
-    <!-- Note 卡片体 -->
+    <!-- Task 卡片体 -->
     <div
       v-if="self.expanded"
-      class="mark-card-body"
+      class="task-card-body"
     >
-      <div
-        class="mark-body-wrapper"
-        style="height: auto; overflow: auto; scrollbar-width: none;"
-      >
-        <div
-          class="mark-content"
-          draggable="false"
-          style="display: grid; gap: 2px; grid-template-columns: 56px auto; min-height: auto"
-        >
-          <div class="field-value color-picker-wrapper">
-            <el-color-picker
-              v-model="self.cardColor"
-              :predefine="predefineColors"
-              @change="onColorChange"
-            />
+      <div class="task-body-wrapper">
+        <div class="task-content">
+          <div class="field-label">
+            任务描述:
           </div>
 
           <div class="field-value">
             <el-input
-              v-model="self.noteContent"
+              v-model="self.address"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 10 }"
-              placeholder="请输入注记内容"
-              @input="onNoteContentChange"
+              placeholder="请输入任务描述"
+              @input="onAddressChange"
+            />
+          </div>
+
+          <div class="field-label">
+            步骤概述:
+          </div>
+
+          <div class="field-value">
+            <el-input
+              v-model="self.description"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 16 }"
+              placeholder="（选填）请输入需要执行的操作步骤或描述"
+              @input="onDescriptionChange"
             />
           </div>
         </div>
@@ -180,17 +185,14 @@ import {
   Postcard,
 } from '@element-plus/icons-vue'
 
-import { InputDialog } from '../comp/inputDialog'
-import { 
+import { InputDialog } from '../../comp/inputDialog.js'
+import {
   globalCardDragState,
-  globalDragHoverCard, 
-} from '../../../store/globalData.js'
+  globalDragHoverCard,
+} from '../../../../store/globalData.js'
 
-import PopMenu from './comp/PopMenu.vue'
+import PopMenu from '../comp/PopMenu.vue'
 
-// ------------------------
-// 类型定义
-// ------------------------
 type CardBase = {
   id: string
   title: string
@@ -205,33 +207,27 @@ type TabCardBase = CardBase & {
   markMessage?: string
 }
 
-type NoteCardBase = TabCardBase & {
-  cardColor: string
-  noteContent: string
+type TaskCardBase = TabCardBase & {
+  address: string
+  description: string
 }
 
-// ------------------------
-// 参数列表
-// ------------------------
 const props = defineProps<{
   parent_uid?: string
-  self: NoteCardBase
+  self: TaskCardBase
   tab_key: string
 }>()
 
-// ------------------------
-// 触发事件列表
-// ------------------------
 const emit = defineEmits<{
   (e: 'update:delete-card', card_uid: string): void
   (e: 'update:contentChange', card_uid: string): void
 }>()
 
 // ------------------------
-// 初始化默认值
+// 初始化兜底
 // ------------------------
-props.self.noteContent ??= ''
-props.self.cardColor ??= ''
+props.self.address ??= ''
+props.self.description ??= ''
 props.self.marked ??= false
 props.self.markMessage ??= '已标记'
 
@@ -275,13 +271,13 @@ function onTabCardTitleChange(e: Event) {
 }
 
 // ------------------------
-// 内容修改
+// 卡片体字段修改
 // ------------------------
-function onNoteContentChange() {
+function onAddressChange() {
   emit('update:contentChange', props.self.uid)
 }
 
-function onColorChange() {
+function onDescriptionChange() {
   emit('update:contentChange', props.self.uid)
 }
 
@@ -353,7 +349,7 @@ async function updateMarkContent() {
   try {
     const value = await InputDialog.open(
       '请输入文本',
-      '编辑 Mark 内容',
+      '编辑标记内容',
       {
         placeholder: props.self.markMessage,
         defaultValue: props.self.markMessage,
@@ -383,67 +379,58 @@ function editTabCard() {
 
   emit('update:contentChange', props.self.uid)
 }
-
-// ------------------------
-// 预定义颜色
-// ------------------------
-const predefineColors = [
-  '#ff4500',
-  '#ff8c00',
-  '#ffd700',
-  '#90ee90',
-  '#00ced1',
-  '#1e90ff',
-  '#c71585',
-  'rgba(255, 69, 0, 0.68)',
-  'rgb(255, 120, 0)',
-  'hsv(51, 100, 98)',
-  'hsva(120, 40, 94, 0.5)',
-  'hsl(181, 100%, 37%)',
-  'hsla(209, 100%, 56%, 0.73)',
-  '#c7158577',
-]
 </script>
-
 
 <style scoped>
 .no-drag {
-  -webkit-app-region: no-drag; 
+  -webkit-app-region: no-drag;
 }
 
-input, textarea {
+input,
+textarea {
   user-select: none;
 }
 
-.mark-body-wrapper {
+.task-body-wrapper {
   min-height: 60px;
 }
 
-.mark-content {
-  /* min-height: 100%; */
+.task-content {
   position: relative;
   border-radius: 8px;
   background: transparent;
-  display: grid;
-  flex-wrap: wrap;
   margin-right: 5px;
-  overflow: auto;         /* 保持可滚动 */
-  scrollbar-width: none;  /* Firefox 隐藏滚动条 */
-  gap: 4px;
+  overflow: auto;
+  scrollbar-width: none;
   padding: 8px 12px;
+
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: 100px 1fr;
+  align-items: start;
 }
 
-.field-value.color-picker-wrapper {
+.field-label {
+  min-height: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--apix-default-dark-color);
+}
 
+.field-value {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
 }
 
 /* 开启动画 */
 .scale-fade-enter-active {
-  animation: scaleFadeIn .25s cubic-bezier(0.22, 1, 0.36, 1); /* 弹性进入 */
+  animation: scaleFadeIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .scale-fade-leave-active {
-  animation: scaleFadeOut .2s cubic-bezier(0.4, 0, 0.2, 1);   /* 柔和离开 */
+  animation: scaleFadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes scaleFadeIn {
@@ -453,7 +440,7 @@ input, textarea {
   }
   60% {
     opacity: 1;
-    transform: scale(1.03) translateY(0); /* 稍微放大一点 */
+    transform: scale(1.03) translateY(0);
   }
   100% {
     opacity: 1;
@@ -468,7 +455,7 @@ input, textarea {
   }
   100% {
     opacity: 0;
-    transform: scale(0.95) translateY(6px); /* 离场下沉一点 */
+    transform: scale(0.95) translateY(6px);
   }
 }
 </style>

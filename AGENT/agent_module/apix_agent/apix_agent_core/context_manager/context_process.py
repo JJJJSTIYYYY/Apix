@@ -1102,7 +1102,6 @@ class AIContextManager:
 - Use tools only when necessary.
 - Never assume tool results.
 - Prefer incremental progress over large uncertain actions.
-- Append your operation logs and important events to /workspace/sub_agent_bus.log.
 """
             return (
                 "# Follow this workflow when solving the task:\n\n"

@@ -28,7 +28,7 @@ class FileLockTimeoutError(TimeoutError):
 
 class FileSystemManager:
 
-    UNDELETABLE_IN_WORKSPACE = [".", "./sub_agent_bus.log"]
+    UNDELETABLE_IN_WORKSPACE = [".", "./agent_bus.log"]
 
     def __init__(self):
         # flie path -> (name, event)
