@@ -371,6 +371,19 @@ type MsgBubbleData = {
   selected?: boolean
 }
 
+type RenderItem =
+  | {
+      kind: 'message'
+      key: string
+      html: string
+      label_type: 'think' | 'content'
+    }
+  | {
+      kind: 'tool'
+      key: string
+      tool: ToolLabel
+    }
+
 const props = defineProps<{
   msg: MsgBubbleData
   is_selecting?: boolean
@@ -413,19 +426,6 @@ const md = new MarkdownIt({
     return `<div class="code-block"><button class="code-copy-btn" data-code="${raw}" type="button">${copy_svg.value}</button><code class="hljs ${languageClass}">${highlighted}</code></div>`
   },
 })
-
-type RenderItem =
-  | {
-      kind: 'message'
-      key: string
-      html: string
-      label_type: 'think' | 'content'
-    }
-  | {
-      kind: 'tool'
-      key: string
-      tool: ToolLabel
-    }
 
 const expandedThinkMap = ref<Record<string, boolean>>({})
 

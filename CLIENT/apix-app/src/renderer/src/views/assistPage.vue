@@ -546,7 +546,7 @@ const messagePreviewList = computed(() =>
     .filter(msg => msg.role === 'human')
     .map(msg => ({
       msg_id: msg.id,
-      preview: (msg.chunks?.[0].content ?? '').slice(0, 30),
+      preview: (msg.chunks?.[0].content ?? '').slice(0, 50),
     })),
 )
 

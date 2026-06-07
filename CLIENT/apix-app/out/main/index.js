@@ -1,7 +1,7 @@
 "use strict";
 const electron = require("electron");
 const utils = require("@electron-toolkit/utils");
-const path = require("path");
+const path$1 = require("path");
 const fs = require("fs");
 const os = require("os");
 const worker_threads = require("worker_threads");
@@ -1522,7 +1522,7 @@ class FileSystemManager {
 }
 function registerFileIpc(mainWindow) {
   console.log("registerFileIpc...");
-  const dataDir = path.join(electron.app.getPath("userData"), "ApiX");
+  const dataDir = path$1.join(electron.app.getPath("userData"), "ApiX");
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   console.log("Apix data dir:", dataDir);
   const fsManager = new FileSystemManager({
@@ -1562,7 +1562,7 @@ function registerFileIpc(mainWindow) {
       if (!stat.isFile()) {
         throw new Error("Please select a file.");
       }
-      const ext = path.extname(selectedPath).slice(1).toLowerCase();
+      const ext = path$1.extname(selectedPath).slice(1).toLowerCase();
       if (normalizedExtensions.length > 0 && !normalizedExtensions.includes(ext)) {
         throw new Error(`Unsupported file type: .${ext}`);
       }
@@ -1574,7 +1574,7 @@ function registerFileIpc(mainWindow) {
   electron.ipcMain.handle("openDir", async (event, dirPath, fileName = "") => {
     try {
       if (fileName) {
-        const fullPath = path.join(dirPath, fileName);
+        const fullPath = path$1.join(dirPath, fileName);
         electron.shell.showItemInFolder(fullPath);
         return { success: true };
       }
@@ -1591,7 +1591,7 @@ function registerFileIpc(mainWindow) {
   });
   electron.ipcMain.handle("openCacheDir", async () => {
     try {
-      const dataDir2 = path.join(electron.app.getPath("userData"), "ApiX");
+      const dataDir2 = path$1.join(electron.app.getPath("userData"), "ApiX");
       if (!fs.existsSync(dataDir2)) {
         fs.mkdirSync(dataDir2, { recursive: true });
       }
@@ -1609,11 +1609,11 @@ function registerFileIpc(mainWindow) {
   });
   electron.ipcMain.handle("openImageTemp", async (_, base64, fileName) => {
     try {
-      const tempDir = path.join(os.tmpdir(), "apix-temp");
+      const tempDir = path$1.join(os.tmpdir(), "apix-temp");
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
-      const filePath = path.join(tempDir, fileName);
+      const filePath = path$1.join(tempDir, fileName);
       fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
       await electron.shell.openPath(filePath);
       return { success: true, path: filePath };
@@ -1624,11 +1624,11 @@ function registerFileIpc(mainWindow) {
   });
   electron.ipcMain.handle("createTempFileFromBase64", async (_, base64, fileName) => {
     try {
-      const tempDir = path.join(os.tmpdir(), "apix-temp");
+      const tempDir = path$1.join(os.tmpdir(), "apix-temp");
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
-      const filePath = path.join(tempDir, fileName);
+      const filePath = path$1.join(tempDir, fileName);
       fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
       return filePath;
     } catch (err) {
@@ -1638,7 +1638,7 @@ function registerFileIpc(mainWindow) {
   });
   electron.ipcMain.handle("cleanTempDir", async (_, maxAgeMs = 24 * 60 * 60 * 1e3) => {
     try {
-      const tempDir = path.join(os.tmpdir(), "apix-temp");
+      const tempDir = path$1.join(os.tmpdir(), "apix-temp");
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
         return { success: true, removed: 0 };
@@ -1646,7 +1646,7 @@ function registerFileIpc(mainWindow) {
       const files = fs.readdirSync(tempDir);
       let removedCount = 0;
       for (const file of files) {
-        const filePath = path.join(tempDir, file);
+        const filePath = path$1.join(tempDir, file);
         try {
           const stat = fs.statSync(filePath);
           if (!stat.isFile()) continue;
@@ -2711,6 +2711,29 @@ function registerAiFilesIpc() {
       };
     }
   });
+  electron.ipcMain.handle("apix", async (request) => {
+    const url = new URL(request.url);
+    if (url.hostname !== "workspace") {
+      return new Response("Not Found", {
+        status: 404
+      });
+    }
+    const relativePath = decodeURIComponent(
+      url.pathname.replace(/^\/+/, "")
+    );
+    const filePath = path.join(
+      currentWorkspaceDir,
+      relativePath
+    );
+    try {
+      const buffer = await fs.readFile(filePath);
+      return new Response(buffer);
+    } catch {
+      return new Response("Not Found", {
+        status: 404
+      });
+    }
+  });
 }
 function registerAiTaskIpc() {
   console.log("registerAiTaskIpc...");
@@ -2767,17 +2790,17 @@ function registerAiTaskIpc() {
 const TEST_API_BASE = "http://127.0.0.1:5090";
 function registerLocalTaskIpc() {
   console.log("registerLocalTaskIpc...");
-  const dataDir = path.join(electron.app.getPath("userData"), "ApiX");
+  const dataDir = path$1.join(electron.app.getPath("userData"), "ApiX");
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   console.log("Apix data dir:", dataDir);
   electron.ipcMain.handle("readData", (event, key) => {
-    const filePath = path.join(dataDir, `${key}.yaml`);
+    const filePath = path$1.join(dataDir, `${key}.yaml`);
     if (!fs.existsSync(filePath)) return null;
     const content = fs.readFileSync(filePath, "utf-8").trim();
     return content ? yaml.load(content) : null;
   });
   electron.ipcMain.handle("writeData", (event, key, value) => {
-    const filePath = path.join(dataDir, `${key}.yaml`);
+    const filePath = path$1.join(dataDir, `${key}.yaml`);
     fs.writeFileSync(filePath, yaml.dump(value), "utf-8");
     return true;
   });
@@ -2822,7 +2845,7 @@ const baseWindowOptions = {
   autoHideMenuBar: true,
   icon,
   webPreferences: {
-    preload: path.join(__dirname, "../preload/index.js"),
+    preload: path$1.join(__dirname, "../preload/index.js"),
     // nodeIntegration: true,
     // contextIsolation: false,
     sandbox: false,
@@ -2886,7 +2909,7 @@ function createMainWindow() {
   if (utils.is.dev && process.env["ELECTRON_RENDERER_URL"]) {
     mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
-    mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+    mainWindow.loadFile(path$1.join(__dirname, "../renderer/index.html"));
   }
   return mainWindow;
 }

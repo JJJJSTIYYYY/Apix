@@ -59,7 +59,7 @@ async def get_available_tools(
             read_memory,
             update_memory,  
             ocr_analysis,
-            # send_images,
+            send_images,
             request_user_input
         ],
         "task_flow": [
