@@ -243,8 +243,15 @@
               </el-button>
 
             </div>
-            <div class="send-and-stop-btn-wrapper">
-              <el-button v-if="generatingState?.[store.mini_chat_current_history_id[props.page_id]]?.isGenerating ?? false" class="stop-button" type="primary" @click="stopGenerating">
+            <div 
+              class="send-and-stop-btn-wrapper"
+              :title="generatingState?.[store.mini_chat_current_history_id[props.page_id]]?.streamStateText ?? ''"
+            >
+              <el-button 
+                v-if="generatingState?.[store.mini_chat_current_history_id[props.page_id]]?.isGenerating ?? false" 
+                class="stop-button" type="primary" 
+                @click="stopGenerating"
+              >
                 <svg t="1779159856052" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="17438" width="20" height="20"><path d="M348.16 307.2h327.68c22.621184 0 40.96 18.338816 40.96 40.96v327.68c0 22.621184-18.338816 40.96-40.96 40.96H348.16c-22.621184 0-40.96-18.338816-40.96-40.96V348.16c0-22.621184 18.338816-40.96 40.96-40.96z" fill="var(--apix-primary-text)" p-id="17439"></path></svg>
               </el-button>
               
