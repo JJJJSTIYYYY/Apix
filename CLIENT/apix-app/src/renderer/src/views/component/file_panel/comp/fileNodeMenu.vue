@@ -63,16 +63,16 @@
 
       <button 
         class="menu-item"
-        @click="compressToSkill"
+        @click="createSkill"
       >
         <span>创建技能包目录</span>
       </button>
 
       <button 
         class="menu-item"
-        @click="compressToSkill"
+        @click="compressSkill"
       >
-        <span>上传为技能包归档</span>
+        <span>归档并上传技能包</span>
       </button>
     </div>
   </div>
@@ -93,6 +93,7 @@ const emit = defineEmits<{
   (e: "rename"): void
   (e: "delete-item"): void
   (e: "create-skill"): void
+  (e: "compress-skill"): void
 }>()
 
 const wrapperRef = ref<HTMLElement | null>(null)
@@ -142,8 +143,13 @@ function deleteItem() {
   emit('close-menu')
 }
 
-function compressToSkill() {
+function createSkill() {
   emit('create-skill')
+  emit('close-menu')
+}
+
+function compressSkill() {
+  emit('compress-skill')
   emit('close-menu')
 }
 </script>

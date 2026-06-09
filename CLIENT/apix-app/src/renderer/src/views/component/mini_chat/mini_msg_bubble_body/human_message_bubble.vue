@@ -4,6 +4,22 @@
     :class="{ selected: is_selecting && props.msg.selected }"
     @click.stop="toggleSelectFullArea"
   >
+    <div class="hover-menu-bar" v-if="!props.msg.is_editing">
+      <button 
+        class="menu-item"
+        @click="reEditContext"
+      >
+        <svg t="1776756230407" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9832" width="20" height="20"><path d="M720.042667 170.666667v73.142857H195.047619v536.380952h585.142857V512h73.142857v268.190476a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V243.809524a73.142857 73.142857 0 0 1 73.142857-73.142857h524.995048z m156.281904 27.696762l51.541334 51.882666-392.825905 390.046476-53.101714 1.950477 1.511619-54.028191 392.874666-389.851428z" p-id="9833" fill="currentColor"></path></svg>
+      </button>
+
+      <button 
+        class="menu-item"
+        @click="copyContextValue"
+      >
+        <svg t="1776756262130" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="10157" width="20" height="20"><path d="M585.142857 365.714286a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V438.857143a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238z m0 73.142857H195.047619v390.095238h390.095238V438.857143z m-73.142857 219.428571v73.142857H268.190476v-73.142857h243.809524zM828.952381 121.904762a73.142857 73.142857 0 0 1 73.142857 73.142857v390.095238a73.142857 73.142857 0 0 1-73.142857 73.142857h-121.904762v-73.142857h121.904762V195.047619H438.857143v121.904762h-73.142857V195.047619a73.142857 73.142857 0 0 1 73.142857-73.142857h390.095238zM512 536.380952v73.142858H268.190476v-73.142858h243.809524z" p-id="10158" fill="currentColor"></path></svg>
+      </button>
+    </div>
+    
     <div
       v-if="is_selecting && props.msg.pending === false"
       class="message-select-box"
@@ -563,6 +579,42 @@ onBeforeUnmount(() => {
 
 .message-wrapper.selected {
   background: var(--apix-default-light-color);
+}
+
+/* ==================== 悬停菜单 ==================== */
+.hover-menu-bar {
+  opacity: 0;
+  position: absolute;
+  right: 14px;
+  bottom: -10px;
+  z-index: 999;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.message-wrapper:hover .hover-menu-bar {
+  opacity: 0.5;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--apix-default-dark-color);
+  cursor: pointer;
+  transition: all 0.12s var(--apix-cubic-bezier);
+  padding: 0 3px;
+}
+
+.menu-item:hover {
+  color: var(--apix-default-dark-color);
+}
+
+.menu-item:active {
+  transform: scale(0.9);
 }
 
 /* ==================== 多选复选框 ==================== */

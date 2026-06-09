@@ -434,7 +434,7 @@ class AIContextManager:
                         f"Content: \"{referenced_message.get("content", "`[content missed]`") or '`[content missed]`'}\""\
                         f"\n\n{raw_text}"
                 if active_file:
-                    raw_text = f"Active File:  \n> \"{active_file}\"\n\n{raw_text}"
+                    raw_text = f"Referenced File:  \n> \"{active_file}\"\n\n{raw_text}"
 
                 msg = HumanMessage(content=raw_text, name=name)
                 messages.append(msg)

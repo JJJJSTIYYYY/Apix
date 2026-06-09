@@ -346,11 +346,23 @@ export function registerFileIpc(mainWindow) {
     }
   )
 
-  // Search text
+  // Create Skill Folder
   ipcMain.handle(
     'fs:createSkillFolder',
     async (_, atPath, skillName) => {
       return await fsManager.createSkillFolder(atPath, skillName)
+    }
+  )
+
+  // Compress Skill Floder
+  ipcMain.handle(
+    'fs:compressSkillFloder',
+    async (_, atPath) => {
+      const skillMdPath = path.join(atPath, 'SKILL.md');
+
+      await fs.promises.access(skillMdPath);
+
+      return fsManager.compressFolder(atPath);
     }
   )
 }

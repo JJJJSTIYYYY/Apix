@@ -26,6 +26,7 @@ const api = {
   rename: (oldPath, newPath) => ipcRenderer.invoke('fs:rename', oldPath, newPath),
   searchText: (keyword, cwd) => ipcRenderer.invoke('fs:searchText', keyword, cwd),
   createSkillFolder: (atPath, skillName) => ipcRenderer.invoke('fs:createSkillFolder', atPath, skillName),
+  compressSkillFloder: (atPath) => ipcRenderer.invoke('fs:compressSkillFloder', atPath),
 
   /**
    * Listen fs watcher events from main process

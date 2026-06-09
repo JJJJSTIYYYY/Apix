@@ -67,6 +67,7 @@
           @rename="handleRenameStart"
           @delete-item="handleDeleteItem"
           @create-skill="handleCreateSkill"
+          @compress-skill="handleCompressSkill"
         />
       </transition>
 
@@ -115,6 +116,7 @@
           @want-to-create-dir="(...args) => $emit('wantToCreateDir', ...args)"
           @hide-all-input="(...args) => $emit('hideAllInput', ...args)"
           @rename="(...args) => $emit('hideAllInput', ...args)"
+          @upload-skill="(...args) => $emit('uploadSkill', ...args)"
         />
       </div>
     </Transition>
@@ -128,6 +130,7 @@ import fileNodeMenu from './comp/fileNodeMenu.vue'
 import { ConfirmDialog } from '../../component/comp/confirmDialog.js'
 import { InputDialog } from '../../component/comp/inputDialog.js'
 import { getSupportFileSVG } from '../../../store/globalData.js'
+import { ElMessage } from 'element-plus'
 
 // ------------------------
 // Props
@@ -156,7 +159,8 @@ const emit = defineEmits([
   'wantToCreateDir',
   'create',
   'rename',
-  'hideAllInput'
+  'hideAllInput',
+  'uploadSkill'
 ])
 
 // ------------------------
@@ -374,68 +378,65 @@ const handleCreateNewDir = () => {
 const handleDeleteItem = async () => {
   try {
     const wariningTail = props.node.type === 'directory' ? '及其子目录？':'？'
-    await ConfirmDialog.confirm(
-      `您可以从回收站还原此文件。`,
-      `确定要要删除“${props.node.name}”${wariningTail}`,
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
-    )
+    try {
+      await ConfirmDialog.confirm(
+        `您可以从回收站还原此文件。`,
+        `确定要要删除“${props.node.name}”${wariningTail}`,
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+      )
+    } catch (error) { }
     if (props.node.type === 'directory') await window.api.deleteDirectory(props.node.path)
     else await window.api.deleteFile(props.node.path)
   } catch (err: any) {
-    
+    ElMessage({ type: 'error', message: '删除失败', plain: true })
   }
 }
 
 const handleCreateSkill = async () => {
-  InputDialog
-    .open(
-      '请输入技能包名',
-      '新建技能包',
-      {
-        placeholder: '技能包名',
-        defaultValue: '',
-      }
-    )
-    .then(async value => {
-      if (!value) {
-        return
-      }
+  InputDialog.open('请输入技能包名', '新建技能包', {
+    placeholder: '技能包名',
+    defaultValue: '',
+  })
+    .then(async (value) => {
+      if (!value) return;
 
       if (props.node.type === 'directory') {
-        console.log("Create new skill in", props.node.path, value)
-        const result = await window.api.createSkillFolder(
-          props.node.path,
-          value
-        )
-        console.log("Create new skill result:", result)
+        console.log('Create new skill in', props.node.path, value);
+        const result = await window.api.createSkillFolder(props.node.path, value);
+        console.log('Create new skill result:', result);
         if (!result.success) {
-          ElMessage({ type: 'error', message: result.message, plain: true })
+          ElMessage({ type: 'error', message: result.message, plain: true });
         }
-      }
-      else {
-        const parentPath =
-          props.node.path.substring(
-            0,
-            props.node.path.length
-            - props.node.name.length
-            - 1
-          )
-        console.log("Create new skill in", parentPath, value)
-        const result = await window.api.createSkillFolder(
-          parentPath,
-          value
-        )
-        console.log("Create new skill result:", result)
+      } else {
+        const parentPath = props.node.path.substring(0, props.node.path.length - props.node.name.length - 1);
+        console.log('Create new skill in', parentPath, value);
+        const result = await window.api.createSkillFolder(parentPath, value);
+        console.log('Create new skill result:', result);
         if (!result.success) {
-          ElMessage({ type: 'error', message: result.message, plain: true })
+          ElMessage({ type: 'error', message: result.message, plain: true });
         }
       }
     })
-    .catch(() => {})
+    .catch((error) => {
+      ElMessage({ type: 'error', message: `新建技能包失败: ${error}`, plain: true })
+    });
+};
+
+const handleCompressSkill = async () => {
+  try {
+    if (props.node.type !== 'directory') {
+      ElMessage({ type: 'warning', message: '请选择技能包目录', plain: true })
+      return
+    }
+    const path = await window.api.compressSkillFloder(props.node.path);
+    emit("uploadSkill", path)
+  } catch (error) {
+    ElMessage({ type: 'error', message: `新建技能包失败: ${error}`, plain: true })
+  }
 }
 </script>
 

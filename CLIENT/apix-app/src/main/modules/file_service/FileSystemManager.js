@@ -247,6 +247,14 @@ export class FileSystemManager {
         )
     }
 
+    // Search text
+    compressFolder(atPath) {
+        return this._call(
+            'compressFolder',
+            { atPath }
+        )
+    }
+
     // Dispose
     async dispose() {
         await this.worker.terminate()

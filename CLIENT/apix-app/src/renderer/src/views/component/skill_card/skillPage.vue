@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { ElMessage } from 'element-plus'
 import SkillPackageCard from './skillCard.vue'
 import skillDocs from '../../../assets/docs/skillDocs.html?raw'
@@ -108,6 +108,11 @@ onMounted(async () => {
   } catch (err) {
     console.error('[Skill page onMounted error]:', err)
   }
+})
+
+onActivated(async () => {
+  if (cid.value === '') return
+  skillList.value = await getAvailableSkills(cid.value)
 })
 
 // ----------------------------------------------------------------------
@@ -243,28 +248,21 @@ const handleDeleteSkill = async (skillId: string) => {
 const isUploading = ref(false)
 
 const uploadSkill = async () => {
-
   if (isUploading.value) return
 
   try {
-
     const result = await window.api.openFileDialog('file', ['zip'])
 
-    if (result.canceled || result.filePaths.length === 0) {
-      return
-    }
+    if (result.canceled || result.filePaths.length === 0) return
 
     isUploading.value = true
 
-    const uploadTasks = result.filePaths.map((path: string) => {
-
+    const uploadTasks = result.filePaths.map((path) => {
       const plainFile = {
         name: path.split('/').pop(),
         path,
       }
-
       return window.api.uploadSkillFiles(cid.value, [plainFile])
-
     })
 
     const results = await Promise.allSettled(uploadTasks)
@@ -273,57 +271,38 @@ const uploadSkill = async () => {
     let failed = 0
 
     for (const r of results) {
-
       if (r.status === 'fulfilled' && r.value?.success) {
-
         success++
-
         const messages = r.value.messages
-
-        if (Array.isArray(messages)) {
-          mergeSkills(messages)
-        }
-
+        if (Array.isArray(messages)) mergeSkills(messages)
       } else {
         failed++
       }
-
     }
 
     if (failed === 0) {
-
       ElMessage({
         type: 'success',
         message: `技能包上传成功 (${success})`,
         plain: true,
       })
-
     } else {
-
       ElMessage({
         type: 'warning',
         message: `上传完成：成功 ${success} / 失败 ${failed}`,
         plain: true,
       })
-
     }
-
   } catch (err) {
-
     console.error('uploadSkill failed:', err)
-
     ElMessage({
       type: 'error',
       message: '技能包上传失败: ' + String(err),
       plain: true,
     })
-
   } finally {
-
     isUploading.value = false
-
   }
-
 }
 
 function formatSize(bytes: number) {

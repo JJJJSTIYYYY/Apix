@@ -22,6 +22,7 @@
           @create-new-path="createNewPath"
           @hide-all-input="hideNewFileInput"
           @open-file="openFile"
+          @upload-skill="handleUploadSkill"
         />
 
         <!-- 左边拖拽面板 -->
@@ -949,6 +950,53 @@ const handleOpenActivedFile = async (file_path: string) => {
       const name = path.split('/').pop()
       await openFile(path, name)
     }
+  }
+}
+
+const handleUploadSkill = async (atPath: string) => {
+  console.log('Upload skill: ', atPath)
+  try {
+    const uploadTasks = [atPath].map((path) => {
+      const plainFile = {
+        name: path.split('/').pop(),
+        path,
+      }
+      return window.api.uploadSkillFiles(cid.value, [plainFile])
+    })
+
+    const results = await Promise.allSettled(uploadTasks)
+
+    let success = 0
+    let failed = 0
+
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value?.success) {
+        success++
+      } else {
+        failed++
+      }
+    }
+
+    if (failed === 0) {
+      ElMessage({
+        type: 'success',
+        message: `技能包上传成功 (${success})`,
+        plain: true,
+      })
+    } else {
+      ElMessage({
+        type: 'warning',
+        message: `上传完成：成功 ${success} / 失败 ${failed}`,
+        plain: true,
+      })
+    }
+  } catch (err) {
+    console.error('uploadSkill failed:', err)
+    ElMessage({
+      type: 'error',
+      message: '技能包上传失败: ' + String(err),
+      plain: true,
+    })
   }
 }
 

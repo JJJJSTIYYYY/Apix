@@ -78,6 +78,7 @@
           @want-to-create-file="createNewFile"
           @want-to-create-dir="createNewDir"
           @hide-all-input="(...args) => $emit('hideAllInput', ...args)"
+          @upload-skill="handleUploadSkill"
         />
       </div>
     </div>
@@ -126,6 +127,7 @@ const emit = defineEmits({
   collapseDir: (path) => true,
   changeWorkspace: (path) => true,
   hideAllInput: (nodePath) => true,
+  uploadSkill: (atPath) => true,
 })
 
 // ------------------------
@@ -232,6 +234,10 @@ const createNewFile = async (atPath: string) => {
 const createNewDir = async (atPath: string) => {
   creatingPath.value = atPath
   emit("createNewPath", atPath, 'directory')
+}
+
+const handleUploadSkill = async (atPath: string) => {
+  emit("uploadSkill", atPath)
 }
 
 // ------------------------

@@ -11,6 +11,7 @@ import { parentPort } from 'worker_threads'
 import chokidar from 'chokidar'
 
 import fg from 'fast-glob'
+import archiver from 'archiver'
 
 class FsWatcherWorker {
 
@@ -1069,6 +1070,57 @@ ${yamlContent}---
     }
   }
 
+  async compressFolder(atPath) {
+    const stat = await fs.stat(atPath);
+    const dir = path.dirname(atPath);
+
+    // Folder => folderName.zip
+    // File => fileName(without ext).zip
+    const baseName = stat.isDirectory()
+      ? path.basename(atPath)
+      : path.parse(atPath).name;
+
+    let zipPath = path.join(dir, `${baseName}.zip`);
+    let index = 1;
+
+    while (true) {
+      try {
+        await fs.access(zipPath);
+        zipPath = path.join(dir, `${baseName}(${index}).zip`);
+        index++;
+      } catch {
+        break;
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      import('fs')
+        .then(({ default: fsNative }) => {
+          const output = fsNative.createWriteStream(zipPath);
+          const archive = archiver('zip', {
+            zlib: { level: 9 }
+          });
+
+          output.on('close', () => resolve(zipPath));
+          output.on('error', reject);
+          archive.on('error', reject);
+
+          archive.pipe(output);
+
+          if (stat.isDirectory()) {
+            archive.directory(atPath, false);
+          } else {
+            archive.file(atPath, {
+              name: path.basename(atPath)
+            });
+          }
+
+          archive.finalize();
+        })
+        .catch(reject);
+    });
+  }
+
   // RPC handlers
   handlers = {
     scanDir:
@@ -1121,6 +1173,9 @@ ${yamlContent}---
 
     createSkillFolder:
       this.createSkillFolder.bind(this),
+
+    compressFolder:
+      this.compressFolder.bind(this),
   }
 
   // Handle RPC message
