@@ -8,6 +8,7 @@
       <button 
         class="menu-item"
         @click="reEditContext"
+        style="transform: scaleX(0.94) scaleY(1.06);"
       >
         <svg t="1776756230407" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9832" width="20" height="20"><path d="M720.042667 170.666667v73.142857H195.047619v536.380952h585.142857V512h73.142857v268.190476a73.142857 73.142857 0 0 1-73.142857 73.142857H195.047619a73.142857 73.142857 0 0 1-73.142857-73.142857V243.809524a73.142857 73.142857 0 0 1 73.142857-73.142857h524.995048z m156.281904 27.696762l51.541334 51.882666-392.825905 390.046476-53.101714 1.950477 1.511619-54.028191 392.874666-389.851428z" p-id="9833" fill="currentColor"></path></svg>
       </button>
@@ -594,7 +595,7 @@ onBeforeUnmount(() => {
 }
 
 .message-wrapper:hover .hover-menu-bar {
-  opacity: 0.5;
+  opacity: 0.3;
 }
 
 .menu-item {

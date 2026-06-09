@@ -37,7 +37,7 @@
               </button>
             </div>
             <div class="task-info-title">
-              <div class="task-id">任务详情</div>
+              <div class="task-id">工具详情</div>
             </div>
             <div 
               class="btn-area"
