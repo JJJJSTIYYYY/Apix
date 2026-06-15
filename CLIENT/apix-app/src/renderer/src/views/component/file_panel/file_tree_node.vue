@@ -267,7 +267,7 @@ watch(
       await nextTick()
       console.log('[watch] inputValue: ', inputValue.value, '. Creating: ', props.node.creating_type)
       let file_name = inputValue.value
-      file_name = fileName.replace(/[\\/:*?"<>|]/g, '_')
+      file_name = file_name.replace(/[\\/:*?"<>|]/g, '_')
       if (props.node.creating_type === 'file') {
         if (!isSupportFile(file_name)) file_name += '.aflow'
         emit("create", props.node.path, file_name, 'file')
