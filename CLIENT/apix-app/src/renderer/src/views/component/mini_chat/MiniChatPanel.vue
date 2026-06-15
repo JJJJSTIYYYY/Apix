@@ -1832,7 +1832,8 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
         history_id: currentHid,
         platform: 'default',
 
-        ...currentConfigSet(store)
+        ...currentConfigSet(store),
+        work_dir: store.mini_chat_currentWorkDir[props.page_id],
       }
     )
   } catch (err) {

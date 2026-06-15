@@ -760,7 +760,7 @@ const watchWorkspace = async (events) => {
         const exists = parentNode.children.some(child => child.path === e.path)
         if (exists) continue
         parentNode.children.push({
-          name: e.path.split('/').pop(),
+          name: e.path.split(/[\\/]/).pop(),
           path: e.path,
           type: 'directory',
           children: []
@@ -772,7 +772,7 @@ const watchWorkspace = async (events) => {
         const exists = parentNode.children.some(child => child.path === e.path)
         if (exists) continue
         parentNode.children.push({
-          name: e.path.split('/').pop(),
+          name: e.path.split(/[\\/]/).pop(),
           path: e.path,
           type: 'file'
         })
@@ -947,7 +947,7 @@ const handleOpenActivedFile = async (file_path: string) => {
     }
     else {
       const path = store.getWorkspace() + file_path.substring('/workspace'.length)
-      const name = path.split('/').pop()
+      const name = path.split(/[\\/]/).pop()
       await openFile(path, name)
     }
   }
@@ -958,7 +958,7 @@ const handleUploadSkill = async (atPath: string) => {
   try {
     const uploadTasks = [atPath].map((path) => {
       const plainFile = {
-        name: path.split('/').pop(),
+        name: path.split(/[\\/]/).pop(),
         path,
       }
       return window.api.uploadSkillFiles(cid.value, [plainFile])

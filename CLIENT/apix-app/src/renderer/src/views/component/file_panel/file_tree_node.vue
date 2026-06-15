@@ -213,6 +213,7 @@ async function handleRenameStart() {
 async function confirmRename() {
   if (!renameInputShow.value) return
   renameInputShow.value = false
+  renameValue.value = renameValue.value.replace(/[\\/:*?"<>|]/g, '_')
 
   if (renameValue.value !== props.node.name) {
     console.log('Rename', props.node.path, 'to', props.node.path.substring(0, props.node.path?.length - props.node.name?.length) + renameValue.value)
@@ -266,6 +267,7 @@ watch(
       await nextTick()
       console.log('[watch] inputValue: ', inputValue.value, '. Creating: ', props.node.creating_type)
       let file_name = inputValue.value
+      file_name = fileName.replace(/[\\/:*?"<>|]/g, '_')
       if (props.node.creating_type === 'file') {
         if (!isSupportFile(file_name)) file_name += '.aflow'
         emit("create", props.node.path, file_name, 'file')

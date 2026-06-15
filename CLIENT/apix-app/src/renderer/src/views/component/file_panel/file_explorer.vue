@@ -220,6 +220,8 @@ function handleCreate(at_path, name, type) {
 const closeWorkspace = async () => {
   try {
     await window.api.unwatchWorkspace()
+    selectedPath.value = ""
+    workspaceName.value = ""
     emit('close')
   } catch (error) {
     console.error("[closeWorkspace] error: ", error)
