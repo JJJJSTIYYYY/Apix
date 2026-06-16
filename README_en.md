@@ -120,6 +120,10 @@ If you'd like to customize the deployment process, please refer to our documenta
 - [ ] Plugin Marketplace
 - [ ] Multi platform support
 
+**Version Log**  
+
+- The code related to linear task flow editing is currently broken and will be fixed in a future release.
+
 ---
 
 ## 📄 License
