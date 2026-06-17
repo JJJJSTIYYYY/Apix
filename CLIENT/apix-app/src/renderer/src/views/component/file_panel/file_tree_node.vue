@@ -1,6 +1,7 @@
 <template>
   <div
     @contextmenu.prevent="onContextMenu"
+    @keydown="handleFileNodeKeydown"
   >
 
     <!-- Row -->
@@ -390,7 +391,9 @@ const handleDeleteItem = async () => {
           type: 'warning',
         }
       )
-    } catch (error) { }
+    } catch (error) {
+      return
+    }
     if (props.node.type === 'directory') await window.api.deleteDirectory(props.node.path)
     else await window.api.deleteFile(props.node.path)
   } catch (err: any) {
@@ -438,6 +441,21 @@ const handleCompressSkill = async () => {
     emit("uploadSkill", path)
   } catch (error) {
     ElMessage({ type: 'error', message: `新建技能包失败: ${error}`, plain: true })
+  }
+}
+
+const handleFileNodeKeydown = async (
+  e: KeyboardEvent & {
+    isComposing?: boolean
+    keyCode?: number
+  }
+) => {
+  if (e.isComposing || e.keyCode === 229) {
+    return
+  }
+
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Backspace') {
+    await handleDeleteItem()
   }
 }
 </script>

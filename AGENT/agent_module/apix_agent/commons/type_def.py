@@ -235,7 +235,7 @@ class SubAgentState(MainAgentState):
     parent_task_id: str
     start_timestamp: int
     finish_timestamp: int
-    status: Literal["in_progress", "completed", "pending", "failed", "cancelled"]
+    status: Literal["in_progress", "done", "completed", "pending", "failed", "cancelled"]
     outputs: Annotated[str, operator.add]
     errors: Annotated[str, operator.add]
 

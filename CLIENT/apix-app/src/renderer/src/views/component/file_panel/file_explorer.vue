@@ -337,9 +337,9 @@ const globalHandleKeydown = async (
     return
   }
 
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Backspace') {
-    emit('delete', selectedPath.value)
-  }
+  // if ((e.metaKey || e.ctrlKey) && e.key === 'Backspace') {
+  //   emit('delete', selectedPath.value)
+  // }
 }
 
 onMounted(async () => {

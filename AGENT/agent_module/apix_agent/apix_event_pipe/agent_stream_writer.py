@@ -94,11 +94,7 @@ class AgentStreamWriter:
             "block_id": block_id,
         }
 
-        envelope = self._before_send(envelope)
-
         self._writer(envelope)
-
-        self._after_send(envelope)
 
     async def send_blocking_event(
         self,
@@ -296,16 +292,3 @@ class AgentStreamWriter:
         )
 
         return cleared_count
-
-    # Extension hooks
-    def _before_send(
-        self,
-        envelope: ApixEventEnvelope,
-    ) -> ApixEventEnvelope:
-        return envelope
-
-    def _after_send(
-        self,
-        envelope: ApixEventEnvelope,
-    ) -> None:
-        pass

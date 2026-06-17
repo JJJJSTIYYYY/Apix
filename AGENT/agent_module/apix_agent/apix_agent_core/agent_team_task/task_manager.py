@@ -24,6 +24,7 @@ class TeamTaskManager:
         self.task_queue: asyncio.Queue = asyncio.Queue()
         self.stop_request_queue: asyncio.Queue = asyncio.Queue()
         self.task_state_store: dict[Tuple[str, str], SubAgentState] = {}
+        self.generation_id_to_task_id_collection: dict[str, list] = {} # To collect assigned task in one generation.
 
         self._state_lock = asyncio.Lock()
 
@@ -194,7 +195,7 @@ class TeamTaskManager:
                     not_found.append(task_id)
                     continue
 
-                state["status"] = "cancelled"
+                state['status'] = "cancelled"
                 state['errors'] = "Task canceled due to "+reason
                 stopped.append(task_id)
 

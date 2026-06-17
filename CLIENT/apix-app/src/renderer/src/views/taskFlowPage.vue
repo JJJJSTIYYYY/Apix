@@ -111,7 +111,7 @@
           <MiniChatPanel
             :page_id="'taskFlowPage'"
             :workspace="store.getWorkspace()"
-            :active_file="'/workspace'+activeTab.substring(store.getWorkspace().length)"
+            :active_file="(activeTab && activeTab !== '') ? ('/workspace'+activeTab.substring(store.getWorkspace().length)) : ''"
             @quote-file="saveTabContent"
             @open-actived-file="handleOpenActivedFile"
           />

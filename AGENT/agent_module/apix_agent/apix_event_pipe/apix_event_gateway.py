@@ -21,7 +21,7 @@ from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter
 # =========================
 # Handler
 # =========================
-class ActionHandler:
+class EventHandler:
 
     def __init__(self, gen_mgr: GenerationManager):
         self.gen_mgr = gen_mgr
@@ -167,7 +167,7 @@ class ActionHandler:
         
 
     async def chat_with_llm(self, payload: ApixEntryDataSchema):
-        logger.trace('[ActionHandler] chat_with_llm Enter')
+        logger.trace('[EventHandler] chat_with_llm Enter')
 
         data = payload.get("data") or {}
         client_id = data.get("client_id")
@@ -326,7 +326,7 @@ class ActionHandler:
 
 
     async def resolve_block(self, payload: ApixEntryDataSchema):
-        logger.trace('[ActionHandler] resolve_block Enter')
+        logger.trace('[EventHandler] resolve_block Enter')
 
         data = payload.get('data')
         block_id = data.get('block_id')
@@ -343,7 +343,7 @@ class ActionHandler:
 
 
     async def abort_generation(self, payload: ApixEntryDataSchema):
-        logger.trace('[ActionHandler] abort_generation Enter')
+        logger.trace('[EventHandler] abort_generation Enter')
 
         data = payload.get("data") or {}
         client_id = data.get("client_id")
@@ -355,6 +355,21 @@ class ActionHandler:
 
         await generation_manager.abort_by_history_id(client_id, history_id, platform)
 
+    
+
+    # Extension hooks
+    def _before_send(
+        self,
+        envelope: ApixEventEnvelope,
+    ) -> ApixEventEnvelope:
+        return envelope
+
+    def _after_send(
+        self,
+        envelope: ApixEventEnvelope,
+    ) -> None:
+        pass
 
 
-action_handler = ActionHandler(generation_manager)
+
+action_handler = EventHandler(generation_manager)
