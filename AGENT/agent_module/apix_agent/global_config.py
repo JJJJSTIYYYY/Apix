@@ -9,7 +9,7 @@ OPERATION_SYSTEM = platform.system().lower()
 
 DEBUG = True
 TRACE = True
-MAX_LOG_FILE_SIZE = True
+MAX_LOG_FILE_SIZE = 5 * 1024 * 1024
 
 OUTPUT_GRAPH_PNG = False  # Whether to output the agent graph as a PNG file
 
