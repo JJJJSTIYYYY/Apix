@@ -123,7 +123,7 @@ If you'd like to customize the deployment process, please refer to our documenta
 - [ ] Graph-Based Workflow Editor
 - [ ] Workspace Time Travel
 
-**Version Log**  
+## 🗺️ Version Log (Version 2.1.1)
 
 - The code related to linear task flow editing is currently broken and will be fixed in a future release. (low)
 - Fix incorrect context construction after message node editing.
