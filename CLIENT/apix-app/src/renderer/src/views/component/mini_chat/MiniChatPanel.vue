@@ -48,25 +48,27 @@
           {{ agentName }}
         </div>
 
-        <div class="chat-wrapper-btn-wrapper">
-          <button
-            v-if="!optionKeyPress"
-            class="quote-file-btn"
-            @click="handleQuoteFileClick"
-          >
-            引用此文件
-          </button>
-          <div
-            v-else
-            class="always-quote-file-selection"
-          >
+        <div>
+          <div class="chat-wrapper-btn-wrapper" v-if="props.active_file && props.active_file !== ''">
+            <button
+              v-if="!optionKeyPress"
+              class="quote-file-btn"
+              @click="handleQuoteFileClick"
+            >
+              “引用此文件“
+            </button>
             <div
-              class="message-select-box"
-              :class="{ checked: store.config.alwaysQuoteFile }"
-              @click.stop="toggleSelect"
-            ></div>
+              v-else
+              class="always-quote-file-selection"
+            >
+              <div
+                class="message-select-box"
+                :class="{ checked: store.config.alwaysQuoteFile }"
+                @click.stop="toggleSelect"
+              ></div>
 
-            <span>总是引用当前文件</span>
+              <span>总是引用当前文件</span>
+            </div>
           </div>
         </div>
       </div>
@@ -2184,7 +2186,7 @@ const modelPoviderOptions = computed(() => [
   { label: 'Ollama:local', value: 'ollama:local', icon: ollamaIcon },
   { label: 'Ollama', value: 'ollama', icon: ollamaIcon },
   { label: 'OpenAI', value: 'openai', icon: openaiIcon },
-  { label: 'Google', value: 'google', icon: googleIcon },
+  // { label: 'Google', value: 'google', icon: googleIcon },
   { label: 'DeepSeek', value: 'deepseek', icon: deepseekIcon },
   { label: '通义千问', value: 'qwen', icon: qwenIcon },
   { label: '月之暗面', value: 'moonshot', icon: moonshotIcon },

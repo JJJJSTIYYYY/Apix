@@ -93,13 +93,12 @@ class AgentCreator:
         permission_level: Literal["main", "sub"],
         cache_prefix: str = "",
         enable_graph_png: bool = False,
-        log_prefix: str = "[create_agent]",
     ):
         """
         Unified agent builder (for both main and sub agents).
         """
 
-        logger.trace(f'[agent.py] [AI_Agent] {log_prefix} Enter')
+        logger.trace()
 
         # Ensure config is JSON serializable
         config_dict = config if isinstance(config, dict) else asdict(config)
@@ -122,7 +121,7 @@ class AgentCreator:
                     # Refresh TTL
                     cached["expire_at"] = now + GRAPH_CACHE_TTL
 
-                    logger.success(f"{log_prefix} Get Agent From Cache (TTL refreshed).")
+                    logger.success(f"Get Agent From Cache (TTL refreshed).")
                     return cached["graph"]
 
         # Config extraction
@@ -148,7 +147,7 @@ class AgentCreator:
                 api_key=api_key,
                 config=config,
             )
-            logger.success(f"{log_prefix} Get {model} from {provider}.")
+            logger.success(f"Get {model} from {provider}.")
         except Exception as e:
             return f"{e}"
 
@@ -166,9 +165,7 @@ class AgentCreator:
                 try:
                     llm = llm.bind_tools(tools)
                 except NotImplementedError:
-                    logger.warning(
-                        f"{log_prefix} Binding tools to {model} from {provider} is not supported."
-                    )
+                    logger.warning(f"Binding tools to {model} from {provider} is not supported.")
 
         # Graph build
         if permission_level == 'main':
@@ -232,7 +229,7 @@ class AgentCreator:
                 "status": "running"
             }
 
-        logger.success(f"{log_prefix} Compile Agent Finish.")
+        logger.success(f"Compile Agent Finish.")
         return agent_graph
 
 
@@ -251,7 +248,6 @@ class AgentCreator:
             permission_level="main",
             cache_prefix="",
             enable_graph_png=True,
-            log_prefix="[create_agent]",
         )
 
 
@@ -266,7 +262,6 @@ class AgentCreator:
             permission_level="sub",
             cache_prefix="sub_",
             enable_graph_png=False,
-            log_prefix="[create_sub_agent]",
         )
     
 
@@ -285,6 +280,7 @@ class AgentCreator:
             for entry in self.graph_cache.values():
                 if entry["graph"] is agent_graph:
                     entry["status"] = "done"
+                    logger.success("Agent task done.")
                     return
     
 
@@ -313,7 +309,7 @@ class AgentCreator:
                 removed += 1
 
         if removed:
-            logger.info(f"[graph_cache] Cleaned {removed} expired graph(s).")
+            logger.info(f"Cleaned {removed} expired graph(s).")
 
         return removed
         

@@ -68,7 +68,7 @@ async def check_git_env(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[check_git_env]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -110,7 +110,7 @@ async def init_workspace(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[init_workspace]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -151,7 +151,7 @@ async def commit_workspace(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[commit_workspace]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -189,7 +189,7 @@ async def checkout_workspace(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[checkout_workspace]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -233,7 +233,7 @@ async def get_current_state(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[get_current_state]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -273,7 +273,7 @@ async def get_history(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[get_history]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -310,7 +310,7 @@ async def get_reflog(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[get_reflog]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}
@@ -346,7 +346,7 @@ async def get_graph(request: Request):
         )
 
     except Exception as e:
-        logger.error(f"[get_graph]: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "messages": str(e)}

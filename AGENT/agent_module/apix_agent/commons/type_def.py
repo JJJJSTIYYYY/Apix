@@ -1,4 +1,3 @@
-
 from typing import Any, NotRequired, Required, TypedDict, Annotated, Literal
 import operator
 from langchain_core.messages import AnyMessage 
@@ -97,10 +96,11 @@ class InvalidOutputsError(Exception):
 
 
 
-class ApixEventEnvelopeTarget(TypedDict):
+class ApixIdentity(TypedDict):
     id: str
     platform: str
-    conversation_id: str
+    conversation_id: str | None
+    associated_account: NotRequired[dict]
 
 
 class RoleSchema(TypedDict):
@@ -198,7 +198,7 @@ class GraphRuntimeContext(TypedDict):
     client_id: str
     session_id: NotRequired[str]
     history_id: str
-    target: ApixEventEnvelopeTarget
+    target: ApixIdentity
     generation_id: str
     node_id: NotRequired[str]
     parent_node_id: NotRequired[str]
@@ -235,30 +235,22 @@ class SubAgentState(MainAgentState):
     parent_task_id: str
     start_timestamp: int
     finish_timestamp: int
-    status: Literal["in_progress", "done", "completed", "pending", "failed", "cancelled"]
+    status: Literal["in_progress", "completed", "pending", "failed", "cancelled"]
     outputs: Annotated[str, operator.add]
     errors: Annotated[str, operator.add]
 
 
 class MinimalEnvelopeData(TypedDict, total=False):
     event_name: Required[str]
-    content: Required[Any]
+    content: Required[Any] # Serializable object
 
 
 class ApixEventEnvelope(TypedDict):
     event: str
-    target: ApixEventEnvelopeTarget
-    generation_id: str
+    target: NotRequired[ApixIdentity]
+    generation_id: NotRequired[str]
     data: MinimalEnvelopeData          # main payload
     timestamp: float
-    blocking: bool
+    blocking: NotRequired[bool]
     block_id: NotRequired[str]
 
-
-
-class McpMetaSchema(TypedDict):
-    mcp_id: str
-    mcp_name: str
-    transport: Literal["stdio", "http", "streamable_http", "websocket", "sse"]
-    endpoint: str # For stdio, it's the command to start the MCP server. For http/websocket/sse, it's the URL to connect.
-    config: dict[str, Any]

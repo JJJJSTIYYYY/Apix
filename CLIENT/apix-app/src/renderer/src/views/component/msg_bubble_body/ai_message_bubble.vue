@@ -21,6 +21,7 @@
         v-if="(props.msg.pre_node && props.msg.pre_node.length > 0) || (props.msg.next_node && props.msg.next_node.length > 0)"
         class="branch-switch-wrapper"
       >
+        <div style="height: 2px; width: 100%; background: linear-gradient(to right, transparent, var(--apix-default-light-color));"></div>
         <div class="branch-switch-label-wrapper">
           <button
             class="branch-switch-btn pre"
@@ -46,6 +47,7 @@
             </svg>
           </button>
         </div>
+        <div style="height: 2px; width: 100%; background: linear-gradient(to left, transparent, var(--apix-default-light-color));"></div>
       </div>
 
       <!-- Unified chunks -->
@@ -1351,15 +1353,15 @@ onBeforeUnmount(() => {
 .branch-switch-wrapper {
   opacity: 0.4;
   width: calc(840px - 34px);
-  background-color: var(--branch-bg);
-  border-radius: 24px;
-  border: 1px solid var(--branch-border);
   margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 45% 10% 45%;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .branch-switch-wrapper:hover {
   opacity: 1;
-  border: 1px solid var(--branch-hover-border);
 }
 
 .branch-switch-label-wrapper {

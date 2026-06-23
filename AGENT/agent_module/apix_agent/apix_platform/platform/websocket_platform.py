@@ -109,13 +109,13 @@ class WebsocketPlatform(PlatformBase):
                 try:
                     await ctx.websocket.send_json(data)
                 except Exception:
-                    logger.warning("websocket send failed - disconnected")
+                    logger.warning("Websocket send failed - disconnected")
                     ctx.connected = False
                     break
 
         except asyncio.CancelledError:
             ctx.connected = False
-            logger.info(f"[sender_loop] cancelled for client={ctx.client_id}")
+            logger.info(f"Send loop cancelled for client {ctx.client_id}")
 
     # interface
     async def send(self, client_id: str, envelope: ApixEventEnvelope):

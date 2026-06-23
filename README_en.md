@@ -114,15 +114,34 @@ If you'd like to customize the deployment process, please refer to our documenta
 - [x] MCP Integration
 - [x] Visual Linear Workflow Editor
 - [x] Secure Docker Sandbox
+- [x] Event loop
+- [ ] Scheduled Task Management
+- [ ] Plugin and hooks
+- [ ] Multi platform support
+- [ ] Plugin Marketplace
+- [ ] Add missing unit tests
 - [ ] Graph-Based Workflow Editor
 - [ ] Workspace Time Travel
-- [ ] Scheduled Task Management
-- [ ] Plugin Marketplace
-- [ ] Multi platform support
 
 **Version Log**  
 
-- The code related to linear task flow editing is currently broken and will be fixed in a future release.
+- The code related to linear task flow editing is currently broken and will be fixed in a future release. (low)
+- Fix incorrect context construction after message node editing.
+- Add event loop and event listener mechanism to invoke event handlers non-blockingly by priority.
+- Implement automatic tasks and scheduled tasks based on the event loop.
+- !!! The next-generation APIX is currently in the works (underlying refactoring).
+
+---
+
+## About APIX 3.0
+
+- Refactoring the underlying Agent Loop
+- Cleaner project directory structure
+- More flexible system extension points
+- Introducing an in-memory database with configurable cache (can be disabled)
+- Easier installation and deployment
+- More efficient KV-cache hit rate
+- Smaller project footprint / fewer dependencies
 
 ---
 

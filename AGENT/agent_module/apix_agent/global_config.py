@@ -1,4 +1,5 @@
 # Global configuration settings for the Apix Agent Core module.
+VERSION = "4.2.1"
 
 import os
 import uuid
@@ -8,6 +9,7 @@ OPERATION_SYSTEM = platform.system().lower()
 
 DEBUG = True
 TRACE = True
+MAX_LOG_FILE_SIZE = True
 
 OUTPUT_GRAPH_PNG = False  # Whether to output the agent graph as a PNG file
 

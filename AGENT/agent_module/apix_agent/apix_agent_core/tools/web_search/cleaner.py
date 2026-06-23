@@ -61,7 +61,7 @@ class SearchResultCleaner:
         )
 
         logger.info(
-            "[SearchResultCleaner] "
+            "Clear search result: "
             f"mode={mode}, "
             f"raw={raw_length}, "
             f"cleaned={cleaned_length}, "

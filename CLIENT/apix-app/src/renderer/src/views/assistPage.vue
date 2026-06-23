@@ -2152,7 +2152,7 @@ const modelPoviderOptions = computed(() => [
   { label: 'Ollama:local', value: 'ollama:local', icon: ollamaIcon },
   { label: 'Ollama', value: 'ollama', icon: ollamaIcon },
   { label: 'OpenAI', value: 'openai', icon: openaiIcon },
-  { label: 'Google', value: 'google', icon: googleIcon },
+  // { label: 'Google', value: 'google', icon: googleIcon },
   { label: 'DeepSeek', value: 'deepseek', icon: deepseekIcon },
   { label: '通义千问', value: 'qwen', icon: qwenIcon },
   { label: '月之暗面', value: 'moonshot', icon: moonshotIcon },

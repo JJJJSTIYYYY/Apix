@@ -307,7 +307,7 @@ async def get_messages_for_user(req: Request):
                     "created_at": str
                 },
                 ...
-            ]
+            ] | str
         }
     """
     logger.info(f"[API][get_messages_for_user] enter.")
@@ -315,6 +315,38 @@ async def get_messages_for_user(req: Request):
 
     query_id = await dsm.submit_query(
         action="get_messages_for_user",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+@router.post("/memory/user/current_chain_id")
+async def current_chain_id(req: Request):
+    """
+    Fetch the cached node id chain of the user's current message branch.
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+            "history_id": str
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": str | list,
+            "cache_hit": bool
+        }
+    """
+    logger.info(f"[API][current_chain_id] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_current_messages_branch_chain",
         payload=payload,
     )
     result = await dsm.wait_result(query_id)

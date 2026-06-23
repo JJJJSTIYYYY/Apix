@@ -1,12 +1,11 @@
 import asyncio
-import os
 import time
-from typing import Any, Tuple
+from typing import Tuple
 from uuid import uuid4
 
 from apix_agent.commons.logger import logger
 from apix_agent.commons.type_def import AgentConfigSchema, SubAgentState
-from apix_agent.global_config import BASE_DIR
+from apix_agent.apix_event_pipe.common_event.agent_event_writer import AgentCommonEvent, event_pipe
 
 
 class TeamTaskManager:
@@ -24,7 +23,9 @@ class TeamTaskManager:
         self.task_queue: asyncio.Queue = asyncio.Queue()
         self.stop_request_queue: asyncio.Queue = asyncio.Queue()
         self.task_state_store: dict[Tuple[str, str], SubAgentState] = {}
-        self.generation_id_to_task_id_collection: dict[str, list] = {} # To collect assigned task in one generation.
+        self.generation_tasks: dict[str, set[str]] = {} # To collect assigned task in one generation.
+        self.task_generation: dict[str, str] = {} # To index a generation_id by task_id
+        self.unreaded_tasks: set[str] = {}
 
         self._state_lock = asyncio.Lock()
 
@@ -32,18 +33,32 @@ class TeamTaskManager:
     # Public API
     # ------------------------------------------------------------------
 
-    async def submit_task(self, initial_state: SubAgentState, config: AgentConfigSchema, agent_name: str) -> str:
+    async def submit_task(self, initial_state: SubAgentState, config: AgentConfigSchema, agent_name: str, generation_id: str) -> str:
         task_id = str(uuid4())
         initial_state["task_id"] = task_id
         history_id = initial_state["history_id"]
 
         async with self._state_lock:
             self.task_state_store[((history_id, task_id))] = initial_state
+            self.generation_tasks.setdefault(generation_id, set()).add(task_id)
+            self.task_generation[task_id] = generation_id
 
         if self.task_queue is None:
             self.task_queue = asyncio.Queue()
 
         await self.task_queue.put((agent_name, initial_state, config))
+
+        await event_pipe.post_event(
+            event=AgentCommonEvent.INFO,
+            target=initial_state.get("target"),
+            data={
+                "event_name": "on_team_task_task_submitted",
+                "content": {
+                    "agent_name": agent_name,
+                    "initial_state": initial_state
+                }
+            }
+        )
         return task_id
 
 
@@ -198,6 +213,17 @@ class TeamTaskManager:
                 state['status'] = "cancelled"
                 state['errors'] = "Task canceled due to "+reason
                 stopped.append(task_id)
+        
+                await event_pipe.post_event(
+                    event=AgentCommonEvent.INFO,
+                    target=state.get("target"),
+                    data={
+                        "event_name": "on_team_task_stop_submitted",
+                        "content": {
+                            "task_id": task_id
+                        }
+                    }
+                )
 
         # Put stop requests outside lock to avoid blocking state operations
         for task_id in stopped:
@@ -210,15 +236,240 @@ class TeamTaskManager:
         return f"Stop request submitted for tasks: {stopped}"
 
 
-    async def update_task_state_store(self, history_id: str, task_id: str, key: str, value: Any):
+    async def update_task_state_store(
+        self,
+        history_id: str,
+        task_id: str,
+        **updates,
+    ):
+        return await self._update_task(
+            history_id,
+            task_id,
+            **updates,
+        )
 
+
+    async def _update_task(
+        self,
+        history_id: str,
+        task_id: str,
+        **updates,
+    ):
         async with self._state_lock:
             state = self.task_state_store.get((history_id, task_id))
-            if state:
-                state[key] = value
+            if not state:
+                return None
 
-        # logger.debug(f"[update_task_state_store] Current task_state_store: {self.task_state_store}")
-        # TODO: inform the gateway to call main agent if task finish
+            state.update(updates)
+
+            return state.get("target")
+        
+
+    async def _update_unreaded_task(
+        self,
+        task_id: str,
+        readed: bool
+    ):
+        async with self._state_lock:
+            if readed:
+                self.unreaded_tasks.discard(task_id)
+
+            else:
+                self.unreaded_tasks.add(task_id)
 
 
-task_manager = TeamTaskManager()
+    async def mark_in_progress(
+        self,
+        history_id: str,
+        task_id: str,
+    ):
+        target = await self._update_task(
+            history_id,
+            task_id,
+            status="in_progress",
+        )
+        
+        await event_pipe.post_event(
+            event=AgentCommonEvent.INFO,
+            target=target,
+            data={
+                "event_name": "on_team_task_in_progress",
+                "content": {
+                    "task_id": task_id
+                }
+            }
+        )
+
+
+    async def mark_completed(
+        self,
+        history_id: str,
+        task_id: str,
+    ):
+        target = await self._update_task(
+            history_id,
+            task_id,
+            status="completed",
+            finish_timestamp=int(time.time()),
+        )
+
+        await self._emit_task_event(
+            event=AgentCommonEvent.INFO,
+            event_name="on_team_task_completed",
+            history_id=history_id,
+            task_id=task_id,
+            target=target,
+        )
+
+        await self._emit_generation_completed_if_needed(
+            history_id,
+            task_id,
+            target,
+        )
+
+
+    async def mark_failed(
+        self,
+        history_id: str,
+        task_id: str,
+        error: str,
+    ):
+        target = await self._update_task(
+            history_id,
+            task_id,
+            status="failed",
+            errors=error,
+            finish_timestamp=int(time.time()),
+        )
+
+        await self._emit_task_event(
+            event=AgentCommonEvent.ERROR,
+            event_name="on_team_task_failed",
+            history_id=history_id,
+            task_id=task_id,
+            target=target,
+        )
+
+        await self._emit_generation_completed_if_needed(
+            history_id,
+            task_id,
+            target,
+        )
+
+
+    async def mark_cancelled(
+        self,
+        history_id: str,
+        task_id: str,
+        reason: str | None = None,
+    ):
+        updates = {
+            "status": "cancelled",
+            "finish_timestamp": int(time.time()),
+        }
+
+        if reason:
+            updates["errors"] = reason
+
+        target = await self._update_task(
+            history_id,
+            task_id,
+            **updates,
+        )
+
+        await self._emit_task_event(
+            event=AgentCommonEvent.WARNING,
+            event_name="on_team_task_cancelled",
+            history_id=history_id,
+            task_id=task_id,
+            target=target,
+        )
+
+        await self._emit_generation_completed_if_needed(
+            history_id,
+            task_id,
+            target,
+        )
+
+
+    async def _emit_task_event(
+        self,
+        *,
+        event: AgentCommonEvent,
+        event_name: str,
+        history_id: str,
+        task_id: str,
+        target=None,
+    ):
+        generation_id = self.task_generation.get(task_id)
+
+        await event_pipe.post_event(
+            event=event,
+            target=target,
+            data={
+                "event_name": event_name,
+                "content": {
+                    "task_id": task_id,
+                    "generation_id": generation_id,
+                    "history_id": history_id.replace("sub_", ''),
+                }
+            }
+        )
+        
+
+    async def _finish_generation_task(
+        self,
+        task_id: str,
+    ):
+        async with self._state_lock:
+            generation_id = self.task_generation.pop(task_id, None)
+
+            if not generation_id:
+                return False, None
+
+            task_ids = self.generation_tasks.get(generation_id)
+
+            if not task_ids:
+                return False, generation_id
+
+            task_ids.discard(task_id)
+
+            if not task_ids:
+                self.generation_tasks.pop(generation_id, None)
+                return True, generation_id
+
+            return False, generation_id
+        
+
+    async def _emit_generation_completed_if_needed(
+        self,
+        history_id: str,
+        task_id: str,
+        target=None,
+    ):
+        """
+        Emit generation completed event if all tasks in the generation
+        have finished.
+        """
+
+        generation_finished, generation_id = (
+            await self._finish_generation_task(task_id)
+        )
+
+        if not generation_finished:
+            return
+
+        await event_pipe.post_event(
+            event=AgentCommonEvent.INFO,
+            target=target,
+            data={
+                "event_name": "on_generation_team_task_completed",
+                "content": {
+                    "generation_id": generation_id,
+                    "history_id": history_id.replace("sub_", ''),
+                }
+            }
+        )
+
+
+team_task_manager = TeamTaskManager()

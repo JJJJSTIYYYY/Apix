@@ -9,8 +9,8 @@ from .llm_creator import *
 
 
 def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfigSchema | None = None) -> BaseChatModel | Any:
-    logger.trace('[llm_factory.py] [ ] [get_llm_node] Enter')
-    logger.info(f"[get_llm_node] Trying to get {model} from {provider}...")
+    logger.trace()
+    logger.info(f"Trying to get {model} from {provider}...")
     if not provider.strip() or not model.strip():
         raise ValueError(f"Unsupported LLM service type: {provider}: {model}")
 
@@ -38,7 +38,7 @@ def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfig
         else:
             raise ProviderNotFound(f"Unsupport provider type: {p_type}.", provider=p_id)
     else:
-        logger.error(f"[get_llm_node] Failed to get {model} from {provider}...")
+        logger.error(f"Failed to get {model} from {provider}...")
         raise ValueError(f"Unsupported LLM service type: {provider}")
     
     return llm_model

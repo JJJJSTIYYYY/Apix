@@ -3,7 +3,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection, StdioConnection, StreamableHttpConnection, WebsocketConnection
 
-from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
+from apix_agent.apix_agent_core.agent_task.team_task_manager import team_task_manager
+from apix_agent.apix_platform.register import PLATFORM_REGISTRY
 from apix_agent.commons.logger import logger
 from apix_agent.global_config import BASE_URL, MEMORY_SERVICE_BASE_URL
 
@@ -35,7 +36,7 @@ async def get_models_list(request_data: Request):
         api_key = body.get("api_key")
         config = body.get("config", {}) or {}
     except Exception as e:
-        logger.error(f"[get_models_list]: Invalid request body: {e}")
+        logger.error(f"Invalid request body: {e}")
         return JSONResponse(content={"messages": ['Error occurred']}, status_code=400)
 
     # --------------------
@@ -53,7 +54,7 @@ async def get_models_list(request_data: Request):
 
         except Exception as e:
             raw_models_name_list.append(f'Error occurred: {e}')
-            logger.error(f"[get_models_list][ollama]: {e}")
+            logger.error(f"Failed to get ollama model: {e}")
 
     # --------------------
     # Google Gemini
@@ -85,14 +86,13 @@ async def get_models_list(request_data: Request):
 
         except Exception as e:
             raw_models_name_list.append(f'Error occurred: {e}')
-            logger.error(f"[get_models_list] [{model_provider}]: {e}")
+            logger.error(f"Failed to get {model_provider} model: {e}")
 
     elif model_provider == "custom":
         provider_id = None
         try:
-            logger.info(f"[get_models_list]: Custom provider config: {config}")
             provider_id = config.get("custom_provider_id")
-            response = httpx.post(
+            response = await httpx.AsyncClient().post(
                 f"{MEMORY_SERVICE_BASE_URL}/provider/get_llm_provider_by_id",
                 json={
                     "provider_id": provider_id,
@@ -100,7 +100,6 @@ async def get_models_list(request_data: Request):
             )
             response.raise_for_status()
             provider_metas = response.json().get("messages", []) or []
-            logger.info(f"[get_models_list]: Custom provider meta: {provider_metas}")
             if provider_metas:
                 provider_meta = provider_metas[0]
             else:
@@ -109,10 +108,10 @@ async def get_models_list(request_data: Request):
 
         except Exception as e:
             raw_models_name_list.append(f'Error occurred: {e}')
-            logger.error(f"[get_models_list] [{model_provider}] provider_id={provider_id}: {e}")
+            logger.error(f"Failed to get {model_provider} model, provider_id={provider_id}: {e}")
 
     else:
-        logger.error(f"[get_models_list]: Unsupported model_provider: {model_provider}")
+        logger.error(f"Unsupported model provider: {model_provider}")
 
     models_name_list = sorted({
         model_name
@@ -150,7 +149,7 @@ async def get_sub_agent_task_list():
             ]
         }
     """
-    task_list = await task_manager.query_all_tasks(expire=False)
+    task_list = await team_task_manager.query_all_tasks(expire=False)
 
     for task in task_list:
         current_todo_list = task.get("current_todo_list")
@@ -201,8 +200,8 @@ async def clear_finished_tasks():
             ]
         }
     """
-    await task_manager.clear_finished_tasks()
-    task_list = await task_manager.query_all_tasks(expire=False)
+    await team_task_manager.clear_finished_tasks()
+    task_list = await team_task_manager.query_all_tasks(expire=False)
 
     for task in task_list:
         current_todo_list = task.get("current_todo_list")
@@ -251,9 +250,8 @@ async def stop_task(request_data: Request):
     body = await request_data.json()
     task_id = body.get("task_id")
     history_id = body.get("history_id")
-    logger.info(f"[stop_task] Stop task from: {history_id} - {task_id}")
 
-    res = await task_manager.stop_tasks(history_id=history_id, task_ids=[task_id], reason="user-initiated cancellation")
+    res = await team_task_manager.stop_tasks(history_id=history_id, task_ids=[task_id], reason="user-initiated cancellation")
 
     return JSONResponse(
         status_code=200,
@@ -322,7 +320,7 @@ async def get_mcp_tools(request_data: Request):
             }
             mcp_client = MultiServerMCPClient(connection)
             tools = await mcp_client.get_tools()
-            logger.info(f"[get_mcp_tools] MCP tools from stdio transport: {tools}")
+            logger.info(f"Get MCP tools from stdio transport: {tools}")
 
         elif transport == "streamable_http":
             connection: StreamableHttpConnection = {
@@ -338,7 +336,7 @@ async def get_mcp_tools(request_data: Request):
             }
             mcp_client = MultiServerMCPClient(connection)
             tools = await mcp_client.get_tools()
-            logger.info(f"[get_mcp_tools] MCP tools from {transport} transport: {tools}")
+            logger.info(f"Get MCP tools from {transport} transport: {tools}")
 
         elif transport == "websocket":
             connection: WebsocketConnection = {
@@ -350,7 +348,7 @@ async def get_mcp_tools(request_data: Request):
             }
             mcp_client = MultiServerMCPClient(connection)
             tools = await mcp_client.get_tools()
-            logger.info(f"[get_mcp_tools] MCP tools from {transport} transport: {tools}")
+            logger.info(f"Get MCP tools from {transport} transport: {tools}")
 
         elif transport == "sse":
             connection: SSEConnection = {
@@ -365,7 +363,7 @@ async def get_mcp_tools(request_data: Request):
             }
             mcp_client = MultiServerMCPClient(connection)
             tools = await mcp_client.get_tools()
-            logger.info(f"[get_mcp_tools] MCP tools from {transport} transport: {tools}")
+            logger.info(f"Get MCP tools from {transport} transport: {tools}")
 
 
         async with httpx.AsyncClient(timeout=5) as client:
@@ -379,10 +377,10 @@ async def get_mcp_tools(request_data: Request):
             )
 
         if resp.status_code != 200 or not resp.json().get('success'):
-            logger.warning(f"[get_mcp_tools] Failed to update MCP server info to memory service: {resp.text}")
+            logger.warning(f"Failed to update MCP server info to memory service: {resp.text}")
 
     except Exception as e:
-        logger.error(f"[get_mcp_tools] Error while getting MCP tools: {e}")
+        logger.error(f"Error while getting MCP tools: {e}")
         return JSONResponse(
             status_code=500,
             content={
@@ -398,4 +396,18 @@ async def get_mcp_tools(request_data: Request):
             "messages": [tool.name for tool in tools]
         }
     )
+
+
+
+@router.get("/api/v1/get_registered_platform")
+async def get_registered_platform():
+    """
+    Get registered platform.
+
+    Returns:
+        {
+            "success": bool,
+            "messages": list[str],
+        }
+    """
 

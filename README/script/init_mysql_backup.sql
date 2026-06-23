@@ -22,6 +22,7 @@ CREATE TABLE conversations (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Conversation id used in system',
 
     user_uid VARCHAR(64) NOT NULL COMMENT 'Owner user uid',
+    platform VARCHAR(32) NOT NULL DEFAULT 'default',
 
     conversation_uid VARCHAR(64) NOT NULL COMMENT 'Conversation uid that exposes to user',
     title VARCHAR(255) NOT NULL DEFAULT '新的聊天...' COMMENT 'Conversation title',
@@ -365,6 +366,7 @@ DELIMITER $$
 
 CREATE PROCEDURE create_conversation (
     IN p_user_uid VARCHAR(64),
+    IN p_platform VARCHAR(32),
     IN p_conversation_uid VARCHAR(64),
     IN p_title VARCHAR(255),
     IN p_workspace VARCHAR(255),
@@ -373,6 +375,7 @@ CREATE PROCEDURE create_conversation (
 BEGIN
     INSERT INTO conversations (
         user_uid,
+        platform,
         conversation_uid,
         title,
         work_space,
@@ -382,6 +385,7 @@ BEGIN
     )
     VALUES (
         p_user_uid,
+        p_platform,
         p_conversation_uid,
         COALESCE(p_title, '新的聊天...'),
         COALESCE(p_workspace, ''),

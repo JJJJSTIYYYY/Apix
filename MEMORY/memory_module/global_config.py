@@ -1,10 +1,11 @@
 DEBUG = True
+TRACE = False
 
 AI_SERVICE_URL = "http://localhost:5091"
 
 MEMO_REDIS_URL = "redis://localhost:6379"
 REDIS_POOL_SIZE = 3
-DEFAULT_EXPIRE_SECONDS = 60
+DEFAULT_EXPIRE_SECONDS = 600
 
 WORKER_COUNT = 4 # Number of worker tasks in DataServerManager, to process query.
 

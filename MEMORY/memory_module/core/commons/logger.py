@@ -1,6 +1,6 @@
 import sys
 from datetime import datetime
-from global_config import DEBUG
+from global_config import DEBUG, TRACE
 
 class Logger:
     """
@@ -17,9 +17,11 @@ class Logger:
         'purple': '\033[95m',
         'cyan': '\033[96m',
         'white': '\033[97m',
-        'gray': '\033[90m',          # dark gray (very舒服)
+        'gray': '\033[90m',          # dark gray (非常舒服)
         'light_gray': '\033[37m',    # light gray (INFO专用)
         'light_yellow': '\033[93;1m',
+        'bold': '\033[1m',
+        'underline': '\033[4m',
         'reset': '\033[0m'
     }
     
@@ -46,7 +48,46 @@ class Logger:
         self.show_time = show_time
         self.show_level = show_level
     
-    def _get_formatted_message(self, level, message):
+    def _format_message(self, message, *args):
+        """格式化消息，支持类似 logging 的 % 格式化"""
+        if not args:
+            return str(message)
+        
+        try:
+            # 尝试使用 % 格式化
+            return message % args
+        except (TypeError, ValueError):
+            # 如果格式化失败，将消息和参数拼接
+            parts = [str(message)]
+            parts.extend(str(arg) for arg in args)
+            return ' '.join(parts)
+    
+    def _format_kwargs(self, **kwargs):
+        """将kwargs格式化为字符串"""
+        if not kwargs:
+            return ""
+        
+        parts = []
+        for key, value in kwargs.items():
+            # 处理不同类型的值
+            if isinstance(value, (dict, list, tuple, set)):
+                # 对于容器类型，使用repr以获得更详细的表示
+                formatted_value = repr(value)
+            elif isinstance(value, str):
+                # 字符串类型，如果有空格则加引号
+                if ' ' in value:
+                    formatted_value = f'"{value}"'
+                else:
+                    formatted_value = value
+            else:
+                # 其他类型直接转字符串
+                formatted_value = str(value)
+            
+            parts.append(f"{key}={formatted_value}")
+        
+        return " | ".join(parts)
+    
+    def _get_formatted_message(self, level, message, *args, **kwargs):
         """格式化日志消息"""
         parts = []
         
@@ -62,8 +103,14 @@ class Logger:
         if self.show_level:
             parts.append(f"[{level.upper()}]")
         
-        # 添加消息内容
-        parts.append(str(message))
+        # 格式化主消息（支持 % 格式化和多个参数）
+        formatted_main = self._format_message(message, *args)
+        parts.append(formatted_main)
+        
+        # 添加上下文字典（kwargs）
+        if kwargs:
+            kwargs_str = self._format_kwargs(**kwargs)
+            parts.append(f"({kwargs_str})")
         
         return ' '.join(parts)
     
@@ -72,86 +119,60 @@ class Logger:
         color_code = self.COLOR_CODES.get(color_name, self.COLOR_CODES['white'])
         return f"{color_code}{text}{self.COLOR_CODES['reset']}"
     
-    def _log(self, level, message, color_name=None):
+    def _log(self, level, message, *args, color_name=None, **kwargs):
         """通用日志方法"""
         if color_name is None:
             color_name = self.LEVEL_COLORS.get(level, 'white')
         
-        formatted_message = self._get_formatted_message(level, message)
+        formatted_message = self._get_formatted_message(level, message, *args, **kwargs)
         colored_message = self._colorize(formatted_message, color_name)
         
         # 输出到控制台
         print(colored_message, file=sys.stderr if level in ['error', 'exception'] else sys.stdout)
     
-    def info(self, message):
+    def info(self, message, *args, **kwargs):
         """信息级别日志 - 蓝色"""
-        if DEBUG: self._log('info', message)
+        if DEBUG: self._log('info', message, *args, **kwargs)
     
-    def warning(self, message):
+    def warning(self, message, *args, **kwargs):
         """警告级别日志 - 黄色"""
-        if DEBUG: self._log('warning', message)
+        if DEBUG: self._log('warning', message, *args, **kwargs)
     
-    def error(self, message):
+    def error(self, message, *args, **kwargs):
         """错误级别日志 - 红色"""
-        if DEBUG: self._log('error', message)
+        if DEBUG: self._log('error', message, *args, **kwargs)
     
-    def exception(self, message):
+    def exception(self, message, *args, **kwargs):
         """异常级别日志 - 红色"""
-        if DEBUG: self._log('error', message)
+        if DEBUG: self._log('error', message, *args, **kwargs)
     
-    def success(self, message):
+    def success(self, message, *args, **kwargs):
         """成功级别日志 - 绿色"""
-        if DEBUG: self._log('success', message)
+        if DEBUG: self._log('success', message, *args, **kwargs)
     
-    def debug(self, message):
+    def debug(self, message, *args, **kwargs):
         """调试级别日志 - 青色"""
-        if DEBUG: self._log('debug', message)
+        if DEBUG: self._log('debug', message, *args, **kwargs)
     
-    def custom(self, message, level='CUSTOM', color='light_yellow'):
+    def custom(self, message, *args, level='CUSTOM', color='light_yellow', **kwargs):
         """自定义级别和颜色的日志"""
-        if DEBUG: self._log(level, message, color)
+        if DEBUG: self._log(level, message, *args, color, **kwargs)
     
     # 为淡黄色输出提供便捷方法
-    def light_yellow(self, message):
+    def light_yellow(self, message, *args, **kwargs):
         """淡黄色输出（自定义级别）"""
-        if DEBUG: self.custom(message, 'LIGHT_YELLOW', 'light_yellow')
+        if DEBUG: self.custom(message, *args, level='LIGHT_YELLOW', color='light_yellow', **kwargs)
     
-    def separator(self, length=50, char='-', color='light_yellow'):
+    def separator(self, length=50, char='-', color='light_yellow', *args, **kwargs):
         """输出分隔线"""
         if DEBUG: 
             separator_line = char * length
-            self.custom(separator_line, 'SEPARATOR', color)
+            self.custom(separator_line, *args, level='SEPARATOR', color=color, **kwargs)
+    
+    def trace(self, message):
+        """跟踪日志 - 青色"""
+        '''统一格式 [文件名] [类名] [方法名] Enter'''
+        if TRACE: self._log('debug', message)
 
 
-# 使用示例
-def use_case():
-    # 创建日志记录器实例
-    logger = Logger(name="AppLogger", show_time=True, show_level=True)
-    
-    # 输出各种类型的日志
-    logger.info("这是一条信息日志")
-    logger.warning("这是一条警告日志")
-    logger.error("这是一条错误日志")
-    logger.success("这是一条成功日志")
-    logger.debug("这是一条调试日志")
-    logger.light_yellow("这是一条淡黄色日志")
-    
-    # 输出分隔线
-    logger.separator()
-    
-    # 测试异常日志
-    try:
-        # 模拟一个异常
-        result = 10 / 0
-    except ZeroDivisionError:
-        logger.exception("发生了除零异常")
-    
-    logger.separator()
-    
-    # 创建一个不显示时间的简化日志记录器
-    simple_logger = Logger(name="Simple", show_time=False, show_level=True)
-    simple_logger.info("简化的日志记录器")
-    simple_logger.warning("没有时间戳的警告")
-
-
-logger = Logger(name="MEMORY_SERVER", show_time=True, show_level=True)
+logger = Logger(name="FILE_SERVER", show_time=True, show_level=True)

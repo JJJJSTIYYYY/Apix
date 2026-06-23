@@ -326,6 +326,12 @@ class AgentSandboxManager:
 
         return stdout.decode()
     
+    async def start(self):
+        pass
+
+    async def stop(self):
+        await self.cleanup_all()
+    
 
 
 agent_sandbox = AgentSandboxManager()
@@ -335,7 +341,4 @@ agent_sandbox = AgentSandboxManager()
 async def clean_sandbox():
     return await agent_sandbox.cleanup_expired()
 
-
-@auto_init.auto_stop
-async def clear_docker_container():
-    await agent_sandbox.cleanup_all()
+auto_init.register(agent_sandbox)

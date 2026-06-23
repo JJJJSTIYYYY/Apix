@@ -5,7 +5,7 @@ from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.tools.web_search.manager import manager
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
@@ -19,7 +19,7 @@ async def search_web_by_keywords(
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
 
-    logger.trace('[search_tool.py] [tool] [search_web_by_keywords] Enter')
+    logger.trace()
 
     target = state.get("target")
     generation_id = state.get("generation_id")
@@ -125,7 +125,7 @@ async def search_web_by_keywords(
         })
 
     except Exception as e:
-        logger.exception(f"[search_web_by_keywords] failed: {str(e)}")
+        logger.exception(f"Failed to search online: {str(e)}")
 
         error_msg = f"Failed to search web by keyword(s) with error(s): {str(e)}"
 
@@ -156,7 +156,7 @@ async def search_web_by_urls(
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
 
-    logger.trace('[search_tool.py] [tool] [search_web_by_urls] Enter')
+    logger.trace()
 
     target = state.get("target")
     generation_id = state.get("generation_id")
@@ -274,7 +274,7 @@ async def search_web_by_urls(
         })
 
     except Exception as e:
-        logger.exception(f"[search_web_by_urls] failed: {str(e)}")
+        logger.exception(f"Failed to search online: {str(e)}")
 
         error_msg = f"Failed to search web by url(s) with error(s): {str(e)}"
 

@@ -12,7 +12,7 @@ from langgraph.config import get_stream_writer
 from apix_agent.commons.type_def import (
     ApixEventEnvelope,
     MinimalEnvelopeData,
-    ApixEventEnvelopeTarget,
+    ApixIdentity,
 )
 
 from apix_agent.commons.logger import logger
@@ -47,7 +47,7 @@ class AgentStreamWriter:
 
     @staticmethod
     def _target_hash(
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
     ) -> str:
         """
         Build stable hash key for target.
@@ -57,12 +57,7 @@ class AgentStreamWriter:
         - Avoid Python built-in hash(), because it is process-randomized
         """
 
-        target_json = json.dumps(
-            target,
-            sort_keys=True,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
+        target_json = target.get("id") + ':' + target.get("conversation_id")
 
         return hashlib.sha256(
             target_json.encode("utf-8")
@@ -73,7 +68,7 @@ class AgentStreamWriter:
         self,
         *,
         event: AgentStreamEvent,
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
         data: MinimalEnvelopeData = None,
         generation_id: Optional[str] = None,
         timestamp: Optional[float] = None,
@@ -81,7 +76,16 @@ class AgentStreamWriter:
         blocking: bool = False,
     ):
         """
-        Send structured event.
+        Send structured event while in agent loop.
+        Can be called from inside any [`StateGraph`][langgraph.graph.StateGraph] node or
+        functional API [`task`][langgraph.func.task].
+
+        Args:
+            event: Event enum.
+            target: Event receiver. 
+                !!! This receiver serves only as a placeholder; it is not the real receiver. 
+                !!! For APIX streams, the target is restricted to the event originator, as this rule avoids accidental cross‑streaming.
+            data: Event data, should contains event_name and content.
         """
 
         envelope: ApixEventEnvelope = {
@@ -96,16 +100,19 @@ class AgentStreamWriter:
 
         self._writer(envelope)
 
+    # Public API
     async def send_blocking_event(
         self,
         *,
         event: AgentStreamEvent,
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
         data: MinimalEnvelopeData = None,
         timeout: Optional[float] = None,
     ) -> Any:
         """
-        Send blocking event and wait for acknowledgment result.
+        Send blocking event and wait for acknowledgment result while in agent loop.
+        Can be called from inside any [`StateGraph`][langgraph.graph.StateGraph] node or
+        functional API [`task`][langgraph.func.task].
         """
 
         block_id = uuid.uuid4().hex
@@ -114,7 +121,6 @@ class AgentStreamWriter:
         future = loop.create_future()
 
         target_hash = self._target_hash(target)
-        # logger.debug(f"[send_blocking_event] Target is {target}")
 
         if target_hash not in self._blocking_futures:
             self._blocking_futures[target_hash] = {}
@@ -133,7 +139,6 @@ class AgentStreamWriter:
         )
 
         logger.warning(
-            f"[send_blocking_event] "
             f"Block and wait... "
             f"target={target_hash} "
             f"block_id={block_id}"
@@ -146,7 +151,6 @@ class AgentStreamWriter:
                 result = await future
 
             logger.success(
-                f"[send_blocking_event] "
                 f"Get result. "
                 f"target={target_hash} "
                 f"block_id={block_id}"
@@ -169,7 +173,7 @@ class AgentStreamWriter:
         self,
         *,
         event: AgentStreamEvent,
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
         data: MinimalEnvelopeData = None,
         timeout: Optional[float] = None,
     ) -> bool:
@@ -183,7 +187,7 @@ class AgentStreamWriter:
     def resolve_block(
         cls,
         *,
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
         block_id: str,
         result: Any = None,
     ) -> bool:
@@ -213,7 +217,7 @@ class AgentStreamWriter:
     def cancel_block(
         cls,
         *,
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
         block_id: str,
     ) -> bool:
         """
@@ -247,7 +251,7 @@ class AgentStreamWriter:
     @classmethod
     def clear_all_block(
         cls,
-        target: ApixEventEnvelopeTarget,
+        target: ApixIdentity,
     ) -> int:
         """
         Release all blocking futures with None result.
@@ -259,12 +263,9 @@ class AgentStreamWriter:
         target_hash = cls._target_hash(target)
 
         logger.warning(
-            f"[clear_all_block] "
             f"Clear block... "
             f"target={target_hash} "
         )
-
-        # logger.debug(f"[clear_all_block] Target is {target}")
 
         target_futures = cls._blocking_futures.get(target_hash)
 
@@ -286,7 +287,6 @@ class AgentStreamWriter:
         cls._blocking_futures.pop(target_hash, None)
 
         logger.warning(
-            f"[clear_all_block] "
             f"Released {cleared_count} blocking futures "
             f"for target={target_hash}"
         )

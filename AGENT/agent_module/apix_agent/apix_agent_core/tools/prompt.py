@@ -587,7 +587,7 @@ Use this tool in these scenarios:
 2. When temporary Python code needs to be executed immediately
 3. When performing one-off analysis, transformations, or calculations
 4. When the code does not need to persist after execution
-5. When you want to sleep and wait for something to finish, using sleep()
+5. When you want to wait for something to finish, using asyncio.sleep()
 
 ## When NOT to Use This Tool
 Do NOT use this tool when:

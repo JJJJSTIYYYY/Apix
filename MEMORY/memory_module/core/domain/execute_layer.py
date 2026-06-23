@@ -228,6 +228,7 @@ class DataExecutors:
         """
         try:
             logger.info("[DataExecutors][append_message] enter.")
+            messages = payload["messages"]
             # 1. Persist to MySQL
             res = await self.mysql.append_message(payload)
             if not res.get("success"):
@@ -250,6 +251,17 @@ class DataExecutors:
                 logger.warning(
                     f"[DataExecutors][append_message] Redis backfill failed: {e}"
                 )
+
+            user_uid = payload["client_id"]
+            conversation_id = payload["history_id"]
+            node_id = messages.get("node_id", "")
+            parent_id = messages.get("parent_id", "")
+            await self.redis.update_current_messages_branch_chain_cache({
+                "client_id": user_uid,
+                "history_id": conversation_id,
+                "node_id": node_id,
+                "parent_id": parent_id,
+            })
 
             return {
                 "success": True,
@@ -330,6 +342,7 @@ class DataExecutors:
         allow_roles,
         guess_children: bool = True,
     ):
+
         if not messages:
             return [], {}
 
@@ -364,6 +377,7 @@ class DataExecutors:
         rows = [r for r in rows if not r["is_deleted"]]
 
         parsed = []
+        node_id_chain = []
         for msg in rows:
             if msg.get("role") not in allow_roles:
                 continue
@@ -387,7 +401,10 @@ class DataExecutors:
             msg["info"] = info
 
             parsed.append(msg)
+            if len(node_id_chain) == 0 or node_id_chain[-1] != msg.get("node_id"):
+                node_id_chain.append(msg.get("node_id"))
 
+        logger.info("[_build_visible_messages] node_id_chain: ", node_id_chain)
         # build branches info
         branches = {}
 
@@ -415,7 +432,7 @@ class DataExecutors:
                         for c in visible_siblings
                     ]
 
-        return parsed, branches
+        return parsed, branches, node_id_chain
 
     @task_handler("get_messages")
     async def get_messages(self, payload: dict) -> dict:
@@ -424,17 +441,35 @@ class DataExecutors:
 
             current_node_id = payload.get("current_node_id")
 
+            try:
+                if current_node_id == '-':
+                    cache_chain_res = await self.redis.get_current_messages_branch_chain({
+                        "client_id": payload["client_id"],
+                        "history_id": payload["history_id"],
+                    })
+                    if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
+                        cached_chain = cache_chain_res.get("messages")
+                        if isinstance(cached_chain, list) and len(cached_chain)>0:
+                            current_node_id = cached_chain[-1]
+            except Exception as e:
+                logger.warning(
+                    f"[DataExecutors][get_messages] warning: get cached message id chain fialed: {e}, skip."
+                )
+
             # 1. Redis
             redis_res = await self.redis.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
                 messages = redis_res.get("messages", [])
 
-                parsed_messages, branches = self._build_visible_messages(
+                parsed_messages, branches, node_id_chain = self._build_visible_messages(
                     messages,
                     current_node_id,
                     allow_roles=('human', 'ai', 'system', 'tools'),
                     guess_children=False
                 )
+
+                payload["node_id_chain"] = node_id_chain
+                await self.redis.cache_current_messages_branch_chain(payload)
 
                 redis_res["messages"] = parsed_messages
                 redis_res["branches"] = branches
@@ -463,12 +498,16 @@ class DataExecutors:
                 )
 
             # 4. build branch
-            parsed_messages, branches = self._build_visible_messages(
+            parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
                 allow_roles=('human', 'ai', 'system', 'tools'),
                 guess_children=False
             )
+
+            # 5. cache current node chain
+            payload["node_id_chain"] = node_id_chain
+            await self.redis.cache_current_messages_branch_chain(payload)
 
             mysql_res["messages"] = parsed_messages
             mysql_res["branches"] = branches
@@ -490,16 +529,34 @@ class DataExecutors:
 
             current_node_id = payload.get("current_node_id")
 
+            try:
+                if current_node_id == '-':
+                    cache_chain_res = await self.redis.get_current_messages_branch_chain({
+                        "client_id": payload["client_id"],
+                        "history_id": payload["history_id"],
+                    })
+                    if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
+                        cached_chain = cache_chain_res.get("messages")
+                        if isinstance(cached_chain, list) and len(cached_chain)>0:
+                            current_node_id = cached_chain[-1]
+            except Exception as e:
+                logger.warning(
+                    f"[DataExecutors][get_messages] warning: get cached message id chain fialed: {e}, skip."
+                )
+
             # 1. Redis
             redis_res = await self.redis.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
                 messages = redis_res.get("messages", [])
 
-                parsed_messages, branches = self._build_visible_messages(
+                parsed_messages, branches, node_id_chain = self._build_visible_messages(
                     messages,
                     current_node_id,
                     allow_roles=('human', 'ai', 'info')
                 )
+
+                payload["node_id_chain"] = node_id_chain
+                await self.redis.cache_current_messages_branch_chain(payload)
 
                 redis_res["messages"] = parsed_messages
                 redis_res["branches"] = branches
@@ -528,11 +585,15 @@ class DataExecutors:
                 )
 
             # 4. build branch
-            parsed_messages, branches = self._build_visible_messages(
+            parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
                 allow_roles=('human', 'ai', 'info')
             )
+
+            # 5. cache current node chain
+            payload["node_id_chain"] = node_id_chain
+            await self.redis.cache_current_messages_branch_chain(payload)
 
             mysql_res["messages"] = parsed_messages
             mysql_res["branches"] = branches
@@ -541,6 +602,36 @@ class DataExecutors:
         except Exception as e:
             logger.exception(
                 f"[DataExecutors][get_messages_for_user] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("search_messages_by_keyword")
+    async def search_messages_by_keyword(self, payload: dict) -> dict:
+        try:
+            logger.info("[DataExecutors][search_messages_by_keyword] enter.")
+            return await self.mysql.search_messages_by_keyword(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][search_messages_by_keyword] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("get_current_messages_branch_chain")
+    async def get_current_messages_branch_chain(self, payload: dict) -> dict:
+        try:
+            logger.info("[DataExecutors][get_current_messages_branch_chain] enter.")
+            return await self.redis.get_current_messages_branch_chain(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_current_messages_branch_chain] error: {e}"
             )
             return {
                 "success": False,

@@ -15,7 +15,7 @@ from apix_agent.commons.logger import logger
 def get_temperature(config: AgentConfigSchema | None) -> float:
     config = config or {}
     t = config.get("model_temperature", 1)
-    if t > 2: t = 3
+    if t > 2: t = 2
     elif t < 0: t = 0
     return t
 
@@ -308,7 +308,7 @@ class PatchedChatMoonshot(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ):
-        # print(f"[PatchedChatMoonshot] _convert_chunk_to_generation_chunk called with chunk: {chunk}")
+        # print(f"_convert_chunk_to_generation_chunk called with chunk: {chunk}")
         generation_chunk = super()._convert_chunk_to_generation_chunk(
             chunk,
             default_chunk_class,
@@ -366,7 +366,7 @@ class PatchedChatMoonshot(ChatOpenAI):
                 and not msg.content
             ):
                 reasoning_content_map[i] = "..."
-                logger.warning("[PatchedChatMoonshot] Empty message with tool calls.")
+                logger.warning("Empty message with tool calls.")
             if (
                 isinstance(msg, (AIMessage, AIMessageChunk))
                 and not msg.content

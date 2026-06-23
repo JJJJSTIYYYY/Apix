@@ -9,7 +9,7 @@ from langchain.tools import InjectedState, tool, InjectedToolCallId
 from langgraph.types import Command
 import yaml
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
 from apix_agent.commons.file_content_reader import load_from_yaml
 from apix_agent.global_config import BASE_DIR
@@ -59,9 +59,7 @@ def update_memory_to_yaml(
             data = []
 
         if not isinstance(data, list):
-            logger.warning(
-                f"[update_memory_to_yaml] Invalid yaml structure in {file_path}, resetting to empty list."
-            )
+            logger.warning(f"Invalid yaml structure in {file_path}, resetting to empty list.")
             data = []
 
         # Remove all same-title memos first
@@ -90,12 +88,12 @@ def update_memory_to_yaml(
                 sort_keys=False,
             )
 
-        logger.info("[update_memory_to_yaml] yaml updated successfully.")
+        logger.info("Yaml updated successfully.")
 
         return data
 
     except Exception as e:
-        logger.error(f"[update_memory_to_yaml] Error: {e}")
+        logger.error(f"Error: {e}")
         raise
 
 

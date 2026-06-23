@@ -6,7 +6,7 @@
     @mouseleave="expanded = false"
   >
     <div
-      v-for="item in msg_item"
+      v-for="item in filteredMsgItems"
       :key="item.msg_id"
       :ref="el => setItemRef(el, item.msg_id)"
       class="scroll-item"
@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, ref, watch, computed } from 'vue'
 
 export interface MessagePreviewItem {
   msg_id: string
@@ -45,6 +45,12 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+const filteredMsgItems = computed<MessagePreviewItem[]>(() => {
+  return props.msg_item.filter(item => 
+    item.preview && item.preview.trim() !== ''
+  )
+})
 
 const emit = defineEmits<{
   (e: 'scroll-to', msgId: string): void

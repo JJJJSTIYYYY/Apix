@@ -182,10 +182,10 @@ body, * {
   --apix-input-error-shadow: 0 0 0 3px rgba(243, 80, 80, 0.2);
 
   /* 链接 */
-  --apix-link-color: rgb(70, 155, 150);
-  --apix-link-hover: rgb(50, 130, 125);
-  --apix-link-active: rgb(40, 110, 105);
-  --apix-link-visited: rgb(120, 90, 160);
+  --apix-link-color: rgb(87, 184, 178);
+  --apix-link-hover: rgb(67, 164, 158);
+  --apix-link-active: rgb(53, 136, 130);
+  --apix-link-visited: rgb(134, 112, 164);
 
   /* 滚动条 */
   --apix-scrollbar-track: rgb(240, 242, 242);

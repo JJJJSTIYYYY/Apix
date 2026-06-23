@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 from typing import Dict, Literal, Optional
 from uuid import uuid4
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter
 from apix_agent.commons.resource_cleaner import resource_cleaner
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
-from apix_agent.commons.type_def import ApixEventEnvelope, ApixEventEnvelopeTarget
+from apix_agent.commons.type_def import ApixEventEnvelope, ApixIdentity
 from apix_agent.global_config import GENERATION_TTL
 
 
@@ -22,6 +22,7 @@ class GenerationState:
     history_id: str
     generation_id: str
     client_id: str
+    platform: str
 
     # running / finished / aborted
     status: Literal["running", "finished", "aborted"] = "running"
@@ -42,6 +43,11 @@ class GenerationState:
     # Protect cache_tokens concurrent access
     gen_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
+    # Wait for status change
+    status_condition: asyncio.Condition = field(
+        default_factory=asyncio.Condition
+    )
+
 
 class GenerationManager:
 
@@ -50,12 +56,14 @@ class GenerationManager:
         self._active_generation_ids: Dict[str, list[str]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
 
+
     def _get_lock(self, client_id: str) -> asyncio.Lock:
         lock = self._locks.get(client_id)
         if not lock:
             lock = asyncio.Lock()
             self._locks[client_id] = lock
         return lock
+    
 
     def _get_client_generations(self, client_id: str) -> Dict[str, GenerationState]:
         gens = self._connections.get(client_id)
@@ -63,6 +71,7 @@ class GenerationManager:
             gens = {}
             self._connections[client_id] = gens
         return gens
+    
 
     def _get_active_list(self, client_id: str) -> list[str]:
         active_list = self._active_generation_ids.get(client_id)
@@ -70,10 +79,22 @@ class GenerationManager:
             active_list = []
             self._active_generation_ids[client_id] = active_list
         return active_list
+    
+    
+    async def _set_generation_status(
+        self,
+        gen: GenerationState,
+        status: Literal["running", "finished", "aborted"]
+    ):
+        async with gen.status_condition:
+            gen.status = status
+            gen.status_condition.notify_all()
+
 
     def list_running_generations(self, client_id: str) -> list[str]:
         gens = self._connections.get(client_id, {})
         return [gid for gid, gen in gens.items() if gen.status == "running"]
+    
 
     async def create_generation(
         self,
@@ -84,7 +105,7 @@ class GenerationManager:
 
         new_gen_id = str(uuid4())
 
-        await self.abort_by_history_id(client_id, history_id, platform)
+        await self.abort_by_history_id(client_id, history_id)
 
         async with self._get_lock(client_id):
             gens = self._get_client_generations(client_id)
@@ -93,13 +114,15 @@ class GenerationManager:
             gens[new_gen_id] = GenerationState(
                 history_id=history_id,
                 generation_id=new_gen_id,
-                client_id=client_id
+                client_id=client_id,
+                platform=platform
             )
 
             if new_gen_id not in active_generation_ids:
                 active_generation_ids.append(new_gen_id)
 
         return new_gen_id
+    
     
     def _ensure_code_block(self, content: str) -> str:
         """
@@ -130,6 +153,7 @@ class GenerationManager:
             content += "```\n"
 
         return content
+    
     
     async def update_cache_tokens(
         self,
@@ -191,6 +215,7 @@ class GenerationManager:
                 gen.cache_tokens["content"] = ""
                 gen.cache_tokens["think"] = ""
 
+
     async def persist_cache_tokens(self, gen: GenerationState):
         async with gen.gen_lock:
             interrupted_msg = copy.deepcopy(gen.cache_tokens)
@@ -219,6 +244,7 @@ class GenerationManager:
                     interrupted_msg,
                     parent_node_id
                     )
+                
 
     async def abort_generation(self, client_id: str, generation_id: str):
         async with self._get_lock(client_id):
@@ -231,7 +257,7 @@ class GenerationManager:
                 return
 
             await self.persist_cache_tokens(gen)
-            gen.status = "aborted"
+            await self._set_generation_status(gen, 'aborted')
 
             active_generation_ids = self._active_generation_ids.get(client_id)
             if active_generation_ids:
@@ -240,11 +266,12 @@ class GenerationManager:
                 except ValueError:
                     pass
 
-    async def abort_by_history_id(self, client_id: str, history_id: str, platform: str = 'default'):
-        target: ApixEventEnvelopeTarget = {
+
+    async def abort_by_history_id(self, client_id: str, history_id: str):
+        target: ApixIdentity = {
             'id': client_id,
             'conversation_id': history_id,
-            'platform': platform
+            'platform': 'default'
         }
         AgentStreamWriter.clear_all_block(target)
         
@@ -256,12 +283,13 @@ class GenerationManager:
                 gen = gens.get(gid)
                 if gen and gen.history_id == history_id and gen.status == "running":
                     await self.persist_cache_tokens(gen)
-                    gen.status = "aborted"
+                    await self._set_generation_status(gen, 'aborted')
 
                     try:
                         active_generation_ids.remove(gid)
                     except ValueError:
                         pass
+
 
     async def is_generation_aborted(self, client_id: str, generation_id: str) -> bool:
         async with self._get_lock(client_id):
@@ -271,6 +299,7 @@ class GenerationManager:
 
             gen = gens.get(generation_id)
             return (not gen) or gen.status == "aborted"
+        
 
     async def is_generation_finished(self, client_id: str, generation_id: str) -> bool:
         async with self._get_lock(client_id):
@@ -280,13 +309,42 @@ class GenerationManager:
 
             gen = gens.get(generation_id)
             return (not gen) or gen.status == "finished"
+        
+        
+    async def await_by_history_id(self, client_id: str, history_id: str):
+        async with self._get_lock(client_id):
+            gens = self._connections.get(client_id, {})
+
+            # Only one running generation in a conversation
+            gen = next(
+                (
+                    g for g in gens.values()
+                    if g.history_id == history_id
+                    and g.status == "running"
+                ),
+                None
+            )
+
+        if not gen:
+            return
+        
+        logger.trace()
+
+        async with gen.status_condition:
+            await gen.status_condition.wait_for(
+                lambda: gen.status in ("finished", "aborted")
+            )
+
+        logger.trace()
+
 
     def get_generation(self, client_id: str, generation_id: str) -> Optional[GenerationState]:
         gens = self._connections.get(client_id)
         if not gens:
-            logger.exception(f"[get_generation] Client {client_id} not register a generation state set")
+            logger.exception(f"Client {client_id} not register a generation state set")
             return None
         return gens.get(generation_id)
+    
 
     async def clean_expired(self) -> int:
         """
@@ -332,7 +390,7 @@ class GenerationManager:
                 if to_delete:
                     removed = len(to_delete)
                     total_removed += removed
-                    logger.info(f"[generation_cache] client={client_id}, removed={removed} generation(s)")
+                    logger.info(f"Client {client_id}: removed {removed} generation(s)")
 
         return total_removed
 

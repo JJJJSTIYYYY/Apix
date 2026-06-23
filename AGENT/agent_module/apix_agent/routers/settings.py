@@ -61,7 +61,7 @@ async def set_proxy(request_data: Request):
     """
     try:
         body = await request_data.json()
-        logger.info(f"[set_proxy] Set proxy: {body}")
+        logger.info(f"Set proxy: {body}")
 
         http_proxy = body.get("http_proxy", "")
         https_proxy = body.get("https_proxy", "")
@@ -77,7 +77,7 @@ async def set_proxy(request_data: Request):
         else:
             # Restore original HTTP proxy
             original_http = _ORIGINAL_PROXY_ENV.get("HTTP_PROXY")
-            logger.info(f"[set_proxy] Set HTTP_PROXY: {original_http}")
+            logger.info(f"Set HTTP_PROXY: {original_http}")
             if original_http is None:
                 os.environ.pop("HTTP_PROXY", None)
             else:
@@ -93,7 +93,7 @@ async def set_proxy(request_data: Request):
         else:
             # Restore original HTTPS proxy
             original_https = _ORIGINAL_PROXY_ENV.get("HTTPS_PROXY")
-            logger.info(f"[set_proxy] Set HTTPS_PROXY: {original_http}")
+            logger.info(f"Set HTTPS_PROXY: {original_http}")
             if original_https is None:
                 os.environ.pop("HTTPS_PROXY", None)
             else:
@@ -107,7 +107,7 @@ async def set_proxy(request_data: Request):
         else:
             # Restore original NO_PROXY if not provided
             original_no_proxy = _ORIGINAL_PROXY_ENV.get("NO_PROXY")
-            logger.info(f"[set_proxy] Set NO_PROXY: {original_http}")
+            logger.info(f"Set NO_PROXY: {original_http}")
             if original_no_proxy is None:
                 os.environ.pop("NO_PROXY", None)
             else:
@@ -122,7 +122,7 @@ async def set_proxy(request_data: Request):
         )
 
     except Exception as e:
-        logger.error(f"[set_proxy]: Proxy address unreachable: {e}")
+        logger.error(f"Proxy address unreachable: {e}")
         return JSONResponse(
             content={
                 "messages": f"Proxy address unreachable: {e}",

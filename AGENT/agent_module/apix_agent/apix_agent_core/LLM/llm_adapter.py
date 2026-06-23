@@ -130,7 +130,7 @@ class LlmNodeAdapter:
         config = fall_back_config.copy()
         config['enable_think'] = reasoning
 
-        logger.warning(f"[LlmNodeAdapter] [astream] Get attr: provider={provider}, model_name={model_name}.")
+        logger.warning(f"Get attr: provider={provider}, model_name={model_name}.")
 
         if provider == "deepseek" or (
             model_name and model_name.startswith("deepseek")
@@ -224,7 +224,7 @@ class LlmNodeAdapter:
         config = fall_back_config.copy()
         config['enable_think'] = reasoning
 
-        logger.warning(f"[LlmNodeAdapter] [ainvoke] Get attr: provider={provider}, model_name={model_name}.")
+        logger.warning(f"Get attr: provider={provider}, model_name={model_name}.")
 
         if provider == "deepseek" or (
             model_name and model_name.startswith("deepseek")
@@ -342,13 +342,13 @@ class LlmNodeAdapter:
             content = resp.content
 
             result = content.strip().lower()
-            logger.debug(f"[is_vision_model] provider={provider}, model={model_name}, test_resp_content={content}")
+            logger.debug(f"provider={provider}, model={model_name}, test_resp_content={content}")
             if "test" in result and "vision" in result:
                 result_flag = True
 
         except Exception as e:
             error_msg = str(e).lower()
-            logger.warning(f"[is_vision_model] {type(e)}: {str(e)}")
+            logger.warning(f"Error: {type(e)}: {str(e)}")
 
             # 5. detect auth error -> DO NOT cache
             if any(keyword in error_msg for keyword in [

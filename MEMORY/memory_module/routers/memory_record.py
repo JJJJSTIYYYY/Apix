@@ -168,6 +168,48 @@ async def get_messages(req: Request):
     )
 
 
+@router.post("/memory/memory/search_messages_by_keyword")
+async def search_messages_by_keyword(req: Request):
+    """
+    Search messages in all conversations by keyword.
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+            "keyword": str
+        }
+
+    Returns:
+        {
+            "success": True / False,
+            "messages": [
+                {
+                    "conversation_uid": str,
+                    "generation_id": str,
+                    "role": str,
+                    "title": str,
+                    "content": str,
+                    "last_active_at": str
+                },
+                ...
+            ]
+        }
+    """
+    logger.info(f"[API][search_messages_by_keyword] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="search_messages_by_keyword",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
 @router.post("/memory/memory/shortterm")
 async def get_shortterm(req: Request):
     """
@@ -254,6 +296,7 @@ async def create_new_conversation(req: Request):
     Request Body (JSON):
         {
             "client_id": str,
+            "platform": str,
             "session_id": str (optional),
             "title": str (optional),
             "workspace": str (optional),

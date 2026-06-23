@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import _AsyncGeneratorContextManager
+from typing import Any, Literal, TypedDict
 
 import httpx
 from langchain_mcp_adapters.client import (
@@ -15,8 +16,14 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from apix_agent.commons.auto_init import auto_init
 from apix_agent.commons.logger import logger
 from apix_agent.global_config import MEMORY_SERVICE_BASE_URL
-from apix_agent.commons.type_def import McpMetaSchema
 
+
+class McpMetaSchema(TypedDict):
+    mcp_id: str
+    mcp_name: str
+    transport: Literal["stdio", "http", "streamable_http", "websocket", "sse"]
+    endpoint: str # For stdio, it's the command to start the MCP server. For http/websocket/sse, it's the URL to connect.
+    config: dict[str, Any]
 
 class MCPContextHolder:
 
@@ -78,10 +85,7 @@ class MCPContextHolder:
             try:
                 await self._worker_task
             except Exception as e:
-                logger.error(
-                    f"[MCPContextHolder.stop] "
-                    f"Worker already failed for '{self.mcp_name}': {e}"
-                )
+                logger.error(f"Worker already failed for '{self.mcp_name}': {e}")
             finally:
                 self._worker_task = None
                 self.session = None
@@ -131,7 +135,7 @@ class MCPToolManager:
         res = resp.json()
         if resp.status_code != 200 or not res.get("success"):
             logger.warning(
-                "[get_mcp_meta] Failed to get MCP meta: "
+                "Failed to get MCP meta: "
                 f"{resp.text}"
             )
             return []
@@ -190,19 +194,19 @@ class MCPToolManager:
                 }
             else:
                 logger.warning(
-                    f"[create_mcp_client] Unknown transport "
+                    f"Unknown transport "
                     f"'{transport}' for MCP '{mcp_name}'."
                 )
                 return None
             client = MultiServerMCPClient(connection)
             logger.info(
-                f"[create_mcp_client] Created MCP client: "
+                f"Created MCP client: "
                 f"{mcp_name}"
             )
             return client
         except Exception as e:
             logger.error(
-                f"[create_mcp_client] Error while creating "
+                f"Error while creating "
                 f"MCP client: {e}"
             )
             return None
@@ -230,34 +234,24 @@ class MCPToolManager:
                 await holder.start()
                 self.mcp_client_cm[mcp_id] = holder
                 tools = await holder.get_tools()
-                logger.info(
-                    f"[get_mcp_tools] Loaded "
-                    f"{len(tools)} MCP tools "
-                    f"for '{mcp_name}'"
-                )
+                logger.info(f"Loaded {len(tools)} MCP tools for '{mcp_name}'")
                 return tools
             elif lifecycle == "always_close":
                 client = await self.create_mcp_client(mcp_meta)
                 if not client:
                     return []
                 return await client.get_tools()
-            logger.warning(
-                f"[get_mcp_tools] Unknown lifecycle "
-                f"'{lifecycle}' for MCP '{mcp_name}'."
-            )
+            logger.warning(f"Unknown lifecycle '{lifecycle}' for MCP '{mcp_name}'.")
             return []
         except Exception as e:
-            logger.error(
-                f"[get_mcp_tools] Error while "
-                f"getting MCP tools: {e}"
-            )
+            logger.error(f"Error while getting MCP tools: {e}")
             return []
 
     async def cache_first(
         self,
         mcp_meta: McpMetaSchema,
     ) -> list[BaseTool] | None:
-        logger.trace(f'[mcp_tool.py] [MCPToolManager] [cache_first] Enter')
+        logger.trace()
         mcp_id = mcp_meta["mcp_id"]
         lifecycle = (
             mcp_meta.get("config", {})
@@ -267,32 +261,29 @@ class MCPToolManager:
         try:
             holder = self.mcp_client_cm.get(mcp_id)
             if not holder:
-                logger.warning("[cache_first] No holder found in mcp_client_cm")
+                logger.warning("No holder found in mcp_client_cm")
                 return None
             if holder.lifecycle != "keep_alive" or holder.lifecycle != lifecycle:
-                logger.info(f"[cache_first] Stop outdated MCP: {mcp_meta.get('mcp_name')}")
+                logger.info(f"Stop outdated MCP: {mcp_meta.get('mcp_name')}")
                 await holder.stop()
                 self.mcp_client_cm.pop(mcp_id, None)
                 return None
             logger.info(
-                f"[cache_first] Reusing MCP "
+                f"Reusing MCP "
                 f"'{holder.mcp_name}' "
                 f"(ID: {holder.mcp_id}, "
                 f"lifecycle: {holder.lifecycle})"
             )
             return await holder.get_tools()
         except Exception as e:
-            logger.error(
-                f"[cache_first] Error while "
-                f"reusing MCP tools: {e}"
-            )
+            logger.error(f"Error while reusing MCP tools: {e}")
             return None
 
     async def load_all_mcp_tools(
         self,
         client_id: str,
     ) -> list[BaseTool]:
-        logger.trace(f'[mcp_tool.py] [MCPToolManager] [load_all_mcp_tools] Enter')
+        logger.trace()
         mcp_meta_list = await self.get_mcp_meta(client_id)
         all_tools: list[BaseTool] = []
         for mcp_meta in mcp_meta_list:
@@ -312,15 +303,19 @@ class MCPToolManager:
                 await holder.stop()
             except Exception as e:
                 logger.error(
-                    f"[cleanup_all] Error while "
+                    f"Error while "
                     f"cleaning MCP '{holder.mcp_name}' "
                     f"(ID: {holder.mcp_id}): {e}"
                 )
+    
+    async def start(self):
+        pass
+
+    async def stop(self):
+        await self.cleanup_all()
 
 
 mcp_mgr = MCPToolManager()
 
 
-@auto_init.auto_stop
-async def clear_docker_container():
-    await mcp_mgr.cleanup_all()
+auto_init.register(mcp_mgr)

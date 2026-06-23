@@ -55,15 +55,7 @@ class DefaultPlatform(WebsocketPlatform):
 
 default_platform = DefaultPlatform(generation_manager)
 
-
-@auto_init.auto_start
-async def start_websocket():
-    await default_platform.start()
-
-
-@auto_init.auto_stop
-async def stop_websocket():
-    await default_platform.stop()
+auto_init.register(default_platform)
 
 
 register_platform(default_platform)

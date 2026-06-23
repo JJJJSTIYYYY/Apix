@@ -1,4 +1,5 @@
 import asyncio
+import re
 from ulid import ulid
 import inspect
 import json
@@ -285,6 +286,7 @@ class MysqlService:
         Args:
             payload: Dict, the format is {
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
+                "platform": str,
                 "session_id": "{{ sid }} : to indicate which tab the data belong to",
                 "title": "conversation title",
                 "workspace": "Agent work dir",
@@ -299,12 +301,13 @@ class MysqlService:
         logger.info(f"[MysqlService][create_conversation] enter.")
         try:
             user_uid = payload["client_id"]
+            platform = payload.get("platform", "default")
             conversation_uid = self._conversation_id_generator()
             session_id = payload.get("session_id", "")
             title = payload.get("title", "新的聊天...")
             workspace = payload.get("workspace", None)
 
-            await self._call_procedure("create_conversation", (user_uid, conversation_uid, title, workspace, session_id))
+            await self._call_procedure("create_conversation", (user_uid, platform, conversation_uid, title, workspace, session_id))
             return {
                 "success": True,
                 "messages": f"{conversation_uid}",
@@ -588,6 +591,64 @@ class MysqlService:
             }
         except Exception as e:
             logger.exception(f"[MysqlService][fetch_messages_for_user] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("mysql.memo.search_messages_by_keyword")
+    async def search_messages_by_keyword(self, payload: dict) -> dict:
+        """
+        Search messages in all conversations. Call procedure search_messages_by_keyword.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": str,
+                "keyword": str
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or [...] (list of result dicts),
+            }
+
+            Result dict format: {
+                "conversation_uid": str,
+                "generation_id": str,
+                "role": str,
+                "content": str,
+                "title": str,
+                "last_active_at": str
+            }
+        """
+        logger.info("[MysqlService][search_messages_by_keyword] enter.")
+        try:
+            user_uid = payload["client_id"]
+            keyword: str = payload["keyword"]
+
+            # Ignore keywords that contain only %, _, \ and whitespace
+            if not re.sub(r"[%_\\\s]+", "", keyword):
+                return {
+                    "success": True,
+                    "messages": [],
+                }
+
+            # Normalize separators for SQL LIKE search
+            keyword = re.sub(r"[_\\\s]+", "%", keyword)
+            keyword = re.sub(r"%+", "%", keyword).strip("%")
+
+            rows = await self._call_procedure("search_messages_by_keyword", (user_uid, keyword))
+
+            return {
+                "success": True,
+                "messages": rows,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][search_messages_by_keyword] ❌ Error: {type(e).__name__}: {e}"
+            )
             return {
                 "success": False,
                 "messages": f"fail: {e}",

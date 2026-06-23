@@ -8,7 +8,7 @@ from langgraph.graph import END
 from langgraph.graph.state import Command
 from langgraph.types import Overwrite
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
@@ -69,7 +69,7 @@ class SubAgentNode(AgentNodeBase):
             )
 
         except Exception as e:
-            logger.error(f"[context_summary] rewrite sub-agent history failed: {e}")
+            logger.error(f"Rewrite sub-agent history failed: {e}")
 
 
     async def context_prepare(self, state: SubAgentState) -> Command:
@@ -185,7 +185,7 @@ class SubAgentNode(AgentNodeBase):
             3: drop_tool_messages(min_keep=2)
             4+: exponential truncate (reversible)
         """
-        logger.trace('[agent.py] [AgentNode] [context_summary] Enter')
+        logger.trace()
 
         # Config
         agent_role = state.get("agent_role")
@@ -219,7 +219,7 @@ class SubAgentNode(AgentNodeBase):
             return Command(update={})
 
         logger.info(
-            f"[context_summary] Triggered. "
+            f"Context compress triggered. "
             f"len={len(messages)} level={context_compress_level} "
             f"retry={llm_retry_count} error={last_error}"
         )
@@ -246,7 +246,7 @@ class SubAgentNode(AgentNodeBase):
                 )
 
             logger.success(
-                f"[context_summary] Truncate (memory disabled). keep={keep_recent}"
+                f"Truncate (memory disabled). keep={keep_recent}"
             )
 
             return Command(
@@ -270,7 +270,7 @@ class SubAgentNode(AgentNodeBase):
             )
 
             logger.success(
-                f"[context_summary] Level1 drop_tool_messages "
+                f"Level 1: Drop tool messages "
                 f"(min_keep={keep_recent_base})"
             )
 
@@ -327,7 +327,7 @@ class SubAgentNode(AgentNodeBase):
                     fall_back_config=config
                 )
             except Exception as e:
-                logger.error(f"[context_summary] Summary failed: {e}")
+                logger.error(f"Summary failed: {e}")
                 # Directly entry next level
                 return Command(update={})
 
@@ -342,7 +342,7 @@ class SubAgentNode(AgentNodeBase):
                 )
 
             logger.success(
-                f"[context_summary] Level2 summary done. "
+                f"Level 2: Summary done. "
                 f"remain={len(recent_messages)}"
             )
 
@@ -361,7 +361,7 @@ class SubAgentNode(AgentNodeBase):
                 min_keep=2,
             )
 
-            logger.success("[context_summary] Level 3 drop_tool_messages(min_keep=2)")
+            logger.success("Level 3: Drop tool messages(min_keep=2)")
 
             return Command(
                 update={
@@ -378,7 +378,7 @@ class SubAgentNode(AgentNodeBase):
         )
 
         logger.success(
-            f"[context_summary] Level{context_compress_level} truncate "
+            f"Level {context_compress_level}: Truncate "
             f"(keep={keep_recent})"
         )
 
@@ -500,7 +500,7 @@ class SubAgentNode(AgentNodeBase):
 
         except ConflictToolCalls as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             if llm_retry_count < MAX_RETRY:
                 return Command(
                     update={
@@ -514,7 +514,7 @@ class SubAgentNode(AgentNodeBase):
 
         except InvalidOutputsError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             if llm_retry_count < MAX_RETRY:
                 return Command(
                     update={
@@ -528,7 +528,7 @@ class SubAgentNode(AgentNodeBase):
         except BadRequestError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
             context_compress_level = state.get("context_compress_level", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             if llm_retry_count < MAX_RETRY and  LlmNodeAdapter.guess_exception_type(str(e)) == 'token_exceed':
                 return Command(
                     update={
@@ -542,7 +542,7 @@ class SubAgentNode(AgentNodeBase):
             
         except RateLimitError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             if llm_retry_count < MAX_RETRY and  LlmNodeAdapter.guess_exception_type(str(e)) == 'rate_limit':
                 return Command(
                     update={

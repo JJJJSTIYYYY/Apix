@@ -14,6 +14,7 @@ import httpx
 
 from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage, ToolMessage, AIMessage, AnyMessage
 
+from apix_agent.commons.common_func import convert_generation_id_to_message_node_id
 from apix_agent.commons.type_def import MainAgentState, MemoItem
 from apix_agent.global_config import BASE_DIR, FILE_SERVICE_URL, MEMORY_SERVICE_BASE_URL
 from apix_agent.commons.logger import logger
@@ -56,7 +57,7 @@ class AIContextManager:
         Returns:
             None
         """
-        logger.trace('[context_process.py] [AIContextManager] [append_to_messages] Enter')
+        logger.trace()
 
         if "extra" in message and "user_meta_data" in message["extra"]:
             # file_id and file name should be contained in meta_data list.
@@ -69,7 +70,7 @@ class AIContextManager:
                     "content": f"User upload file(s): {str(files.get("uploaded_files"))}",
                     "timestamp": timestamp,
                     "generation_id": generation_id,
-                    "node_id": generation_id[-12:] + "-user",
+                    "node_id": convert_generation_id_to_message_node_id(generation_id, 'user'),
                     "parent_id": message.get("parent_id") or parent_id
                 }
                 sys_payload = {
@@ -93,12 +94,11 @@ class AIContextManager:
                 
         generation_id = message.get("generation_id", "")
         role = message.get("role", "")
+        message["node_id"] = convert_generation_id_to_message_node_id(generation_id, role)
 
         if role == 'human': 
-            message["node_id"] = generation_id[-12:] + "-user"
             message["parent_id"] = message.get("parent_id") or parent_id
         else:
-            message["node_id"] = generation_id[-12:] + "-apix"
             message["parent_id"] = parent_id
 
         payload = {
@@ -176,7 +176,7 @@ class AIContextManager:
             None
         """
         if history_id.startswith("sub_"): return
-        logger.trace('[context_process.py] [ ] [create_memory] Enter')
+        logger.trace()
         extra = additional_info
         message = {
             "role": "info", 
@@ -202,7 +202,7 @@ class AIContextManager:
         Returns:
             None
         """
-        logger.trace('[context_process.py] [AIContextManager] [append_to_messages] Enter')
+        logger.trace()
         content = content.strip()
         if not content: return
         
@@ -244,9 +244,9 @@ class AIContextManager:
         Returns:
             list[dict]: Message dict list returned by memory service.
         """
-        logger.trace('[context_process.py] [AIContextManager] [fetch_messages] Enter')
+        logger.trace()
         logger.info(
-            f"[fetch_messages] client_id={client_id}, history_id={history_id}, cursor={cursor}"
+            f"client_id={client_id}, history_id={history_id}, cursor={cursor}"
         )
         # msg_cursor = msg_dict.get("msg_cursor", 0)  # reserved
 
@@ -271,7 +271,7 @@ class AIContextManager:
         resp_content = resp.json()
         messages = resp_content.get("messages", [])
 
-        logger.info(f"[fetch_messages] fetched {len(messages)} messages")
+        logger.info(f"Fetched {len(messages)} messages")
 
         return messages, messages[-1].get('node_id')
     
@@ -294,9 +294,9 @@ class AIContextManager:
                 }
             ]
         """
-        logger.trace('[context_process.py] [AIContextManager] [fetch_shortterm_memory] Enter')
+        logger.trace()
         logger.info(
-            f"[fetch_shortterm_memory] client_id={client_id} history_id={history_id}"
+            f"client_id={client_id}, history_id={history_id}"
         )
 
         async with httpx.AsyncClient(timeout=5) as client:
@@ -405,9 +405,9 @@ class AIContextManager:
         after_index should equals to msg_dict.get("info").get("id") when its ai message,
         or equals to msg_dict.get("info").get("task_id") when its tool message, but in 
         """
-        logger.trace('[context_process.py] [AIContextManager] [create_agent_messages] Enter')
-        logger.info(f"[create_agent_messages] client_messages count: {len(client_messages)}, after index: {after_index}")
-        # logger.info(f"[create_agent_messages] client_messages: {client_messages}")
+        logger.trace()
+        logger.info(f"client_messages count: {len(client_messages)}, after index: {after_index}")
+        # logger.info(f"client_messages: {client_messages}")
 
         messages = []
         messages_after_index = []
@@ -427,14 +427,19 @@ class AIContextManager:
 
                 active_file = extra.get("active_file", '') or ''
                 referenced_message = extra.get("referenced_message", {}) or {}
+                system_instruction = extra.get("system_instruction", []) or []
 
                 if referenced_message and isinstance(referenced_message, dict):
                     raw_text = f"Referenced Message:  \n" \
                         f"> Role: {referenced_message.get("role", "`[unknow]`") or '`[unknow]`'}  " \
                         f"Content: \"{referenced_message.get("content", "`[content missed]`") or '`[content missed]`'}\""\
                         f"\n\n{raw_text}"
+                    
                 if active_file:
                     raw_text = f"Referenced File:  \n> \"{active_file}\"\n\n{raw_text}"
+
+                if system_instruction and isinstance(system_instruction, list):
+                    raw_text = f"System Instruction:  \n \"{'\n-'.join(system_instruction)}\"\n\n{raw_text}"
 
                 msg = HumanMessage(content=raw_text, name=name)
                 messages.append(msg)
@@ -474,23 +479,6 @@ class AIContextManager:
                     if tool_calls:
                         msg.tool_calls = tool_calls
 
-                # if remain_tool_message:
-                #     if not isinstance(tool_calls, list) and tool_calls:
-                #         tool_calls = json.loads(tool_calls)
-                #     msg.tool_calls = tool_calls
-                #     if not content and not think and tool_calls:
-                #         called_tools = [call.get("name") for call in (tool_calls or []) if isinstance(call, dict)]
-                #         inject_content = 'Call tools: ' + ", ".join(called_tools)
-                #         content = ''
-                #         additional_kwargs = {}
-                #         if not reasoning: content = inject_content
-                #         else: additional_kwargs["reasoning_content"] = inject_content
-                #         msg = AIMessage(
-                #             content=content,
-                #             additional_kwargs=additional_kwargs,
-                #             tool_calls=tool_calls
-                #         )
-
                 messages.append(msg)
                 if not begin_to_append and index == after_index: 
                     begin_to_append = True
@@ -518,9 +506,7 @@ class AIContextManager:
                 if begin_to_append: messages_after_index.append(msg)
 
             else:
-                logger.warning(
-                    f"[create_agent_messages] Unknown role or empty content ignored: {role}"
-                )
+                logger.warning(f"Unknown role or empty content ignored: {role}")
 
         while messages_after_index and isinstance(messages_after_index[0], ToolMessage):
             messages_after_index.pop(0)
@@ -556,9 +542,7 @@ class AIContextManager:
         Returns:
             list[dict]: Memory message dicts list (len 1)
         """
-        logger.trace('[context_process.py] [AIContextManager] [create_dict_message] Enter')
-        logger.info(f"\033[32m[create_dict_message]\033[0m message: {message}")
-
+        logger.trace()
         messages: dict = {}
 
         if isinstance(message, (AIMessage, AIMessageChunk)):
@@ -616,7 +600,7 @@ class AIContextManager:
 
         else:
             logger.warning(
-                f"[create_dict_message] Unsupported message type ignored: {type(message)}"
+                f"Unsupported message type ignored: {type(message)}"
             )
 
         return messages
@@ -709,10 +693,10 @@ class AIContextManager:
         Returns:
             (to_summarize, recent_messages)
         """
-        logger.trace('[context_process.py] [AIContextManager] [split_messages] Enter')
+        logger.trace()
         logger.info(
-            f"[split_messages] input_messages count: {len(input_messages)}, "
-            f"keep_recent={keep_recent}"
+            f"Input messages length: {len(input_messages)}, "
+            f"Base keep recent={keep_recent}"
         )
 
         if not input_messages:
@@ -753,7 +737,7 @@ class AIContextManager:
         recent_messages = input_messages[split_idx:]
 
         logger.info(
-            f"[split_messages] result: to_summarize={len(to_summarize)}, "
+            f"Result: to_summarize={len(to_summarize)}, "
             f"recent_messages={len(recent_messages)}"
         )
 
@@ -777,8 +761,8 @@ class AIContextManager:
             list[AnyMessage]: AI and human messages after filtered.
             str: message's id
         """
-        logger.trace('[context_process.py] [AIContextManager] [filter_agent_messages] Enter')
-        logger.info(f"[filter_agent_messages] client_messages count: {len(input_messages)}")
+        logger.trace()
+        logger.info(f"Client messages count: {len(input_messages)}")
 
         messages = []
         system_msgs = []
@@ -804,7 +788,7 @@ class AIContextManager:
             elif isinstance(input_msg, SystemMessage):
                 system_msgs.append(copy.copy(input_msg))
 
-        logger.info(f"[filter_agent_messages] The latest message id is {index}")
+        logger.info(f"The latest message id is {index}")
         return system_msgs, messages, index
         
 
@@ -910,7 +894,7 @@ class AIContextManager:
             memo_filename = hashlib.sha256(hash_input).hexdigest()
             memo_path = memo_dir / f"{memo_filename}.yaml"
 
-            logger.info(f"[init_memorandum_list] Trying to load memorandum_list from {memo_path}")
+            logger.info(f"Trying to load memorandum list from {memo_path}")
 
             if not memo_path.exists():
                 return []
@@ -919,7 +903,7 @@ class AIContextManager:
 
             if not isinstance(memorandum_list, list):
                 logger.warning(
-                    f"[init_memorandum_list] Invalid memorandum yaml structure for client_id {client_id}: {memorandum_list}"
+                    f"Invalid memorandum yaml structure for client {client_id}: {memorandum_list}"
                 )
                 return []
 
@@ -948,8 +932,8 @@ class AIContextManager:
         memorandum_list = list(merged_memorandum_map.values())
 
         logger.info(
-            f"[init_memorandum_list] Initialized memorandum list for client_id {client_id}, "
-            f"history_id {history_id}: {memorandum_list}"
+            f"Initialized memorandum list for client {client_id}, "
+            f"conversation {history_id}: {memorandum_list}"
         )
 
         state["memorandum"].clear()
@@ -1344,7 +1328,7 @@ User-facing output:
         if definition.strip():
             structured += f"- Your Characteristics:\n {definition.strip()}\n"
 
-        logger.info(f"[create_role_prompt_list] Insert role prompt:\n{structured}")
+        logger.info(f"Insert role prompt:\n{structured}")
         if not higher_role_prompt_permission: return [HumanMessage(content=structured)]
         else: return [SystemMessage(content=structured)]
 

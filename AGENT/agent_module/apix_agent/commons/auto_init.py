@@ -1,5 +1,4 @@
-import asyncio
-from typing import Callable, List, Awaitable, Union
+from typing import Any, List
 
 from apix_agent.commons.logger import logger
 
@@ -8,57 +7,57 @@ class AutoInit:
     """
     Global auto initializer (singleton).
 
-    Features:
-        - Centralized init execution
-        - Supports async / sync functions
-        - Auto registration via decorator
-        - start(): execute all init functions once
-        - stop(): execute all stop functions (reverse order)
+    Registered objects must implement:
+        - async start(...)
+        - async stop(...)
     """
 
     _instance = None
 
     def __new__(cls):
-        # Singleton
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
-        # Registered init / stop functions
-        self._inits: List[Callable[[], Union[None, Awaitable[None]]]] = []
-        self._stops: List[Callable[[], Union[None, Awaitable[None]]]] = []
+        # Avoid reinitializing singleton
+        if getattr(self, "_initialized", False):
+            return
 
-        # Started flag
+        self._services: List[Any] = []
         self._started = False
+        self._initialized = True
 
     # -----------------------------
     # Registration
     # -----------------------------
 
-    def register_init(self, func: Callable):
-        if func not in self._inits:
-            self._inits.append(func)
-            logger.debug(f"[AutoInit] Registered init: {func.__name__}")
+    def register(self, service: Any):
+        """
+        Register a lifecycle service.
 
-    def register_stop(self, func: Callable):
-        if func not in self._stops:
-            self._stops.append(func)
-            logger.debug(f"[AutoInit] Registered stop: {func.__name__}")
+        Service must provide:
+            - start()
+            - stop()
+        """
+        if service in self._services:
+            return
 
-    def auto_start(self, func: Callable):
-        """
-        Decorator to auto-register an init function.
-        """
-        self.register_init(func)
-        return func
+        if not hasattr(service, "start"):
+            raise AttributeError(
+                f"{service.__class__.__name__} missing start() method"
+            )
 
-    def auto_stop(self, func: Callable):
-        """
-        Decorator to auto-register a stop function.
-        """
-        self.register_stop(func)
-        return func
+        if not hasattr(service, "stop"):
+            raise AttributeError(
+                f"{service.__class__.__name__} missing stop() method"
+            )
+
+        self._services.append(service)
+
+        logger.debug(
+            f"Registered service: {service.__class__.__name__}"
+        )
 
     # -----------------------------
     # Lifecycle
@@ -66,58 +65,60 @@ class AutoInit:
 
     async def start(self):
         """
-        Execute all init functions once.
+        Start all registered services once.
         """
         if self._started:
             return
 
         self._started = True
 
-        if not self._inits:
-            logger.debug("[AutoInit] no init functions")
+        if not self._services:
+            logger.debug("No services")
             return
 
-        logger.info("[AutoInit] starting...")
+        logger.info("Starting...")
 
-        for func in list(self._inits):
+        for service in self._services:
             try:
-                result = func()
+                await service.start()
 
-                # Support async + sync
-                if asyncio.iscoroutine(result):
-                    await result
-
-                logger.debug(f"[AutoInit] executed init: {func.__name__}")
+                logger.debug(
+                    f"Started: {service.__class__.__name__}"
+                )
 
             except Exception as e:
-                logger.error(f"[AutoInit] error in init {func.__name__}: {e}")
+                logger.exception(
+                    f"Error starting "
+                    f"{service.__class__.__name__}: {e}"
+                )
 
-        logger.info("[AutoInit] all init functions executed")
+        logger.success("All services started")
 
     async def stop(self):
         """
-        Execute all stop functions (reverse order).
+        Stop all registered services in reverse order.
         """
-        if not self._stops:
-            logger.debug("[AutoInit] no stop functions")
+        if not self._services:
+            logger.debug("No services")
             return
 
-        logger.info("[AutoInit] stopping...")
+        logger.info("Stopping...")
 
-        for func in reversed(self._stops):
+        for service in reversed(self._services):
             try:
-                result = func()
+                await service.stop()
 
-                # Support async + sync
-                if asyncio.iscoroutine(result):
-                    await result
-
-                logger.debug(f"[AutoInit] executed stop: {func.__name__}")
+                logger.debug(
+                    f"Stopped: {service.__class__.__name__}"
+                )
 
             except Exception as e:
-                logger.error(f"[AutoInit] error in stop {func.__name__}: {e}")
+                logger.exception(
+                    f"Error stopping "
+                    f"{service.__class__.__name__}: {e}"
+                )
 
-        logger.info("[AutoInit] all stop functions executed")
+        logger.success("All services stopped")
 
         self._started = False
 

@@ -54,7 +54,7 @@ class ResourceCleaner:
         """
         if func not in self._cleaners:
             self._cleaners.append(func)
-            logger.debug(f"[ResourceCleaner] Registered: {func.__name__}")
+            logger.debug(f"Registered: {func.__name__}")
 
     def auto_clear(self, func: Callable):
         """
@@ -78,13 +78,15 @@ class ResourceCleaner:
     # Lifecycle
     # -----------------------------
 
-    async def start(self, interval: int = 30):
+    async def start(self):
         """
         Start background cleanup loop.
 
         Args:
             interval: Cleanup interval in seconds
         """
+        interval = CACHE_CLEAN_INTERVAL or 30
+
         if self._running:
             return
 
@@ -93,7 +95,7 @@ class ResourceCleaner:
 
         self._task = asyncio.create_task(self._loop(), name="resource-cleaner")
 
-        logger.info("[ResourceCleaner] started")
+        logger.info("Cleanup loop started")
 
     async def stop(self):
         """
@@ -113,7 +115,7 @@ class ResourceCleaner:
 
             self._task = None
 
-        logger.info("[ResourceCleaner] stopped")
+        logger.info("Cleanup loop stopped")
 
     # -----------------------------
     # Core loop
@@ -128,7 +130,7 @@ class ResourceCleaner:
                 await asyncio.sleep(self._interval)
                 await self.run_once()
         except asyncio.CancelledError:
-            logger.debug("[ResourceCleaner] loop cancelled")
+            logger.debug("Cleanup loop cancelled")
 
     async def run_once(self):
         """
@@ -151,21 +153,13 @@ class ResourceCleaner:
                     total_removed += result
 
             except Exception as e:
-                logger.error(f"[ResourceCleaner] error in {func.__name__}: {e}")
+                logger.error(f"Error in {func.__name__}: {e}")
 
         if total_removed:
-            logger.info(f"[ResourceCleaner] cleaned total={total_removed}")
+            logger.info(f"Cleaned total={total_removed}")
 
 
 # Global singleton
 resource_cleaner = ResourceCleaner()
 
-
-@auto_init.auto_start
-async def start_resource_cleaner():
-    await resource_cleaner.start(CACHE_CLEAN_INTERVAL)
-
-
-@auto_init.auto_stop
-async def stop_resource_cleaner():
-    await resource_cleaner.stop()
+auto_init.register(resource_cleaner)

@@ -76,30 +76,14 @@ class RedisService:
     # Key Builders
     # ------------------------------------------------------------------
 
-    def _build_memo_key(self, payload: dict) -> str:
+    def _build_memo_key(self, payload: dict, prefix: str = 'memo') -> str:
         client_id = payload.get("client_id")
         history_id = payload.get("history_id")
 
         if not all([client_id, history_id]):
             raise KeyError("[RedisService][_build_memo_key] client_id / history_id required")
 
-        return f"memo:{client_id}:{history_id}"
-
-    def _build_longterm_key(self, payload: dict) -> str:
-        client_id = payload.get("client_id")
-
-        if not client_id:
-            raise KeyError("[RedisService][_build_longterm_key] client_id required")
-
-        return f"longterm:{client_id}"
-
-    def _build_task_key(self, payload: dict) -> str:
-        '''build task key'''
-        task_hash = payload.get("task_hash")
-        if not (task_hash):
-            raise KeyError("[RedisService][_build_task_key] task_hash required")
-
-        return f"task:{task_hash}"
+        return f"{prefix}:{client_id}:{history_id}"
 
     # ------------------------------------------------------------------
     # Memo Redis (Conversation Cache)
@@ -283,6 +267,205 @@ class RedisService:
                 "success": False,
                 "messages": f"fail: {e}",
             }
+        
+    @task_handler("redis.memo.cache_current_messages_branch_chain")
+    async def cache_current_messages_branch_chain(self, payload: dict) -> dict:
+        """
+        Cache the node id chain of the user's current message branch.
+
+        The chain contains all node ids from the root node to the current
+        branch tip node, preserving the exact branch path selected by the user.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }}",
+                "history_id": "{{ hid }}",
+                "node_id_chain": list
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "success / fail: {e}",
+            }
+        """
+        logger.info(
+            "[RedisService][cache_current_messages_branch_chain] enter."
+        )
+
+        try:
+            node_id_chain = payload.get("node_id_chain", [])
+
+            if not isinstance(node_id_chain, list):
+                raise ValueError(
+                    "[RedisService][cache_current_messages_branch_chain] "
+                    "node_id_chain must be a list"
+                )
+
+            key = self._build_memo_key(payload, prefix='chain')
+
+            await self._memo_redis.set(
+                key,
+                json.dumps(node_id_chain, ensure_ascii=False),
+                ex=86400,
+            )
+
+            return {
+                "success": True,
+                "messages": "success",
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[RedisService][cache_current_messages_branch_chain] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("redis.memo.update_current_messages_branch_chain_cache")
+    async def update_current_messages_branch_chain_cache(self, payload: dict) -> dict:
+        """
+        Best effort to update the cached chain.
+
+        If parent_id exist in cached chain, update node_id to cache,
+        otherwise do nothing.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }}",
+                "history_id": "{{ hid }}",
+                "node_id": str,
+                "parent_id": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "success / fail: {e}",
+            }
+        """
+        logger.info(
+            "[RedisService][update_current_messages_branch_chain_cache] enter."
+        )
+
+        try:
+            node_id = payload["node_id"]
+            parent_id = payload["parent_id"]
+
+            key = self._build_memo_key(payload, prefix="chain")
+
+            cached_chain = await self._memo_redis.get(key)
+
+            # Cache miss, do nothing
+            if not cached_chain:
+                return {
+                    "success": True,
+                    "messages": "cache not found",
+                }
+
+            node_id_chain = json.loads(cached_chain)
+
+            if not isinstance(node_id_chain, list):
+                raise ValueError(
+                    "[RedisService][update_current_messages_branch_chain_cache] "
+                    "cached node_id_chain must be a list"
+                )
+
+            # Parent node not in current branch chain, do nothing
+            if parent_id not in node_id_chain:
+                return {
+                    "success": True,
+                    "messages": "parent_id not found in cache",
+                }
+
+            parent_index = node_id_chain.index(parent_id)
+            
+            if (
+                parent_index == len(node_id_chain) - 2
+                and node_id_chain[-1] == node_id
+            ):
+                return {
+                    "success": True,
+                    "messages": "already up to date",
+                }
+
+            # Keep nodes before and including parent_id, then append new node_id as branch tip.
+            new_chain = node_id_chain[: parent_index + 1]
+            new_chain.append(node_id)
+
+            await self._memo_redis.set(
+                key,
+                json.dumps(new_chain, ensure_ascii=False),
+                ex=86400,
+            )
+
+            return {
+                "success": True,
+                "messages": "success",
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[RedisService][update_current_messages_branch_chain_cache] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    @task_handler("redis.memo.get_current_messages_branch_chain")
+    async def get_current_messages_branch_chain(self, payload: dict) -> dict:
+        """
+        Fetch the cached node id chain of the user's current message branch.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": "{{ cid }}",
+                "history_id": "{{ hid }}"
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list,
+                "cache_hit": bool
+            }
+        """
+        logger.info(
+            "[RedisService][get_current_messages_branch_chain] enter."
+        )
+
+        try:
+            key = self._build_memo_key(payload, prefix='chain')
+
+            raw = await self._memo_redis.get(key)
+
+            if not raw:
+                return {
+                    "success": True,
+                    "messages": [],
+                    "cache_hit": False,
+                }
+
+            node_id_chain = json.loads(raw)
+
+            return {
+                "success": True,
+                "messages": node_id_chain,
+                "cache_hit": True,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[RedisService][get_current_messages_branch_chain] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
 
     # ------------------------------------------------------------------
     # TTL

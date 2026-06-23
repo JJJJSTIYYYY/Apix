@@ -126,7 +126,7 @@ class AgentNodeBase(ABC):
         """
         Decide whether to enter tool execution loop.
         """
-        logger.trace('[node_base.py] [AgentNodeBase] [should_continue] Enter')
+        logger.trace()
         if not state.get("messages"):
             return END
         last_message = state["messages"][-1]

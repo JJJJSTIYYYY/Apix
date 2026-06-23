@@ -6,7 +6,7 @@ from langchain.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent import global_config
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.context_manager.context_process import ai_context_manager
@@ -21,7 +21,7 @@ async def search_knowledge_base(
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
 
-    logger.trace('[retrieval_tool.py] [tool] [knowledge_base_retrieval] Enter')
+    logger.trace()
 
     target = state.get("target")
     generation_id = state.get("generation_id")
@@ -165,7 +165,7 @@ async def search_knowledge_base(
         })
 
     except Exception as e:
-        logger.exception(f"[knowledge_base_retrieval] failed: {str(e)}")
+        logger.exception(f"Failed search knowledge base: {str(e)}")
 
         error_msg = f"Failed to retrieve knowledge base chunks: {str(e)}"
 

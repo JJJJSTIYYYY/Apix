@@ -1,5 +1,7 @@
 from datetime import datetime
+from typing import Literal
 import inflect
+
 
 def get_date_natural_language():
     now = datetime.now()
@@ -16,3 +18,21 @@ def get_date_natural_language():
     natural_date = f"DATE: {weekday}, {month} {ordinal_day}, {year}"
     
     return natural_date
+
+
+def convert_generation_id_to_message_node_id(
+    generation_id: str | list[str] | set[str],
+    role: Literal['user', 'human', 'ai', 'assistant']
+) -> str | list[str] | set[str]:
+    suffix = "-user" if role in ['user', 'human'] else "-apix"
+
+    def convert(gid: str) -> str:
+        return gid[-12:] + suffix
+
+    if isinstance(generation_id, str):
+        return convert(generation_id)
+
+    return type(generation_id)(
+        convert(gid)
+        for gid in generation_id
+    )

@@ -6,8 +6,8 @@ from langchain.tools import tool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
-from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.apix_agent_core.agent_task.team_task_manager import team_task_manager
 from apix_agent.commons.logger import logger
 from apix_agent.commons.type_def import MainAgentState, SubAgentState
 from apix_agent.apix_agent_core.tools.prompt import ASSIGN_SUB_ASSISTANT_PROMPT, QUERY_SUB_ASSISTANT_PROMPT, STOP_SUB_ASSISTANT_PROMPT
@@ -134,10 +134,11 @@ async def assign_sub_assistant(
         }
         config = state.get("config")
 
-        task_id = await task_manager.submit_task(
+        task_id = await team_task_manager.submit_task(
             initial_state=initial_state,
             config=config,
             agent_name=assistant_name,
+            generation_id=generation_id
         )
 
         if not task_id:
@@ -168,7 +169,7 @@ async def assign_sub_assistant(
         )
 
     except Exception as e:
-        logger.exception(f'[assign_sub_assistant] Error occurred: {str(e)}')
+        logger.exception(f'Error occurred: {str(e)}')
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
             target=target,
@@ -226,7 +227,7 @@ async def query_sub_assistant(
     # -------------------------
 
     try:
-        results = await task_manager.query_tasks(
+        results = await team_task_manager.query_tasks(
             history_id="sub_" + state.get("history_id", ""),
             task_ids=task_ids
         )
@@ -259,7 +260,7 @@ async def query_sub_assistant(
         )
 
     except Exception as e:
-        logger.exception(f'[query_sub_assistant] Error occurred: {str(e)}')
+        logger.exception(f'Error occurred: {str(e)}')
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
             target=target,
@@ -347,7 +348,7 @@ async def stop_sub_assistant(
     # -------------------------
 
     try:
-        results = await task_manager.stop_tasks(
+        results = await team_task_manager.stop_tasks(
             history_id="sub_" + state.get("history_id"),
             task_ids=task_ids,
             reason=reason
@@ -378,7 +379,7 @@ async def stop_sub_assistant(
         )
 
     except Exception as e:
-        logger.exception(f'[stop_sub_assistant] Error occurred: {str(e)}')
+        logger.exception(f'Error occurred: {str(e)}')
         event_writer.send_event(
             event=AgentStreamEvent.TOOL_EXEC_END, 
             target=target,

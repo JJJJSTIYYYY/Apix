@@ -31,14 +31,13 @@ def load_from_yaml(dir, key=None) -> dict | str:
         if os.path.exists(dir):
             with open(dir, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f)
-                logger.info("[load_from_yaml] load config from yaml file successfully.")
         else:
             config = {}
         if key is not None:
             return config.get(key)
     
     except Exception as e:
-        logger.error(f"[load_from_yaml] Error loading yaml file: {e}")
+        logger.error(f"Error loading yaml file: {e}")
         raise
     return config
 
@@ -62,9 +61,8 @@ def write_to_yaml(dir, data: dict):
             Path(dir).parent.mkdir(parents=True, exist_ok=True)
         with open(dir, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, allow_unicode=True)
-            logger.info("[write_to_yaml] write data to local yaml file successfully.")
     except Exception as e:
-        logger.error(f"[write_to_yaml] Error writing to yaml file: {e}")
+        logger.error(f"Error writing to yaml file: {e}")
         raise
 
 
@@ -100,9 +98,8 @@ def append_to_yaml(dir, new_data: dict):
 
         with open(dir, "w", encoding="utf-8") as f:
             yaml.safe_dump(existing_data, f, allow_unicode=True)
-            logger.info("[append_to_yaml] append data to local yaml file successfully.")
     except Exception as e:
-        logger.error(f"[append_to_yaml] Error appending to yaml file: {e}")
+        logger.error(f"Error appending to yaml file: {e}")
         raise
 
 def update_to_yaml(file_path: Path, title: str, content: str) -> dict:
@@ -137,12 +134,10 @@ def update_to_yaml(file_path: Path, title: str, content: str) -> dict:
         with open(file_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, allow_unicode=True)
 
-        logger.info("[update_to_yaml] yaml updated successfully.")
-
         return data
 
     except Exception as e:
-        logger.error(f"[update_to_yaml] Error: {e}")
+        logger.error(f"Error updating to yaml file: {e}")
         raise
 
 # ==========================================================

@@ -4,7 +4,7 @@
     :class="{ selected: is_selecting && props.msg.selected }"
     @click.stop="toggleSelectFullArea"
   >
-    <div class="hover-menu-bar" v-if="!props.msg.is_editing">
+    <div class="hover-menu-bar" v-if="!props.msg.is_editing && showHumanBubble">
       <button 
         class="menu-item"
         @click="reEditContext"
@@ -36,6 +36,7 @@
 
       <div class="branch-switch-wrapper"
           v-if="(props.msg.pre_node && props.msg.pre_node.length > 0) || (props.msg.next_node && props.msg.next_node.length > 0)">
+        <div style="height: 2px; width: 100%; background: linear-gradient(to right, transparent, var(--apix-default-light-color));"></div>
         <div 
           class="branch-switch-label-wrapper"
         >
@@ -55,6 +56,7 @@
             <svg t="1777025401907" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1364" width="16" height="16"><path d="M611.872 512L318.592 226.752A48.48 48.48 0 0 1 304 192c0-26.496 21.056-48 47.008-48 12.064 0 23.68 4.736 32.416 13.248l317.12 308.416q19.456 18.88 19.456 46.336 0 27.424-19.456 46.336l-317.12 308.384a46.528 46.528 0 0 1-32.416 13.28c-25.952 0-47.008-21.504-47.008-48 0-13.12 5.28-25.696 14.592-34.752L611.84 512z" fill="#7C8394" p-id="1365"></path></svg>
           </button>
         </div>
+        <div style="height: 2px; width: 100%; background: linear-gradient(to left, transparent, var(--apix-default-light-color));"></div>
       </div>
       
       <div
@@ -78,7 +80,21 @@
           <svg v-else-if="msg.pending" t="1772618878456" class="icon rotate-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4818" width="200" height="200"><path d="M469.333333 85.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".8" p-id="4819"></path><path d="M469.333333 725.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".4" p-id="4820"></path><path d="M938.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".2" p-id="4821"></path><path d="M298.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".6" p-id="4822"></path><path d="M783.530667 180.138667m30.169889 30.169889l0 0q30.169889 30.169889 0 60.339779l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339779l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".1" p-id="4823"></path><path d="M330.965333 632.661333m30.16989 30.16989l0 0q30.169889 30.169889 0 60.339778l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339778l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".5" p-id="4824"></path><path d="M843.861333 783.530667m-30.169889 30.169889l0 0q-30.169889 30.169889-60.339779 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339779 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".3" p-id="4825"></path><path d="M391.338667 330.965333m-30.16989 30.16989l0 0q-30.169889 30.169889-60.339778 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339778 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".7" p-id="4826"></path></svg>
         </div>
         <div
+          class="system-instruction-bar"
+          v-if="systemInstruction && systemInstruction.length > 0"
+        >
+          <div
+            v-for="instruction in systemInstruction"
+            class="instruction-bar"
+            @click="showInstruction(instruction.ins)"
+          >
+            <svg t="1782128941029" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9449" width="16" height="16"><path d="M874.057143 276.72381l-490.057143 490.105904-234.057143-234.081524 41.447619-41.49638 192.609524 192.609523 448.609524-448.609523 41.447619 41.49638z" fill="currentColor" p-id="9450"></path></svg>
+            <span class="instruction-bar-content">{{ ''+instruction.preview }}</span>
+          </div>
+        </div>
+        <div
           key="bubble"
+          v-if="showHumanBubble"
           class="human-bubble"
           @mousedown="handleMouseDown"
           @mouseup="handleMouseUp"
@@ -105,6 +121,7 @@
 
           <div
             ref="bubbleContentRef"
+            v-if="renderedContent && renderedContent !== ''"
             class="bubble-content markdown-body selectable"
             :class="{ collapsed: shouldCollapse && !isExpanded }"
             v-html="renderedContent"
@@ -183,6 +200,7 @@ import msgBubbleMenu from '../../msg_bubble_body/comp/msgBubbleMenu.vue'
 import MarkdownIt from 'markdown-it'
 import msgSelectionBubble from '../../msg_bubble_body/comp/msgSelectionBubble.vue'
 import { globalSelection } from '../../../../store/globalData.js'
+import { ConfirmDialog } from '../../comp/confirmDialog.js'
 
 const emit = defineEmits<{
   edit: [id: string]
@@ -240,6 +258,23 @@ const uploadedFiles = computed<UploadedFile[]>(() => {
   return props.msg.extra?.user_meta_data?.uploaded_files ?? []
 })
 
+const systemInstruction = computed<object[]>(() => {
+  const rawSystemInstruction = props.msg.extra?.system_instruction ?? []
+  const SystemInstructionView = []
+  for (const si of rawSystemInstruction) {
+    console.log("si:", si)
+    if (si.startsWith("/system-heartbeat")) SystemInstructionView.push({
+      preview: "已发出自动任务",
+      ins: si
+    })
+    if (si.startsWith("/system-cron")) SystemInstructionView.push({
+      preview: "已发出定时任务",
+      ins: si
+    })
+  }
+  return SystemInstructionView
+})
+
 const referencedMessage = computed<object>(() => {
   return props.msg.extra?.referenced_message ?? {}
 })
@@ -247,6 +282,13 @@ const referencedMessage = computed<object>(() => {
 const activedFile = computed<string>(() => {
   return props.msg.extra?.active_file ?? ''
 })
+
+const showHumanBubble = computed(() => {
+  return activedFile.value && activedFile.value !== '' ||
+    referencedMessage.value && referencedMessage.value.content && referencedMessage.value.content !== '' ||
+    renderedContent.value && renderedContent.value !== ''
+  }
+)
 
 
 // 折叠/展开
@@ -323,6 +365,14 @@ watch(
   },
   { immediate: true }
 )
+
+
+const showInstruction = async (ins: string) => {
+  await ConfirmDialog.confirm(ins, '指令详情', {
+    confirmButtonText: '确定',
+    type: 'info',
+  })
+}
 
 
 // 菜单
@@ -756,6 +806,30 @@ onBeforeUnmount(() => {
   100% { transform: rotate(360deg); }
 }
 
+.system-instruction-bar {
+  width: 100%;
+}
+
+.instruction-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  padding-right: 3px;
+  height: 20px;
+  color: var(--apix-tertiary-dark-color);
+}
+
+.instruction-bar:hover {
+  box-shadow: inset 0 -1px 0 0 var(--apix-tertiary-dark-color);
+}
+
+.instruction-bar-content {
+  font-size: 14px !important;
+  color: currentColor !important;
+}
+
 .bubble-content {
   color: var(--content-color);
   background-color: transparent;
@@ -859,15 +933,15 @@ onBeforeUnmount(() => {
 .branch-switch-wrapper {
   opacity: 0.4;
   width: calc(400px - 34px);
-  background-color: var(--branch-bg);
-  border-radius: 24px;
-  border: 1px solid var(--branch-border);
   margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 40% 20% 40%;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .branch-switch-wrapper:hover {
   opacity: 1;
-  border: 1px solid var(--branch-hover-border);
 }
 
 .branch-switch-label-wrapper {

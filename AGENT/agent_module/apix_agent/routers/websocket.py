@@ -4,8 +4,7 @@ import json
 import traceback
 
 from apix_agent.commons.type_def import PlatformNotRegister
-from apix_agent.apix_agent_core.generation_manager import generation_manager
-from apix_agent.apix_event_pipe.apix_event_gateway import action_handler
+from apix_agent.apix_event_pipe.stream_event.stream_event_gateway import action_handler
 from apix_agent.apix_platform.register import PLATFORM_REGISTRY
 from apix_agent.commons.logger import logger
 from apix_agent.apix_platform import *
@@ -16,7 +15,7 @@ router = APIRouter(tags=["websocket"])
 @router.websocket("/ws/{platform}/{client_id}")
 async def ws_endpoint(websocket: WebSocket, platform: str, client_id: str):
     await websocket.accept()
-    logger.success(f"[ws] client connected: {client_id}")
+    logger.success(f"Client connected: {client_id}")
 
     try:
         websocket_platform = PLATFORM_REGISTRY[platform]
@@ -24,20 +23,20 @@ async def ws_endpoint(websocket: WebSocket, platform: str, client_id: str):
             raise PlatformNotRegister(platform=platform)
         await websocket_platform.register(websocket, client_id)
     except Exception as e:
-        logger.error(f"[ws] register failed for client={client_id}: {e}")
+        logger.error(f"Websocket platform register failed for client {client_id}: {e}")
         await websocket.close()
         return
 
     try:
         while True:
             raw_data = await websocket.receive_text()
-            logger.info(f"[ws] recv from client={client_id}: {raw_data}")
+            logger.info(f"Receive data from client {client_id}: {raw_data}")
 
             try:
                 data = json.loads(raw_data)
                 data = websocket_platform.trans_payload(data)
             except json.JSONDecodeError as e:
-                logger.error(f"[ws] invalid json from client={client_id}")
+                logger.error(f"Invalid json from client {client_id}")
                 continue
 
             action = data.get("action")
@@ -52,31 +51,31 @@ async def ws_endpoint(websocket: WebSocket, platform: str, client_id: str):
                 try:
                     await action_handler.abort_generation(data)
                 except Exception as e:
-                    logger.error(f"[ws] abort_generation failed client={client_id}: {e}")
+                    logger.error(f"Abort generation failed for client {client_id}: {e}")
                     continue
 
-                logger.warning(f"[ws] abort_generation by client={client_id}, history={history_id}")
+                logger.warning(f"Abort generation by client {client_id} for conversation {history_id}")
 
             elif action == "resolve_block":
                 try:
                     await action_handler.resolve_block(data)
                 except Exception as e:
-                    logger.error(f"[ws] resolve_block failed client={client_id}: {e}")
+                    logger.error(f"Resolve block failed for client {client_id}: {e}")
                     continue
 
             else:
-                raise ValueError(f"unknown action: {action}")
+                raise ValueError(f"Unknown action: {action}")
 
     except WebSocketDisconnect:
-        logger.info(f"[ws] client disconnected: {client_id}")
+        logger.info(f"Client disconnected: {client_id}")
 
     except Exception as e:
         logger.error(
-            "[ws] unexpected error for client="+
+            "Unexpected error for client="+
             f"{client_id}: {e}\n{traceback.format_exc()}"
         )
 
     finally:
         await websocket_platform.unregister(client_id)
-        logger.info(f"[ws] connection cleaned up: {client_id}")
+        logger.info(f"Connection cleaned up: {client_id}")
 

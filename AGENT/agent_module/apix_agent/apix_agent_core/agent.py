@@ -7,7 +7,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from apix_agent.commons.auto_init import auto_init
 from apix_agent.apix_agent_core.agent_factory.agent_creator import agent_creator
-from apix_agent.apix_agent_core.agent_team_task.task_manager import task_manager
+from apix_agent.apix_agent_core.agent_task.team_task_manager import team_task_manager
 from apix_agent.commons.type_def import MainAgentState, SubAgentState, AgentConfigSchema
 from apix_agent.commons.logger import logger
 
@@ -36,14 +36,13 @@ class AgentRuningtime:
                 self.stop_sub_agent(),
                 name="sub-agent-stopper",
             )
-            logger.info("[stop_sub_agent] Worker started.")
 
         if self._sub_agent_worker_task is None:
             self._sub_agent_worker_task = asyncio.create_task(
                 self._sub_agent_worker_loop(),
                 name="sub-agent-worker",
             )
-            logger.info("[sub_agent_worker] Worker started.")
+            logger.info("Worker started.")
 
 
     async def stop(self):
@@ -60,7 +59,6 @@ class AgentRuningtime:
                 await stopper
             except asyncio.CancelledError:
                 pass
-            logger.info("[stop_sub_agent] Worker stopped.")
 
         # Stop sub-agent worker
         worker = self._sub_agent_worker_task
@@ -71,7 +69,7 @@ class AgentRuningtime:
                 await worker
             except asyncio.CancelledError:
                 pass
-            logger.info("[sub_agent_worker] Worker stopped.")
+            logger.info("Worker stopped.")
 
 
     async def _run_sub_agent(
@@ -93,7 +91,7 @@ class AgentRuningtime:
             agent = await agent_creator.create_sub_agent(agent_name, initial_state.get("agent_role"), config)
 
             if not isinstance(agent, CompiledStateGraph):
-                logger.error(f"[sub_agent_worker] Create sub-agent failed: {agent}")
+                logger.error(f"Create sub-agent failed: {agent}")
                 return
             
             stream = agent.astream(
@@ -102,56 +100,49 @@ class AgentRuningtime:
                 stream_mode="custom",
             )
 
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "status", "in_progress")
+            await team_task_manager.mark_in_progress(initial_state["history_id"], initial_state["task_id"])
 
             async for chunk in stream:
                 if chunk.get("event") == "tool_exec_start":
                     tool_data = chunk.get("data", {})
                     if tool_data.get("tool_name", "") == "write_todos":
-                        await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "todos", tool_data.get("content", []))
+                        await team_task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], todos=tool_data.get("content", []))
                 elif chunk.get("event") == "ai_message_return":
                     msg_data = chunk.get("data", {})
                     if msg_data.get("event_name", "") == "output_chunk_rtn":
-                        await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "outputs", msg_data.get("content", ""))
+                        await team_task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], outputs=msg_data.get("content", ""))
 
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "status", "completed")
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "finish_timestamp", int(time.time()))
+            await team_task_manager.mark_completed(initial_state["history_id"], initial_state["task_id"])
 
         except asyncio.CancelledError:
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "status", "cancelled")
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "finish_timestamp", int(time.time()))
-            logger.info(f"[sub_agent_worker] Task stopped: {initial_state['task_id']}")
+            await team_task_manager.mark_cancelled(initial_state["history_id"], initial_state["task_id"])
+            logger.info(f"Task stopped: {initial_state['task_id']}")
 
         except Exception as e:
             error_logs = traceback.format_exc()
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "finish_timestamp", int(time.time()))
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "errors", f"{type(e)}: {e}: {error_logs}")
-            await task_manager.update_task_state_store(initial_state["history_id"], initial_state["task_id"], "status", "failed")
-            logger.error(f"[sub_agent_worker] Task execution failed: {type(e)}: {e}: {error_logs}")
+            await team_task_manager.mark_failed(initial_state["history_id"], initial_state["task_id"], error=f"{type(e)}: {e}: {error_logs}")
+            logger.error(f"Task execution failed: {type(e)}: {e}: {error_logs}")
 
         finally:
             # Remove from running task registry
             self._running_tasks.pop(initial_state["task_id"], None)
             if agent:
-                agent_creator.done(agent)
+                await agent_creator.done(agent)
 
 
     async def _sub_agent_worker_loop(self):
         """
         Background worker that dispatches sub-agent tasks.
         """
-
-        logger.info("[sub_agent_worker] Started.")
-
         try:
             while True:
-                agent_name, initial_state, config = await task_manager.task_queue.get()
+                agent_name, initial_state, config = await team_task_manager.task_queue.get()
 
                 try:
                     task_id = initial_state.get("task_id")
 
                     if not task_id:
-                        logger.error("[_sub_agent_worker_loop] No task_id provided in initial_state.")
+                        logger.error("No task_id provided in initial_state.")
                         raise RuntimeError("No task_id provided in initial_state.")
 
                     # Dispatch task
@@ -166,30 +157,28 @@ class AgentRuningtime:
                     self._running_tasks[task_id] = task
 
                 finally:
-                    task_manager.task_queue.task_done()
+                    team_task_manager.task_queue.task_done()
 
         except asyncio.CancelledError:
-            logger.info("[sub_agent_worker] Cancelled.")
+            logger.info("Worker loop task cancelled.")
 
 
     async def stop_sub_agent(self):
         """
         Background worker that handles stop requests for running sub-agent tasks.
         """
-        logger.info("[sub_agent_stop_worker] Started.")
-
         try:
             while True:
-                task_id = await task_manager.stop_request_queue.get()
+                task_id = await team_task_manager.stop_request_queue.get()
 
                 task = self._running_tasks.get(task_id)
 
                 if not task:
-                    logger.warning(f"[sub_agent_stop_worker] Task not found: {task_id}")
-                    task_manager.stop_request_queue.task_done()
+                    logger.warning(f"Task not found: {task_id}")
+                    team_task_manager.stop_request_queue.task_done()
                     continue
 
-                logger.info(f"[sub_agent_stop_worker] Cancelling task: {task_id}")
+                logger.info(f"Cancelling task: {task_id}")
 
                 task.cancel()
 
@@ -198,10 +187,10 @@ class AgentRuningtime:
                 except asyncio.CancelledError:
                     pass
                 
-                task_manager.stop_request_queue.task_done()
+                team_task_manager.stop_request_queue.task_done()
 
         except asyncio.CancelledError:
-            logger.info("[sub_agent_stop_worker] Cancelled.")
+            logger.info("Stop sub-agent loop cancelled.")
             
 
     #---------------------------------------------------------------
@@ -224,7 +213,7 @@ class AgentRuningtime:
         Returns:
             Async iterator of LangGraph stream events.
         """
-        logger.trace('[agent.py] [AI_Agent] [submit_task] Enter')
+        logger.trace()
 
         agent = await agent_creator.create_agent(agent_name, agent_role, config)
         if not isinstance(agent, CompiledStateGraph):
@@ -232,7 +221,7 @@ class AgentRuningtime:
                 f"Get agent error. Please make sure your config correct.\n\nDetail: {agent}"
             )
         logger.info(
-            f"[submit_task] Start agent streaming: "
+            f"Start agent streaming: "
             f"{agent_role} - {agent_name}"
         )
 
@@ -250,11 +239,4 @@ class AgentRuningtime:
 
 ai_agent = AgentRuningtime()
 
-@auto_init.auto_start
-async def start_ai_agent_runingtime():
-    await ai_agent.start()
-
-
-@auto_init.auto_stop
-async def stop_ai_agent_runingtime():
-    await ai_agent.stop()
+auto_init.register(ai_agent)

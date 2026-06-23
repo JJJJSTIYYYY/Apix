@@ -7,68 +7,31 @@ import traceback
 
 import httpx
 
-from apix_agent.apix_platform.register import PLATFORM_REGISTRY
+from apix_agent.commons.common_func import convert_generation_id_to_message_node_id
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.generation_manager import generation_manager, GenerationManager
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
-from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelopeTarget, MainAgentState, MinimalEnvelopeData, ApixEventEnvelope, PlatformNotRegister, ProviderNotFound
+from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelope, ApixIdentity, MainAgentState, ProviderNotFound
 from apix_agent.commons.file_content_reader import load_from_yaml, write_to_yaml
 from apix_agent.global_config import BASE_DIR, BASE_URL, MEMORY_SERVICE_BASE_URL
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter
+from apix_agent.apix_event_pipe.event_handler_base import EventHandler
 
 
 # =========================
-# Handler
+# Stream Event Handler
 # =========================
-class EventHandler:
+class StreamEventHandler(EventHandler):
 
     def __init__(self, gen_mgr: GenerationManager):
+        super().__init__()
         self.gen_mgr = gen_mgr
 
         self.cached_config: AgentConfigSchema | None = None
         self._config_lock = asyncio.Lock()
 
-    def _build_envelope(
-        self,
-        event: str,
-        target: ApixEventEnvelopeTarget,
-        data: MinimalEnvelopeData,
-        generation_id: str,
-    ) -> ApixEventEnvelope:
-        return {
-            "event": event,
-            "target": target,
-            "data": data,
-            "generation_id": generation_id,
-            "timestamp": time.time(),
-        }
-    
-    async def _send_envelope(
-        self,
-        target: ApixEventEnvelopeTarget,
-        envelope: ApixEventEnvelope = None
-    ):
-        """
-        Dispatch envelope to different platform senders.
-
-        - default → websocket
-        - extensible via @send_interface
-        """
-
-        if not envelope:
-            return
-        
-        client_id = target.get("id")
-        platform = target.get("platform")
-        sender = PLATFORM_REGISTRY.get(platform)
-
-        if not sender:
-            raise PlatformNotRegister(platform=platform)
-
-        await sender.send(client_id, envelope)
-
-    async def _ensure_config(self, config: AgentConfigSchema) -> AgentConfigSchema:
+    async def _ensure_config(self, config: AgentConfigSchema, platform: str = 'default') -> AgentConfigSchema:
         """
         Ensure config is merged into cache (deep merge) and persisted if changed.
 
@@ -82,7 +45,7 @@ class EventHandler:
         if config.get("models_provider") == 'custom':
             provider_id = config.get("custom_provider_id", "")
 
-            response = httpx.post(
+            response = await httpx.AsyncClient().post(
                 f"{MEMORY_SERVICE_BASE_URL}/provider/get_llm_provider_by_id",
                 json={
                     "provider_id": provider_id,
@@ -90,7 +53,7 @@ class EventHandler:
             )
             response.raise_for_status()
             provider_metas = response.json().get("messages", []) or []
-            logger.info(f"[get_models_list]: Custom provider meta: {provider_metas}")
+            logger.info(f"Custom provider meta: {provider_metas}")
             if provider_metas:
                 provider_meta = provider_metas[0]
             else:
@@ -101,11 +64,15 @@ class EventHandler:
             config["models_provider"] = provider
             BASE_URL[provider] = endpoint or ""
 
-        cache_file_path = Path(BASE_DIR) / "running_cache" / "config_cache.yaml"
+        cache_file_folder = Path(BASE_DIR) / "running_cache"
+        cache_file_path = Path(BASE_DIR) / "running_cache" / f"{platform}_config_cache.yaml"
 
         async with self._config_lock:
             if self.cached_config is None:
                 self.cached_config = load_from_yaml(cache_file_path) or {}
+                if platform != 'default' and not self.cached_config:
+                    # fallback to default
+                    self.cached_config = load_from_yaml(cache_file_folder / f"default_config_cache.yaml") or {}
 
             old_config = copy.deepcopy(self.cached_config)
 
@@ -139,7 +106,7 @@ class EventHandler:
             try:
                 _, p_type, p_id = provider.split('-', 2)
 
-                response = httpx.post(
+                response = await httpx.AsyncClient().post(
                     f"{MEMORY_SERVICE_BASE_URL}/provider/get_llm_provider_by_id",
                     json={
                         "provider_id": p_id,
@@ -148,7 +115,7 @@ class EventHandler:
                 response.raise_for_status()
 
                 provider_metas = response.json().get("messages", []) or []
-                logger.info(f"[ensure_config]: restore custom provider meta: {provider_metas}")
+                logger.info(f"Restore custom provider meta: {provider_metas}")
 
                 if not provider_metas:
                     raise ProviderNotFound(provider=p_id)
@@ -160,40 +127,61 @@ class EventHandler:
                 BASE_URL[provider] = endpoint or ""
 
             except Exception as e:
-                logger.error(f"[ensure_config]: failed to restore BASE_URL for {provider}: {e}")
+                logger.error(f"Failed to restore BASE_URL for {provider}: {e}")
                 raise
 
         return self.cached_config
+    
+
+    async def _handle_stream_event(
+        self,
+        client_id: str,
+        generation_id: str,
+        target: ApixIdentity,
+        astream,
+        event: ApixEventEnvelope,
+    ) -> bool:
+        """
+        Returns:
+            True  -> stop stream
+            False -> continue stream
+        """
+        pass
         
 
     async def chat_with_llm(self, payload: ApixEntryDataSchema):
-        logger.trace('[EventHandler] chat_with_llm Enter')
+        '''
+        Invoke agent.
+        '''
+        logger.trace()
 
         data = payload.get("data") or {}
         client_id = data.get("client_id")
         session_id = data.get("session_id", "")
         history_id = data.get("history_id", "")
         platform = data.get("platform", "")
-        target: ApixEventEnvelopeTarget = {
+        associated_account = data.get("associated_account")
+        target: ApixIdentity = {
             "id": client_id,
             "platform": platform,
             "conversation_id": history_id,
+            "associated_account": associated_account
         }
 
         try:
             generation_id = await generation_manager.create_generation(client_id, history_id, platform)
         except Exception as e:
-            logger.error(f"[chat_with_llm] create_generation failed client={client_id}: {e}")
+            logger.error(f"Create generation failed client={client_id}: {e}")
 
         gen = self.gen_mgr.get_generation(client_id, generation_id)
         if not gen:
-            logger.error(f"[chat_with_llm] Please create a generation first. client_id={client_id}, generation_id={generation_id}")
+            logger.error(f"Please create a generation first. client_id={client_id}, generation_id={generation_id}")
             return
 
         try:
             message = data.get("messages", {})
             re_generate = data.get("re_generate", False)
-            config = await self._ensure_config(data.get("config", {}) or {})
+            config = await self._ensure_config(data.get("config", {}) or {}, platform)
             work_dir = config.get("work_dir", "")
 
             if work_dir and not os.path.exists(work_dir):
@@ -209,7 +197,7 @@ class EventHandler:
 
             if not isinstance(message, dict):
                 class_name = type(message).__name__
-                raise ValueError(f"[chat_with_llm] Unexpected data type: message is {class_name}, expected dict.")
+                raise ValueError(f"Unexpected data type: message is {class_name}, expected dict.")
 
             timestamp = int(time.time() * 1000)
             initial_state: MainAgentState = {
@@ -219,7 +207,7 @@ class EventHandler:
                 "session_id": session_id,
                 "history_id": history_id,
                 "target": target,
-                "node_id": generation_id[-12:] + "-apix",
+                "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
                 "generation_id": generation_id,
                 "config": config,
                 "timestamp": timestamp,
@@ -264,7 +252,7 @@ class EventHandler:
                         data={
                             "event_name": "msg_stream_start",
                             "content": {
-                                "node_id": generation_id[-12:] + "-apix",
+                                "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
                                 "parent_id": content
                             }
                         },
@@ -284,11 +272,11 @@ class EventHandler:
                         generation_id=generation_id,
                     )
                     await self._send_envelope(target, envelop)
-                    logger.warning(f"[chat_with_llm] this generation has been aborted, generation_id = {generation_id}")
+                    logger.warning(f"This generation has been aborted, generation_id = {generation_id}")
                     return
 
                 await self.gen_mgr.update_cache_tokens(client_id, generation_id, achunk)
-                await asyncio.sleep(0.06)
+                # await asyncio.sleep(0.06)
                 await self._send_envelope(target, achunk)
 
             envelop = self._build_envelope(
@@ -301,10 +289,10 @@ class EventHandler:
                 generation_id=generation_id,
             )
             await self._send_envelope(target, envelop)
-            gen.status = 'finished'
+            await self.gen_mgr._set_generation_status(gen, 'finished')
 
         except Exception as e:
-            logger.error(f"[chat_with_llm error] {client_id}: {traceback.format_exc()}")
+            logger.error(f"Error for user {client_id}: {traceback.format_exc()}")
 
             if client_id:
                 await self.gen_mgr.abort_generation(client_id, generation_id)
@@ -326,24 +314,30 @@ class EventHandler:
 
 
     async def resolve_block(self, payload: ApixEntryDataSchema):
-        logger.trace('[EventHandler] resolve_block Enter')
+        '''
+        Resolve a block in an agent loop.
+        '''
+        logger.trace()
 
         data = payload.get('data')
         block_id = data.get('block_id')
         message = data.get('messages')
-        target: ApixEventEnvelopeTarget = {
+        target: ApixIdentity = {
             'id': data.get('client_id'),
             'platform': data.get('platform'),
             'conversation_id': data.get('history_id')
         }
         if not block_id: 
-            raise ValueError(f"[abort_generation] Missing required fields in payload: {data}")
+            raise ValueError(f"Missing required fields in payload: {data}")
         
         AgentStreamWriter.resolve_block(target=target, block_id=block_id, result=message)
 
 
     async def abort_generation(self, payload: ApixEntryDataSchema):
-        logger.trace('[EventHandler] abort_generation Enter')
+        '''
+        Interrupt a running generation immediately and clear its block.
+        '''
+        logger.trace()
 
         data = payload.get("data") or {}
         client_id = data.get("client_id")
@@ -351,25 +345,31 @@ class EventHandler:
         platform = data.get("platform", "")
 
         if not client_id or not history_id or not platform:
-            raise ValueError(f"[abort_generation] Missing required fields in payload: {data}")
+            raise ValueError(f"Missing required fields in payload: {data}")
 
-        await generation_manager.abort_by_history_id(client_id, history_id, platform)
-
-    
-
-    # Extension hooks
-    def _before_send(
-        self,
-        envelope: ApixEventEnvelope,
-    ) -> ApixEventEnvelope:
-        return envelope
-
-    def _after_send(
-        self,
-        envelope: ApixEventEnvelope,
-    ) -> None:
-        pass
+        await generation_manager.abort_by_history_id(client_id, history_id)
 
 
+    async def await_for_generation(self, payload: ApixEntryDataSchema):
+        '''
+        Wait for all active generations associated with the specified conversation
+        history to complete.
 
-action_handler = EventHandler(generation_manager)
+        This handler blocks until every running generation under the given
+        ``history_id`` transitions from ``running`` to either ``finished`` or
+        ``aborted``. If no matching running generation exists, it returns
+        immediately.
+        '''
+        logger.trace()
+
+        data = payload.get("data") or {}
+        client_id = data.get("client_id")
+        history_id = data.get("history_id", "")
+        await generation_manager.await_by_history_id(
+            client_id,
+            history_id
+        )
+
+
+
+action_handler = StreamEventHandler(generation_manager)

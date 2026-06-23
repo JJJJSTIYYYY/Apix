@@ -5,7 +5,8 @@ from langchain_core.messages import SystemMessage, AIMessageChunk, HumanMessage,
 from langgraph.graph.state import Command
 from langgraph.types import Overwrite
 
-from apix_agent.apix_event_pipe.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
+from apix_agent.commons.common_func import convert_generation_id_to_message_node_id
+from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter, AgentStreamEvent
 from apix_agent.apix_agent_core.agent_factory.prompt import *
 from apix_agent.apix_agent_core.LLM.llm_adapter import LlmNodeAdapter
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
@@ -28,7 +29,7 @@ class MainAgentNode(AgentNodeBase):
         Prepare sandbox, memorandum, skills, rag and memory prompt.
         Create agent message (langChain messsage object).
         """
-        logger.trace('[agent.py] [AgentNode] [context_prepare] Enter')
+        logger.trace()
 
         # Basic state extraction
         config = state.get("config", {})
@@ -95,7 +96,7 @@ class MainAgentNode(AgentNodeBase):
                 # For a full generation wtih new user input.
                 await ai_context_manager.append_to_messages(client_id, history_id, client_message)
                 # A new uer message appended in database, update the last confirmed node_id to this message
-                current_visible_node_id = generation_id + '-user'
+                current_visible_node_id = convert_generation_id_to_message_node_id(generation_id, 'user')
             else: 
                 # For a incomplete generation wtihout user input. (re-generation mode)
                 # parent_id in client_message means the last confirmed node_id
@@ -137,7 +138,7 @@ class MainAgentNode(AgentNodeBase):
                 after_index=after_index,
                 reasoning=enable_think
             )
-            logger.info(f"[context_prepare] Prepared message objects: {messages}")
+            logger.info(f"Prepared message objects: {messages}")
 
             # Return command
             return Command(
@@ -169,7 +170,7 @@ class MainAgentNode(AgentNodeBase):
             3: drop_tool_messages(min_keep=2)
             4+: exponential truncate (reversible)
         """
-        logger.trace('[agent.py] [AgentNode] [context_summary] Enter')
+        logger.trace()
 
         # Config
         generation_id = state.get("generation_id")
@@ -184,7 +185,7 @@ class MainAgentNode(AgentNodeBase):
         context_compress_level = state.get("context_compress_level", 0)
         shortterm_memory = state.get("shortterm_memory", "")
 
-        logger.info(f"[context_summary] Existing shortterm memory:\n{shortterm_memory}")
+        logger.info(f"Existing shortterm memory:\n{shortterm_memory}")
 
         messages = state.get("messages", [])
 
@@ -205,7 +206,7 @@ class MainAgentNode(AgentNodeBase):
             return Command(update={})
 
         logger.info(
-            f"[context_summary] Triggered. "
+            f"Context compress triggered. "
             f"len={len(messages)} level={context_compress_level} "
             f"retry={llm_retry_count} error={last_error}"
         )
@@ -225,9 +226,7 @@ class MainAgentNode(AgentNodeBase):
                 keep_recent=keep_recent,
             )
 
-            logger.success(
-                f"[context_summary] Truncate (memory disabled). keep={keep_recent}"
-            )
+            logger.success(f"Truncate (memory disabled). keep={keep_recent}")
 
             return Command(
                 update={
@@ -250,7 +249,7 @@ class MainAgentNode(AgentNodeBase):
             )
 
             logger.success(
-                f"[context_summary] Level1 drop_tool_messages "
+                f"Level 1: Drop tool messages "
                 f"(min_keep={keep_recent_base})"
             )
 
@@ -307,7 +306,7 @@ class MainAgentNode(AgentNodeBase):
                     fall_back_config=config
                 )
             except Exception as e:
-                logger.error(f"[context_summary] Summary failed: {e}")
+                logger.error(f"Summary failed: {e}")
                 # Directly entry next level
                 return Command(update={})
 
@@ -322,7 +321,7 @@ class MainAgentNode(AgentNodeBase):
             )
 
             logger.success(
-                f"[context_summary] Level2 summary done. "
+                f"Level 2: Summary done. "
                 f"remain={len(recent_messages)}"
             )
 
@@ -352,7 +351,7 @@ class MainAgentNode(AgentNodeBase):
                 min_keep=2,
             )
 
-            logger.success("[context_summary] Level 3 drop_tool_messages(min_keep=2)")
+            logger.success("Level 3: Drop tool messages(min_keep=2)")
 
             return Command(
                 update={
@@ -369,7 +368,7 @@ class MainAgentNode(AgentNodeBase):
         )
 
         logger.success(
-            f"[context_summary] Level{context_compress_level} truncate "
+            f"Level {context_compress_level}: Truncate "
             f"(keep={keep_recent})"
         )
 
@@ -385,7 +384,7 @@ class MainAgentNode(AgentNodeBase):
         Merge system prompt and context.
         Call LLM with current conversation state.
         """
-        logger.trace('[agent.py] [AI_Agent] [llm_call] Enter')
+        logger.trace()
 
         # Basic config
         agent_role = state.get("agent_role")
@@ -406,9 +405,7 @@ class MainAgentNode(AgentNodeBase):
         event_writer = AgentStreamWriter(generation_id)
         messages = state["messages"]
 
-        logger.info(
-            f'[agent.py] [AI_Agent] [llm_call] Invoke llm with {len(messages)} messages'
-        )
+        logger.info(f'Invoke llm with {len(messages)} messages')
 
         # Load base rule prompt
         state["rule_prompt"] = self._load_prompt(agent_role)
@@ -439,9 +436,7 @@ class MainAgentNode(AgentNodeBase):
             todo_prompt = ai_context_manager.create_todo_prompt(state, agent_role)
             runtime_prompt_parts.append(todo_prompt)
 
-            logger.info(
-                f'[agent.py] [AI_Agent] [llm_call] Load todos:\n {todo_prompt}'
-            )
+            logger.info(f'Load todos:\n {todo_prompt}')
 
         # Merge all runtime prompt parts
         runtime_prompt = "".join(runtime_prompt_parts)
@@ -475,7 +470,7 @@ class MainAgentNode(AgentNodeBase):
             if skill_msgs:
                 # Inject
                 llm_input = llm_input + skill_msgs
-                logger.warning(f"[agent.py] [AI_Agent] [llm_call] Injected {len(skill_msgs)} skill(s) markdown. [{char_num} Chars]")
+                logger.warning(f"Injected {len(skill_msgs)} skill(s) markdown. [{char_num} Chars]")
 
         # Inject alert if necessary
         need_alert = self._should_inject_alert(
@@ -483,10 +478,10 @@ class MainAgentNode(AgentNodeBase):
             threshold=llm_calls_warning_threshold,
         )
         if need_alert:
-            logger.warning(f"[agent.py] [AI_Agent] [llm_call] Inject `SYSTEM_ALERT_PROMPT`: {self.SYSTEM_ALERT_PROMPT}")
+            logger.warning(f"Inject `SYSTEM_ALERT_PROMPT`: {self.SYSTEM_ALERT_PROMPT}")
             llm_input = llm_input + [SystemMessage(self.SYSTEM_ALERT_PROMPT)]
         if state.get("error_detail"):
-            logger.warning(f"[agent.py] [AI_Agent] [llm_call] Inject `CRITICAL WARN`: {state.get("error_detail")}")
+            logger.warning(f"Inject `CRITICAL WARN`: {state.get("error_detail")}")
             llm_input = llm_input + [SystemMessage(f"CRITICAL WARN: {state.get("error_detail")}. If you are trying to do that, stop immediately any way!")]
 
         # Start streaming
@@ -571,7 +566,7 @@ class MainAgentNode(AgentNodeBase):
 
         except ConflictToolCalls as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             event_writer.send_event(
                 event=AgentStreamEvent.RUNTIME_WARNING, 
                 target=target,
@@ -596,7 +591,7 @@ class MainAgentNode(AgentNodeBase):
 
         except InvalidOutputsError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             event_writer.send_event(
                 event=AgentStreamEvent.RUNTIME_WARNING, 
                 target=target,
@@ -620,7 +615,7 @@ class MainAgentNode(AgentNodeBase):
         except BadRequestError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
             context_compress_level = state.get("context_compress_level", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             event_writer.send_event(
                 event=AgentStreamEvent.RUNTIME_WARNING, 
                 target=target,
@@ -645,7 +640,7 @@ class MainAgentNode(AgentNodeBase):
             
         except RateLimitError as e:
             llm_retry_count = state.get("llm_retry_count", 0) + 1
-            logger.warning(f"[llm_call] Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
+            logger.warning(f"Error occurred: {type(e).__name__}; \nRetry at soon ({llm_retry_count}/{MAX_RETRY})...")
             event_writer.send_event(
                 event=AgentStreamEvent.RUNTIME_WARNING, 
                 target=target,
@@ -667,7 +662,7 @@ class MainAgentNode(AgentNodeBase):
             else:
                 raise e
 
-        logger.info(f"[llm_call] Generate chunks num: {chunk_num}")
+        logger.info(f"Generate chunks num: {chunk_num}")
 
         # End streaming
         event_writer.send_event(
