@@ -41,14 +41,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: CLIENT/apix-app
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            npm ci
-          else
-            # mica-electron is Windows-only, skip it on macOS/Linux
-            npm ci --omit=optional
-          fi
-        shell: bash
+        run: npm ci
 
       - name: Build & package Electron app
         working-directory: CLIENT/apix-app
