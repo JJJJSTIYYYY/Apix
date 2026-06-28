@@ -99,6 +99,57 @@ chmod +x setup.sh
 
 ---
 
+### Docker Compose (Recommended)
+
+To run all backend services inside Docker, run after `setup.ps1` / `setup.sh`:
+
+**Windows:**
+
+```powershell
+.\start-docker.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x start-docker.sh
+./start-docker.sh
+```
+
+The Electron frontend still runs on the host. Service ports remain unchanged:
+
+- AGENT: `http://127.0.0.1:5091`
+- TASK: `http://127.0.0.1:5090`
+- MEMORY: `http://127.0.0.1:5093`
+- FILE: `http://127.0.0.1:5094`
+
+For RAG vector search with Milvus, add `--profile milvus`:
+
+```bash
+docker compose --profile milvus up -d --build
+```
+
+---
+
+### Local Backend Startup
+
+If you prefer not to use Docker, start the four backend services locally after setup:
+
+**Windows:**
+
+```powershell
+.\start-local.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x start-local.sh
+./start-local.sh
+```
+
+---
+
 ### Custom Installation
 
 If you'd like to customize the deployment process, please refer to our documentation:

@@ -66,19 +66,6 @@
     "vue": "^3.5.17",
     "vue-eslint-parser": "^10.2.0"
   },
-  "build": {
-    "appId": "com.justiy.apix",
-    "productName": "ApiX",
-    "win": {
-      "icon": "build/icons/icon.ico"
-    },
-    "mac": {
-      "icon": "build/icons/icon.icns"
-    },
-    "linux": {
-      "icon": "build/icons/"
-    }
-  },
   "volta": {
     "node": "22.19.0"
   }

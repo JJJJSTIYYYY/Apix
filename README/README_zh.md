@@ -11,6 +11,66 @@ cd Apix
 
 ---
 
+# 推荐：Docker Compose 一键部署（后端全容器化）
+
+项目根目录已提供 `docker-compose.yml`，可将 Redis、MySQL 与四个 Python 后端服务（TASK / AGENT / MEMORY / FILE）全部运行在 Docker 中。Electron 前端仍在宿主机运行。
+
+## 前置条件
+
+- 已安装 [Docker Desktop](https://www.docker.com/) 并正在运行
+- 已执行 `setup.ps1`（Windows）或 `setup.sh`（macOS/Linux）完成依赖镜像构建与数据库初始化
+
+## 启动
+
+**Windows:**
+
+```powershell
+.\start-docker.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x start-docker.sh
+./start-docker.sh
+```
+
+脚本会自动设置 `HOST_BASE_DIR` 环境变量，确保 AGENT 在容器内也能正确 spawned `agent-sandbox` 兄弟容器。
+
+## 端口说明
+
+服务端口与本地启动完全一致：
+
+- AGENT: `http://127.0.0.1:5091`
+- TASK: `http://127.0.0.1:5090`
+- MEMORY: `http://127.0.0.1:5093`
+- FILE: `http://127.0.0.1:5094`
+
+## 可选：启动 Milvus（RAG 向量库）
+
+```bash
+docker compose --profile milvus up -d --build
+```
+
+## 本地启动后端（非 Docker）
+
+如果你不想使用 Docker Compose，可以执行：
+
+**Windows:**
+
+```powershell
+.\start-local.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x start-local.sh
+./start-local.sh
+```
+
+---
+
 # Docker配置
 
 [Docker Desktop下载地址](https://www.docker.com/)

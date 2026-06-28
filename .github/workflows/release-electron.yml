@@ -1,0 +1,61 @@
+name: Release Electron Client
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build on ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            builder-args: --win
+          - os: macos-latest
+            name: macOS
+            builder-args: --mac
+          - os: ubuntu-latest
+            name: Linux
+            # snap is excluded because it requires snapcraft in CI.
+            # Add --linux snap here and install snapcraft if you need it.
+            builder-args: --linux AppImage deb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: CLIENT/apix-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: CLIENT/apix-app
+        run: npm ci
+
+      - name: Build & package Electron app
+        working-directory: CLIENT/apix-app
+        run: npm run build && npx --no-install electron-builder ${{ matrix.builder-args }} --publish=never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Skip macOS code-signing lookup. Code signing can be enabled later
+          # by setting APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, etc.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: CLIENT/apix-app/dist/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

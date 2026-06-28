@@ -178,6 +178,7 @@ class StreamEventHandler(EventHandler):
             logger.error(f"Please create a generation first. client_id={client_id}, generation_id={generation_id}")
             return
 
+        agent = None
         try:
             message = data.get("messages", {})
             re_generate = data.get("re_generate", False)
