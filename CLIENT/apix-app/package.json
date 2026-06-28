@@ -40,7 +40,6 @@
     "js-yaml": "^4.1.0",
     "markdown-it": "^14.1.0",
     "markdown-it-link-attributes": "^4.0.1",
-    "mica-electron": "^1.5.16",
     "node-fetch": "^3.3.2",
     "pinia": "^3.0.3",
     "trash": "^10.1.1",
@@ -65,6 +64,9 @@
     "vite": "^7.0.5",
     "vue": "^3.5.17",
     "vue-eslint-parser": "^10.2.0"
+  },
+  "optionalDependencies": {
+    "mica-electron": "^1.5.16"
   },
   "volta": {
     "node": "22.19.0"
