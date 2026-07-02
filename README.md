@@ -84,6 +84,53 @@ chmod +x setup.sh
 
 > 一键安装过程中请确保网络保持畅通
 
+### 方式二：Docker Compose 一键启动（推荐）
+
+如果您希望所有后端服务都运行在 Docker 中，可在执行完 `setup.ps1` / `setup.sh` 后运行：
+
+**Windows:**
+
+```powershell
+.\start-docker.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x start-docker.sh
+./start-docker.sh
+```
+
+启动后，Electron 客户端仍在宿主机运行，服务端口保持不变：
+
+- AGENT: `http://127.0.0.1:5091`
+- TASK: `http://127.0.0.1:5090`
+- MEMORY: `http://127.0.0.1:5093`
+- FILE: `http://127.0.0.1:5094`
+
+如需使用 RAG 向量库 Milvus，请加上 `--profile milvus`：
+
+```bash
+docker compose --profile milvus up -d --build
+```
+
+### 方式三：本地启动后端服务
+
+执行完 `setup.ps1` / `setup.sh` 后，如果不需要 Docker，可以直接启动四个本地后端服务：
+
+**Windows:**
+
+```powershell
+.\start-local.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x start-local.sh
+./start-local.sh
+```
+
 ### 如果您想自定义安装
 
 可以参考我们的部署文档:

@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from uuid import uuid4
 
 from apix_agent.commons.auto_init import auto_init
-from apix_agent.global_config import SANDBOX_DOCKER_IMAGE_NAME, CONTIANER_TTL
+from apix_agent.global_config import SANDBOX_DOCKER_IMAGE_NAME, CONTIANER_TTL, BASE_DIR
 from apix_agent.commons.resource_cleaner import resource_cleaner
 
 
@@ -278,12 +278,18 @@ class AgentSandboxManager:
         # Check image exists locally
         await self._run_cmd(["docker", "image", "inspect", image_name])
 
+        # When the agent itself runs inside Docker, the host Docker daemon
+        # cannot see the container's filesystem. HOST_BASE_DIR points to the
+        # same directory on the host so bind-mounts work from sibling containers.
+        host_base_dir = os.environ.get("HOST_BASE_DIR", BASE_DIR)
+        host_work_dir = self._to_host_path(work_dir, BASE_DIR, host_base_dir)
+
         cmd = [
             "docker", "run",
             "-d",
             "--rm",                         # Auto remove when stopped
             "--network", "host",            # Share network with host
-            "-v", f"{work_dir}:/workspace", # Bind mount
+            "-v", f"{host_work_dir}:/workspace", # Bind mount
             "-w", "/workspace",             # Working directory
             "--name", f"agent_sandbox_{uuid4()}",
             image_name,
@@ -292,6 +298,24 @@ class AgentSandboxManager:
 
         result = await self._run_cmd(cmd)
         return result.strip()
+
+    def _to_host_path(self, container_path: str, container_base: str, host_base: str) -> str:
+        """Translate a container path to the equivalent host path using HOST_BASE_DIR mapping."""
+        container_path = os.path.abspath(container_path)
+        container_base = os.path.abspath(container_base)
+        host_base = os.path.abspath(host_base)
+
+        # Normalize Windows backslashes for Docker bind-mount syntax
+        norm_container_path = container_path.replace("\\", "/")
+        norm_container_base = container_base.replace("\\", "/")
+        norm_host_base = host_base.replace("\\", "/")
+
+        if norm_container_path.startswith(norm_container_base + "/") or norm_container_path == norm_container_base:
+            relative = norm_container_path[len(norm_container_base):].lstrip("/")
+            host_path = os.path.join(host_base, relative) if relative else host_base
+            return host_path.replace("\\", "/")
+
+        return norm_container_path
 
     async def _container_alive(self, container_id: str) -> bool:
         try:

@@ -1,0 +1,201 @@
+services:
+  apix-redis:
+    image: redis:7
+    container_name: apix-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./MEMORY/memory_module/data/redis/data-redis-memo:/data
+    networks:
+      - apix-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  apix-mysql:
+    image: mysql:8.0
+    container_name: apix-mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: your_root_password
+      MYSQL_DATABASE: apix_database
+      MYSQL_USER: apix
+      MYSQL_PASSWORD: apixapix
+    volumes:
+      - ./MEMORY/memory_module/data/mysql_data:/var/lib/mysql
+      - ./README/script/init_mysql_backup.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - apix-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pyour_root_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  apix-task:
+    build:
+      context: ./TASK/task_flow_module
+      dockerfile: Dockerfile
+    container_name: apix-task
+    restart: unless-stopped
+    ports:
+      - "5090:5090"
+    networks:
+      - apix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  apix-memory:
+    build:
+      context: ./MEMORY/memory_module
+      dockerfile: Dockerfile
+    container_name: apix-memory
+    restart: unless-stopped
+    ports:
+      - "5093:5093"
+    environment:
+      MEMO_REDIS_URL: redis://apix-redis:6379
+      MYSQL_DOCKER_BASE_URL: apix-mysql
+      MYSQL_DOCKER_PORT: "3306"
+    depends_on:
+      apix-redis:
+        condition: service_healthy
+      apix-mysql:
+        condition: service_healthy
+    networks:
+      - apix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5093/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  apix-file:
+    build:
+      context: ./FILE/file_service
+      dockerfile: Dockerfile
+    container_name: apix-file
+    restart: unless-stopped
+    ports:
+      - "5094:5094"
+    environment:
+      MYSQL_DOCKER_BASE_URL: apix-mysql
+      MYSQL_DOCKER_PORT: "3306"
+      MEMO_REDIS_URL: redis://apix-redis:6379
+      MILVUS_DOCKER_BASE_URI: http://apix-milvus:19530
+      FILE_STORE_BASE_DIR: /app/data/files
+    volumes:
+      - ./FILE/file_service/data/files:/app/data/files
+    depends_on:
+      apix-redis:
+        condition: service_healthy
+      apix-mysql:
+        condition: service_healthy
+    networks:
+      - apix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5094/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  apix-agent:
+    build:
+      context: ./AGENT/agent_module
+      dockerfile: Dockerfile
+    container_name: apix-agent
+    restart: unless-stopped
+    ports:
+      - "5091:5091"
+    environment:
+      TASK_SERVER_BASE_URL: http://apix-task:5090
+      AGENT_SERVICE_URL: http://apix-agent:5091
+      MEMORY_SERVICE_BASE_URL: http://apix-memory:5093
+      FILE_SERVICE_URL: http://apix-file:5094
+      AGENT_BASE_DIR: /app/apix_running_time
+      HOST_BASE_DIR: ${HOST_BASE_DIR}
+    volumes:
+      - ./AGENT/apix_running_time:/app/apix_running_time
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      apix-task:
+        condition: service_healthy
+      apix-memory:
+        condition: service_healthy
+      apix-file:
+        condition: service_healthy
+    networks:
+      - apix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5091/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  apix-milvus:
+    image: milvusdb/milvus:v2.5.8
+    container_name: apix-milvus
+    profiles: ["milvus"]
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    ports:
+      - "19530:19530"
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - ./MEMORY/memory_module/data/milvus:/var/lib/milvus
+    networks:
+      - apix-network
+    depends_on:
+      - etcd
+      - minio
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: apix-etcd
+    profiles: ["milvus"]
+    restart: unless-stopped
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./MEMORY/memory_module/data/etcd:/etcd
+    command: >
+      etcd -advertise-client-urls=http://127.0.0.1:2379
+      -listen-client-urls http://0.0.0.0:2379
+      --data-dir /etcd
+    networks:
+      - apix-network
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: apix-minio
+    profiles: ["milvus"]
+    restart: unless-stopped
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ./MEMORY/memory_module/data/minio:/minio_data
+    command: minio server /minio_data
+    networks:
+      - apix-network
+
+networks:
+  apix-network:
+    driver: bridge

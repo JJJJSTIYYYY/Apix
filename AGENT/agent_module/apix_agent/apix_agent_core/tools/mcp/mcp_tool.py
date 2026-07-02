@@ -127,19 +127,33 @@ class MCPToolManager:
         self,
         client_id: str,
     ) -> list[McpMetaSchema]:
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/mcp/get_enabled_mcp_servers",
-                json={"client_id": client_id},
-            )
-        res = resp.json()
-        if resp.status_code != 200 or not res.get("success"):
-            logger.warning(
-                "Failed to get MCP meta: "
-                f"{resp.text}"
-            )
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.post(
+                    f"{MEMORY_SERVICE_BASE_URL}/mcp/get_enabled_mcp_servers",
+                    json={"client_id": client_id},
+                )
+            if resp.status_code != 200:
+                logger.warning(
+                    f"Failed to get MCP meta: status={resp.status_code}, body={resp.text[:500]}"
+                )
+                return []
+            try:
+                res = resp.json()
+            except Exception as e:
+                logger.warning(
+                    f"Failed to parse MCP meta response as JSON: {e}, body={resp.text[:500]}"
+                )
+                return []
+            if not res.get("success"):
+                logger.warning(
+                    f"MCP meta request unsuccessful: {res}"
+                )
+                return []
+            return res.get("messages", [])
+        except Exception as e:
+            logger.warning(f"Failed to fetch MCP meta: {e}")
             return []
-        return res.get("messages", [])
 
     async def create_mcp_client(
         self,

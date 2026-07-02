@@ -108,12 +108,14 @@ class AIContextManager:
             "messages": message,
         }
 
+        logger.info(f"[append_to_messages] payload: {json.dumps(payload, ensure_ascii=False)[:1000]}")
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.post(
                 f"{MEMORY_SERVICE_BASE_URL}/memory/memory/append_message",
                 json=payload,
             )
 
+        logger.info(f"[append_to_messages] response status={resp.status_code}, body={resp.text[:1000]}")
         if resp.status_code != 200 or not resp.json().get('success'):
             raise HTTPException(
                 status_code=resp.status_code,

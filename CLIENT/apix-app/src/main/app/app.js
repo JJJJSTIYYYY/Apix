@@ -1,4 +1,5 @@
 import {
+  app,
   shell,
   BrowserWindow
 } from 'electron'
@@ -9,13 +10,16 @@ import { isMac, isWin } from '../app/constants'
 import { registerFileIpc } from '../ipc/file'
 import { registerAiIpc } from '../ipc/ai_chat'
 import { registerClipboardIpc } from '../ipc/clipboard'
-import icon from '../../../resources/APIX.png'
 import { registerLogreIpc } from '../ipc/login_register'
 import { registerWebsocketIpc } from '../ws/wsClient'
 import { registerAiConfigIpc } from '../ipc/ai_configuration'
 import { registerAiFilesIpc } from '../ipc/ai_files'
 import { registerAiTaskIpc } from '../ipc/ai_task'
 import { registerLocalTaskIpc } from '../ipc/local_task'
+
+const iconPath = app.isPackaged
+  ? join(process.resourcesPath, 'app.asar', 'resources', 'APIX.png')
+  : join(process.cwd(), 'resources', 'APIX.png')
 
 // ---------- Windows Mica Support ----------
 let MicaBrowserWindow = null
@@ -35,7 +39,7 @@ const baseWindowOptions = {
   minHeight: 970,
   show: false,
   autoHideMenuBar: true,
-  icon: icon,
+  icon: iconPath,
   webPreferences: {
     preload: join(__dirname, '../preload/index.js'),
     // nodeIntegration: true,

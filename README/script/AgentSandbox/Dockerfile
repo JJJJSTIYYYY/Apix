@@ -7,7 +7,9 @@ ENV https_proxy=$HTTPS_PROXY
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y \
+# Use Tsinghua mirror for apt to improve connectivity in this environment
+RUN sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g; s/security.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y \
     curl \
     git \
     unzip \

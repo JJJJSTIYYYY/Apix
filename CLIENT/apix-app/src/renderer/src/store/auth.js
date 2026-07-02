@@ -54,13 +54,18 @@ export const useAuthStore = defineStore("auth", () => {
           user_uid: res.messages.uid
         })
         window.api.initWebsocket(res.messages.uid)
+        return true
       }
       else {
         console.log("before throw")
-        throw new Error('登录失败: ' + res.messages)
+        throw new Error('登录失败: ' + (res.messages?.msg || res.messages || '未知错误'))
       }
-      loading.value = false
-      return true
+    } catch (err) {
+      console.error("Login error:", err)
+      if (err?.message?.includes('fetch failed') || err?.name === 'TypeError') {
+        throw new Error('无法连接认证服务，请确认后端已启动')
+      }
+      throw err
     } finally {
       loading.value = false
     }
@@ -82,14 +87,18 @@ export const useAuthStore = defineStore("auth", () => {
           username,
           user_uid: res.messages.uid
         })
+        return true
       }
       else {
         console.log("before throw")
-        throw new Error('注册失败: ' + res.messages)
+        throw new Error('注册失败: ' + (res.messages?.msg || res.messages || '未知错误'))
       }
-
-      loading.value = false
-      return true
+    } catch (err) {
+      console.error("Register error:", err)
+      if (err?.message?.includes('fetch failed') || err?.name === 'TypeError') {
+        throw new Error('无法连接认证服务，请确认后端已启动')
+      }
+      throw err
     } finally {
       loading.value = false
     }
@@ -105,12 +114,16 @@ export const useAuthStore = defineStore("auth", () => {
         user.value = null
         localStorage.removeItem(STORAGE_KEY)
         console.warn("User ensure failed:", res.messages)
-        loading.value = false
         return false
       }
       console.log("User ensure success:", res.messages)
-      loading.value = false
       return true
+    } catch (err) {
+      console.error("User ensure error:", err)
+      // 后端不可用时直接清空本地登录态，避免卡住登录页
+      user.value = null
+      localStorage.removeItem(STORAGE_KEY)
+      return false
     } finally {
       loading.value = false
     }
