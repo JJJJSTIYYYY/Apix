@@ -26,6 +26,7 @@
         <!-- 右侧内容 -->
         <el-main style="width: auto; height: 100%; padding: 0px;">
           <TaskPage v-if="currentPage==='TaskPage'" />
+          <CronPage v-else-if="currentPage==='CronPage'" />
         </el-main>
   </el-main>
 </el-container>
@@ -37,6 +38,7 @@ import HomePage from './homePage.vue'
 import { useAppCacheData } from '../store/app'
 import { useAuthStore } from '../store/auth'
 import TaskPage from './component/task_card/taskPage.vue'
+import CronPage from './component/cron_card/cronPage.vue'
 
 const authStore = useAuthStore()
 const store = useAppCacheData()
@@ -54,7 +56,7 @@ const handleSelect = (key: string) => {
       currentPage.value = 'TaskPage'
       break
     case '2':
-      currentPage.value = 'TimedPage'
+      currentPage.value = 'CronPage'
       break
   }
   
@@ -72,10 +74,10 @@ const handleSelect = (key: string) => {
 }
 
 .menu-aside {
-  width: 150px; 
+  width: 130px; 
   height: calc(100vh - 36px);
   background-color: var(--apix-panel-layer-2-background) !important;
-  padding: 0 12px 0 12px !important;
+  padding: 12px 12px 0 12px !important;
   box-shadow: inset -1px 0 0 0 var(--apix-border-disabled);
 
   border-radius: var(--apix-border-radius-base) 0 0 var(--apix-border-radius-base);
@@ -85,10 +87,6 @@ const handleSelect = (key: string) => {
 .el-menu-vertical {
   padding-top: 5px !important;
   left: calc(var(--apix-left-side-bar-width, 66px) - 66px);
-}
-
-.el-menu-vertical :deep(.el-icon svg path) {
-  fill: var(--apix-primary-dark) !important;
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
@@ -112,7 +110,7 @@ const handleSelect = (key: string) => {
 }
 
 .el-menu-item {
-  padding: 0 0 0 12px !important;
+  padding: 0px 3px !important;
   min-width: 100%;
   color: var(--apix-primary-dark);
   transition: background 0.2s var(--apix-cubic-bezier) !important;
@@ -130,40 +128,5 @@ const handleSelect = (key: string) => {
 
 .el-menu-item.is-active {
   color: rgb(0, 173, 155);
-  background: radial-gradient(
-    circle at center,
-    rgba(79, 223, 208, 0.16) 0%, 
-    rgba(79, 223, 208, 0.08) 20%, 
-    rgba(79, 223, 208, 0) 40% 
-  );
-}
-
-.el-menu {
-  background-color: transparent;
-  padding: 2px;
-  padding-left: 4px;
-}
-
-.el-menu-vertical-data {
-  height: 100%;
-}
-
-.el-menu-item {
-  border-radius: 16px;
-}
-
-.el-menu-item:hover {
-  background: rgba(0, 173, 156, 0.142);
-}
-
-.el-menu-item.is-active {
-  color: rgb(0, 173, 155);
-  /* 核心：中心到四周减淡的圆形泛光背景 */
-  background: radial-gradient(
-    circle at center,
-    rgba(0, 231, 208, 0.2) 0%,      /* 中心最亮 */
-    rgba(0, 231, 208, 0.08) 10%,    /* 中间过渡 */
-    rgba(0, 231, 208, 0) 30%        /* 边缘完全透明 */
-  );
 }
 </style>

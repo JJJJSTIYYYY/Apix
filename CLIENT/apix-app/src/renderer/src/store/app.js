@@ -339,10 +339,17 @@ export const useAppCacheData = defineStore("app", {
       this.persistState('work_dir')
     },
 
-    getWorkDir(history_id) {
-      return history_id
-        ? (this.work_dir[history_id] || '')
-        : ''
+    async getWorkDir(history_id) {
+      if (history_id === "-1") return ""
+      try {
+        const res = await window.api.getChatMeta(history_id)
+        const swp = res.messages[0]?.work_space || ""
+        console.log("Get workspace for conversation", history_id, ":", res)
+        return swp
+      } catch (error) {
+        console.error("Get workspace error", error)
+        return ""
+      }
     },
 
     removeWorkDir(history_id) {

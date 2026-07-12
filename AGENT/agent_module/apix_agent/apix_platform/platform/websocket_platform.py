@@ -108,6 +108,7 @@ class WebsocketPlatform(PlatformBase):
 
                 try:
                     await ctx.websocket.send_json(data)
+                    logger.info("Send json data", data)
                 except Exception:
                     logger.warning("Websocket send failed - disconnected")
                     ctx.connected = False

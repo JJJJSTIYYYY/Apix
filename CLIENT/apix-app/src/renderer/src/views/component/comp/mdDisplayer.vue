@@ -264,42 +264,6 @@ onBeforeUnmount(() => {
   display: none;
   height: 0;
 }
-
-/* ------------------------
-   Copy button
-------------------------- */
-:deep(.code-copy-btn) {
-  position: absolute;
-  top: 1px;
-  right: 1px;
-
-  width: 44px;
-  height: 24px;
-  font-size: 12px;
-
-  border-radius: var(--apix-button-border-radius);
-  border: none;
-  cursor: pointer;
-
-  background: var(--apix-default-light-color);
-  color: var(--apix-default-dark-color);
-
-  opacity: 0;
-  transition:
-    opacity 0.15s ease,
-    width 0.15s var(--apix-cubic-bezier),
-    background-color 0.05s ease;
-}
-
-:deep(.code-block:hover .code-copy-btn) {
-  opacity: 1;
-}
-
-.btn-area {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
 </style>
 
 <style scoped>
@@ -371,8 +335,8 @@ onBeforeUnmount(() => {
 
 :deep(.code-copy-btn) {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: -3px;
+  right: -3px;
   padding: 0px;
   font-size: 12px;
   border-radius: 8px;

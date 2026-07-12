@@ -653,6 +653,7 @@ body, * {
   background-color: var(--apix-panel-layer-0-background);
 }
 
+.el-time-panel,
 .el-popper,
 .n-base-select-menu {
   border-radius: 12px !important;
@@ -660,11 +661,12 @@ body, * {
   margin-bottom: 8px;
 
   color: var(--apix-secondary-dark-color) !important;
-  overflow: hidden;
+  /* overflow: hidden; */
   border: 1px solid var(--apix-panel-layer-5-background) !important;
   backdrop-filter: saturate(180%) blur(16px);
   transition: all 0.3s var(--apix-cubic-bezier);
   background-color: color-mix(in srgb, var(--apix-panel-layer-5-background) 50%, transparent) !important;
+  box-shadow: var(--apix-shadow-lg) !important;
 }
 .n-base-select-menu-option-wrapper {
   padding: 0px !important;
@@ -700,4 +702,180 @@ span.el-popper__arrow {
 .el-dialog {
   border-radius: 24px !important;
   overflow: hidden;
+}
+
+
+
+/* ---------------- Input ---------------- */
+
+/* 通用 input/select wrapper */
+.el-picker-panel__body-wrapper .el-input-tag__wrapper,
+.el-picker-panel__body-wrapper .el-input__wrapper,
+.el-picker-panel__body-wrapper .el-select__wrapper {
+  box-shadow: inset 0 0 0 1px var(--apix-default-light-color) !important;
+  border-radius: var(--apix-button-border-radius) !important;
+  padding: 4px 12px !important;
+  background: transparent !important;
+  transition: all 0.2s ease !important;
+}
+.el-picker-panel__body-wrapper .el-input-tag__wrapper {
+  height: 38px;
+  max-height: 38px;
+  overflow: scroll;
+}
+
+/* hover */
+.el-picker-panel__body-wrapper .el-input-tag__wrapper:hover,
+.el-picker-panel__body-wrapper .el-input__wrapper:hover,
+.el-picker-panel__body-wrapper .el-select__wrapper:hover {
+  box-shadow: inset 0 0 0 1px var(--apix-default-light-color) !important;
+}
+
+/* focus */
+.el-picker-panel__body-wrapper .el-input-tag__wrapper.is-focused,
+.el-picker-panel__body-wrapper .el-input__wrapper.is-focus,
+.el-picker-panel__body-wrapper .el-select__wrapper.is-focus {
+  box-shadow: inset 0 0 0 2px var(--apix-primary-color) !important;
+  background: transparent !important;
+}
+
+/* input text */
+.el-picker-panel__body-wrapper .el-input-tag__inner,
+.el-picker-panel__body-wrapper .el-input__inner {
+  color: var(--apix-primary-dark) !important;
+  font-size: 14px !important;
+}
+
+/* password icon */
+.el-input__password {
+  color: var(--apix-tertiary-dark-color) !important;
+}
+
+/* word count */
+.el-input__count {
+  color: var(--apix-tertiary-dark-color) !important;
+  font-size: 11px !important;
+  background: transparent !important;
+}
+
+.el-picker-panel__body-wrapper .el-input .el-input__count .el-input__count-inner {
+  background: transparent !important;
+}
+
+.el-tag.el-tag--info {
+  color: var(--apix-tertiary-dark-color) !important;
+  background-color: var(--apix-default-light-color);
+}
+
+
+
+.el-time-panel {
+  background-color: var(--apix-panel-layer-5-background) !important;
+}
+
+.el-time-panel__btn.confirm {
+  border: none;
+  cursor: pointer;
+  border-radius: var(--apix-button-border-radius) !important;
+  padding: 0px 12px;
+  transition: opacity 0.2s var(--apix-cubic-bezier),
+    color 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier) !important;
+
+  background: color-mix(in srgb, var(--apix-lightest-color) 85%, transparent) !important;
+  color: var(--apix-darkest-color) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--apix-darkest-color) 8%, transparent) !important;
+}
+
+.el-time-panel__btn.cancel {
+  padding: 0px 6px;
+  border-radius: var(--apix-button-border-radius);
+  border: none;
+  cursor: pointer;
+  color: var(--apix-default-dark-color);
+  background: transparent;
+}
+
+.el-picker-panel {
+  background: transparent !important;
+}
+
+.el-date-table th,
+.el-date-picker__time-header {
+  border-bottom: 1px solid var(--apix-default-light-color) !important;
+}
+
+.el-button.el-button--small.is-text.el-picker-panel__link-btn:hover,
+.el-button.el-button--small.is-text.el-picker-panel__link-btn {
+  padding: 0px 6px;
+  border-radius: var(--apix-button-border-radius);
+  border: none;
+  cursor: pointer;
+  color: var(--apix-default-dark-color);
+  background: transparent;
+}
+
+.el-button.el-button--small.is-plain.el-picker-panel__link-btn {
+  
+  border: none;
+  cursor: pointer;
+  border-radius: var(--apix-button-border-radius) !important;
+  padding: 0px 12px;
+  transition: opacity 0.2s var(--apix-cubic-bezier),
+    color 0.2s var(--apix-cubic-bezier),
+    background-color 0.2s var(--apix-cubic-bezier) !important;
+
+  background: color-mix(in srgb, var(--apix-lightest-color) 85%, transparent) !important;
+  color: var(--apix-darkest-color) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--apix-darkest-color) 8%, transparent) !important;
+}
+
+.el-time-panel__footer,
+.el-picker-panel__footer {
+  border-top: 1px solid var(--apix-default-light-color) !important;
+  background: transparent !important;
+}
+
+.el-time-spinner__item:hover:not(.is-disabled):not(.is-active) {
+  background-color: color-mix(in srgb, var(--apix-default-light-color) 44.6%, transparent) !important;
+}
+
+.el-time-spinner__item.is-active:not(.is-disabled) {
+  color: var(--apix-primary-active) !important;
+}
+
+.el-time-panel__content:before {
+  border-top: 1px solid var(--apix-secondary-light-color) !important;
+  border-bottom: 1px solid var(--apix-secondary-light-color) !important;
+}
+
+.el-date-table td.today .el-date-table-cell__text {
+  color: var(--apix-primary-color) !important;
+}
+
+.el-date-table td.available {
+  color: var(--apix-default-dark-color) !important;
+}
+
+.el-date-table td.prev-month,
+.el-date-table td.next-month {
+  color: var(--apix-tertiary-dark-color) !important;
+}
+
+.el-date-table td.available:hover {
+  color: var(--apix-primary-active) !important;
+}
+
+.el-date-table td.current:not(.disabled) .el-date-table-cell__text {
+  background: var(--apix-primary-active) !important;
+  color: white !important;
+}
+
+.el-date-picker__header-label {
+  color: var(--apix-default-dark-color) !important;
+}
+
+.el-date-picker__next-btn .el-picker-panel__icon-btn,
+.el-date-picker__prev-btn .el-picker-panel__icon-btn{
+  color: var(--apix-default-dark-color) !important;
 }

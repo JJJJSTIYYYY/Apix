@@ -211,6 +211,26 @@ class DataExecutors:
                 "messages": f"fail: {e}",
             }
         
+    @task_handler("get_conversation_meta_by_id")
+    async def get_conversation_meta_by_id(self, payload: dict) -> dict:
+        """
+        Fetch user's conversation list.
+
+        Redis is NOT involved.
+        """
+        try:
+            logger.info("[DataExecutors][get_conversation_meta_by_id] enter.")
+            return await self.mysql.get_conversation_meta_by_id(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_conversation_meta_by_id] error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
     # --------------------------------------------------
     # Conversation Messages
     # --------------------------------------------------
@@ -990,6 +1010,184 @@ class DataExecutors:
         except Exception as e:
             logger.exception(
                 f"[DataExecutors][update_mcp_server] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    @task_handler("create_cron_task")
+    async def create_cron_task(self, payload: dict) -> dict:
+        """
+        Insert a cron task meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][create_cron_task] enter.")
+
+            task_id = str(uuid4().hex)
+            payload["task_id"] = task_id
+
+            return await self.mysql.create_cron_task(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][create_cron_task] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    @task_handler("get_all_enabled_cron_tasks")
+    async def get_all_enabled_cron_tasks(self, payload: dict) -> dict:
+        """
+        Get all cron task meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_all_enabled_cron_tasks] enter.")
+
+            mysql_res = await self.mysql.get_all_enabled_cron_tasks(payload)
+
+            if not mysql_res.get("success"):
+                return mysql_res
+
+            parsed = []
+
+            crons = mysql_res.get("messages", []) or []
+
+            for cron in crons:
+
+                config = cron.get("extra_config")
+
+                if config and not isinstance(config, (dict, list)):
+                    try:
+                        cron["extra_config"] = json.loads(config)
+                    except Exception:
+                        cron["extra_config"] = {}
+
+                parsed.append(cron)
+
+            mysql_res["messages"] = parsed
+
+            return mysql_res
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_all_enabled_cron_tasks] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    @task_handler("get_cron_tasks")
+    async def get_cron_tasks(self, payload: dict) -> dict:
+        """
+        Get all cron task meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_cron_tasks] enter.")
+
+            mysql_res = await self.mysql.get_cron_tasks(payload)
+
+            if not mysql_res.get("success"):
+                return mysql_res
+
+            parsed = []
+
+            crons = mysql_res.get("messages", []) or []
+
+            for cron in crons:
+
+                config = cron.get("extra_config")
+
+                if config and not isinstance(config, (dict, list)):
+                    try:
+                        cron["extra_config"] = json.loads(config)
+                    except Exception:
+                        cron["extra_config"] = {}
+
+                parsed.append(cron)
+
+            mysql_res["messages"] = parsed
+
+            return mysql_res
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_cron_tasks] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    @task_handler("get_cron_task_by_id")
+    async def get_cron_task_by_id(self, payload: dict) -> dict:
+        """
+        Get a cron task meta in database.
+        """
+        try:
+            logger.info("[DataExecutors][get_cron_task_by_id] enter.")
+
+            mysql_res = await self.mysql.get_cron_task_by_id(payload)
+
+            if not mysql_res.get("success"):
+                return mysql_res
+
+            parsed = []
+
+            crons = mysql_res.get("messages", []) or []
+
+            for cron in crons:
+
+                config = cron.get("extra_config")
+
+                if config and not isinstance(config, (dict, list)):
+                    try:
+                        cron["extra_config"] = json.loads(config)
+                    except Exception:
+                        cron["extra_config"] = {}
+
+                parsed.append(cron)
+
+            mysql_res["messages"] = parsed
+
+            return mysql_res
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][get_cron_task_by_id] error: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    @task_handler("update_cron_task")
+    async def update_cron_task(self, payload: dict) -> dict:
+        """
+        Update a cron task meta in database,
+        include enabled/is_deleted status.
+        """
+        try:
+            logger.info("[DataExecutors][update_cron_task] enter.")
+
+            return await self.mysql.update_cron_task(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"[DataExecutors][update_cron_task] error: {e}"
             )
 
             return {

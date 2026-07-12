@@ -369,7 +369,7 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">启用 Agent 子代理   <span class="setting-label">Beta</span></div>
+            <div class="setting-title">启用 Agent 子代理</div>
             <div class="setting-control">
               <div class="setting-info" :class="{ danger_info: store.config.agentAssign }">
                 开启智能体子代理模式，提供异步任务处理能力，不推荐在个人PC本地部署时开启。
@@ -397,7 +397,7 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">启用 Agent-Term 蜂群模式   <span class="setting-label">Beta</span></div>
+            <div class="setting-title">启用 Agent-Term 蜂群模式</div>
             <div class="setting-control">
               <div class="setting-info" :class="{ danger_info: store.config.agentSwarm }">
                 开启多智能体协作模式，不推荐在个人PC本地部署时开启。开启此项默认将 <strong>Agent 子代理</strong> 视为已开启。
@@ -432,7 +432,7 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">自动整理会话或工作区中的记忆</div>
+            <div class="setting-title">自动整理会话或工作区中的记忆  <span class="setting-label">施工中</span></div>
             <div class="setting-control">
               <div class="setting-info"  :class="{ danger_info: store.config.longtermMemory }">
                 让Agent自动整理会话中或工作区中保存的记忆，开启后，当记忆数量达到一定阈值时将自动触发。
@@ -649,7 +649,7 @@
           </div>
 
           <div class="setting-card">
-            <div class="setting-title">允许的域名关键字</div>
+            <div class="setting-title">允许的域名关键字  <span class="setting-label">施工中</span></div>
             <div class="setting-control">
               <el-input
                 placeholder="选择一个配置文件或直接输入 e.g: wiki,github,arxiv"
@@ -818,6 +818,7 @@
       <div class="logout-btn-wrapper">
         <button
           class="sync-config-btn"
+          @click="syncConfig"
         >
           同步设置至APIX后台
         </button>
@@ -1086,6 +1087,32 @@ const switchMode = (key: keyof typeof store.config, target: 'on' | 'off') => {
 
   // Persist to local storage / backend
   store.saveAppConfig(key as string, value)
+}
+
+const syncConfig = async () => {
+  try {
+    await ConfirmDialog.confirm(
+      `将当前设置同步至APIX服务器缓存？<br>以下信息将会被同步:<br>` +
+      `• 当前选择的模型以及API密钥<br>` +
+      `• 当前设置的Agent权限<br>` +
+      `• 当前选择的搜索引擎及其API密钥<br>` +
+      `⚠︎ 同步的信息将会作为后续自动任务的默认配置`,
+      '同步确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+
+    try {
+      ElMessage.success('已同步')
+    }catch (err) {
+      ElMessage.error('同步失败')
+      console.error("error to sync agent config: ", err)
+    }
+  } catch (err) {
+  }
 }
 
 /* Logout */

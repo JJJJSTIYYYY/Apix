@@ -440,8 +440,8 @@ class AIContextManager:
                 if active_file:
                     raw_text = f"Referenced File:  \n> \"{active_file}\"\n\n{raw_text}"
 
-                if system_instruction and isinstance(system_instruction, list):
-                    raw_text = f"System Instruction:  \n \"{'\n-'.join(system_instruction)}\"\n\n{raw_text}"
+                if system_instruction and isinstance(system_instruction, dict):
+                    raw_text = f"System Instruction:  \n \"{'\n-'.join(system_instruction.get('prompt', []))}\"\n\n{raw_text}"
 
                 msg = HumanMessage(content=raw_text, name=name)
                 messages.append(msg)

@@ -38,6 +38,9 @@ export function getSupportFileSVG (path) {
 // const messageCache = reactive<Record<string, ChatMessage[]>>({})
 // const generatingState = reactive<Record<string, GeneratingState[]>>({})
 
+// globalDataLock 用于保护后续五个公共数据不被多个页面并发写入, 页面切入/切出时比较 page_id 和 globalDataLock.value
+export const globalDataLock = ref("default")
+export const historyList = ref([])
 export const messageCache = reactive({})
 export const generatingState = reactive({})
 export const loadedHistorySet = reactive(new Set())

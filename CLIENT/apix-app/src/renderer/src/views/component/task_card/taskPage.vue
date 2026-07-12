@@ -6,7 +6,7 @@
       <div class="page-title-wrapper">
         <div class="title-wrapper">
           <h1 class="data-page-title">
-            后台子代理任务视图
+            子代理活动监控
           </h1>
           <div class="btn-wrapper">
             <el-button
@@ -22,7 +22,7 @@
               class="clear-btn"
               @click="clearCompleted"
             >
-              清理已完成
+              清理任务
               <el-icon style="padding-left: 4px;"><Delete /></el-icon>
             </el-button>
             <div class="auto-refresh-wrapper">

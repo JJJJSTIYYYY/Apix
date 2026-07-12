@@ -146,7 +146,7 @@
             </Transition>
 
             <Transition name="fade">
-              <div v-if="isQuoteShow && quotedText !== {}" class="quote-label">
+              <div v-if="isQuoteShow" class="quote-label">
                 <div style="display: flex; gap: 6px; align-items: center;">
                   <div class="quote-icon">
                     <svg t="1776857880346" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1651" width="20" height="20"><path d="M460.8 460.361143c54.418286 0 99.84-36.425143 99.84-94.281143 0-54.857143-37.284571-90.88-88.283429-90.88-26.148571 0-46.281143 10.294857-58.697142 30.006857 13.275429-60.854857 59.117714-101.12 121.270857-103.698286 16.713143-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-15.853714-30.006857-37.284571-30.006857-96.420571 0-182.125714 82.285714-182.125715 190.72 0 77.129143 51.419429 126.848 116.553143 126.848z m-262.308571 0c54.436571 0 99.858286-36.425143 99.858285-94.281143 0-54.857143-37.705143-90.88-88.704-90.88-25.709714 0-46.281143 10.294857-58.715428 30.006857 13.275429-60.854857 59.574857-100.699429 121.709714-103.698286 16.274286-0.859429 28.708571-12.434286 28.708571-28.708571 0-19.730286-16.274286-30.006857-37.705142-30.006857-96.420571 0-182.144 82.285714-182.144 190.72 0 77.129143 51.858286 126.848 116.992 126.848zM669.074286 207.908571h241.700571c18.432 0 33.005714-14.134857 33.005714-32.566857 0-18.011429-14.573714-32.146286-32.987428-32.146285h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566857z m0 224.566858h241.700571c18.432 0 33.005714-14.134857 33.005714-32.548572 0-18.011429-14.573714-32.164571-32.987428-32.164571h-241.737143a31.817143 31.817143 0 0 0-32.128 32.146285c0 18.432 14.134857 32.566857 32.146286 32.566858zM112.786286 657.078857h797.988571a32.658286 32.658286 0 0 0 33.005714-32.585143c0-17.993143-14.573714-32.146286-32.987428-32.146285H112.786286c-18.432 0-32.566857 14.153143-32.566857 32.146285 0 18.011429 14.134857 32.585143 32.548571 32.585143z m0 224.128h797.988571c18.432 0 33.005714-14.134857 33.005714-32.128 0-18.011429-14.573714-32.585143-32.987428-32.585143H112.786286a32.292571 32.292571 0 0 0-32.566857 32.585143c0 17.993143 14.134857 32.128 32.548571 32.128z" fill="var(--apix-default-button-text)" p-id="1652"></path></svg>
@@ -292,7 +292,7 @@ import ChatHistoryPanel from './component/dialog_history/history_panel.vue'
 import { type ChatHistory } from './component/dialog_history/history_card.vue'
 import { useAppCacheData, currentConfigSet } from '../store/app'
 import { useAuthStore } from '../store/auth'
-import { messageCache, generatingState, loadingHistorySet, loadedHistorySet } from '../store/globalData.js'
+import { messageCache, generatingState, loadingHistorySet, loadedHistorySet, historyList, globalDataLock } from '../store/globalData.js'
 import { ElMessage } from 'element-plus'
 import { NAvatar, NSelect } from 'naive-ui'
 import { InputDialog } from './component/comp/inputDialog'
@@ -740,7 +740,7 @@ const stream_state_text = computed(() => {
 // ################################
 // Chat history
 // ################################
-const historyList = ref<ChatHistory[]>([])
+// const historyList = ref<ChatHistory[]>([])
 
 async function get_conversation_list(cidValue: string) {
   const res = await window.api.getChatlist(cidValue)
@@ -759,6 +759,7 @@ async function get_conversation_list(cidValue: string) {
       createTime: raw_chat.create_at,
       isGenerating: false,
       hasNewMessage: raw_chat.has_new_message,
+      workspace: raw_chat.work_space
     })
   }
   return chat_list
@@ -930,7 +931,7 @@ const handleSelectHistory = async (id: string | number) => {
   quotedText.value = {}
 
   store.current_history_id = nextHid
-  store.currentWorkDir = store.getWorkDir(nextHid)
+  store.currentWorkDir = await store.getWorkDir(nextHid)
 
   ensureHistoryMessages(nextHid)
   ensureGeneratingState(nextHid)
@@ -982,7 +983,7 @@ const handleCreateChat = async () => {
   ensureGeneratingState(newHid)
 
   store.current_history_id = newHid
-  store.currentWorkDir = store.getWorkDir(newHid)
+  store.currentWorkDir = await store.getWorkDir(newHid)
 }
 
 const createChat = async () => {
@@ -997,12 +998,13 @@ const createChat = async () => {
 
   const chat = {
     id: newHid,
-    preview: 'New chat...',
+    preview: '新的聊天',
     time: format_date.time,
     date: format_date.label,
     tokens: 0,
     star: false,
     createTime: format_date.full,
+    workspace: store.currentWorkDir
   }
 
   historyList.value.unshift(chat)
@@ -1255,11 +1257,13 @@ function handleSelectText(msgId: string, role: string) {
 // WebSocket
 // ################################
 function getPayloadHistoryId(payload: any) {
-  return String(
+  const id = String(
     payload?.data?.history_id ??
     payload?.history_id ??
-    ''
+    ""
   )
+  if (id === "") return null
+  else return id
 }
 
 const isHistoryHide = ref(true)
@@ -1279,10 +1283,14 @@ const actionMap: Record<string, (payload: any, historyId: string) => void> = {
   invalid_outputs_warning: handleWarning,
   bad_request_warning: handleWarning,
   rate_limit_warning: handleWarning,
+  auto_create_conversation: handleSyncConversation,
 }
 
 function handleWsMessage(payload: any) {
-  if (!websocketGateSwitch) return
+  // console.log("Received ws event:", payload.data?.messages?.event_name)
+  console.log("assist page globalDataLock:", globalDataLock.value)
+  if (globalDataLock.value !== "default") return
+  // console.log("Handle ws event:", payload.data?.messages?.event_name)
   const historyId = getPayloadHistoryId(payload)
   if (!historyId) return
 
@@ -1640,6 +1648,26 @@ function handleImageChunkRtn(generationId: string, data: any, historyId: string)
   }
 }
 
+async function handleSyncConversation(payload: any, historyId: string) {
+  if (historyList.value.findIndex(c => String(c.id) === historyId) !== -1) return
+  console.log("Add conversation to list")
+  const conversation_meta = payload.data?.messages?.content?.conversation_meta
+  const format_date = formatTime(conversation_meta.created_at)
+  const chat = {
+    id: conversation_meta.conversation_uid,
+    preview: conversation_meta.title,
+    time: format_date.time,
+    date: format_date.label,
+    tokens: 0,
+    star: false,
+    createTime: format_date.full,
+    workspace: conversation_meta.work_space,
+    hasNewMessage: true
+  }
+
+  historyList.value.unshift(chat)
+}
+
 async function syncHistoryMessages(historyId: string, force = false) {
   if (!historyId || historyId === '-1') return
   if (loadingHistorySet.has(historyId)) return
@@ -1764,7 +1792,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
       user_meta_data: {
         uploaded_files: uploadedFiles,
       },
-      referenced_message: (isQuoteShow.value && quotedText.value !== {}) ? toRaw(quotedText.value) : {},
+      referenced_message: (isQuoteShow.value) ? toRaw(quotedText.value) : {},
       active_file: '',
     },
   }
@@ -1793,7 +1821,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
   selectedFiles.value = []
   scrollToBottom()
 
-  if (list.length === 1) {
+  if (list.length === 1) { // Update conversation title
     const nowHis = historyList.value.find(c => String(c.id) === currentHid)
     if (nowHis) {
       nowHis.preview = content
@@ -1802,7 +1830,7 @@ async function sendMessage(content:string = '', parent_id: string = '-', re_gene
           cid.value,
           sid.value,
           currentHid,
-          { title: content.slice(0, 30) }
+          { title: content.slice(0, 200) }
         )
       } catch (err) {
         console.warn('Failed to update conversation title:', err)
@@ -2026,17 +2054,16 @@ async function handleBranchSwitch(branch_id: string) {
 // ################################
 // Lifecycle
 // ################################
-let websocketGateSwitch = false
 onActivated(() => {
-  websocketGateSwitch = true
+  globalDataLock.value = "default"
 })
 
-onDeactivated(() => {
-  websocketGateSwitch = false
-})
+// onDeactivated(() => {
+//   websocketGateSwitch = false
+// })
 
 onMounted(async () => {
-  websocketGateSwitch = true
+  globalDataLock.value = "default"
   window.addEventListener('keydown', globalHandleKeydown)
   initBottomSentinelObserver()
 
@@ -2055,7 +2082,7 @@ onMounted(async () => {
       await loadHistoryMessages(store.current_history_id)
     }
     if (store.current_history_id) {
-      store.currentWorkDir = store.getWorkDir(store.current_history_id)
+      store.currentWorkDir = await store.getWorkDir(store.current_history_id)
     }
   } catch (err) {
     console.error('Initialization failed', err)

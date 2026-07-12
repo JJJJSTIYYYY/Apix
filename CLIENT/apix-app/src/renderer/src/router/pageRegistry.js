@@ -25,7 +25,7 @@ export const pageRegistry = [
   {
     path: '/taskPage',
     name: 'task-page',
-    title: '任务视图',
+    title: '自动任务',
     icon: 'Memo',
     component: () => import('@renderer/views/taskPage.vue')
   },

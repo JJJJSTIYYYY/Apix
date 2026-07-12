@@ -461,7 +461,6 @@ const handleSave = () => {
 
 :deep(.mcp-dialog) {
   border-radius: var(--apix-panel-border-radius) !important;
-  overflow: hidden;
   box-shadow: var(--apix-shadow-lg);
   max-height: calc(92vh - 30px);
   overflow: scroll !important;

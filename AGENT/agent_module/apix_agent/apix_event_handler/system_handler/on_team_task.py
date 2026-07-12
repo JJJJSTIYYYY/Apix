@@ -1,6 +1,7 @@
 import asyncio
 from typing import TypedDict
 
+from apix_agent.apix_agent_core.agent_task.team_task_manager import team_task_manager
 from apix_agent.commons.common_func import convert_generation_id_to_message_node_id
 from apix_agent.apix_event_pipe.common_event.common_event_gateway import ApixEventItem, event_registry
 from apix_agent.apix_event_pipe.stream_event.stream_event_gateway import action_handler
@@ -106,17 +107,21 @@ async def feedback_to_agent(event: ApixEventItem):
         return
 
     parent_id = cached_chain[-1]
-
+    
+    # system_instruction in the message should keep the same format as following, which is a dict with "name" and "prompt" keys.
     message_payload = {
         "role": "human",
         "content": "",
         "parent_id": parent_id,
         "extra": {
-            "system_instruction": [(
-                "/system-heartbeat: "
-                "Sub-assistant task finish, use `query_sub_assistant` "
-                "to view the detail."
-            )]
+            "system_instruction": {
+                "name": "query_sub_assistant",
+                "prompt": [(
+                    "/system-heartbeat: "
+                    "Sub-assistant task finish, use `query_sub_assistant` "
+                    "to view the detail."
+                )]
+            }
         },
     }
 

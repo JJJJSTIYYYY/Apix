@@ -121,13 +121,11 @@ class PipeEventHandler(EventHandler):
             for handler in handlers:
                 error_occured = False
                 try:
+                    logger.info(f"Call handler for event {event_name}: {handler.callback.__name__}.")
                     await asyncio.wait_for(
                         handler.callback(event),
                         timeout=handler.time_out,
                     )
-
-                    if event.accepted:
-                        break
 
                 except TimeoutError:
                     logger.error(
@@ -151,10 +149,14 @@ class PipeEventHandler(EventHandler):
 
                 if handler.push_to_user and not error_occured:
                     if event and event.target:
-                        self._send_envelope(
+                        logger.info("Send event to user.")
+                        await self._send_envelope(
                             target=event.target,
                             envelope=event.to_envelope()
                         )
+
+                if event.accepted:
+                    break
 
             event.accept()
             return event.to_envelope()

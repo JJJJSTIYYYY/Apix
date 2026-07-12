@@ -87,6 +87,7 @@ export interface ChatHistory {
   star: boolean
   isGenerating?: boolean   // 当前是否正在生成
   hasNewMessage?: boolean  // 是否有未读新消息
+  workspace?: string
 }
 
 const showNewMessage = computed(() => {

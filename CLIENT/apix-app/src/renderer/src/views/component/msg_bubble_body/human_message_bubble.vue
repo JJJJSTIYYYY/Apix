@@ -73,25 +73,24 @@
           <span class="file-name">{{ file.file_name }}</span>
         </div>
       </div>
+      <div
+        class="system-instruction-bar"
+        v-if="systemInstruction.title"
+      >
+        <div
+          class="instruction-bar"
+          @click="showInstruction(systemInstruction.ins)"
+        >
+          <svg t="1782128941029" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9449" width="16" height="16"><path d="M874.057143 276.72381l-490.057143 490.105904-234.057143-234.081524 41.447619-41.49638 192.609524 192.609523 448.609524-448.609523 41.447619 41.49638z" fill="currentColor" p-id="9450"></path></svg>
+          <span class="instruction-bar-content">{{ ''+systemInstruction.title }}</span>
+        </div>
+      </div>
 
       <div class="human-bubble-content-wrapper">
         <div class="send-state-tag">
           <svg t="1772620030116" v-if="msg.error" @click="reSendMsg" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5818" width="200" height="200"><path d="M512 0C229.205333 0 0 229.205333 0 512s229.205333 512 512 512 512-229.205333 512-512S794.794667 0 512 0z m0 796.458667A56.917333 56.917333 0 1 1 511.957333 682.666667 56.917333 56.917333 0 0 1 512 796.458667z m54.186667-227.797334h0.128a60.501333 60.501333 0 0 1-53.802667 55.893334c2.048 0.256 3.882667 1.152 5.973333 1.152h-11.818666c2.048 0 3.84-0.981333 5.845333-1.109334a59.093333 59.093333 0 0 1-53.162667-55.893333l-13.056-284.16a54.314667 54.314667 0 0 1 54.613334-57.045333h26.282666a52.992 52.992 0 0 1 54.186667 57.002666l-15.146667 284.16z" fill="#d81e06" p-id="5819"></path></svg>
           <svg v-else-if="msg.pending" t="1772618878456" class="icon rotate-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4818" width="200" height="200"><path d="M469.333333 85.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".8" p-id="4819"></path><path d="M469.333333 725.333333m42.666667 0l0 0q42.666667 0 42.666667 42.666667l0 128q0 42.666667-42.666667 42.666667l0 0q-42.666667 0-42.666667-42.666667l0-128q0-42.666667 42.666667-42.666667Z" fill="#000000" opacity=".4" p-id="4820"></path><path d="M938.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".2" p-id="4821"></path><path d="M298.666667 469.333333m0 42.666667l0 0q0 42.666667-42.666667 42.666667l-128 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666667l128 0q42.666667 0 42.666667 42.666667Z" fill="#000000" opacity=".6" p-id="4822"></path><path d="M783.530667 180.138667m30.169889 30.169889l0 0q30.169889 30.169889 0 60.339779l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339779l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".1" p-id="4823"></path><path d="M330.965333 632.661333m30.16989 30.16989l0 0q30.169889 30.169889 0 60.339778l-90.509668 90.509668q-30.169889 30.169889-60.339779 0l0 0q-30.169889-30.169889 0-60.339778l90.509668-90.509668q30.169889-30.169889 60.339779 0Z" fill="#000000" opacity=".5" p-id="4824"></path><path d="M843.861333 783.530667m-30.169889 30.169889l0 0q-30.169889 30.169889-60.339779 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339779 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".3" p-id="4825"></path><path d="M391.338667 330.965333m-30.16989 30.16989l0 0q-30.169889 30.169889-60.339778 0l-90.509668-90.509668q-30.169889-30.169889 0-60.339779l0 0q30.169889-30.169889 60.339778 0l90.509668 90.509668q30.169889 30.169889 0 60.339779Z" fill="#000000" opacity=".7" p-id="4826"></path></svg>
 
-        </div>
-        <div
-          class="system-instruction-bar"
-          v-if="systemInstruction && systemInstruction.length > 0"
-        >
-          <div
-            v-for="instruction in systemInstruction"
-            class="instruction-bar"
-            @click="showInstruction(instruction.ins)"
-          >
-            <svg t="1782128941029" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9449" width="16" height="16"><path d="M874.057143 276.72381l-490.057143 490.105904-234.057143-234.081524 41.447619-41.49638 192.609524 192.609523 448.609524-448.609523 41.447619 41.49638z" fill="currentColor" p-id="9450"></path></svg>
-            <span class="instruction-bar-content">{{ ''+instruction.preview }}</span>
-          </div>
         </div>
         <div
           key="bubble"
@@ -257,21 +256,31 @@ const uploadedFiles = computed<UploadedFile[]>(() => {
   return props.msg.extra?.user_meta_data?.uploaded_files ?? []
 })
 
-const systemInstruction = computed<object[]>(() => {
-  const rawSystemInstruction = props.msg.extra?.system_instruction ?? []
-  const SystemInstructionView = []
-  for (const si of rawSystemInstruction) {
-    console.log("si:", si)
-    if (si.startsWith("/system-heartbeat")) SystemInstructionView.push({
-      preview: "已发出自动任务",
-      ins: si
-    })
-    if (si.startsWith("/system-cron")) SystemInstructionView.push({
-      preview: "已发出定时任务",
-      ins: si
-    })
+const insPreviewMap: Record<string, string> = {
+  query_sub_assistant: '已发出自动任务',
+  cron_task: '已发出定时任务'
+}
+
+const systemInstruction = computed<{
+  title?: string
+  ins?: string
+}>(() => {
+  const rawSystemInstruction = props.msg.extra?.system_instruction
+
+  if (!rawSystemInstruction?.name) {
+    return {}
   }
-  return SystemInstructionView
+
+  console.log('rawSystemInstruction', rawSystemInstruction)
+
+  let suffix = ' - '
+  if (rawSystemInstruction.name === "cron_task") suffix = suffix + rawSystemInstruction.task_name
+  else if (rawSystemInstruction.name === "query_sub_assistant") suffix = suffix + "查询子代理"
+
+  return {
+    title: (insPreviewMap[rawSystemInstruction.name] ?? rawSystemInstruction.name) + suffix,
+    ins: (rawSystemInstruction.prompt ?? []).join('\n'),
+  }
 })
 
 const referencedMessage = computed<object>(() => {
@@ -805,7 +814,7 @@ onBeforeUnmount(() => {
 }
 
 .system-instruction-bar {
-  width: 100%;
+  width: fit-content;
 }
 
 .instruction-bar {

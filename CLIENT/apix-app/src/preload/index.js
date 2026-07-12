@@ -7,7 +7,7 @@ const api = {
   writeData: (key, value) => ipcRenderer.invoke('writeData', key, value),
   submitCase: (cid, content) => ipcRenderer.invoke('api:submit_case', cid, content),
 
-  openFileDialog: (type, extensions) => ipcRenderer.invoke('openFileDialog', type, extensions),
+  openFileDialog: (type, extensions = [], title = 'APIX') => ipcRenderer.invoke('openFileDialog', type, extensions, title),
   openDir: (path, fileName = '') => ipcRenderer.invoke('openDir', path, fileName),
   openCacheDir: () => ipcRenderer.invoke('openCacheDir'),
   watchWorkspace: (dirPath) => ipcRenderer.invoke('fs:watch', dirPath),
@@ -64,12 +64,14 @@ const api = {
     ipcRenderer.invoke('api:send_event', cid, action, ws_event),
   stopGeneration: (cid, sid, hid) =>
     ipcRenderer.invoke('api:stop', cid, sid, hid),
-  newChat: (cid, workspace = "") =>
-    ipcRenderer.invoke('api:new_chat', cid, workspace),
+  newChat: (cid, workspace = "", title = "新的聊天...") =>
+    ipcRenderer.invoke('api:new_chat', cid, workspace, title),
   updateConversation: (cid, sid, hid, new_info) =>
     ipcRenderer.invoke('api:update_conversation', cid, sid, hid, new_info),
   getChatlist: (cid) =>
     ipcRenderer.invoke('api:fetch_chat_list', cid),
+  getChatMeta: (hid) =>
+    ipcRenderer.invoke('api:get_chat_meta', hid),
   getChatMsgs: (cid, sid, hid, branch_id = '-') =>
     ipcRenderer.invoke('api:fetch_chat_messages', cid, sid, hid, branch_id),
   deleteMsgs: (cid, hid, node_ids) =>
@@ -80,6 +82,12 @@ const api = {
     ipcRenderer.invoke('api:get_ai_task_list', clear),
   terminateAiTask: (history_id, task_id) =>
     ipcRenderer.invoke('api:stop_task', history_id, task_id),
+  createCronTask: (cid, cron_meta) =>
+    ipcRenderer.invoke('api:create_cron_task', cid, cron_meta),
+  getCronTaskList: (cid) =>
+    ipcRenderer.invoke('api:get_cron_task_list', cid),
+  updateCronTask: (tid, repeat, exec_time, new_info) =>
+    ipcRenderer.invoke('api:update_cron_task', tid, repeat, exec_time, new_info),
 
   // Config AI
   getModelsList: (model_provider, api_key, config = {}) =>

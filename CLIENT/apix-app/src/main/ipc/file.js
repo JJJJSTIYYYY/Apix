@@ -27,7 +27,7 @@ export function registerFileIpc(mainWindow) {
       }
     })
 
-  ipcMain.handle('openFileDialog', async (event, type, extensions = []) => {
+  ipcMain.handle('openFileDialog', async (event, type, extensions = [], title = 'APIX') => {
     let properties = []
 
     if (type === 'file') {
@@ -45,7 +45,7 @@ export function registerFileIpc(mainWindow) {
       : []
 
     const result = await dialog.showOpenDialog({
-      title: 'APIX',
+      title: title,
       properties,
       filters:
         type === 'file' && normalizedExtensions.length > 0

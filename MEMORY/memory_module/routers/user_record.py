@@ -208,6 +208,7 @@ async def fetch_conversation_list(req: Request):
                     "conversation_uid": str,
                     "session_id": str,
                     "title": str,
+                    "work_space": str,
                     "last_active_at": str,
                     "created_at": str,
                     "latest_cursor": int,
@@ -223,6 +224,53 @@ async def fetch_conversation_list(req: Request):
 
     query_id = await dsm.submit_query(
         action="fetch_conversation_list",
+        payload=payload,
+    )
+    result = await dsm.wait_result(query_id)
+    resp = jsonable_encoder(result)
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+@router.post("/memory/user/conversations/meta")
+async def get_conversation_meta_by_id(req: Request):
+    """
+    Fetch a conversation's metadata.
+
+    Behavior:
+    - Query conversation list from MySQL
+    - Used for displaying conversation history panel
+
+    Request Body (JSON):
+        {
+            "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "conversation_uid": str,
+                    "session_id": str,
+                    "title": str,
+                    "work_space": str,
+                    "last_active_at": str,
+                    "created_at": str,
+                    "latest_cursor": int,
+                    "is_pinned": bool,
+                    "has_new_message": bool
+                },
+                ...
+            ]
+        }
+    """
+    logger.info(f"[API][get_conversation_meta_by_id] enter.")
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_conversation_meta_by_id",
         payload=payload,
     )
     result = await dsm.wait_result(query_id)
@@ -692,6 +740,255 @@ async def update_mcp_server(req: Request):
 
     query_id = await dsm.submit_query(
         action="update_mcp_server",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/cron/create_cron_task")
+async def create_cron_task(req: Request):
+    """
+    Create a cron task for user.
+
+    Request Body (JSON):
+        {
+            "client_id": str,
+            "history_id": str,
+            "platform": str,
+            "task_name": str,
+            "prompt": str,
+            "execute": str,       # Python code to execute
+            "exec_time": str,     # ISO-8601
+            "repeat": str,        # "once", "day", "week", "month", "year"
+            "extra_config": dict, # Optional
+            "description": str,   # Optional
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": {
+                "task_id": str
+            }
+        }
+    """
+    logger.info("[API][create_cron_task] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="create_cron_task",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.get("/cron/get_all_enabled_cron_tasks")
+async def get_all_enabled_cron_tasks(req: Request):
+    """
+    Fetch all cron enabled tasks.
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "task_id": str,
+                    "user_uid": str,
+                    "conversation_uid": str,
+                    "platform": str,
+                    "name": str,
+                    "prompt": str,
+                    "execute": str,
+                    "exec_time": str,
+                    "repeat": str,
+                    "extra_config": dict | None,
+                    "description": str,
+                    "created_at": str,
+                    "updated_at": str
+                },
+                ...
+            ]
+        }
+    """
+    logger.info("[API][get_all_enabled_cron_tasks] enter.")
+
+    payload = {}
+
+    query_id = await dsm.submit_query(
+        action="get_all_enabled_cron_tasks",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/cron/get_cron_tasks")
+async def get_cron_tasks(req: Request):
+    """
+    Fetch all cron tasks for user.
+
+    Request Body (JSON):
+        {
+            "client_id": str
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": [
+                {
+                    "task_id": str,
+                    "conversation_uid": str,
+                    "platform": str,
+                    "name": str,
+                    "prompt": str,
+                    "execute": str,
+                    "exec_time": str,
+                    "repeat": str,
+                    "extra_config": dict | None,
+                    "description": str,
+                    "created_at": str,
+                    "updated_at": str
+                },
+                ...
+            ]
+        }
+    """
+    logger.info("[API][get_cron_tasks] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_cron_tasks",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/cron/get_cron_task_by_id")
+async def get_cron_task_by_id(req: Request):
+    """
+    Fetch a cron task by task_id.
+
+    Request Body (JSON):
+        {
+            "task_id": str
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": 
+            [
+                {
+                    "task_id": str,
+                    "user_uid": str,
+                    "conversation_uid": str,
+                    "platform": str,
+                    "name": str,
+                    "prompt": str,
+                    "execute": str,
+                    "exec_time": str,
+                    "repeat": str,
+                    "extra_config": dict | None,
+                    "description": str,
+                    "created_at": str,
+                    "updated_at": str
+                }
+            ]
+        }
+    """
+    logger.info("[API][get_cron_task_by_id] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="get_cron_task_by_id",
+        payload=payload,
+    )
+
+    result = await dsm.wait_result(query_id)
+
+    resp = jsonable_encoder(result)
+
+    return JSONResponse(
+        content=resp,
+        status_code=200,
+    )
+
+
+
+@router.post("/cron/update_cron_task")
+async def update_cron_task(req: Request):
+    """
+    Update or delete a cron task.
+
+    Request Body (JSON):
+        {
+            "task_id": str,
+
+            "history_id": str,      # Optional
+            "platform": str,        # Optional
+            "task_name": str,       # Optional
+            "prompt": str,          # Optional
+            "execute": str,         # Optional
+            "exec_time": str,       # Optional
+            "repeat": str,          # Optional
+            "extra_config": dict,   # Optional
+            "description": str,     # Optional
+            "enabled": bool,        # Optional
+
+            "is_deleted": bool      # Optional
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": str
+        }
+    """
+    logger.info("[API][update_cron_task] enter.")
+
+    payload = await req.json()
+
+    query_id = await dsm.submit_query(
+        action="update_cron_task",
         payload=payload,
     )
 

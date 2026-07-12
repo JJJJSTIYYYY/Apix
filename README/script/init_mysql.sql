@@ -47,6 +47,8 @@ CREATE TABLE conversations (
 
     INDEX idx_user_latest_pinned (user_uid, is_pinned DESC, last_active_at DESC),
 
+    INDEX idx_user_last_active (user_uid, last_active_at DESC),
+
     INDEX idx_user_conversation_active (user_uid, conversation_uid, is_deleted),
 
     CONSTRAINT fk_conversation_user_uid
@@ -302,6 +304,56 @@ CREATE TABLE mcp_server (
 
 
 
+DROP TABLE IF EXISTS cron_task;
+CREATE TABLE cron_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+    -- Business ID
+    task_id VARCHAR(64) NOT NULL,
+
+    -- ApixIdentity
+    user_uid VARCHAR(64) NOT NULL,
+    conversation_uid VARCHAR(255) NOT NULL,
+    platform VARCHAR(32) NOT NULL DEFAULT 'default',
+
+    -- Task
+    name VARCHAR(255) NOT NULL COMMENT 'Task name',
+    prompt TEXT DEFAULT NULL COMMENT 'Prompt sent to the agent',
+    execute LONGTEXT DEFAULT NULL COMMENT 'Python execute code',
+    exec_time DATETIME NOT NULL COMMENT 'Next execution time',
+    `repeat` ENUM('once', 'day', 'week', 'month', 'year') NOT NULL DEFAULT 'once',
+    extra_config JSON DEFAULT NULL,
+    description TEXT DEFAULT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+
+    -- Metadata
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+
+    UNIQUE KEY uk_task_id (task_id),
+
+    INDEX idx_user_tasks (
+        user_uid,
+        is_deleted,
+        exec_time
+    ),
+
+    INDEX idx_enabled_tasks (
+        is_deleted,
+        enabled,
+        exec_time
+    ),
+
+    CONSTRAINT fk_user_uid
+        FOREIGN KEY (user_uid)
+        REFERENCES users(user_uid)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
 -- Stored Procedure: create_user
 DROP PROCEDURE IF EXISTS create_user;
 DELIMITER $$
@@ -455,6 +507,33 @@ BEGIN
     WHERE user_uid = p_user_uid
         AND is_deleted != TRUE
     ORDER BY is_pinned DESC, last_active_at DESC;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_conversation_meta_by_id;
+DELIMITER $$
+
+CREATE PROCEDURE get_conversation_meta_by_id (
+    IN p_conversation_uid VARCHAR(64)
+)
+BEGIN
+    SELECT
+        conversation_uid,
+        session_id,
+        title,
+        work_space,
+        last_active_at,
+        created_at,
+        latest_cursor,
+        is_pinned,
+        has_new_message
+    FROM conversations
+    WHERE conversation_uid = p_conversation_uid
+        AND is_deleted != TRUE
+    LIMIT 1;
 END$$
 
 DELIMITER ;
@@ -809,6 +888,46 @@ BEGIN
       AND role IN ('ai', 'human', 'info')
       AND is_deleted = FALSE
     ORDER BY msg_cursor ASC;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS search_messages_by_keyword;
+DELIMITER $$
+
+CREATE PROCEDURE search_messages_by_keyword (
+    IN p_user_uid VARCHAR(64),
+    IN p_keyword TEXT
+)
+BEGIN
+    SELECT
+        m.conversation_uid,
+        m.generation_id,
+        m.role,
+        m.content,
+        c.title,
+        c.last_active_at
+    FROM messages m
+    INNER JOIN (
+        SELECT
+            id,
+            title,
+            last_active_at
+        FROM conversations
+        WHERE user_uid = p_user_uid
+            AND is_deleted = FALSE
+        ORDER BY last_active_at DESC
+    ) c
+        ON c.id = m.conversation_id
+    WHERE m.is_deleted = FALSE
+        AND m.role IN ('human', 'ai')
+        AND m.content LIKE CONCAT('%', p_keyword, '%')
+    ORDER BY
+        c.last_active_at DESC,
+        m.id DESC
+    LIMIT 300;
 END$$
 
 DELIMITER ;
@@ -1483,6 +1602,190 @@ BEGIN
 
     SELECT ROW_COUNT() AS affected_rows;
 
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS create_cron_task;
+DELIMITER $$
+
+CREATE PROCEDURE create_cron_task (
+    IN p_task_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_conversation_uid VARCHAR(255),
+    IN p_platform VARCHAR(32),
+    IN p_name VARCHAR(255),
+    IN p_prompt TEXT,
+    IN p_execute LONGTEXT,
+    IN p_exec_time DATETIME,
+    IN p_repeat ENUM('once', 'day', 'week', 'month', 'year'),
+    IN p_extra_config JSON,
+    IN p_description TEXT
+)
+BEGIN
+    INSERT INTO cron_task (
+        task_id,
+        user_uid,
+        conversation_uid,
+        platform,
+        name,
+        prompt,
+        execute,
+        exec_time,
+        `repeat`,
+        extra_config,
+        description
+    )
+    VALUES (
+        p_task_id,
+        p_user_uid,
+        p_conversation_uid,
+        IFNULL(p_platform, 'default'),
+        p_name,
+        p_prompt,
+        p_execute,
+        p_exec_time,
+        IFNULL(p_repeat, 'once'),
+        p_extra_config,
+        p_description
+    );
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_cron_tasks;
+DELIMITER $$
+
+CREATE PROCEDURE get_cron_tasks (
+    IN p_user_uid VARCHAR(64)
+)
+BEGIN
+    SELECT
+        task_id,
+        conversation_uid,
+        platform,
+        name,
+        prompt,
+        execute,
+        exec_time,
+        `repeat`,
+        extra_config,
+        description,
+        enabled,
+        created_at,
+        updated_at
+    FROM cron_task
+    WHERE user_uid = p_user_uid
+      AND is_deleted = FALSE
+    ORDER BY exec_time ASC;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_cron_task_by_id;
+DELIMITER $$
+
+CREATE PROCEDURE get_cron_task_by_id (
+    IN p_task_id VARCHAR(64)
+)
+BEGIN
+    SELECT
+        task_id,
+        user_uid,
+        conversation_uid,
+        platform,
+        name,
+        prompt,
+        execute,
+        exec_time,
+        `repeat`,
+        extra_config,
+        description,
+        enabled,
+        created_at,
+        updated_at
+    FROM cron_task
+    WHERE task_id = p_task_id
+      AND is_deleted = FALSE
+    LIMIT 1;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS get_all_enabled_cron_tasks;
+DELIMITER $$
+
+CREATE PROCEDURE get_all_enabled_cron_tasks ()
+BEGIN
+    SELECT
+        task_id,
+        user_uid,
+        conversation_uid,
+        platform,
+        name,
+        prompt,
+        execute,
+        exec_time,
+        `repeat`,
+        extra_config,
+        description,
+        created_at,
+        updated_at
+    FROM cron_task
+    WHERE enabled = TRUE
+      AND is_deleted = FALSE
+    ORDER BY exec_time ASC;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS update_cron_task;
+DELIMITER $$
+
+CREATE PROCEDURE update_cron_task (
+    IN p_task_id VARCHAR(64),
+    IN p_conversation_id VARCHAR(255),
+    IN p_platform VARCHAR(32),
+
+    IN p_name VARCHAR(255),
+    IN p_prompt TEXT,
+    IN p_execute LONGTEXT,
+    IN p_exec_time DATETIME,
+    IN p_repeat ENUM('once', 'day', 'week', 'month', 'year'),
+    IN p_extra_config JSON,
+    IN p_description TEXT,
+    IN p_enabled BOOLEAN,
+
+    IN p_is_deleted BOOLEAN
+)
+BEGIN
+    UPDATE cron_task
+    SET
+        conversation_uid = IF(p_conversation_id IS NULL, conversation_uid, p_conversation_id),
+        platform = IF(p_platform IS NULL, platform, p_platform),
+        name = IF(p_name IS NULL, name, p_name),
+        prompt = IF(p_prompt IS NULL, prompt, p_prompt),
+        execute = IF(p_execute IS NULL, execute, p_execute),
+        exec_time = IF(p_exec_time IS NULL, exec_time, p_exec_time),
+        `repeat` = IF(p_repeat IS NULL, `repeat`, p_repeat),
+        extra_config = IF(p_extra_config IS NULL, extra_config, p_extra_config),
+        description = IF(p_description IS NULL, description, p_description),
+        enabled = IF(p_enabled IS NULL, enabled, p_enabled),
+        is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted)
+    WHERE task_id = p_task_id
+      AND is_deleted = FALSE;
+
+    SELECT ROW_COUNT() AS affected_rows;
 END$$
 
 DELIMITER ;

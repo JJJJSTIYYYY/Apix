@@ -94,7 +94,7 @@ export function registerAiIpc() {
     return true
   })
 
-  ipcMain.handle('api:new_chat', async (event, cid, workspace = "") => {
+  ipcMain.handle('api:new_chat', async (event, cid, workspace = "", title = "新的聊天...") => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/memory/conversation/create`, {
         method: "POST",
@@ -104,14 +104,14 @@ export function registerAiIpc() {
         body: JSON.stringify({
           client_id: cid,
           session_id: "",
-          title: "新的聊天...",
+          title: title,
           workspace: workspace,
         }),
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Create conversation failed.")
+      if (!res.ok || !data.success) {
+        throw new Error(data.messages || "Create conversation failed.")
       }
 
       return data
@@ -141,8 +141,8 @@ export function registerAiIpc() {
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Update conversation failed.")
+      if (!res.ok || !data.success) {
+        throw new Error(data.messages || "Update conversation failed.")
       }
 
       return data
@@ -166,8 +166,32 @@ export function registerAiIpc() {
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Get conversation list failed.")
+      if (!res.ok || !data.success) {
+        throw new Error(data.messages || "Get conversation list failed.")
+      }
+
+      return data
+    } catch (err) {
+      console.error("Get conversation list error:", err)
+      throw err
+    }
+  })
+
+  ipcMain.handle('api:get_chat_meta', async (event, hid) => {
+    try {
+      const res = await fetch(`${MEMORY_API_BASE}/memory/user/conversations/meta`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          history_id: hid,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.messages || "Get conversation list failed.")
       }
 
       return data
@@ -192,8 +216,8 @@ export function registerAiIpc() {
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Fetch conversation msgs failed.")
+      if (!res.ok || !data.success) {
+        throw new Error(data.messages || "Fetch conversation msgs failed.")
       }
 
       // console.log(data)
@@ -225,8 +249,8 @@ export function registerAiIpc() {
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.detail || "Delete messages failed.")
+      if (!res.ok || !data.success) {
+        throw new Error(data.messages || "Delete messages failed.")
       }
 
       return data

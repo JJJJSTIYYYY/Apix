@@ -264,15 +264,44 @@ class MysqlService:
         logger.info(f"[MysqlService][fetch_conversation_list] enter.")
         try:
             user_uid = payload["client_id"]
-            logger.info(f"[MysqlService][fetch_conversation_list] user_uid = {user_uid}")
             rows = await self._call_procedure("fetch_conversation_list", (str(user_uid),))
-            logger.info(f"[MysqlService][fetch_conversation_list] {rows}")
             return {
                 "success": True,
                 "messages": rows,
             }
         except Exception as e:
             logger.exception(f"[MysqlService][fetch_conversation_list] ❌ Error: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("mysql.memo.get_conversation_meta_by_id")
+    async def get_conversation_meta_by_id(self, payload: dict) -> dict:
+        """
+        Get a conversation metadata. Call procedure get_conversation_meta_by_id.
+
+        Args:
+            payload: Dict, the format is {
+                "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or [...] (list of conversation meta dicts),
+            }
+        """
+        logger.info(f"[MysqlService][get_conversation_meta_by_id] enter.")
+        try:
+            conversation_uid = payload["history_id"]
+            rows = await self._call_procedure("get_conversation_meta_by_id", (conversation_uid,))
+            return {
+                "success": True,
+                "messages": rows,
+            }
+        except Exception as e:
+            logger.exception(f"[MysqlService][get_conversation_meta_by_id] ❌ Error: {type(e).__name__}: {e}")
             return {
                 "success": False,
                 "messages": f"fail: {e}",
@@ -1152,7 +1181,7 @@ class MysqlService:
         Return:
             dict, the format is {
                 "success": True / False,
-                "messages": list
+                "messages": "fail: {e}" or list
             }
         """
         logger.info("[MysqlService][get_mcp_servers] enter.")
@@ -1191,7 +1220,7 @@ class MysqlService:
         Return:
             dict, the format is {
                 "success": True / False,
-                "messages": list
+                "messages": "fail: {e}" or list
             }
         """
         logger.info("[MysqlService][get_enabled_mcp_servers] enter.")
@@ -1242,7 +1271,7 @@ class MysqlService:
         Return:
             dict, the format is {
                 "success": True / False,
-                "messages": "success"
+                "messages": "success" or "fail: {e}"
             }
         """
         logger.info("[MysqlService][update_mcp_server] enter.")
@@ -1279,6 +1308,251 @@ class MysqlService:
         except Exception as e:
             logger.exception(
                 f"[MysqlService][update_mcp_server] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    @task_handler("mysql.cron.create_cron_task")
+    async def create_cron_task(self, payload: dict) -> dict:
+        """
+        Create a cron task in database. Call procedure create_cron_task.
+
+        Args:
+            payload: Dict, the format is {
+                "task_id": str,
+                "client_id": str,
+                "conversation_id": str,
+                "platform": str,
+                "task_name": str,
+                "prompt": str,
+                "execute": str,
+                "exec_time": str, # ISO-8601
+                "repeat": Literal["once", "day", "week", "month", "year"],
+                "extra_config": dict,
+                "description": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or {
+                    "task_id": str
+                }
+            }
+        """
+        logger.info("[MysqlService][create_cron_task] enter.")
+
+        try:
+            task_id = payload["task_id"]
+            user_uid = payload["client_id"]
+            conversation_id = payload.get("history_id")
+            platform = payload.get("platform")
+            task_name = payload.get("task_name")
+            task_prompt = payload.get("prompt")
+            execute_code = payload.get("execute")
+            execute_time = payload.get("exec_time")
+            repeat = payload.get("repeat")
+            extra_config = payload.get("extra_config", {})
+            description = payload.get("description", "")
+            
+            if extra_config is None:
+                extra_config = {}
+            if not isinstance(extra_config, str):
+                extra_config = json.dumps(extra_config, ensure_ascii=False)
+
+            await self._call_procedure(
+                "create_cron_task",
+                (task_id, user_uid, conversation_id, platform, task_name, task_prompt, execute_code, execute_time, repeat, extra_config, description,),
+            )
+
+            return {
+                "success": True,
+                "messages": {
+                    "task_id": task_id
+                },
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][create_cron_task] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    async def get_all_enabled_cron_tasks(self, payload: dict) -> dict:
+        """
+        Get all cron tasks in database. Call procedure get_all_enabled_cron_tasks.
+
+        Args:
+            payload: Dict, the format is { }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list
+            }
+        """
+        logger.info("[MysqlService][get_all_enabled_cron_tasks] enter.")
+
+        try:
+            rows = await self._call_procedure("get_all_enabled_cron_tasks", (),)
+
+            return {
+                "success": True,
+                "messages": rows,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][get_all_enabled_cron_tasks] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    async def get_cron_tasks(self, payload: dict) -> dict:
+        """
+        Get all cron tasks in database. Call procedure get_cron_tasks.
+
+        Args:
+            payload: Dict, the format is {
+                "client_id": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list
+            }
+        """
+        logger.info("[MysqlService][get_cron_tasks] enter.")
+
+        try:
+            user_uid = payload["client_id"]
+
+            rows = await self._call_procedure("get_cron_tasks", (user_uid,),)
+
+            return {
+                "success": True,
+                "messages": rows,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][get_cron_tasks] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+
+    async def get_cron_task_by_id(self, payload: dict) -> dict:
+        """
+        Get a cron task in database. Call procedure get_cron_task_by_id.
+
+        Args:
+            payload: Dict, the format is {
+                "task_id": str,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or list
+            }
+        """
+        logger.info("[MysqlService][get_cron_task_by_id] enter.")
+
+        try:
+            task_id = payload["task_id"]
+
+            rows = await self._call_procedure("get_cron_task_by_id", (task_id,),)
+
+            return {
+                "success": True,
+                "messages": rows,
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][get_cron_task_by_id] ❌ Error: {type(e).__name__}: {e}"
+            )
+
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+        
+    async def update_cron_task(self, payload: dict) -> dict:
+        """
+        Update a cron task in database. Call procedure update_cron_task.
+
+        Args:
+            payload: Dict, the format is {
+                "task_id": str,
+                "conversation_id": str,
+                "platform": str,
+                "task_name": str,
+                "prompt": str,
+                "execute": str,
+                "exec_time": str, # ISO-8601
+                "repeat": Literal["once", "day", "week", "month", "year"],
+                "extra_config": dict,
+                "description": str,
+                "is_deleted": bool,
+            }
+
+        Return:
+            dict, the format is {
+                "success": True / False,
+                "messages": "fail: {e}" or "success"
+            }
+        """
+        logger.info("[MysqlService][update_cron_task] enter.")
+
+        try:
+            task_id = payload["task_id"]
+            conversation_id = payload.get("history_id")
+            platform = payload.get("platform")
+            task_name = payload.get("task_name")
+            task_prompt = payload.get("prompt")
+            execute_code = payload.get("execute")
+            execute_time = payload.get("exec_time")
+            repeat = payload.get("repeat")
+            extra_config = payload.get("extra_config")
+            description = payload.get("description")
+            enabled = payload.get("enabled")
+            is_deleted = payload.get("is_deleted")
+
+            if isinstance(extra_config, (dict, list)):
+                extra_config = json.dumps(extra_config)
+
+            await self._call_procedure(
+                "update_cron_task",
+                (task_id, conversation_id, platform, task_name, task_prompt, execute_code, execute_time, repeat, extra_config, description, enabled, is_deleted,),
+            )
+
+            return {
+                "success": True,
+                "messages": "success",
+            }
+
+        except Exception as e:
+            logger.exception(
+                f"[MysqlService][update_cron_task] ❌ Error: {type(e).__name__}: {e}"
             )
 
             return {

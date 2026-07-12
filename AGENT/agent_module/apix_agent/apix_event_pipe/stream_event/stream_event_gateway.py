@@ -7,7 +7,7 @@ import traceback
 
 import httpx
 
-from apix_agent.commons.common_func import convert_generation_id_to_message_node_id
+from apix_agent.commons.common_func import convert_generation_id_to_message_node_id, get_conversation_workspace
 from apix_agent.commons.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.generation_manager import generation_manager, GenerationManager
@@ -158,8 +158,8 @@ class StreamEventHandler(EventHandler):
         data = payload.get("data") or {}
         client_id = data.get("client_id")
         session_id = data.get("session_id", "")
-        history_id = data.get("history_id", "")
-        platform = data.get("platform", "")
+        history_id = data.get("history_id")
+        platform = data.get("platform", "default")
         associated_account = data.get("associated_account")
         target: ApixIdentity = {
             "id": client_id,
@@ -167,6 +167,15 @@ class StreamEventHandler(EventHandler):
             "conversation_id": history_id,
             "associated_account": associated_account
         }
+
+        if not data.get("config"):
+            data["config"] = {
+                "auto_save_config": False,
+                "client_id": client_id,
+                "history_id": history_id,
+                "platform": platform,
+            }
+        data["config"]["work_dir"] = await get_conversation_workspace(history_id)
 
         try:
             generation_id = await generation_manager.create_generation(client_id, history_id, platform)
