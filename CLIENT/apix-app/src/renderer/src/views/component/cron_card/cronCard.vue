@@ -99,6 +99,7 @@ const props = defineProps({
   enabled: { type: Boolean, required: true, },
   created_at: { type: String, required: true, },
   description: { type: String, default: '', },
+  extra_config: { type: Object, default: {}, },
 })
 
 const repeatLabel = {
@@ -106,7 +107,12 @@ const repeatLabel = {
   day: '每天执行',
   week: '每周执行',
   month: '每月执行',
-  year: '每年执行'
+  year: '每年执行',
+  cron: '自定义周期'
+}
+
+const execTimeLabel = {
+  
 }
 
 /* ---------------- Emits ---------------- */

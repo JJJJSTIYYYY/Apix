@@ -2,7 +2,7 @@ import { reactive, ref } from 'vue'
 import darkCss from 'highlight.js/styles/atom-one-dark.css?url'
 import lightCss from 'highlight.js/styles/github.css?url'
 
-export const apix_client_version = '2.1.0'
+export const apix_client_version = '2.2.2'
 
 export function genUUID() {
   return crypto.randomUUID()

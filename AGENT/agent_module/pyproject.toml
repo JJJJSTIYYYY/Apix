@@ -10,6 +10,7 @@ dependencies = [
     "chardet>=6.0.0.post1",
     "charset-normalizer>=3.4.4",
     "crawl4ai>=0.8.6",
+    "croniter>=6.2.4",
     "ddgs>=9.13.1",
     "docx>=0.2.4",
     "easyocr>=1.7.2",

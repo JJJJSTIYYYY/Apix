@@ -1332,7 +1332,7 @@ const actionMap: Record<string, (payload: any, historyId: string) => void> = {
   invalid_outputs_warning: handleWarning,
   bad_request_warning: handleWarning,
   rate_limit_warning: handleWarning,
-  // auto_create_conversation: handleSyncConversation
+  auto_create_conversation: handleSyncConversation
 }
 
 function handleWsMessage(payload: any) {
@@ -1672,7 +1672,8 @@ function handleQuestChunkRtn(generationId: string, data: any, historyId: string)
 
 async function handleSyncConversation(payload: any, historyId: string) {
   if (historyList.value.findIndex(c => String(c.id) === historyId) !== -1) return
-  const conversation_meta = payload.data?.messages?.content
+  console.log("Add conversation to list")
+  const conversation_meta = payload.data?.messages?.content?.conversation_meta
   const format_date = formatTime(conversation_meta.created_at)
   const chat = {
     id: conversation_meta.conversation_uid,
@@ -1683,7 +1684,7 @@ async function handleSyncConversation(payload: any, historyId: string) {
     star: false,
     createTime: format_date.full,
     workspace: conversation_meta.work_space,
-    hasNewMessage: true
+    hasNewMessage: false
   }
 
   historyList.value.unshift(chat)

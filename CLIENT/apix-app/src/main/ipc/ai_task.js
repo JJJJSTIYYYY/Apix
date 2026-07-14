@@ -157,11 +157,16 @@ export function registerAiTaskIpc() {
       }
 
       if (exec_time !== "") {
-        const res_2 = await fetch(`${AI_API_BASE}/api/v1/sync_cron/${tid}/${repeat}/${exec_time.replace(' ', 'T')}`, {
-          method: "GET",
+        const res_2 = await fetch(`${AI_API_BASE}/api/v1/sync_cron`, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            task_id: tid,
+            time_tag: exec_time,
+            repeat_tag: repeat,
+          }),
         })
 
         const data_2 = await res_2.json()

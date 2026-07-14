@@ -10,6 +10,7 @@ from types import FunctionType
 from contextlib import redirect_stdout, redirect_stderr
 
 import httpx
+from croniter import CroniterBadCronError, croniter
 
 from apix_agent.global_config import MEMORY_SERVICE_BASE_URL
 from apix_agent.commons.type_def import ApixIdentity
@@ -28,7 +29,7 @@ class CronTask(TypedDict):
     prompt: str
     execute: str
     exec_time: str | datetime
-    repeat: Literal["once", "day", "week", "month", "year"]
+    repeat: Literal["once", "day", "week", "month", "year", "cron"]
     extra_config: dict
 
 
@@ -64,35 +65,8 @@ class CronTaskManager:
     # Public API
     # ------------------------------------------------------------------
 
-    def create_task_object(
-        self,
-        task_id: str,
-        name: str,
-        prompt: str,
-        user_id: str,
-        conversation_id: str,
-        platform: str,
-        exec_time: str | datetime,
-        execute_code: str = None,
-        repeat: Literal["once", "day", "week", "month", "year"] = "once",
-    ) -> CronTask:
-        """Create a new CronTask dictionary.  Does not add it to the manager."""
-        return {
-            "id": task_id,
-            "name": name,
-            "prompt": prompt,
-            "target": {
-                "id": user_id,
-                "platform": platform,
-                "conversation_id": conversation_id,
-            },
-            "exec_time": exec_time,
-            "execute": execute_code,
-            "repeat": repeat,
-        }
 
-
-    async def add_task(self, task: CronTask) -> None:
+    async def _add_task(self, task: CronTask) -> None:
         """Register a new task or overwrite an existing one with the same id.
 
         After adding, the internal heap is updated and the worker is woken
@@ -100,17 +74,21 @@ class CronTaskManager:
         """
         task_id = task["id"]
 
-        # Parse exec_time to a concrete datetime if a string was provided.
-        exec_time = self._parse_exec_time(task["exec_time"])
+        if not task["extra_config"].get("use_cron_expression", False):
+            # Parse exec_time to a concrete datetime if a string was provided.
+            exec_time = self._parse_exec_time(task["exec_time"])
 
-        if exec_time < datetime.now():
-            if task["repeat"] == "once":
-                await self._update_to_database(task["id"], {
-                    "enabled": False
-                })
-                return
-            # For repeating tasks, compute the next valid exec_time in the future.
-            exec_time = await self.next_execute_time(task)
+            if exec_time < datetime.now():
+                if task["repeat"] == "once":
+                    await self._update_to_database(task["id"], {
+                        "enabled": False
+                    })
+                    # return
+                # For repeating tasks, compute the next valid exec_time in the future.
+                exec_time = await self.next_execute_time(task)
+
+        else:
+            exec_time = await self.compute_execute_time(task)
 
         execute = self._parse_execute(task["execute"])
         if execute is None:
@@ -151,22 +129,74 @@ class CronTaskManager:
 
 
     async def next_execute_time(self, task: str | CronTask, persist: bool = True) -> datetime:
+        """Get a task's next executing time by its repeat and current executing time.
+        Args:
+            task: task id or CronTask
+            persist: whether persist in database after getting the next executing time
+
+        Returns:
+            datetime: datetime object
+        """
         if isinstance(task, str):
             if task not in self._tasks:
                 raise ValueError(f"The task with id {task} not found.")
             task = self._tasks[task]
 
         current = task.get("exec_time")
+        repeat = task.get('repeat')
+
+        if not current or not repeat:
+            raise ValueError("Missing exec_time or repeat.")
+
         current = self._parse_exec_time(current)
         
-        next_exec_time = self._next_exec_time(current, task.get('repeat'))
+        next_exec_time = self._next_exec_time(current, repeat)
 
+        logger.info(f"Get the next executing time from repeat: {next_exec_time.isoformat()}")
         if next_exec_time == current or not persist:
             return next_exec_time
         
         await self._update_to_database(task.get("id"), {
             "exec_time": next_exec_time.isoformat()
         })
+
+        return next_exec_time
+
+
+    async def compute_execute_time(
+        self,
+        task: str | CronTask,
+        persist: bool = True,
+    ) -> datetime:
+        """Get a task's next executing time by its cron expression.
+
+        Args:
+            task: task id or CronTask
+            persist: whether persist in database after getting the next executing time
+
+        Returns:
+            datetime: next executing time
+        """
+        if isinstance(task, str):
+            if task not in self._tasks:
+                raise ValueError(f"The task with id {task} not found.")
+            task = self._tasks[task]
+
+        extra_config = task.get("extra_config") or {}
+        cron_expression = extra_config.get("cron_expression")
+
+        if not cron_expression:
+            raise ValueError("Missing cron_expression.")
+
+        # Compute the next execute time from the current time
+        next_exec_time = self._compute_execute_time(cron_expression)
+
+        logger.info(f"Get the next executing time from cron expression: {next_exec_time.isoformat()}")
+        if persist:
+            await self._update_to_database(
+                task["id"],
+                { "exec_time": next_exec_time.isoformat() },
+            )
 
         return next_exec_time
     
@@ -189,7 +219,7 @@ class CronTaskManager:
 
                 # Rebuild scheduler.
                 for task in tasks:
-                    await self.add_task(task)
+                    await self._add_task(task)
 
                 # Wake the worker so it can rebuild its scheduling state.
                 self._wake_event.set()
@@ -206,8 +236,8 @@ class CronTaskManager:
     async def lazy_sync_tasks(
         self,
         changed_task_id: str,
-        changed_exec_time: str | datetime,
-        changed_repeat: Literal["once", "day", "week", "month", "year"]
+        changed_time_tag: str | datetime,
+        changed_repeat: Literal["once", "day", "week", "month", "year", "cron"]
     ) -> None | bool:
         """Lazily synchronize tasks."""
         try:
@@ -222,14 +252,25 @@ class CronTaskManager:
                 return await self.sync_tasks()
 
             logger.debug(f'Heap top time: {heap_top_time.isoformat()}.')
-            temp_changed_exec_time = changed_exec_time
-            changed_exec_time = self._next_exec_time(self._parse_exec_time(changed_exec_time), changed_repeat)
 
-            if changed_exec_time <= heap_top_time:
-                logger.info(f'Lazy sync cron tasks immediately because of earlier task updated: {temp_changed_exec_time}.')
-                await self.sync_tasks()
+            if changed_repeat != 'cron':
+                # temp_changed_exec_time = changed_time_tag
+                changed_time_tag = self._next_exec_time(self._parse_exec_time(changed_time_tag), changed_repeat)
+
+                if changed_time_tag <= heap_top_time:
+                    logger.info(f'Lazy sync cron tasks immediately because of earlier task updated: {changed_time_tag}.')
+                    await self.sync_tasks()
+                else:
+                    self._need_sync = True
             else:
-                self._need_sync = True
+                temp_changed_cron_expression = changed_time_tag
+                changed_time_tag = self._compute_execute_time(changed_time_tag)
+
+                if changed_time_tag <= heap_top_time:
+                    logger.info(f'Lazy sync cron tasks immediately because of earlier task updated: {changed_time_tag}, expression: {temp_changed_cron_expression}.')
+                    await self.sync_tasks()
+                else:
+                    self._need_sync = True
 
             return True
         
@@ -315,10 +356,13 @@ class CronTaskManager:
 
     def _parse_exec_time(
         self,
-        exec_time: str | datetime
-    ) -> datetime:
+        exec_time: str | datetime | None
+    ) -> datetime | None:
         """Convert a string in ISO-8601 or 'YYYY-MM-DD HH:MM:SS' to datetime.
         A datetime object is returned unchanged."""
+        if not exec_time:
+            return None
+
         if isinstance(exec_time, datetime):
             return exec_time
         # Try ISO format with 'T' separator
@@ -353,7 +397,7 @@ class CronTaskManager:
     def _next_exec_time(
         self,
         current: datetime,
-        repeat: Literal["once", "day", "week", "month", "year"],
+        repeat: Literal["once", "day", "week", "month", "year", "cron"],
     ) -> datetime:
         """Compute the next valid execution time based on the repeat rule."""
 
@@ -399,6 +443,16 @@ class CronTaskManager:
                 raise ValueError(f"Unknown repeat value: {repeat!r}")
 
         return next_time
+
+    
+    def _compute_execute_time(
+        self,
+        cron_expression: str
+    ) -> datetime:
+        try:
+            return croniter(cron_expression, datetime.now()).get_next(datetime)
+        except CroniterBadCronError as e:
+            raise ValueError(f"Invalid cron expression: {cron_expression}") from e
     
 
     async def _get_all_cron_task_from_database(self)-> list[CronTask]:
@@ -590,12 +644,17 @@ class CronTaskManager:
                     self._tasks.pop(task_id, None)
                     # Bump version so future stale entries are ignored.
                     self._versions.pop(task_id, None)
-                    await self._update_to_database(task_id, {
-                        "enabled": False
-                    })
-                else:
+                    await self._update_to_database(task_id, { "enabled": False })
+                elif task["repeat"] != "cron":
                     # Compute next execution time and re-insert into the heap.
                     next_time = await self.next_execute_time(task)
+                    task["exec_time"] = next_time  # update in-place
+                    new_version = self._versions[task_id] + 1
+                    self._versions[task_id] = new_version
+                    heapq.heappush(self._heap, (next_time, task_id, new_version))
+                elif task["repeat"] == "cron":
+                    # Compute next execution time and re-insert into the heap.
+                    next_time = await self.compute_execute_time(task)
                     task["exec_time"] = next_time  # update in-place
                     new_version = self._versions[task_id] + 1
                     self._versions[task_id] = new_version

@@ -155,6 +155,8 @@ class StreamEventHandler(EventHandler):
         '''
         logger.trace()
 
+        await asyncio.sleep(5)
+
         data = payload.get("data") or {}
         client_id = data.get("client_id")
         session_id = data.get("session_id", "")

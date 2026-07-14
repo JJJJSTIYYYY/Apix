@@ -62,7 +62,7 @@ onMounted(() => {
 })
 
 const normalizeHtml = (html: string) =>
-  html.replace(/[\r\n]+/g, '')
+  html.replace(/[\r\n]+/g, '<br>')
 
 function handleConfirm() {
   action = 'confirm'

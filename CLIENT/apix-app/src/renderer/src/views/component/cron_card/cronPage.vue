@@ -11,7 +11,7 @@
           <div class="btn-wrapper">
             <el-button
               type="primary"
-              class="refresh-btn"
+              class="create-btn"
               @click="createCron"
             >
               新建任务
@@ -24,13 +24,20 @@
               清理任务
               <el-icon style="padding-left: 4px;"><Delete /></el-icon>
             </el-button>
+            <el-button
+              class="refresh-btn"
+              @click="refreshTask"
+            >
+              刷新
+              <el-icon style="padding-left: 4px;"><RefreshRight /></el-icon>
+            </el-button>
           </div>
 
           <!-- 搜索 -->
           <div class="search-wrapper">
             <el-input
               v-model="searchKeyword"
-              placeholder="通过任务ID、任务名称、任务提示词、重复周期、执行时间搜索任务"
+              placeholder="通过任务ID、任务名称、任务提示词、执行时间搜索任务"
               clearable
               style="max-width: 420px;"
             >
@@ -75,6 +82,7 @@
               :enabled="item.enabled"
               :created_at="item.created_at"
               :description="item.description"
+              :extra_config="item.extra_config"
               @update:enabled="handleToggle"
               @delete="handleDelete"
               @edit="openCronDialog"
@@ -222,7 +230,6 @@ const filteredTaskList = computed(() => {
     task.task_id.toLowerCase().includes(keyword) ||
     task.name.toLowerCase().includes(keyword) ||
     task.prompt.toLowerCase().includes(keyword) ||
-    task.repeat.toLowerCase().includes(keyword) ||
     task.exec_time.toLowerCase().includes(keyword)
   )
 })
@@ -288,7 +295,7 @@ async function handleSaveCron(payload: {
       await window.api.updateCronTask(
         task_id,
         payload.repeat,
-        payload.exec_time,
+        payload.repeat === 'cron' ? payload.extra_config.cron_expression : payload.exec_time,
         cronMeta
       )
     }
@@ -325,7 +332,7 @@ async function handleToggle({ id, enabled }: { id: string; enabled: boolean }) {
     await window.api.updateCronTask(
       id,
       current.repeat,
-      current.exec_time,
+      current.repeat === 'cron' ? current.extra_config.cron_expression : current.exec_time,
       { enabled }
     )
 
@@ -393,10 +400,28 @@ const clearCompleted = async () => {
   }
 }
 
+const refreshTask = async () => {
+  try {
+    taskList.value = await getTaskList()
+    ElMessage({
+      type: 'success',
+      message: '已刷新',
+      plain: true,
+    })
+  } catch (error) {
+    ElMessage({
+      type: 'error',
+      message: '刷新失败',
+      plain: true,
+    })
+    console.error(error)
+  }
+}
+
 const handleDelete = async (taskId: string) => {
   try {
     const index = taskList.value.findIndex(t => t.task_id === taskId)
-    const execTime = index >= 0 ? taskList.value[index].exec_time : ""
+    const execTime = index >= 0 ? (taskList.value[index].repeat === 'cron' ? taskList.value[index].extra_config.cron_expression : taskList.value[index].exec_time) : ""
     const repeat = index >= 0 ? taskList.value[index].repeat : ""
 
     await window.api.updateCronTask(taskId, repeat, execTime, { is_deleted: true })
@@ -477,6 +502,7 @@ function formatTime(time: string) {
   scrollbar-width: none;
 }
 
+.create-btn,
 .refresh-btn,
 .clear-btn {
   margin: 0 !important;
@@ -495,11 +521,17 @@ function formatTime(time: string) {
   border: none;
 }
 
+.refresh-btn {
+  width: 84px;
+}
+
+.create-btn:hover,
 .refresh-btn:hover,
 .clear-btn:hover {
   background-color: var(--apix-primary-hover);
 }
 
+.create-btn:active,
 .refresh-btn:active,
 .clear-btn:active {
   transform: scale(0.98);

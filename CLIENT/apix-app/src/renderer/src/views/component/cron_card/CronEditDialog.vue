@@ -109,19 +109,31 @@
 
         <!-- execute time -->
         <div class="form-item">
-          <div class="label">计划执行时间</div>
+          <div class="label exec-time-label">
+            {{ localUseCronExpression ? 'Cron 表达式' : '计划执行时间' }}
+            <div class="always-create-conversation">
+              <el-checkbox v-model="localUseCronExpression">使用 Cron 表达式</el-checkbox>
+            </div>
+          </div>
           <el-date-picker
             v-model="localExecTime"
+            v-if="!localUseCronExpression"
             type="datetime"
             placeholder="请选择日期时间"
             format="YYYY-MM-DD HH:mm:ss"
             value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%; overflow: visible"
           />
+          <el-input
+            v-else
+            v-model="localCronExpression"
+            placeholder="输入 Cron 表达式"
+            class="input"
+          />
         </div>
 
         <!-- repeat -->
-        <div class="form-item">
+        <div class="form-item" v-if="!localUseCronExpression">
           <div class="label">执行周期</div>
           <el-radio-group
             v-model="localRepeat"
@@ -249,6 +261,8 @@ const historyListView = computed(() => {
   return localHistoryList.value.map(item => ({ label: item.preview, value: item.id }))
 })
 const localAlwaysCreateConversation = ref(false)
+const localUseCronExpression = ref(false)
+const localCronExpression = ref('')
 
 const isEdit = computed(() => !!props.cron)
 
@@ -298,6 +312,9 @@ watch(
 
     if (cron) {
       await syncHistoryList(true)
+      localAlwaysCreateConversation.value = Boolean(cron.extra_config?.always_create_conversation)
+      localUseCronExpression.value = Boolean(cron.extra_config?.use_cron_expression)
+      localCronExpression.value = cron.extra_config?.cron_expression || ''
       localHistoryId.value = cron.history_id
       localPlatform.value = cron.platform || 'default'
       localTaskName.value = cron.name
@@ -306,8 +323,10 @@ watch(
       localExecTime.value = cron.exec_time || ''
       localRepeat.value = cron.repeat || 'once'
       localDescription.value = cron.description || ''
-      localAlwaysCreateConversation.value = Boolean(cron.extra_config?.always_create_conversation)
     } else {
+      localAlwaysCreateConversation.value = false
+      localUseCronExpression.value = false
+      localCronExpression.value = ''
       localHistoryId.value = ''
       localPlatform.value = 'default'
       localTaskName.value = ''
@@ -316,7 +335,6 @@ watch(
       localExecTime.value = ''
       localRepeat.value = 'once'
       localDescription.value = ''
-      localAlwaysCreateConversation.value = false
     }
 
   },
@@ -393,8 +411,8 @@ const canSave = computed(() =>
   (localHistoryId.value.trim() || localAlwaysCreateConversation) &&
   localPlatform.value.trim() &&
   localTaskName.value.trim() &&
-  localExecTime.value.trim() &&
-  localRepeat.value.trim()
+  (localExecTime.value.trim() || (localUseCronExpression && localCronExpression.value.trim())) &&
+  (localRepeat.value.trim() || localUseCronExpression)
 )
 
 /* ---------------- Methods ---------------- */
@@ -407,6 +425,11 @@ const handleSave = () => {
 
   if (!canSave.value) return
 
+  let parsedRepeat = localRepeat.value
+  if (localUseCronExpression.value) {
+    parsedRepeat = 'cron'
+  }
+
   const payload = {
     is_editing: isEdit.value,
 
@@ -417,10 +440,12 @@ const handleSave = () => {
     prompt: localPrompt.value.trim(),
     execute: localExecute.value.trim(),
     exec_time: localExecTime.value,
-    repeat: localRepeat.value,
+    repeat: parsedRepeat,
     description: localDescription.value.trim(),
     extra_config: {
-      always_create_conversation: localAlwaysCreateConversation.value
+      always_create_conversation: localAlwaysCreateConversation.value,
+      use_cron_expression: localUseCronExpression.value,
+      cron_expression: localCronExpression.value
     },
   }
 
@@ -592,6 +617,7 @@ onMounted(async () => {
   padding-left: 10px;
 }
 
+.exec-time-label,
 .select-python-label,
 .bind-conversation-label {
   display: flex;

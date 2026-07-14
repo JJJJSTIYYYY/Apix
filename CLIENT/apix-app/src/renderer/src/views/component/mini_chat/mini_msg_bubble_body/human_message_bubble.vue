@@ -200,6 +200,7 @@ import MarkdownIt from 'markdown-it'
 import msgSelectionBubble from '../../msg_bubble_body/comp/msgSelectionBubble.vue'
 import { globalSelection } from '../../../../store/globalData.js'
 import { ConfirmDialog } from '../../comp/confirmDialog.js'
+import { mdDisplayer } from '../../comp/mdDisplayer.js'
 
 const emit = defineEmits<{
   edit: [id: string]
@@ -372,10 +373,7 @@ watch(
 
 
 const showInstruction = async (ins: string) => {
-  await ConfirmDialog.confirm(ins, '指令详情', {
-    confirmButtonText: '确定',
-    type: 'info',
-  })
+  mdDisplayer.show(ins, '自动任务指令详情')
 }
 
 

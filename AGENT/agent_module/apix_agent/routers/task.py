@@ -145,13 +145,32 @@ async def stop_task(request_data: Request):
 
 
 
-@router.get("/api/v1/sync_cron/{task_id}/{repeat}/{time}")
-async def sync_cron_tasks(task_id: str, repeat: str, time: str):
+@router.post("/api/v1/sync_cron")
+async def sync_cron_tasks(request_data: Request):
     """
     Lazy sync cron task after cron has any changed.
-    """
 
-    if not await cron_task_manager.lazy_sync_tasks(task_id, time, repeat):
+    Args:
+        request_data (Request):
+            JSON structure:
+            {
+                "task_id": str,
+                "time_tag": str,
+                "repeat_tag": str,
+            }
+
+    Returns:
+        {
+            "success": bool,
+            "messages": str,
+        }
+    """
+    body = await request_data.json()
+    task_id = body.get("task_id")
+    time_tag = body.get("time_tag")
+    repeat_tag = body.get("repeat_tag")
+
+    if not await cron_task_manager.lazy_sync_tasks(task_id, time_tag, repeat_tag):
         return JSONResponse(
             status_code=500,
             content={

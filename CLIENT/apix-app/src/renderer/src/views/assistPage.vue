@@ -1662,7 +1662,7 @@ async function handleSyncConversation(payload: any, historyId: string) {
     star: false,
     createTime: format_date.full,
     workspace: conversation_meta.work_space,
-    hasNewMessage: true
+    hasNewMessage: false
   }
 
   historyList.value.unshift(chat)

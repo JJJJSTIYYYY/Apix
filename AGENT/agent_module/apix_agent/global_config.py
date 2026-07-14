@@ -1,5 +1,5 @@
 # Global configuration settings for the Apix Agent Core module.
-VERSION = "4.2.1"
+VERSION = "2.2.2"
 
 import os
 import uuid
