@@ -213,7 +213,8 @@ async def fetch_conversation_list(req: Request):
                     "created_at": str,
                     "latest_cursor": int,
                     "is_pinned": bool,
-                    "has_new_message": bool
+                    "has_new_message": bool,
+                    "is_cron": bool
                 },
                 ...
             ]

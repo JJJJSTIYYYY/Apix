@@ -57,7 +57,7 @@ async def get_available_tools(
         "default": [
             write_todos, 
             read_memory,
-            update_memory,  
+            write_memory,  
             ocr_analysis,
             send_images,
             request_user_input
@@ -99,7 +99,7 @@ async def get_available_tools(
     return list(filter_tools.values())
 
 # Tools in this set are not allowed to be called simultaneously in one tool_calls
-conflict_tool_set = {"write_todos", "update_memory", "load_skill"}
+conflict_tool_set = {"write_todos", "write_memory", "load_skill"}
 forbiden_for_sub_agent = {"request_user_input", "send_images", "assign_sub_assistant", "query_sub_assistant", "stop_sub_assistant"}
 need_workspace_config_tools = {
     "fetch_files", "read_workspace_file", "list_workspace_files", "write_workspace_file",

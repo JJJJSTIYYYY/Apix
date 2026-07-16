@@ -342,6 +342,7 @@ interface ChatMessage {
   cid: string
   hid: string
   role: Role
+  created_at?: string
 
   node_id?: string
   parent_id?: string
@@ -759,7 +760,8 @@ async function get_conversation_list(cidValue: string) {
       createTime: raw_chat.create_at,
       isGenerating: false,
       hasNewMessage: raw_chat.has_new_message,
-      workspace: raw_chat.work_space
+      workspace: raw_chat.work_space,
+      is_cron: raw_chat.is_cron
     })
   }
   return chat_list
@@ -884,6 +886,7 @@ function parseHistoryMessages(raw: any[], hid: string): ChatMessage[] {
           todos: cloneMaybeArray(extra?.todo_list ?? []),
           images: cloneMaybeArray(extra?.image_meta ?? []),
           pending: false,
+          created_at: r.created_at
         }
 
         appendToolCallsFromExtra(newMsg, extra)
@@ -1662,7 +1665,8 @@ async function handleSyncConversation(payload: any, historyId: string) {
     star: false,
     createTime: format_date.full,
     workspace: conversation_meta.work_space,
-    hasNewMessage: false
+    hasNewMessage: false,
+    is_cron: true
   }
 
   historyList.value.unshift(chat)

@@ -681,7 +681,7 @@ function registerAiIpc() {
     );
     return true;
   });
-  electron.ipcMain.handle("api:new_chat", async (event, cid, workspace = "", title = "新的聊天...") => {
+  electron.ipcMain.handle("api:new_chat", async (event, cid, workspace = "", title = "新的聊天...", is_cron = false) => {
     try {
       const res = await fetch(`${MEMORY_API_BASE}/memory/memory/conversation/create`, {
         method: "POST",
@@ -692,7 +692,8 @@ function registerAiIpc() {
           client_id: cid,
           session_id: "",
           title,
-          workspace
+          workspace,
+          is_cron
         })
       });
       const data = await res.json();

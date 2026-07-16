@@ -38,7 +38,7 @@ from apix_agent.apix_agent_core.tools.basic_tools.file_manager import (
 # -------------------------
 from apix_agent.apix_agent_core.tools.basic_tools.todo_list import (
     write_todos,
-    update_memory,
+    write_memory,
     read_memory,    
 )
 
@@ -114,7 +114,7 @@ __all__ = [
     # Todos management
     "write_todos",
     "read_memory",
-    "update_memory",
+    "write_memory",
 
     # Web
     "search_web_by_keywords",

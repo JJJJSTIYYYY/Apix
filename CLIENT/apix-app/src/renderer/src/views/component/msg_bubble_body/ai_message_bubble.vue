@@ -221,6 +221,10 @@
         :class="{ show: !msg.pending }"
       >
         <div class="tag-wrapper">
+          <div class="tag-name">日期:</div>
+          <div>{{ typeof msg.created_at === 'string'?msg.created_at.replace("T", " "):msg.created_at }}</div>
+        </div>
+        <div class="tag-wrapper">
           <div class="tag-name">供应商:</div>
           <div>{{ msg.info?.model_provider }}</div>
         </div>
@@ -357,6 +361,7 @@ type MsgBubbleData = {
   id: string
   cid: string
   hid: string
+  created_at: string
   node_id?: number
   parent_id?: number
   pre_node?: string[]

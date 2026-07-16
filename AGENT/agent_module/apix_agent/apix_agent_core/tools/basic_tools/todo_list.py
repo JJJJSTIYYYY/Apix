@@ -160,7 +160,7 @@ class Memory(TypedDict):
 
 
 @tool(description=UPDATE_MEMORY_PROMPT)
-async def update_memory(
+async def write_memory(
     memories: list[Memory],
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
@@ -178,7 +178,7 @@ async def update_memory(
         target=target,
         data={
             "event_name": "tool_exec_chunk_rtn",
-            "tool_name": "update_memory",
+            "tool_name": "write_memory",
             "tool_call_id": tool_call_id,
             "content": "Update memories",
             "chunk_position": "start",
@@ -208,7 +208,7 @@ async def update_memory(
                 target=target,
                 data={
                     "event_name": "tool_exec_chunk_rtn",
-                    "tool_name": "update_memory",
+                    "tool_name": "write_memory",
                     "tool_call_id": tool_call_id,
                     "content": "Empty title",
                     "chunk_position": "end",
@@ -235,7 +235,7 @@ async def update_memory(
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memory",
+                "tool_name": "write_memory",
                 "tool_call_id": tool_call_id,
                 "content": "Missing state keys",
                 "chunk_position": "end",
@@ -405,7 +405,7 @@ async def update_memory(
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memory",
+                "tool_name": "write_memory",
                 "tool_call_id": tool_call_id,
                 "content": "Batch update success",
                 "chunk_position": "end",
@@ -434,7 +434,7 @@ async def update_memory(
             target=target,
             data={
                 "event_name": "tool_exec_chunk_rtn",
-                "tool_name": "update_memory",
+                "tool_name": "write_memory",
                 "tool_call_id": tool_call_id,
                 "content": f"Error occurred {str(e)}",
                 "chunk_position": "end",

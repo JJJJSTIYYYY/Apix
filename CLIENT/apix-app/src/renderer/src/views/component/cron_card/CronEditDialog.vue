@@ -377,7 +377,7 @@ const handleCreateConversation = async () => {
 }
 
 const createConversation = async (conversationTitle: string, workspace: string) => {
-  const res = await window.api.newChat(cid.value, workspace ?? "", conversationTitle)
+  const res = await window.api.newChat(cid.value, workspace ?? "", conversationTitle, true)
   return String(res.messages)
 }
 
@@ -408,11 +408,11 @@ const selectDir = async () => {
 /* ---------------- 校验 ---------------- */
 
 const canSave = computed(() =>
-  (localHistoryId.value.trim() || localAlwaysCreateConversation) &&
+  (localHistoryId.value.trim()) &&
   localPlatform.value.trim() &&
   localTaskName.value.trim() &&
-  (localExecTime.value.trim() || (localUseCronExpression && localCronExpression.value.trim())) &&
-  (localRepeat.value.trim() || localUseCronExpression)
+  ((!localUseCronExpression.value &&  localExecTime.value.trim()) || (localUseCronExpression.value && localCronExpression.value.trim())) &&
+  (localRepeat.value.trim() || localUseCronExpression.value)
 )
 
 /* ---------------- Methods ---------------- */

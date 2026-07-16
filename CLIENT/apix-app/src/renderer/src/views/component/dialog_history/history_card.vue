@@ -12,6 +12,12 @@
               >
                 <svg t="1777123727784" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9432" width="20" height="20"><path d="M170.666667 138.678857c0-17.67619 14.336-32.01219 32.01219-32.01219h618.642286c17.67619 0 32.01219 14.336 32.01219 32.01219v778.654476L512 768 170.666667 917.333333V138.654476z" p-id="9433" fill="currentColor"></path></svg>
               </span>
+              <span
+                v-if="history.is_cron"
+                class="q-star-badge-inline"
+              >
+                <svg t="1784206398949" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6956" width="20" height="20"><path d="M346.325333 942.421333a423.424 423.424 0 1 1 328.533334-780.544 423.424 423.424 0 0 1-328.533334 780.586667z m116.053334-593.749333v229.12a39.253333 39.253333 0 0 0 0.554666 6.698667c1.706667 10.794667 8.149333 20.224 17.621334 25.685333l177.493333 102.485333a36.181333 36.181333 0 1 0 36.181333-62.677333l-159.573333-92.16V348.672a36.181333 36.181333 0 0 0-72.32 0zM52.906667 260.266667a42.24 42.24 0 0 1 4.394666-59.562667L221.482667 58.88a42.24 42.24 0 1 1 55.168 63.872l-164.266667 141.824a42.24 42.24 0 0 1-59.52-4.394667l0.042667 0.042667z m859.562666 4.266666L741.546667 125.056a42.581333 42.581333 0 0 1-5.973334-60.202667 43.093333 43.093333 0 0 1 60.458667-5.973333l170.88 139.477333a42.837333 42.837333 0 0 1-54.485333 66.090667z" fill="currentColor" p-id="6957"></path></svg>
+              </span>
               <span v-if="history.isGenerating" class="q-label generating">
                 <span class="loading-dots">
                   <span></span>
@@ -85,6 +91,7 @@ export interface ChatHistory {
   tokens?: number
   createTime: number
   star: boolean
+  is_cron?: boolean
   isGenerating?: boolean   // 当前是否正在生成
   hasNewMessage?: boolean  // 是否有未读新消息
   workspace?: string
@@ -301,8 +308,11 @@ const handleConnectProject = async () => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
+  padding: 1px;
+  background-color: #b5c8c636;
+  border-radius: 3px;
 }
 
 .q-card-status {

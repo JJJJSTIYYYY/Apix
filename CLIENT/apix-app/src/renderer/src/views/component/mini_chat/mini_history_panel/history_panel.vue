@@ -93,6 +93,7 @@ const isSearchFocused = ref(false)
 
 // fold 状态
 const foldStatus = ref<Record<string, boolean>>({
+  '自动任务': false,
   '已收藏': true,
   '今天': true,
   '昨天': true,
@@ -103,17 +104,27 @@ const foldStatus = ref<Record<string, boolean>>({
 // grouped list
 const groupedHistories = computed(() => {
   const starred: ChatHistory[] = []
+  const cron: ChatHistory[] = []
   const normalGroups: Record<string, ChatHistory[]> = {}
 
   for (const item of filteredHistories.value) {
     if (item.star) {
       starred.push(item)
+    } else if (item.is_cron) {
+      cron.push(item)
     } else {
       ;(normalGroups[item.date] ||= []).push(item)
     }
   }
 
   const result: { date: string; items: ChatHistory[] }[] = []
+
+  if (cron.length > 0) {
+    result.push({
+      date: '自动任务',
+      items: [...cron].sort((a, b) => b.createTime - a.createTime),
+    })
+  }
 
   if (starred.length > 0) {
     result.push({
@@ -127,7 +138,10 @@ const groupedHistories = computed(() => {
       date,
       items: [...items].sort((a, b) => b.createTime - a.createTime),
     }))
-    .sort((a, b) => (b.items[0]?.createTime ?? 0) - (a.items[0]?.createTime ?? 0))
+    .sort(
+      (a, b) =>
+        (b.items[0]?.createTime ?? 0) - (a.items[0]?.createTime ?? 0)
+    )
 
   result.push(...normalGroupList)
 

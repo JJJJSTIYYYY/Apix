@@ -300,6 +300,7 @@ async def create_new_conversation(req: Request):
             "session_id": str (optional),
             "title": str (optional),
             "workspace": str (optional),
+            "is_cron": str (optional),
         }
 
     Returns:

@@ -131,6 +131,59 @@ Do NOT use this tool when:
 
 
 
+SCHEDULE_CRON_TASK_PROMPT = """
+Delegate a task to a sub-assistant
+
+## Args
+- agent_identity (str): Sub-agent's name and role in format `name[role]`, e.g: `Alice[Coder]`
+- system_prompt (str): System prompt that used to define Sub-agent's characteristics
+- task_description (str): The final objective of the task
+- instruction (str): Detailed instructions for the sub-agent
+
+## Returns
+- str: task id
+
+## Note
+- This tool creates a sub-agent with the same capabilities as you (include callable tools, available skills and so on)
+- The sub-agent will autonomously work to complete the task
+- Once the task is assigned, this tool returns immediately
+
+## When to Use
+Use this tool when:
+1. The task may take a long time to complete
+2. The user explicitly asks you to assign some work to another assistant
+3. You are continuing a previous conversation with the sub-assistant (Use the same `agent_identity` in this case)
+Typical scenarios:
+1. Background processing
+2. Delegating complex or time-consuming work
+
+## When NOT to Use
+Do NOT use this tool when:
+1. The task is simple and can be completed directly
+2. The user explicitly asks you to handle the task yourself
+3. The task depends heavily on your current reasoning context
+
+## Important Guidelines
+How to Write the Task:  
+task_description:
+Provide a concise description of the task's final goal. This description is visible to you and the user, but not to the sub-agent
+- After assigning the task → add this description to your TODO list and mark TODO as **in progress**
+- When the task is compeleted → mark TODO as **completed**  
+instruction:
+The detailed instructions for the sub-agent
+It should include:  
+- A detailed task goal
+- task context
+- workspace directory (create one if directory is not exist on disk)
+- relevant information
+- constraints (list clearly)
+- expected output format (if any)  
+The instruction must be self-contained because the sub-agent does not have access to your conversation history or reasoning content
+Do not reference previous messages such as "above", "earlier", or "previous analysis"
+"""
+
+
+
 # OCR
 OCR_ANALYSIS_PROMPT = """
 Analyze one or more image files and return the recognized text or image analysis result

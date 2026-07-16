@@ -49,7 +49,7 @@ const api = {
   chatComplations: (cid, sid, hid, content, re_generate, chat_config) => electron.ipcRenderer.invoke("api:chat", cid, sid, hid, content, re_generate, chat_config),
   sendWsEvent: (cid, action, ws_event) => electron.ipcRenderer.invoke("api:send_event", cid, action, ws_event),
   stopGeneration: (cid, sid, hid) => electron.ipcRenderer.invoke("api:stop", cid, sid, hid),
-  newChat: (cid, workspace = "", title = "新的聊天...") => electron.ipcRenderer.invoke("api:new_chat", cid, workspace, title),
+  newChat: (cid, workspace = "", title = "新的聊天...", is_cron = false) => electron.ipcRenderer.invoke("api:new_chat", cid, workspace, title, is_cron),
   updateConversation: (cid, sid, hid, new_info) => electron.ipcRenderer.invoke("api:update_conversation", cid, sid, hid, new_info),
   getChatlist: (cid) => electron.ipcRenderer.invoke("api:fetch_chat_list", cid),
   getChatMeta: (hid) => electron.ipcRenderer.invoke("api:get_chat_meta", hid),

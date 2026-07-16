@@ -167,8 +167,9 @@ async def execute_cron_task_new_conversation(
                 f"{MEMORY_SERVICE_BASE_URL}/memory/memory/conversation/create",
                 json={
                     "client_id": target["id"],
-                    "title": f"[CRON] {task_name}",
+                    "title": f"{task_name}",
                     "workspace": workspace,
+                    "is_cron": True
                 },
             )
 
@@ -194,7 +195,7 @@ async def execute_cron_task_new_conversation(
                 "content": {
                     "conversation_meta": {
                         "conversation_uid": conversation_id,
-                        "title": f"[CRON] {task_name}",
+                        "title": f"{task_name}",
                         "work_space": workspace,
                         "created_at": datetime.now().isoformat(),
                     }

@@ -335,8 +335,9 @@ class MysqlService:
             session_id = payload.get("session_id", "")
             title = payload.get("title", "新的聊天...")
             workspace = payload.get("workspace", None)
+            is_cron = payload.get("is_cron", False)
 
-            await self._call_procedure("create_conversation", (user_uid, platform, conversation_uid, title, workspace, session_id))
+            await self._call_procedure("create_conversation", (user_uid, platform, conversation_uid, title, workspace, session_id, is_cron))
             return {
                 "success": True,
                 "messages": f"{conversation_uid}",
