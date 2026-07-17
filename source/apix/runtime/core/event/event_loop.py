@@ -186,7 +186,7 @@ class ApixEventLoop:
             )
 
             if not handlers:
-                return event
+                return event.
 
             for handler in handlers:
                 if event.accepted:
