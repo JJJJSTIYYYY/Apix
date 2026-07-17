@@ -59,19 +59,19 @@ class AgentCreator:
         if pure_chat_on:
             agent_permission.append("forbidden")
         if enable_file_opration:
-            agent_permission.append("file_opration")
+            agent_permission.append("file_operation")
         if enable_web_search:
             agent_permission.append("web_search")
         if enable_knowledge_retrieval:
             agent_permission.append("knowledge_retrieval")
         if enable_command_opration:
-            agent_permission.append("command_opration")
+            agent_permission.append("command_operation")
         if enable_skill_load:
             agent_permission.append("skill_load")
         if enable_task_flow:
             agent_permission.append("task_flow")
         if (enable_agent_assign or enable_agent_swarm) and permission_level == 'main':
-            agent_permission.append("sab_agent_assign")
+            agent_permission.append("sub_agent_assign")
 
 
         if "forbidden" in agent_permission:

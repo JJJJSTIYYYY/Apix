@@ -27,10 +27,10 @@ def get_llm_node(*, provider: str, model: str, api_key: str, config: AgentConfig
         llm_model = get_xiaomi_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "google":
         raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
-        llm_model = get_google_model(model, api_key, BASE_URL.get(provider), config)
+        # llm_model = get_google_model(model, api_key, BASE_URL.get(provider), config)
     elif provider == "qianfan":
         raise ValueError(f"LLM provider: {provider} is Unsupported at now.")
-        llm_model = get_qianfan_model(model, api_key, BASE_URL.get(provider), config)
+        # llm_model = get_qianfan_model(model, api_key, BASE_URL.get(provider), config)
     elif provider.startswith("custom-"):
         _, p_type, p_id = provider.split('-', 2)
         if p_type == "openai":

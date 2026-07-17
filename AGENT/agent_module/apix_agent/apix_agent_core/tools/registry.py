@@ -15,7 +15,7 @@ async def get_available_tools(
     Must return @tool-decorated objects ONLY.
 
     Avaliable permission: 
-    {"file_opration", "web_search", "knowledge_retrieval", "command_opration", "skill_load", "task_flow", "sab_agent_assign", "forbidden"}
+    {"file_operation", "web_search", "knowledge_retrieval", "command_operation", "skill_load", "task_flow", "sub_agent_assign", "forbidden"}
     """
     if isinstance(permission, str):
         modes = [permission]
@@ -27,7 +27,7 @@ async def get_available_tools(
 
     # Tool registry mapping
     tool_registry = {
-        "file_opration": [
+        "file_operation": [
             fetch_files,
             read_workspace_file,
             list_workspace_files,
@@ -42,14 +42,14 @@ async def get_available_tools(
         "knowledge_retrieval": [
             search_knowledge_base
         ],
-        "command_opration": [
+        "command_operation": [
             run_workspace_command,
             run_python_code,
         ],
         "skill_load": [
             load_skill
         ],
-        "sab_agent_assign": [
+        "sub_agent_assign": [
             assign_sub_assistant,
             query_sub_assistant,
             stop_sub_assistant

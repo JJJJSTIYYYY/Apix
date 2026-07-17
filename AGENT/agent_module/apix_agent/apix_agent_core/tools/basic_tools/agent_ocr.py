@@ -162,7 +162,7 @@ async def ocr_analysis(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "ocr_analysis",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
@@ -374,7 +374,7 @@ async def send_images(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "send_images",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }

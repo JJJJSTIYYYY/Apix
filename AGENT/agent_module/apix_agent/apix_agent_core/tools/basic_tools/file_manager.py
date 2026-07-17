@@ -133,7 +133,7 @@ async def fetch_files(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "fetch_files",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
@@ -374,7 +374,7 @@ async def read_workspace_file(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "read_workspace_file",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
@@ -495,7 +495,7 @@ async def write_workspace_file(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "write_workspace_file",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
@@ -637,7 +637,7 @@ async def delete_workspace_file(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "delete_workspace_file",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
@@ -756,7 +756,7 @@ async def move_workspace_file(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "move_workspace_file",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
@@ -886,7 +886,7 @@ async def list_workspace_files(
                 "event_name": "tool_exec_chunk_rtn",
                 "tool_name": "list_workspace_files",
                 "tool_call_id": tool_call_id,
-                "content": "Sandbox not configutrd",
+                "content": "Sandbox not configured",
                 "chunk_position": "end",
                 "status": "fail",
             }
