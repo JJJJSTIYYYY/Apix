@@ -2,7 +2,7 @@ import copy
 import uuid
 from typing import Tuple
 
-from apix.runtime.core.event.base import (
+from apix.core.event.base import (
     EventHandlerFunc,
     HandlerEntry,
     HandlerMeta,

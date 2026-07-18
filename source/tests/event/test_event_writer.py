@@ -10,8 +10,8 @@ from unittest.mock import patch, AsyncMock
 
 import pytest
 
-from apix.runtime.core.event.base import ApixEvent, EventType
-from apix.runtime.core.event.event_writer import EventPipeWriter
+from apix.core.event.base import ApixEvent, EventType
+from apix.core.event.event_writer import EventPipeWriter
 
 
 class TestEventPipeWriterPostEvent:
@@ -26,7 +26,6 @@ class TestEventPipeWriterPostEvent:
         await writer.clear()
 
         await writer.post_event(
-            target={"id": "user_1"},
             event_type=EventType.INFO,
             event_name="test.event",
             context={"key": "val"},
@@ -35,28 +34,11 @@ class TestEventPipeWriterPostEvent:
         event = await writer.get_event()
 
         assert isinstance(event, ApixEvent)
-        assert event.target == {"id": "user_1"}
         assert event.event_type == EventType.INFO
         assert event.event_name == "test.event"
         assert event.context == {"key": "val"}
         assert isinstance(event.timestamp, float)
         assert event.accepted is False
-
-    @pytest.mark.asyncio
-    async def test_post_event_default_target_none(self):
-        """post_event with target=None should set target to None."""
-        writer = EventPipeWriter()
-        await writer.clear()
-
-        await writer.post_event(
-            target=None,
-            event_type=EventType.ERROR,
-            event_name="error.event",
-        )
-
-        event = await writer.get_event()
-        assert event.target is None
-        assert event.event_type == EventType.ERROR
 
     @pytest.mark.asyncio
     async def test_post_event_default_context_none(self):
@@ -207,13 +189,13 @@ class TestEventPipeWriterSingleton:
 
     def test_event_pipe_is_EventPipeWriter_instance(self):
         """Module-level event_pipe should be an EventPipeWriter instance."""
-        from apix.runtime.core.event.event_writer import event_pipe
+        from apix.core.event.event_writer import event_pipe
 
         assert isinstance(event_pipe, EventPipeWriter)
 
     def test_event_pipe_singleton_same_instance(self):
         """Multiple imports should return the same event_pipe instance."""
-        from apix.runtime.core.event.event_writer import event_pipe as ep1
-        from apix.runtime.core.event.event_writer import event_pipe as ep2
+        from apix.core.event.event_writer import event_pipe as ep1
+        from apix.core.event.event_writer import event_pipe as ep2
 
         assert ep1 is ep2

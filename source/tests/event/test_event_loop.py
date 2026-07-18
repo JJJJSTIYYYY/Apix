@@ -10,9 +10,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from apix.runtime.core.event.base import ApixEvent, EventType, HandlerEntry
-from apix.runtime.core.event.event_registry import ApixEventRegistry
-from apix.runtime.core.event.event_loop import ApixEventLoop
+from apix.core.event.base import ApixEvent, EventType, HandlerEntry
+from apix.core.event.event_registry import ApixEventRegistry
+from apix.core.event.event_loop import ApixEventLoop
 
 
 # ============================
@@ -57,7 +57,6 @@ def _make_handler_entry(
 def _make_event(event_name="test.event", accepted=False):
     """Create a test ApixEvent."""
     return ApixEvent(
-        target=None,
         event_type=EventType.INFO,
         event_name=event_name,
         context=None,
@@ -303,7 +302,7 @@ class TestDispatchEvent:
 
         event = _make_event()
 
-        with patch("apix.runtime.core.event.event_loop.logger") as mock_logger:
+        with patch("apix.core.event.event_loop.logger") as mock_logger:
             result = await handler._dispatch_event(event)
 
             error_calls = [
@@ -328,7 +327,7 @@ class TestDispatchEvent:
 
         event = _make_event()
 
-        with patch("apix.runtime.core.event.event_loop.logger") as mock_logger:
+        with patch("apix.core.event.event_loop.logger") as mock_logger:
             result = await handler._dispatch_event(event)
             assert result.accepted is True
             mock_logger.error.assert_called()
@@ -355,7 +354,7 @@ class TestDispatchEvent:
 
         event = _make_event()
 
-        with patch("apix.runtime.core.event.event_loop.logger"):
+        with patch("apix.core.event.event_loop.logger"):
             await handler._dispatch_event(event)
 
         assert called == ["h1"]
@@ -382,7 +381,7 @@ class TestDispatchEvent:
 
         event = _make_event()
 
-        with patch("apix.runtime.core.event.event_loop.logger"):
+        with patch("apix.core.event.event_loop.logger"):
             await handler._dispatch_event(event)
 
         assert called == ["h1", "h2"]
@@ -419,7 +418,7 @@ class TestDispatchEvent:
         mock_get_handlers = MagicMock(side_effect=RuntimeError("fatal error"))
         with patch.object(registry, "get_handlers", mock_get_handlers):
             event = _make_event()
-            with patch("apix.runtime.core.event.event_loop.logger"):
+            with patch("apix.core.event.event_loop.logger"):
                 await handler._dispatch_event(event)
 
         # Semaphore should be released (no deadlock)
@@ -476,7 +475,7 @@ class TestRunBackgroundHandler:
         entry = _make_handler_entry(callback=slow_handler, time_out=0.001)
         event = _make_event()
 
-        with patch("apix.runtime.core.event.event_loop.logger") as mock_logger:
+        with patch("apix.core.event.event_loop.logger") as mock_logger:
             await handler._run_background_handler(entry, event)
             mock_logger.error.assert_called()
 
@@ -509,7 +508,7 @@ class TestRunBackgroundHandler:
         entry = _make_handler_entry(callback=error_handler)
         event = _make_event()
 
-        with patch("apix.runtime.core.event.event_loop.logger") as mock_logger:
+        with patch("apix.core.event.event_loop.logger") as mock_logger:
             await handler._run_background_handler(entry, event)
             mock_logger.error.assert_called()
 
@@ -627,6 +626,6 @@ class TestModuleSingleton:
 
     def test_pipe_event_handler_is_PipeEventHandler_instance(self):
         """Module-level apix_event_loop should be a ApixEventLoop."""
-        from apix.runtime.core.event.event_loop import apix_event_loop
+        from apix.core.event.event_loop import apix_event_loop
 
         assert isinstance(apix_event_loop, ApixEventLoop)

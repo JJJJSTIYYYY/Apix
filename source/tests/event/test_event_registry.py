@@ -7,12 +7,12 @@ error handling, and metadata retrieval.
 
 import pytest
 
-from apix.runtime.core.event.base import ApixEvent, HandlerEntry
+from apix.core.event.base import ApixEvent, HandlerEntry
 from apix.common.type.exception import (
     EventHandlerNotRegistered,
     EventHandlerAlreadyRegistered,
 )
-from apix.runtime.core.event.event_registry import ApixEventRegistry, apix_event_registry
+from apix.core.event.event_registry import ApixEventRegistry, apix_event_registry
 
 
 # ============================

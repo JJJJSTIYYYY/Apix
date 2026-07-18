@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Any, Awaitable, Callable, Tuple, TypedDict
 from datetime import datetime
 
-from apix.common.type.global_type import ApixIdentity
 from apix.config.base_config import EVENT_HANDLER_DEFAULT_TIME_OUT
 
 
@@ -15,7 +14,6 @@ class EventType(str, Enum):
 
 @dataclass(slots=True)
 class ApixEvent:
-    target: ApixIdentity | None
     event_type: EventType
     event_name: str
     context: Any

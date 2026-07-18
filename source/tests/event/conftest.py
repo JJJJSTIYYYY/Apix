@@ -8,7 +8,7 @@ This conftest patches typing.NotRequired for compatibility.
 import sys
 import typing
 
-from apix.runtime.core.event.base import ApixEvent, EventType, HandlerEntry, HandlerMeta
+from apix.core.event.base import ApixEvent, EventType, HandlerEntry, HandlerMeta
 
 try:
     from typing import NotRequired
@@ -34,7 +34,6 @@ import pytest
 def sample_event():
     """Create a basic sample event."""
     return ApixEvent(
-        target={"id": "user_1"},
         event_type=EventType.INFO,
         event_name="test.event",
         context={"key": "value"},
@@ -47,7 +46,6 @@ def sample_event():
 def sample_event_no_name():
     """Create event with empty name."""
     return ApixEvent(
-        target=None,
         event_type=EventType.INFO,
         event_name="",
         context=None,
@@ -60,9 +58,8 @@ def sample_event_no_name():
 def make_event():
     """Factory fixture: create an event with custom parameters."""
 
-    def _make(event_name="test.event", target=None, event_type=None, context=None):
+    def _make(event_name="test.event", event_type=None, context=None):
         return ApixEvent(
-            target=target,
             event_type=event_type or EventType.INFO,
             event_name=event_name,
             context=context,
