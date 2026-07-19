@@ -73,7 +73,7 @@ BASE_URL = {       # Base URL for the LLM service
     'xiaomimimo': 'https://api.xiaomimimo.com/v1',
 }
 
-_config = _load_from_yaml('./config.yaml')
+_config = _load_from_yaml('./config.yaml') or {}
 
 BASE_URL = _config.get('BASE_URL', "http://localhost:2712")
 BASE_DIR = _config.get('BASE_DIR', "./.apix_data/") # Base log direction
