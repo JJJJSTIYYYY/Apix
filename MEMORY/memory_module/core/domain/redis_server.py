@@ -99,7 +99,6 @@ class RedisService:
             payload: Dict, the format is {
                 "client_id": "{{ cid }} : to indicate which user the data is from.",
                 "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
-                "session_id": "{{ sid }} : to indicate which tab the data belong to",
                 "messages": {
                     "role": 'human', 'ai', 'system', 'tool', 'info'
                     "content": "message content",
@@ -171,7 +170,6 @@ class RedisService:
             payload: Dict, the format is {
                 "client_id": "{{ cid }}",
                 "history_id": "{{ hid }}",
-                "session_id": "{{ sid }}",
                 "messages": [ ... ]  # FULL message list
             }
 
@@ -227,7 +225,6 @@ class RedisService:
             payload: Dict, the format is {
                 "client_id": "{{ cid }}",
                 "history_id": "{{ hid }}",
-                "session_id": "{{ sid }}"
             }
 
         Return:

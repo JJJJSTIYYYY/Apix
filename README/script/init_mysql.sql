@@ -16,7 +16,7 @@ CREATE TABLE users (
 
 
 
--- [id, user_uid, conversation_uid, title, session_id, last_active_at, latest_cursor, is_pinned, is_deleted, created_at]
+-- [id, user_uid, conversation_uid, title, last_active_at, latest_cursor, is_pinned, is_deleted, created_at]
 DROP TABLE IF EXISTS conversations;
 CREATE TABLE conversations (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Conversation id used in system',
@@ -27,13 +27,12 @@ CREATE TABLE conversations (
     conversation_uid VARCHAR(64) NOT NULL COMMENT 'Conversation uid that exposes to user',
     title VARCHAR(255) NOT NULL DEFAULT '新的聊天...' COMMENT 'Conversation title',
 
-    session_id VARCHAR(64) DEFAULT '' COMMENT 'Tab identifier',
-
     last_active_at TIMESTAMP NOT NULL COMMENT 'Last message time',
     latest_cursor BIGINT NOT NULL DEFAULT 0 COMMENT 'Latest message id, Monotonic message cursor for this conversation',
     has_new_message BOOLEAN DEFAULT FALSE,
 
     is_pinned BOOLEAN DEFAULT FALSE,
+    is_cron BOOLEAN DEFAULT  FALSE,
     is_deleted BOOLEAN DEFAULT FALSE,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -321,7 +320,7 @@ CREATE TABLE cron_task (
     prompt TEXT DEFAULT NULL COMMENT 'Prompt sent to the agent',
     execute LONGTEXT DEFAULT NULL COMMENT 'Python execute code',
     exec_time DATETIME NOT NULL COMMENT 'Next execution time',
-    `repeat` ENUM('once', 'day', 'week', 'month', 'year') NOT NULL DEFAULT 'once',
+    `repeat` ENUM('once', 'day', 'week', 'month', 'year', 'cron') NOT NULL DEFAULT 'once',
     extra_config JSON DEFAULT NULL,
     description TEXT DEFAULT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -422,7 +421,7 @@ CREATE PROCEDURE create_conversation (
     IN p_conversation_uid VARCHAR(64),
     IN p_title VARCHAR(255),
     IN p_workspace VARCHAR(255),
-    IN p_session_id VARCHAR(64)
+    IN p_is_cron BOOLEAN
 )
 BEGIN
     INSERT INTO conversations (
@@ -431,9 +430,9 @@ BEGIN
         conversation_uid,
         title,
         work_space,
-        session_id,
         last_active_at,
-        latest_cursor
+        latest_cursor,
+        is_cron
     )
     VALUES (
         p_user_uid,
@@ -441,9 +440,9 @@ BEGIN
         p_conversation_uid,
         COALESCE(p_title, '新的聊天...'),
         COALESCE(p_workspace, ''),
-        COALESCE(p_session_id, ''),
         CURRENT_TIMESTAMP,
-        0
+        0,
+        p_is_cron
     );
 END$$
 
@@ -460,7 +459,6 @@ CREATE PROCEDURE update_conversation (
     IN p_conversation_uid VARCHAR(64),
     IN p_title VARCHAR(255),
     IN p_workspace VARCHAR(255),
-    IN p_session_id VARCHAR(64),
     IN p_is_pinned BOOLEAN,
     IN p_is_deleted BOOLEAN,
     IN p_new_message BOOLEAN
@@ -470,7 +468,6 @@ BEGIN
     SET
         title = IF(p_title IS NULL, title, p_title),
         work_space = IF(p_workspace IS NULL, work_space, p_workspace),
-        session_id = IF(p_session_id IS NULL, session_id, p_session_id),
         is_pinned = IF(p_is_pinned IS NULL, is_pinned, p_is_pinned),
         is_deleted = IF(p_is_deleted IS NULL, is_deleted, p_is_deleted),
         has_new_message = IF(p_new_message IS NULL, has_new_message, p_new_message)
@@ -495,14 +492,14 @@ CREATE PROCEDURE fetch_conversation_list (
 BEGIN
     SELECT
         conversation_uid,
-        session_id,
         title,
         work_space,
         last_active_at,
         created_at,
         latest_cursor,
         is_pinned,
-        has_new_message
+        has_new_message,
+        is_cron
     FROM conversations
     WHERE user_uid = p_user_uid
         AND is_deleted != TRUE
@@ -522,7 +519,6 @@ CREATE PROCEDURE get_conversation_meta_by_id (
 BEGIN
     SELECT
         conversation_uid,
-        session_id,
         title,
         work_space,
         last_active_at,
@@ -864,7 +860,7 @@ DELIMITER ;
 
 
 
--- Stored Procedure: fetch_messages_after_cursor
+-- Deprecated
 DROP PROCEDURE IF EXISTS fetch_messages_for_user;
 DELIMITER $$
 
@@ -1620,7 +1616,7 @@ CREATE PROCEDURE create_cron_task (
     IN p_prompt TEXT,
     IN p_execute LONGTEXT,
     IN p_exec_time DATETIME,
-    IN p_repeat ENUM('once', 'day', 'week', 'month', 'year'),
+    IN p_repeat ENUM('once', 'day', 'week', 'month', 'year', 'cron'),
     IN p_extra_config JSON,
     IN p_description TEXT
 )
@@ -1761,7 +1757,7 @@ CREATE PROCEDURE update_cron_task (
     IN p_prompt TEXT,
     IN p_execute LONGTEXT,
     IN p_exec_time DATETIME,
-    IN p_repeat ENUM('once', 'day', 'week', 'month', 'year'),
+    IN p_repeat ENUM('once', 'day', 'week', 'month', 'year', 'cron'),
     IN p_extra_config JSON,
     IN p_description TEXT,
     IN p_enabled BOOLEAN,

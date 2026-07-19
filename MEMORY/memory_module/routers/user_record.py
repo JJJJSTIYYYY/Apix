@@ -197,7 +197,6 @@ async def fetch_conversation_list(req: Request):
     Request Body (JSON):
         {
             "client_id": "{{ cid }} : to indicate which user the data is from.",
-            "session_id": "{{ sid }} : to indicate which tab the data belong to",
         }
 
     Returns:
@@ -206,7 +205,6 @@ async def fetch_conversation_list(req: Request):
             "messages": [
                 {
                     "conversation_uid": str,
-                    "session_id": str,
                     "title": str,
                     "work_space": str,
                     "last_active_at": str,
@@ -254,7 +252,6 @@ async def get_conversation_meta_by_id(req: Request):
             "messages": [
                 {
                     "conversation_uid": str,
-                    "session_id": str,
                     "title": str,
                     "work_space": str,
                     "last_active_at": str,
@@ -294,7 +291,6 @@ async def update_conversation(req: Request):
         {
             "client_id": "{{ cid }} : to indicate which user the data is from.",
             "history_id": "{{ hid }} : to indicate which dialog history the data belong to.",
-            "session_id": "{{ sid }} : to indicate which tab the data belong to",
             "title": "Conversation title",
             "workspace": "Agent work dir",
             "is_pinned": bool,

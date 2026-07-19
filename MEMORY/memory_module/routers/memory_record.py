@@ -34,7 +34,6 @@ async def append_message(req: Request):
         {
             "client_id": str,
             "history_id": str,
-            "session_id": str,
             "messages": {
                 "role": 'human', 'ai', 'system', 'tool',
                 "content": str,
@@ -89,7 +88,6 @@ async def delete_messages(req: Request):
         {
             "client_id": str,
             "history_id": str,
-            "session_id": str,
             "messages": [  # list of message generation_id and role
                 str # node_id
             ]
@@ -131,7 +129,6 @@ async def get_messages(req: Request):
         {
             "client_id": str,
             "history_id": str,
-            "session_id": str (optional),
             "cursor": int,
             "current_node_id": str,
             "limit": int (optional)
@@ -297,7 +294,6 @@ async def create_new_conversation(req: Request):
         {
             "client_id": str,
             "platform": str,
-            "session_id": str (optional),
             "title": str (optional),
             "workspace": str (optional),
             "is_cron": str (optional),
