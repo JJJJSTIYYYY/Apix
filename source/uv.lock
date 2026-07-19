@@ -54,6 +54,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "inflect" },
+    { name = "pysqlite3" },
     { name = "pyyaml" },
     { name = "redis" },
 ]
@@ -70,6 +71,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.139.2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "inflect", specifier = ">=7.5.0" },
+    { name = "pysqlite3", specifier = ">=0.6.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "redis", specifier = ">=8.0.1" },
 ]
@@ -315,6 +317,29 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c9/bc/1c6a92f385940f727daeecf3bacaf186e03875dff57197801046c583bcf0/pymysql-1.2.0.tar.gz", hash = "sha256:6c7b17ca686988104d7426c27895b455cdeea3e9d3ceb1270f0c3704fead8c33", size = 49021, upload-time = "2026-05-19T08:26:22.302Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c4/bd/2534e130295c8cfd4f0a2e31623baab7502278f1e97bcfe61db75656a77f/pymysql-1.2.0-py3-none-any.whl", hash = "sha256:62169ce6d5510f08e140c5e7990ee884a9764024e4a9a27b2cc11f1099322ae0", size = 45716, upload-time = "2026-05-19T08:26:20.974Z" },
+]
+
+[[package]]
+name = "pysqlite3"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/84/6e586bef5f6337dee60066eef752c73fa6fcb93c1e7997b550d3105ed4f9/pysqlite3-0.6.0.tar.gz", hash = "sha256:ecf5112b62a4e6c04438957e343fe9672707bd3191f789ecae6c95b226aa6bb6", size = 40838, upload-time = "2026-01-05T18:29:37.843Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8e/18/bacbb8a2441b143bfccde253732e16df2c317048523b21902ccff332cee7/pysqlite3-0.6.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:a7855d3016392fa81571404fc1647a1d07d1128ff862652e1f89e59edcc3405e", size = 953475, upload-time = "2026-01-05T18:29:13.214Z" },
+    { url = "https://files.pythonhosted.org/packages/17/6f/ffda929b007221f7f67e0a3cc767532c53d62704a286c6349e4c363ff32a/pysqlite3-0.6.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:60cc74e051af0bef460950ea975d2d6c80a2145203f23653673a19cc367a6bb7", size = 4531104, upload-time = "2026-01-05T18:29:14.233Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/a0/c871dfe9f7b3c7806c3990f173dc192409ae91d39d07a474882f3433c76e/pysqlite3-0.6.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:c86cd86b2833b43fb4c01b8c90e71f70e95105995f4b1e27b8d9d5c906512992", size = 4533627, upload-time = "2026-01-05T18:29:15.332Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/a1/a8ee146a706a9262fc904fa44cd45cf6f60dc776cd0222ecfd9c21afba3e/pysqlite3-0.6.0-cp312-cp312-win32.whl", hash = "sha256:ed0da0211335335900e699f93c7fe7292ab3437b015ee1310ee5199fd9d05c29", size = 727854, upload-time = "2026-01-05T18:29:16.694Z" },
+    { url = "https://files.pythonhosted.org/packages/82/49/0cfffa2e6e4431e8a94ddd0e54a16dc25f5e799e3edec44a6173c0c4bb5e/pysqlite3-0.6.0-cp312-cp312-win_amd64.whl", hash = "sha256:f88d0f8f45bf3644ddd3e7c7de4b6b8d5b10a1bfe23db55b5a1ed95cbd4a0cb9", size = 878641, upload-time = "2026-01-05T18:29:17.941Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/74/b59766bc544bb1b915bb17d9ee93fe6dc86c77f614f028baea1a6d1fe7d7/pysqlite3-0.6.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:64d48638e2c787f1e7ca0100294740f4db7f6bce1516ba8076e082d6443925d4", size = 953052, upload-time = "2026-01-05T18:29:19.166Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/5c/f52f10a4a49d190dc8e3a56f6788580c09b673f465dbd431e2f16eabf788/pysqlite3-0.6.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:1cc753922baa703496b6edbf92687389490b0e7ad61b7ed4925e6cf2a7def0a1", size = 4528389, upload-time = "2026-01-05T18:29:20.142Z" },
+    { url = "https://files.pythonhosted.org/packages/af/22/cb8a672b204ae4ad03d400ffc2ac85d9152fee0c56ef7588158d9e440c9e/pysqlite3-0.6.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:4f03a69a9c64d0476bbf9c619e1024770368b08e6b572c3f5f0fa641f1b67f27", size = 4531182, upload-time = "2026-01-05T18:29:21.519Z" },
+    { url = "https://files.pythonhosted.org/packages/96/8f/710dc106948d9196a0fd8b5f8b958471b70fb95c86287444f78e55d1068e/pysqlite3-0.6.0-cp313-cp313-win32.whl", hash = "sha256:5ae52d27b48a634f1015051d791d23a5bd3f0a992099a632bf39bca21a156420", size = 727626, upload-time = "2026-01-05T18:29:22.66Z" },
+    { url = "https://files.pythonhosted.org/packages/40/06/e30830a19aad6c530a256712d2d91b5720bd666d95dd2a2a5991c5d357fd/pysqlite3-0.6.0-cp313-cp313-win_amd64.whl", hash = "sha256:2886b6ccf9c3c7ce678ea795a2aa9ddb4563c50c81bce399560fdb2c5662e55d", size = 878086, upload-time = "2026-01-05T18:29:24.713Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/8b/9460af84b3e0a33767615b4148bcb746a6aadf9fe2cc55b399d4e00ca22e/pysqlite3-0.6.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:b6f768d6e00d4574f5cc1bff174a4703382afe221b04b009bcb8b41164af08a0", size = 952994, upload-time = "2026-01-05T18:29:25.701Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/3f/5445614ed6b60f058715923d12e7a10a6464cd1cf29ec3a166cc0be46e8e/pysqlite3-0.6.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:268fa5873143cccd79f32624c9a25714e4595715795ae09c8366c75cae8f5aed", size = 4528324, upload-time = "2026-01-05T18:29:26.885Z" },
+    { url = "https://files.pythonhosted.org/packages/46/c8/f490d4890f1d1541efda54fea9249f9ae264c46fd5d0e12e5e2757f6abcb/pysqlite3-0.6.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:65a9af11004d350538b6bd852b0ec22cdd62928be9ab522d85c0840d5bf92a72", size = 4531310, upload-time = "2026-01-05T18:29:28.293Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/c3/ff97773adf35afaadaa969ae9fa20f09d25732b2ceba0b986f7039a89c6b/pysqlite3-0.6.0-cp314-cp314-win32.whl", hash = "sha256:cc9787dc409f800e310c8a457b7c98d1c4d4a76e15821b7fb460c0e63554ddd8", size = 744085, upload-time = "2026-01-05T18:29:29.277Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/76/103fc35bec8934c672b5193eadc66384472fd071c269cd95bc4b16595d17/pysqlite3-0.6.0-cp314-cp314-win_amd64.whl", hash = "sha256:81226436fae52d3bec4ce578104c5bcf4c22d3fcf29d4a590fcbde56b90472ef", size = 903944, upload-time = "2026-01-05T18:29:30.309Z" },
 ]
 
 [[package]]

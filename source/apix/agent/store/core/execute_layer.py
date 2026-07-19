@@ -3,9 +3,9 @@ import json
 from typing import Callable, Dict
 from uuid import uuid4
 
-from apix.agent.store.core.helper.message_node_helper import MessageNodeHelper
-from apix.agent.store.core.mysql_server import MysqlService
-from apix.agent.store.core.redis_server import RedisService
+from apix.agent.store.utils.message_node_helper import MessageNodeHelper
+from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
+from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
 from apix.agent.store.utils.decorator import task_handler
 from apix.common.utils.logger import logger
 
@@ -20,9 +20,9 @@ class DataExecutors:
     - Normalize return format
     """
 
-    def __init__(self, *, redis_store: RedisService, mysql_store: MysqlService):
-        self.redis = redis_store
-        self.mysql = mysql_store
+    def __init__(self, *, cache_store: CacheServerBase, data_store: DataServerBase):
+        self.cache_store = cache_store
+        self.data_store = data_store
                 
 
 
@@ -47,7 +47,7 @@ class DataExecutors:
 
             if not inspect.iscoroutinefunction(attr):
                 raise TypeError(
-                    f"[MysqlService][export_handlers] Task handler '{task_name}' must be async function"
+                    f"Task handler '{task_name}' must be async function"
                 )
 
             handlers[task_name] = attr
@@ -67,11 +67,11 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            res = await self.mysql.ensure_user_exists(payload, exist=False)
+            res = await self.data_store.ensure_user_exists(payload, exist=False)
             if not res.get("success"):
                 return res
             
-            return await self.mysql.create_a_user(payload)
+            return await self.data_store.create_a_user(payload)
 
         except Exception as e:
             logger.exception(
@@ -95,7 +95,7 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            return await self.mysql.verify_user(payload)
+            return await self.data_store.verify_user(payload)
 
         except Exception as e:
             logger.exception(
@@ -115,7 +115,7 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            return await self.mysql.ensure_user_exists(payload)
+            return await self.data_store.ensure_user_exists(payload)
 
         except Exception as e:
             logger.exception(
@@ -144,12 +144,12 @@ class DataExecutors:
         try:
             logger.trace()
             # 1. Ensure user exists (idempotent)
-            res = await self.mysql.ensure_user_exists(payload)
+            res = await self.data_store.ensure_user_exists(payload)
             if not res.get("success"):
                 return res
 
             # 2. Create conversation
-            return await self.mysql.create_conversation(payload)
+            return await self.data_store.create_conversation(payload)
 
         except Exception as e:
             logger.exception(
@@ -178,9 +178,9 @@ class DataExecutors:
             if payload.get("is_deleted", False):
                 expire_payload = payload.copy()
                 expire_payload.pop("task_hash", "")
-                await self.redis.expire_immediately(expire_payload)
+                await self.cache_store.expire_immediately(expire_payload)
             # 2. Update conversation
-            return await self.mysql.update_conversation(payload)
+            return await self.data_store.update_conversation(payload)
 
         except Exception as e:
             logger.exception(
@@ -200,7 +200,7 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            return await self.mysql.fetch_conversation_list(payload)
+            return await self.data_store.fetch_conversation_list(payload)
 
         except Exception as e:
             logger.exception(
@@ -220,7 +220,7 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            return await self.mysql.get_conversation_meta_by_id(payload)
+            return await self.data_store.get_conversation_meta_by_id(payload)
 
         except Exception as e:
             logger.exception(
@@ -250,7 +250,7 @@ class DataExecutors:
             logger.trace()
             messages = payload["messages"]
             # 1. Persist to MySQL
-            res = await self.mysql.append_message(payload)
+            res = await self.data_store.append_message(payload)
             if not res.get("success"):
                 return res
 
@@ -265,20 +265,20 @@ class DataExecutors:
                 logger.info(
                     f"Redis backfill payload: {payload}"
                 )
-                await self.redis.append_messages(payload)
+                await self.cache_store.append_messages(payload)
             except Exception as e:
                 # Redis failure should not break main flow
                 logger.warning(
                     f"Redis backfill failed: {e}"
                 )
 
-            user_uid = payload["user_id"]
-            conversation_id = payload["conversation_id"]
+            user_uid = payload["user_uid"]
+            conversation_uid = payload["conversation_uid"]
             node_id = messages.get("node_id", "")
             parent_id = messages.get("parent_id", "")
-            await self.redis.update_current_messages_branch_chain_cache({
-                "user_id": user_uid,
-                "conversation_id": conversation_id,
+            await self.cache_store.update_current_messages_branch_chain_cache({
+                "user_uid": user_uid,
+                "conversation_uid": conversation_uid,
                 "node_id": node_id,
                 "parent_id": parent_id,
             })
@@ -312,14 +312,14 @@ class DataExecutors:
             logger.trace()
 
             try:
-                await self.redis.expire_immediately(payload)
+                await self.cache_store.expire_immediately(payload)
             except Exception as e:
                 # Redis failure should not break main flow
                 logger.warning(
                     f"Redis backfill failed: {e}"
                 )
 
-            res = await self.mysql.delete_messages(payload)
+            res = await self.data_store.delete_messages(payload)
             if not res.get("success"):
                 return res
             
@@ -332,12 +332,12 @@ class DataExecutors:
 
             if mem_ids:
                 sm_payload = {
-                    "user_id": payload.get("user_id", ""),
-                    "conversation_id": payload.get("conversation_id", ""),
-                    "memory_id": mem_ids
+                    "user_uid": payload.get("user_uid", ""),
+                    "conversation_uid": payload.get("conversation_uid", ""),
+                    "memory_ids": mem_ids
                 }
 
-                res = await self.mysql.delete_shortterm_memory(sm_payload)
+                res = await self.data_store.delete_shortterm_memory(sm_payload)
                 if not res.get("success"):
                     return res
 
@@ -463,9 +463,9 @@ class DataExecutors:
 
             try:
                 if current_node_id == '-':
-                    cache_chain_res = await self.redis.get_current_messages_branch_chain({
-                        "user_id": payload["user_id"],
-                        "conversation_id": payload["conversation_id"],
+                    cache_chain_res = await self.cache_store.get_current_messages_branch_chain({
+                        "user_uid": payload["user_uid"],
+                        "conversation_uid": payload["conversation_uid"],
                     })
                     if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
                         cached_chain = cache_chain_res.get("messages")
@@ -477,19 +477,19 @@ class DataExecutors:
                 )
 
             # 1. Redis
-            redis_res = await self.redis.get_recent_messages(payload)
+            redis_res = await self.cache_store.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
                 messages = redis_res.get("messages", [])
 
                 parsed_messages, branches, node_id_chain = self._build_visible_messages(
                     messages,
                     current_node_id,
-                    allow_roles=('human', 'ai', 'system', 'tools'),
+                    allow_roles=('user', 'ai', 'system', 'tool'),
                     guess_children=False
                 )
 
                 payload["node_id_chain"] = node_id_chain
-                await self.redis.cache_current_messages_branch_chain(payload)
+                await self.cache_store.cache_current_messages_branch_chain(payload)
 
                 redis_res["messages"] = parsed_messages
                 redis_res["branches"] = branches
@@ -499,7 +499,7 @@ class DataExecutors:
             mysql_payload = payload.copy()
             mysql_payload["cursor"] = 1
 
-            mysql_res = await self.mysql.fetch_messages_after_cursor(mysql_payload)
+            mysql_res = await self.data_store.fetch_messages_after_cursor(mysql_payload)
             if not mysql_res.get("success"):
                 return mysql_res
 
@@ -511,7 +511,7 @@ class DataExecutors:
             try:
                 backfill_payload = payload.copy()
                 backfill_payload["messages"] = messages
-                await self.redis.backfill_messages(backfill_payload)
+                await self.cache_store.backfill_messages(backfill_payload)
             except Exception as e:
                 logger.warning(
                     f"Redis backfill failed: {e}"
@@ -521,13 +521,13 @@ class DataExecutors:
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
-                allow_roles=('human', 'ai', 'system', 'tools'),
+                allow_roles=('user', 'ai', 'system', 'tool'),
                 guess_children=False
             )
 
             # 5. cache current node chain
             payload["node_id_chain"] = node_id_chain
-            await self.redis.cache_current_messages_branch_chain(payload)
+            await self.cache_store.cache_current_messages_branch_chain(payload)
 
             mysql_res["messages"] = parsed_messages
             mysql_res["branches"] = branches
@@ -551,9 +551,9 @@ class DataExecutors:
 
             try:
                 if current_node_id == '-':
-                    cache_chain_res = await self.redis.get_current_messages_branch_chain({
-                        "user_id": payload["user_id"],
-                        "conversation_id": payload["conversation_id"],
+                    cache_chain_res = await self.cache_store.get_current_messages_branch_chain({
+                        "user_uid": payload["user_uid"],
+                        "conversation_uid": payload["conversation_uid"],
                     })
                     if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
                         cached_chain = cache_chain_res.get("messages")
@@ -565,18 +565,18 @@ class DataExecutors:
                 )
 
             # 1. Redis
-            redis_res = await self.redis.get_recent_messages(payload)
+            redis_res = await self.cache_store.get_recent_messages(payload)
             if redis_res.get("success") and redis_res.get("cache_hit"):
                 messages = redis_res.get("messages", [])
 
                 parsed_messages, branches, node_id_chain = self._build_visible_messages(
                     messages,
                     current_node_id,
-                    allow_roles=('human', 'ai', 'info')
+                    allow_roles=('user', 'ai', 'info')
                 )
 
                 payload["node_id_chain"] = node_id_chain
-                await self.redis.cache_current_messages_branch_chain(payload)
+                await self.cache_store.cache_current_messages_branch_chain(payload)
 
                 redis_res["messages"] = parsed_messages
                 redis_res["branches"] = branches
@@ -586,7 +586,7 @@ class DataExecutors:
             mysql_payload = payload.copy()
             mysql_payload["cursor"] = 1
 
-            mysql_res = await self.mysql.fetch_messages_after_cursor(mysql_payload)
+            mysql_res = await self.data_store.fetch_messages_after_cursor(mysql_payload)
             if not mysql_res.get("success"):
                 return mysql_res
 
@@ -598,7 +598,7 @@ class DataExecutors:
             try:
                 backfill_payload = payload.copy()
                 backfill_payload["messages"] = messages
-                await self.redis.backfill_messages(backfill_payload)
+                await self.cache_store.backfill_messages(backfill_payload)
             except Exception as e:
                 logger.warning(
                     f"Redis backfill failed: {e}"
@@ -608,12 +608,12 @@ class DataExecutors:
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
-                allow_roles=('human', 'ai', 'info')
+                allow_roles=('user', 'ai', 'info')
             )
 
             # 5. cache current node chain
             payload["node_id_chain"] = node_id_chain
-            await self.redis.cache_current_messages_branch_chain(payload)
+            await self.cache_store.cache_current_messages_branch_chain(payload)
 
             mysql_res["messages"] = parsed_messages
             mysql_res["branches"] = branches
@@ -632,7 +632,7 @@ class DataExecutors:
     async def search_messages_by_keyword(self, payload: dict) -> dict:
         try:
             logger.trace()
-            return await self.mysql.search_messages_by_keyword(payload)
+            return await self.data_store.search_messages_by_keyword(payload)
 
         except Exception as e:
             logger.exception(
@@ -647,7 +647,7 @@ class DataExecutors:
     async def get_current_messages_branch_chain(self, payload: dict) -> dict:
         try:
             logger.trace()
-            return await self.redis.get_current_messages_branch_chain(payload)
+            return await self.cache_store.get_current_messages_branch_chain(payload)
 
         except Exception as e:
             logger.exception(
@@ -671,10 +671,10 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            res = await self.mysql.ensure_user_exists(payload)
+            res = await self.data_store.ensure_user_exists(payload)
             if not res.get("success"):
                 return res
-            return await self.mysql.insert_file_info(payload)
+            return await self.data_store.insert_file_info(payload)
 
         except Exception as e:
             logger.exception(
@@ -695,7 +695,7 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            return await self.mysql.update_file_info(payload)
+            return await self.data_store.update_file_info(payload)
 
         except Exception as e:
             logger.exception(
@@ -715,7 +715,7 @@ class DataExecutors:
         """
         try:
             logger.trace()
-            return await self.mysql.fetch_recent_files(payload)
+            return await self.data_store.fetch_recent_files(payload)
 
         except Exception as e:
             logger.exception(
@@ -738,7 +738,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.fetch_shortterm_memory(payload)
+            mysql_res = await self.data_store.fetch_shortterm_memory(payload)
 
             return mysql_res
 
@@ -759,7 +759,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.insert_shortterm_memory(payload)
+            mysql_res = await self.data_store.insert_shortterm_memory(payload)
 
             return mysql_res
 
@@ -786,7 +786,7 @@ class DataExecutors:
             provider_id = str(uuid4().hex)
             payload["provider_id"] = provider_id
 
-            return await self.mysql.create_llm_provider(payload)
+            return await self.data_store.create_llm_provider(payload)
         
         except Exception as e:
             logger.exception(
@@ -805,7 +805,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_llm_providers(payload)
+            mysql_res = await self.data_store.get_llm_providers(payload)
             if not mysql_res.get("success"):
                 return mysql_res
             
@@ -837,7 +837,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_llm_provider_by_id(payload)
+            mysql_res = await self.data_store.get_llm_provider_by_id(payload)
             if not mysql_res.get("success"):
                 return mysql_res
             
@@ -869,7 +869,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            return await self.mysql.update_llm_provider(payload)
+            return await self.data_store.update_llm_provider(payload)
         
         except Exception as e:
             logger.exception(
@@ -895,7 +895,7 @@ class DataExecutors:
             mcp_id = str(uuid4().hex)
             payload["mcp_id"] = mcp_id
 
-            return await self.mysql.create_mcp_server(payload)
+            return await self.data_store.create_mcp_server(payload)
 
         except Exception as e:
             logger.exception(
@@ -916,7 +916,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_mcp_servers(payload)
+            mysql_res = await self.data_store.get_mcp_servers(payload)
 
             if not mysql_res.get("success"):
                 return mysql_res
@@ -960,7 +960,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_enabled_mcp_servers(payload)
+            mysql_res = await self.data_store.get_enabled_mcp_servers(payload)
 
             if not mysql_res.get("success"):
                 return mysql_res
@@ -1005,7 +1005,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            return await self.mysql.update_mcp_server(payload)
+            return await self.data_store.update_mcp_server(payload)
 
         except Exception as e:
             logger.exception(
@@ -1029,7 +1029,7 @@ class DataExecutors:
             task_id = str(uuid4().hex)
             payload["task_id"] = task_id
 
-            return await self.mysql.create_cron_task(payload)
+            return await self.data_store.create_cron_task(payload)
 
         except Exception as e:
             logger.exception(
@@ -1050,7 +1050,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_all_enabled_cron_tasks(payload)
+            mysql_res = await self.data_store.get_all_enabled_cron_tasks(payload)
 
             if not mysql_res.get("success"):
                 return mysql_res
@@ -1094,7 +1094,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_cron_tasks(payload)
+            mysql_res = await self.data_store.get_cron_tasks(payload)
 
             if not mysql_res.get("success"):
                 return mysql_res
@@ -1138,7 +1138,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            mysql_res = await self.mysql.get_cron_task_by_id(payload)
+            mysql_res = await self.data_store.get_cron_task_by_id(payload)
 
             if not mysql_res.get("success"):
                 return mysql_res
@@ -1183,7 +1183,7 @@ class DataExecutors:
         try:
             logger.trace()
 
-            return await self.mysql.update_cron_task(payload)
+            return await self.data_store.update_cron_task(payload)
 
         except Exception as e:
             logger.exception(

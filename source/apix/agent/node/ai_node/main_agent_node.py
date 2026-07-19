@@ -34,8 +34,8 @@ class MainAgentNode(AgentNodeBase):
         # Basic state extraction
         config = state.get("config", {})
         generation_id = state.get("generation_id")
-        user_id = state.get("user_id")
-        conversation_id = state.get("conversation_id")
+        user_uid = state.get("user_uid")
+        conversation_uid = state.get("conversation_uid")
         timestamp = state.get("timestamp")
         re_generate = state.get("re_generate")
 
@@ -57,13 +57,13 @@ class MainAgentNode(AgentNodeBase):
         # Sandbox initialization
         if not state.get("sandbox"):
             sandbox = await agent_sandbox.get_sandbox_container_id(
-                user_id=user_id,
+                user_uid=user_uid,
                 work_dir=work_dir
             )
 
             if not sandbox:
                 sandbox = await agent_sandbox.configure_sandbox(
-                    user_id=user_id,
+                    user_uid=user_uid,
                     work_dir=work_dir,
                 )
 
@@ -74,18 +74,18 @@ class MainAgentNode(AgentNodeBase):
         # Load skills
         skills = []
         if not pure_chat_on and enable_skill_load:
-            skills = await ai_context_manager.fetch_available_skills(user_id)
+            skills = await ai_context_manager.fetch_available_skills(user_uid)
 
         # Load rag documents
         documents = []
         if not pure_chat_on and enable_knowledge_retrieval:
-            documents = await ai_context_manager.fetch_available_documents(user_id)
+            documents = await ai_context_manager.fetch_available_documents(user_uid)
 
         if not input_msg:
             raise RuntimeError("Error: Attempt invoke agent without input.")
         client_message = input_msg  # Only process latest message
 
-        if client_message.get("role") == "human":
+        if client_message.get("role") == "user":
             client_message.update({
                 "timestamp": timestamp,
                 "generation_id": generation_id,
@@ -94,7 +94,7 @@ class MainAgentNode(AgentNodeBase):
             # Persist message and fetch full history
             if not re_generate: 
                 # For a full generation wtih new user input.
-                await ai_context_manager.append_to_messages(user_id, conversation_id, client_message)
+                await ai_context_manager.append_to_messages(user_uid, conversation_uid, client_message)
                 # A new uer message appended in database, update the last confirmed node_id to this message
                 current_visible_node_id = convert_generation_id_to_message_node_id(generation_id, 'user')
             else: 
@@ -102,7 +102,7 @@ class MainAgentNode(AgentNodeBase):
                 # parent_id in client_message means the last confirmed node_id
                 current_visible_node_id = client_message.get("parent_id", '-')
             # Ensure agent message node's parent_id in this generation (normally equals to current_visible_node_id)
-            client_messages, parent_id = await ai_context_manager.fetch_messages(user_id, conversation_id, 0, current_visible_node_id)
+            client_messages, parent_id = await ai_context_manager.fetch_messages(user_uid, conversation_uid, 0, current_visible_node_id)
 
             event_writer = AgentStreamWriter(generation_id)
             target = state.get("target")
@@ -126,7 +126,7 @@ class MainAgentNode(AgentNodeBase):
 
             # Short-term memory
             if enable_shortterm_memory:
-                shortterm = await ai_context_manager.fetch_shortterm_memory(user_id, conversation_id)
+                shortterm = await ai_context_manager.fetch_shortterm_memory(user_uid, conversation_uid)
                 shortterm_memory_prompt = ai_context_manager.create_shortterm_prompt(shortterm)
                 if shortterm:
                     after_index = shortterm[0].get("memory_id")
@@ -314,8 +314,8 @@ class MainAgentNode(AgentNodeBase):
 
             # Persist memory
             await ai_context_manager.insert_shortterm_memory(
-                state["user_id"],
-                state["conversation_id"],
+                state["user_uid"],
+                state["conversation_uid"],
                 to_summarize_last_index,
                 summary_text
             )
@@ -388,7 +388,7 @@ class MainAgentNode(AgentNodeBase):
 
         # Basic config
         agent_role = state.get("agent_role")
-        user_id = state.get("user_id")
+        user_uid = state.get("user_uid")
         target = state.get("target")
         generation_id = state.get("generation_id")
         config = state.get("config", {})
@@ -709,9 +709,9 @@ class MainAgentNode(AgentNodeBase):
         last_message = messages[-1]
 
         generation_id = state.get("generation_id")
-        user_id = state.get("user_id")
+        user_uid = state.get("user_uid")
         target = state.get("target")
-        conversation_id = state.get("conversation_id")
+        conversation_uid = state.get("conversation_uid")
         timestamp = state.get("timestamp")
 
         config = state.get("config")
@@ -737,7 +737,7 @@ class MainAgentNode(AgentNodeBase):
                 fallback_timestamp=timestamp
             )
             await ai_context_manager.append_to_messages(
-                user_id, conversation_id, client_message, state.get("parent_node_id")
+                user_uid, conversation_uid, client_message, state.get("parent_node_id")
             )
             
             event_writer.send_event(
@@ -783,7 +783,7 @@ class MainAgentNode(AgentNodeBase):
                     fallback_timestamp=timestamp
                 )
                 await ai_context_manager.append_to_messages(
-                    user_id, conversation_id, tool_message, state.get("parent_node_id")
+                    user_uid, conversation_uid, tool_message, state.get("parent_node_id")
                 )
             
             event_writer.send_event(
@@ -813,7 +813,7 @@ class MainAgentNode(AgentNodeBase):
             )
 
             await ai_context_manager.append_to_messages(
-                user_id, conversation_id, client_message, state.get("parent_node_id")
+                user_uid, conversation_uid, client_message, state.get("parent_node_id")
             )
             
             event_writer.send_event(

@@ -34,7 +34,7 @@ class SubAgentNode(AgentNodeBase):
     ):
         """Rewrite team worker history (optionally with summary)."""
         try:
-            conversation_id = state.get("conversation_id")
+            conversation_uid = state.get("conversation_uid")
             agent_name = state.get("agent_name")
             generation_id = state.get("generation_id")
             timestamp = state.get("timestamp")
@@ -63,7 +63,7 @@ class SubAgentNode(AgentNodeBase):
                         new_history.append(msg_dict)
 
             await generating_cache.rewrite_history(
-                conversation_id=conversation_id,
+                conversation_uid=conversation_uid,
                 agent_name=agent_name,
                 messages=new_history
             )
@@ -83,8 +83,8 @@ class SubAgentNode(AgentNodeBase):
         agent_role = state.get("agent_role")
         config = state.get("config", {})
         generation_id = state.get("generation_id")
-        user_id = state.get("user_id")
-        conversation_id = state.get("conversation_id")
+        user_uid = state.get("user_uid")
+        conversation_uid = state.get("conversation_uid")
         timestamp = state.get("timestamp")
 
         # Config flags
@@ -103,13 +103,13 @@ class SubAgentNode(AgentNodeBase):
         # Sandbox initialization
         if not state.get("sandbox"):
             sandbox = await agent_sandbox.get_sandbox_container_id(
-                user_id=user_id,
+                user_uid=user_uid,
                 work_dir=work_dir
             )
 
             if not sandbox:
                 sandbox = await agent_sandbox.configure_sandbox(
-                    user_id=user_id,
+                    user_uid=user_uid,
                     work_dir=work_dir,
                 )
 
@@ -120,31 +120,31 @@ class SubAgentNode(AgentNodeBase):
         # Load skills
         skills = []
         if not pure_chat_on and enable_skill_load:
-            skills = await ai_context_manager.fetch_available_skills(user_id)
+            skills = await ai_context_manager.fetch_available_skills(user_uid)
 
         # Load rag documents
         documents = []
         if not pure_chat_on and enable_knowledge_retrieval:
-            documents = await ai_context_manager.fetch_available_documents(user_id)
+            documents = await ai_context_manager.fetch_available_documents(user_uid)
             
         if not input_msg:
             raise RuntimeError("Error: Attempt invoke agent without input.")
         client_message = input_msg # Fetch the latest one only.
 
-        if client_message.get("role") == "human":
+        if client_message.get("role") == "user":
             client_message.update({
                 "timestamp": timestamp,
                 "generation_id": generation_id,
             })
             if agent_role == "team_worker":
                 await generating_cache.append_dict_message(
-                    conversation_id=conversation_id,
+                    conversation_uid=conversation_uid,
                     agent_name=state.get("agent_name"),
                     message_dict=client_message
                 )
 
                 history_messages = await generating_cache.load_history(
-                    conversation_id=conversation_id,
+                    conversation_uid=conversation_uid,
                     agent_name=state.get("agent_name"),
                 )
 
@@ -592,7 +592,7 @@ class SubAgentNode(AgentNodeBase):
         task_id = state.get("task_id")
         generation_id = state.get("generation_id")
         target = state.get("target")
-        conversation_id = state.get("conversation_id")
+        conversation_uid = state.get("conversation_uid")
         timestamp = state.get("timestamp")
 
         config = state.get("config")
@@ -630,7 +630,7 @@ class SubAgentNode(AgentNodeBase):
                     fallback_timestamp=timestamp
                 )
                 await generating_cache.append_dict_message(
-                    conversation_id=conversation_id,
+                    conversation_uid=conversation_uid,
                     agent_name=agent_name,
                     message_dict=client_message
                 )
@@ -678,7 +678,7 @@ class SubAgentNode(AgentNodeBase):
                 # Persist tool message for team worker
                 if agent_role == "team_worker":
                     await generating_cache.append_dict_message(
-                        conversation_id=conversation_id,
+                        conversation_uid=conversation_uid,
                         agent_name=agent_name,
                         message_dict=tool_message
                     )
@@ -702,7 +702,7 @@ class SubAgentNode(AgentNodeBase):
             )
 
             await generating_cache.append_dict_message(
-                conversation_id=conversation_id,
+                conversation_uid=conversation_uid,
                 agent_name=agent_name,
                 message_dict=client_message
             )

@@ -23,13 +23,13 @@ class GeneratingCache:
         # Async locks per history file
         self._locks: Dict[str, asyncio.Lock] = {}
 
-    def _get_file_key(self, conversation_id: str, agent_name: str) -> str:
+    def _get_file_key(self, conversation_uid: str, agent_name: str) -> str:
         """Generate unique lock key"""
-        return f"{conversation_id}:{agent_name}"
+        return f"{conversation_uid}:{agent_name}"
 
-    def _get_file_path(self, conversation_id: str, agent_name: str) -> Path:
+    def _get_file_path(self, conversation_uid: str, agent_name: str) -> Path:
         """Get history file path"""
-        history_dir = self.history_root / conversation_id
+        history_dir = self.history_root / conversation_uid
         history_dir.mkdir(parents=True, exist_ok=True)
 
         return history_dir / f"{agent_name}.jsonl"
@@ -43,7 +43,7 @@ class GeneratingCache:
 
     async def append_message(
         self,
-        conversation_id: str,
+        conversation_uid: str,
         agent_name: str,
         generation_id: str,
         message: AIMessage | AIMessageChunk | ToolMessage,
@@ -53,8 +53,8 @@ class GeneratingCache:
         Append LangChain message to history.
         """
 
-        key = self._get_file_key(conversation_id, agent_name)
-        path = self._get_file_path(conversation_id, agent_name)
+        key = self._get_file_key(conversation_uid, agent_name)
+        path = self._get_file_path(conversation_uid, agent_name)
         lock = self._get_lock(key)
 
         msg_dict = ai_context_manager.create_dict_message(
@@ -73,7 +73,7 @@ class GeneratingCache:
 
     async def append_dict_message(
         self,
-        conversation_id: str,
+        conversation_uid: str,
         agent_name: str,
         message_dict: dict,
     ):
@@ -81,8 +81,8 @@ class GeneratingCache:
         Append pre-built dict message.
         """
 
-        key = self._get_file_key(conversation_id, agent_name)
-        path = self._get_file_path(conversation_id, agent_name)
+        key = self._get_file_key(conversation_uid, agent_name)
+        path = self._get_file_path(conversation_uid, agent_name)
         lock = self._get_lock(key)
 
         async with lock:
@@ -92,14 +92,14 @@ class GeneratingCache:
 
     async def load_history(
         self,
-        conversation_id: str,
+        conversation_uid: str,
         agent_name: str,
     ) -> List[dict]:
         """
         Load full history for a sub-agent.
         """
 
-        path = self._get_file_path(conversation_id, agent_name)
+        path = self._get_file_path(conversation_uid, agent_name)
 
         if not path.exists():
             return []
@@ -118,7 +118,7 @@ class GeneratingCache:
 
     async def rewrite_history(
         self,
-        conversation_id: str,
+        conversation_uid: str,
         agent_name: str,
         messages: list[dict],
     ):
@@ -130,8 +130,8 @@ class GeneratingCache:
         in case of crash or interruption.
         """
 
-        key = self._get_file_key(conversation_id, agent_name)
-        path = self._get_file_path(conversation_id, agent_name)
+        key = self._get_file_key(conversation_uid, agent_name)
+        path = self._get_file_path(conversation_uid, agent_name)
         lock = self._get_lock(key)
 
         async with lock:
@@ -155,14 +155,14 @@ class GeneratingCache:
 
     async def clear_history(
         self,
-        conversation_id: str,
+        conversation_uid: str,
         agent_name: str,
     ):
         """
         Delete history file for a sub-agent.
         """
 
-        path = self._get_file_path(conversation_id, agent_name)
+        path = self._get_file_path(conversation_uid, agent_name)
 
         if path.exists():
             path.unlink()

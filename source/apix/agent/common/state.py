@@ -8,8 +8,8 @@ from apix.common.type.global_type import ApixIdentity
 class GraphRuntimeContext(TypedDict):
     agent_name: str
     agent_role: Literal["team_leader", "team_worker", "main_agent", "sub_agent", "agent"]
-    user_id: str
-    conversation_id: str
+    user_uid: str
+    conversation_uid: str
     target: ApixIdentity
     generation_id: str
     node_id: NotRequired[str]

@@ -5,7 +5,7 @@ from typing import Any, NotRequired, TypedDict
 class ApixIdentity(TypedDict):
     id: str
     platform: NotRequired[str]
-    conversation_id: NotRequired[str]
+    conversation_uid: NotRequired[str]
     associated_account: NotRequired[dict]
 
 

@@ -3,28 +3,41 @@ import uuid
 from typing import Any, Dict, Callable
 
 from apix.agent.store.core.execute_layer import DataExecutors
-from apix.agent.store.core.mysql_server import mysql_server, MysqlService
-from apix.agent.store.core.redis_server import redis_server, RedisService
 from apix.common.utils.logger import logger
-from apix.config.base_config import WORKER_COUNT
+from apix.config.base_config import WORKER_COUNT, CACHE_STORE_TYPE, DATA_STORE_TYPE
+from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
+from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
 
+if CACHE_STORE_TYPE == 'redis':
+    from apix.agent.store.core.server.cache_store.redis_server import cache_server
+elif CACHE_STORE_TYPE == 'builtin':
+    from apix.agent.store.core.server.cache_store.builtin_server import cache_server
+else:
+    raise NotImplementedError()
+
+if DATA_STORE_TYPE == 'mysql':
+    from apix.agent.store.core.server.data_store.mysql_server import data_server
+elif DATA_STORE_TYPE == 'sqlite':
+    from apix.agent.store.core.server.data_store.sqlite_server import data_server
+else:
+    raise NotImplementedError()
 
 class DataServerManager:
 
     def __init__(
         self,
         *,
-        redis_store: RedisService,
-        mysql_store: MysqlService,
+        cache_store: CacheServerBase,
+        data_store: DataServerBase,
         worker_count: int = 4,
     ):
-        self._redis = redis_store
-        self._mysql = mysql_store
+        self._redis = cache_store
+        self._mysql = data_store
 
         # Execution layer
         self.executor = DataExecutors(
-            redis_store=self._redis,
-            mysql_store=self._mysql,
+            cache_store=self._redis,
+            data_store=self._mysql,
         )
 
         # Action -> executor handler
@@ -142,8 +155,7 @@ class DataServerManager:
 
 
 data_server_manager = DataServerManager(
-    redis_store=redis_server,
-    mysql_store=mysql_server,
+    cache_store=cache_server,
+    data_store=data_server,
     worker_count=WORKER_COUNT,
 )
-

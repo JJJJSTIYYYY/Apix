@@ -1,4 +1,4 @@
-from core.common.yuki import options, generator
+from apix.agent.store.utils.yuki import options, generator
 
 
 options = options.IdGeneratorOptions(worker_id=23)

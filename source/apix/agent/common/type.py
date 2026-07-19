@@ -30,8 +30,8 @@ class AgentRoleSchema(TypedDict):
 # Config schema for creating an agent instance
 class AgentConfigSchema(TypedDict):
     # User / Session Info
-    user_id: str
-    conversation_id: str
+    user_uid: str
+    conversation_uid: str
     platform: str
 
     # LLM Runtime
@@ -81,8 +81,8 @@ class AgentConfigSchema(TypedDict):
 
 # Payload schema for invoke an agent
 class ApixPayloadSchema(TypedDict):
-    user_id: str
-    conversation_id: str
+    user_uid: str
+    conversation_uid: str
     platform: str
     messages: dict
     re_generate: bool

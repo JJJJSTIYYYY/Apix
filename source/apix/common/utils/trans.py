@@ -27,13 +27,13 @@ def get_date_natural_language():
 
 def convert_generation_id_to_message_node_id(
     generation_id: str | list[str] | set[str],
-    role: Literal['user', 'human', 'ai', 'assistant']
+    role: Literal['user', 'ai', 'assistant']
 ) -> str | list[str] | set[str]:
     '''
     Convert generation id to message node id.
     '''
 
-    suffix = "-user" if role in ['user', 'human'] else "-apix"
+    suffix = "-user" if role == 'user' else "-apix"
 
     def convert(gid: str) -> str:
         return gid[-12:] + suffix

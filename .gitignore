@@ -24,8 +24,8 @@ node_modules/
 dist/
 dist-electron/
 .vite/
-out/
-build/
+out
+build
 
 # logs
 npm-debug.log*
@@ -42,23 +42,11 @@ pnpm-debug.log*
 .idea/
 .VSCodeCounter/
 
-## Runtime / Data
-# AGENT
-AGENT/model_running_time/
-AGENT/apix_running_time/
-AGENT/agent_module/data/
-# MEMORY
-MEMORY/memory_module/data/
-# FILE
-FILE/file_service/data/
-FILE/file_service/embed_models/
-# TASK
-TASK/logs/
-# Client
-
+# Runtime / Data
+.apix_data
+source/config.yaml
 
 # logs
-.apix_pids
 logs/
 *.log
 cache/

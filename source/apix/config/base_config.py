@@ -76,7 +76,7 @@ BASE_URL = {       # Base URL for the LLM service
 _config = _load_from_yaml('./config.yaml')
 
 BASE_URL = _config.get('BASE_URL', "http://localhost:2712")
-BASE_DIR = _config.get('BASE_DIR', "./data/") # Base log direction
+BASE_DIR = _config.get('BASE_DIR', "./.apix_data/") # Base log direction
 
 DEBUG_LEVEL: Literal['DEBUG', 'INFO', 'WARN', 'ERROR'] = _config.get('DEBUG_LEVEL', 'DEBUG').upper()
 TRACE = _config.get('TRACE', True)
@@ -98,12 +98,18 @@ WORKER_COUNT = _config.get('WORKER_COUNT', 4) # Number of worker tasks in DataSe
 USE_REDIS_CACHE = _config.get('USE_REDIS_CACHE', True)
 DATABASE_TYPE = _config.get('DATABASE_TYPE', 'mysql')
 
-# Config for redis
+
+# Config for cache
+CACHE_STORE_TYPE: Literal['builtin', 'redis'] = _config.get('CACHE_STORE_TYPE', "builtin")
+# Redis
 MEMO_REDIS_URL = _config.get('MEMO_REDIS_URL', "redis://localhost:6379")
 REDIS_POOL_SIZE = _config.get('REDIS_POOL_SIZE', 3)
 DEFAULT_EXPIRE_SECONDS = _config.get('DEFAULT_EXPIRE_SECONDS', 600)
 
-# Config for mysql
+# Config for database
+DATA_STORE_TYPE: Literal['sqlite', 'mysql'] = _config.get('DATA_STORE_TYPE', "sqlite")
+SQLITE_DATABASE = _config.get('SQLITE_DATABASE', os.path.join(BASE_DIR, "apix.sqlite3"))
+# Mysql
 MYSQL_BASE_URL = _config.get('MYSQL_BASE_URL', "localhost")
 MYSQL_PORT = _config.get('MYSQL_PORT', 3307)
 MYSQL_USER = _config.get('MYSQL_USER', "apix")
