@@ -6,8 +6,38 @@ from typing import Literal
 import uuid
 import platform
 
-from apix.common.utils.yaml import load_from_yaml
+import yaml
 
+def _load_from_yaml(dir, key=None) -> dict | str:
+    """
+    Load yaml file and optionally return a specific key.
+
+    Args:
+        dir (str): Path to yaml file.
+        key (str, optional): Specific key to retrieve from yaml content.
+            If provided, return config[key], otherwise return full config.
+
+    Returns:
+        dict | str:
+            - Full yaml data (dict) if key is None
+            - Value of the specified key if key is provided (may be None if key not found)
+
+    Raises:
+        Exception: If file reading or yaml parsing fails.
+    """
+    config = None
+    try:
+        if os.path.exists(dir):
+            with open(dir, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+        else:
+            config = {}
+        if key is not None:
+            return config.get(key)
+    
+    except Exception as e:
+        raise
+    return config
 
 OPERATION_SYSTEM = platform.system().lower()
 SERVER_ID = "apix_service-"+uuid.uuid4().hex
@@ -43,7 +73,7 @@ BASE_URL = {       # Base URL for the LLM service
     'xiaomimimo': 'https://api.xiaomimimo.com/v1',
 }
 
-_config = load_from_yaml('./config.yaml')
+_config = _load_from_yaml('./config.yaml')
 
 BASE_URL = _config.get('BASE_URL', "http://localhost:2712")
 BASE_DIR = _config.get('BASE_DIR', "./data/") # Base log direction
