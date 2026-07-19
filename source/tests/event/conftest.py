@@ -7,6 +7,7 @@ This conftest patches typing.NotRequired for compatibility.
 
 import sys
 import typing
+from uuid import uuid4
 
 from apix.core.event.base import ApixEvent, EventType, HandlerEntry, HandlerMeta
 
@@ -60,6 +61,7 @@ def make_event():
 
     def _make(event_name="test.event", event_type=None, context=None):
         return ApixEvent(
+            event_id="event-"+uuid4().hex,
             event_type=event_type or EventType.INFO,
             event_name=event_name,
             context=context,

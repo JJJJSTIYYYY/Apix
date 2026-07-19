@@ -3,7 +3,7 @@ import traceback
 
 from apix.core.event.base import HandlerEntry, ApixEvent
 from apix.core.event.event_registry import apix_event_registry
-from apix.core.event.event_writer import event_pipe
+from apix.core.event.event_writer import event_pipe_writer
 from apix.core.event.event_registry import ApixEventRegistry
 from apix.common.utils.logger import logger
 
@@ -96,7 +96,7 @@ class ApixEventLoop:
 
         try:
             while True:
-                event = await event_pipe.get_event()
+                event = await event_pipe_writer.get_event()
 
                 await self._dispatch_semaphore.acquire()
 

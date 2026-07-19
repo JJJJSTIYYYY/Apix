@@ -185,17 +185,17 @@ class TestEventPipeWriterClear:
 
 
 class TestEventPipeWriterSingleton:
-    """Tests for the module-level event_pipe singleton."""
+    """Tests for the module-level event_pipe_writer singleton."""
 
     def test_event_pipe_is_EventPipeWriter_instance(self):
-        """Module-level event_pipe should be an EventPipeWriter instance."""
-        from apix.core.event.event_writer import event_pipe
+        """Module-level event_pipe_writer should be an EventPipeWriter instance."""
+        from apix.core.event.event_writer import event_pipe_writer
 
-        assert isinstance(event_pipe, EventPipeWriter)
+        assert isinstance(event_pipe_writer, EventPipeWriter)
 
     def test_event_pipe_singleton_same_instance(self):
-        """Multiple imports should return the same event_pipe instance."""
-        from apix.core.event.event_writer import event_pipe as ep1
-        from apix.core.event.event_writer import event_pipe as ep2
+        """Multiple imports should return the same event_pipe_writer instance."""
+        from apix.core.event.event_writer import event_pipe_writer as ep1
+        from apix.core.event.event_writer import event_pipe_writer as ep2
 
         assert ep1 is ep2

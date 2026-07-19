@@ -7,6 +7,7 @@ dispatch logic, background handlers, error handling, and timeouts.
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
@@ -57,6 +58,7 @@ def _make_handler_entry(
 def _make_event(event_name="test.event", accepted=False):
     """Create a test ApixEvent."""
     return ApixEvent(
+        event_id="event-"+uuid4().hex,
         event_type=EventType.INFO,
         event_name=event_name,
         context=None,

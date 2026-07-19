@@ -14,6 +14,7 @@ class EventType(str, Enum):
 
 @dataclass(slots=True)
 class ApixEvent:
+    event_id: str
     event_type: EventType
     event_name: str
     context: Any

@@ -1,5 +1,5 @@
 """
-Tests for event_pipe module.
+Tests for event_pipe_writer module.
 
 The module provides a global asyncio.Queue instance (EVENT_PIPE)
 used for inter-module event transport.

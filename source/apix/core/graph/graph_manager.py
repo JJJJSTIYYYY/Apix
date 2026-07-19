@@ -1,58 +1,174 @@
-from typing import Awaitable, Callable
+"""Graph construction utilities."""
 
+import inspect
+from collections.abc import Mapping
+
+from apix.core.graph.base import END, START, Command, NodeFunction
+from apix.core.graph.node import Node
 from apix.core.graph.node_graph import NodeGraph
 
 
 class GraphManager:
-    """
-    Manage a node graph with state.
+    """Build the node and transition definition for a stateless graph.
+
+    Graph state is never retained by this builder or the compiled graph. It is
+    carried from node to node in the event context instead. Every graph must
+    define a transition from :data:`START`; nodes without a transition finish
+    by routing to :data:`END`.
     """
 
     def __init__(self):
-        pass
+        """Create an empty graph definition."""
+        self._nodes: dict[str, Node] = {}
+        self._default_gotos: dict[str, str] = {}
+        self._generated_names: set[str] = set()
 
-    def add_node(self, node_func: Callable | Awaitable, node_name: str = None):
-        """
-        Add a graph node.
 
-        Args:
-            node_func: a sync or async Callable instance.
-            node_name: a unique name for node_func, defaults to the function name.
-        """
-        pass
-
-    def add_edge(self, l_node: str, r_node: str, condition: Callable | Awaitable):
-        """
-        Add a graph edge between two nodes in the manager.
-        Direction: l_node -> r_node.
+    def add_node(self, node_func: NodeFunction, node_name: str | None = None):
+        """Register a user-defined state-processing node.
 
         Args:
-            l_node: left node's name that has been added to the manager.
-            r_node: right node's name that has been added to the manager.
-            condition: a sync or async Callable instance; the right node will not be entered if the condition function returns False.
-        """
-        pass
+            node_func: Synchronous or asynchronous node callable.
+            node_name: Unique node name, defaulting to the callable's name.
 
-    def add_router(self, l_node: str, r_nodes: list[str], router: Callable | Awaitable):
+        Returns:
+            This manager, allowing fluent graph construction.
+
+        Raises:
+            ValueError: If the name is reserved or already registered.
         """
-        Add a graph router between two nodes in the manager.
-        Direction: l_node -> r_nodes.
+        node = Node(node_func, node_name)
+
+        if node.name in (START, END):
+            raise ValueError(f"`{node.name}` is a reserved graph node name.")
+        if node.name in self._nodes:
+            raise ValueError(f"Node `{node.name}` is already registered.")
+
+        self._nodes[node.name] = node
+        return self
+
+
+    def add_nodes(self, node_list: list[NodeFunction]):
+        """Register several nodes using each callable's name.
 
         Args:
-            l_node: left node's name that has been added to the manager.
-            r_nodes: a list of right node names that have been added to the manager.
-            router: a sync or async Callable instance; the graph will choose the node whose name is returned by the router.
+            node_list: Synchronous or asynchronous node callables.
+
+        Returns:
+            This manager, allowing fluent graph construction.
         """
-        pass
+        for node_func in node_list:
+            self.add_node(node_func)
+        return self
+
+
+    def _require_endpoint(self, node_name: str, *, source: bool = False) -> None:
+        """Validate a transition endpoint, including the predefined nodes."""
+        if source and node_name == END:
+            raise ValueError("`END` cannot have an outgoing transition.")
+        if node_name not in (START, END) and node_name not in self._nodes:
+            raise ValueError(f"Node `{node_name}` has not been added.")
+
+
+    def _set_transition(self, source: str, target: str) -> None:
+        """Associate one manager-defined outgoing transition with ``source``."""
+        if source in self._default_gotos:
+            raise ValueError(f"Node `{source}` already has an outgoing transition.")
+        self._default_gotos[source] = target
+
+
+    def _generated_node_name(self, kind: str, left: str, function: NodeFunction) -> str:
+        """Create a unique private node name for a condition or router."""
+        base = f"__{kind}__{left}__{function.__name__}"
+        name = base
+        suffix = 2
+        while name in self._nodes or name in self._generated_names:
+            name = f"{base}_{suffix}"
+            suffix += 1
+        self._generated_names.add(name)
+        return name
+
+
+    @staticmethod
+    async def _call(func: NodeFunction, state: dict):
+        """Call ``func`` and await its result only when it is awaitable."""
+        result = func(state)
+        return await result if inspect.isawaitable(result) else result
+
+
+    def add_edge(
+        self,
+        l_node: str,
+        r_node: str,
+        condition: NodeFunction | None = None,
+    ):
+        """Add a direct or conditional transition between graph nodes.
+
+        When ``condition`` is supplied it becomes an internal node: ``True``
+        routes to ``r_node`` and ``False`` routes to :data:`END`. Omitting it
+        creates a direct transition, which is normally used for
+        ``START -> first_node`` and ``last_node -> END``.
+        """
+        self._require_endpoint(l_node, source=True)
+        self._require_endpoint(r_node)
+        if condition is None:
+            self._set_transition(l_node, r_node)
+            return self
+        if not callable(condition):
+            raise TypeError("`condition` must be callable.")
+
+        condition_name = self._generated_node_name("condition", l_node, condition)
+
+        async def condition_node(state: dict) -> Command:
+            """Evaluate the edge condition and route to its target when true."""
+            result = await self._call(condition, state)
+            if not isinstance(result, bool):
+                raise TypeError("A condition function must return bool.")
+            return Command(update={}, goto=r_node if result else END)
+
+        self._nodes[condition_name] = Node(condition_node, condition_name)
+        self._set_transition(l_node, condition_name)
+        return self
+
+
+    def add_router(self, l_node: str, r_nodes: list[str], router: NodeFunction):
+        """Add an internal router node after ``l_node``.
+
+        The router receives the state from the event context and must select a
+        name from ``r_nodes``. A mapping containing ``goto`` is also accepted.
+        :data:`END` may be used as one of the route targets.
+        """
+        self._require_endpoint(l_node, source=True)
+        if not r_nodes:
+            raise ValueError("`r_nodes` must contain at least one target node.")
+        for node_name in r_nodes:
+            self._require_endpoint(node_name)
+        if not callable(router):
+            raise TypeError("`router` must be callable.")
+
+        router_name = self._generated_node_name("router", l_node, router)
+        targets = set(r_nodes)
+
+        async def router_node(state: dict) -> Command:
+            """Run the router and turn its selected target into a command."""
+            result = await self._call(router, state)
+            if isinstance(result, Mapping) and "goto" in result:
+                result = result["goto"]
+            if result not in targets:
+                raise ValueError(f"Router for `{l_node}` returned invalid target `{result}`.")
+            return Command(update={}, goto=result)
+
+        self._nodes[router_name] = Node(router_node, router_name)
+        self._set_transition(l_node, router_name)
+        return self
+
 
     def compile_graph(self) -> NodeGraph:
-        """
-        Compile and return the graph according to the added nodes and edges.
-        """
-        pass
+        """Compile this definition into an event-listening :class:`NodeGraph`.
 
-    def invoke_graph(self, state: dict):
+        Raises:
+            ValueError: If no transition has been defined from :data:`START`.
         """
-        Invoke the graph with an initial state.
-        """
-        pass
+        if START not in self._default_gotos:
+            raise ValueError("A graph must define an outgoing transition from `START`.")
+        return NodeGraph(self._nodes, self._default_gotos)

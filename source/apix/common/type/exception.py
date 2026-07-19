@@ -98,3 +98,20 @@ class EventHandlerAlreadyRegistered(Exception):
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
         return f"{self.message}{error_details}"
+    
+
+class InvalidNodeReturns(Exception):
+    
+    def __init__(self, message="Invalid node returns", errors=None):
+        """        
+        Args:
+            message: error message
+            errors: error object
+        """
+        self.message = message
+        self.errors = errors if errors else []
+        super().__init__(self.message)
+    
+    def __str__(self):
+        error_details = f"Errors: {self.errors}" if self.errors else ""
+        return f"{self.message}{error_details}"

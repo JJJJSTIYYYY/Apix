@@ -1,5 +1,6 @@
 import time
 from typing import Any
+from uuid import uuid4
 
 from apix.common.utils.logger import logger
 from apix.core.event.base import EventType, ApixEvent
@@ -25,6 +26,7 @@ class EventPipeWriter:
         '''
         
         event = ApixEvent(
+            event_id="event-"+uuid4().hex,
             event_type = event_type,
             event_name = event_name,
             context = context,
@@ -48,4 +50,4 @@ class EventPipeWriter:
 
 
 
-event_pipe = EventPipeWriter()
+event_pipe_writer = EventPipeWriter()
