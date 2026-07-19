@@ -1,0 +1,35 @@
+# Debug and trace flags
+DEBUG_LEVEL: "DEBUG" # 'DEBUG', 'INFO', 'WARN', 'ERROR'
+TRACE: true
+
+EVENT_PIPE_MAX_LEN: 1024
+STREAM_PIPE_MAX_LEN: 4096
+
+# Log file size limit
+MAX_LOG_FILE_SIZE: 5242880           # 5 * 1024 * 1024
+
+TOOLS_MAX_OUTPUT_LENGTH: 32000
+
+# Retry and TTL settings
+MAX_RETRY: 8                         # Max retry when llm call fails; must be > 3
+GENERATION_TTL: 600                  # Cleanup finished/aborted generation contexts (seconds)
+CONTIANER_TTL: 6000
+GRAPH_CACHE_TTL: 600
+CACHE_CLEAN_INTERVAL: 300
+
+# Redis configuration
+MEMO_REDIS_URL: "redis://localhost:6379"
+REDIS_POOL_SIZE: 3
+DEFAULT_EXPIRE_SECONDS: 600
+
+# Worker pool size
+WORKER_COUNT: 4                      # Number of worker tasks in DataServerManager for query processing
+
+# MySQL configuration
+MYSQL_BASE_URL: "localhost"
+MYSQL_PORT: 3307
+MYSQL_USER: "apix"
+MYSQL_PASSWORD: "apixapix"
+MYSQL_DATABASE: "apix_database"
+MYSQL_CHARSET: "utf8mb4"
+AUTO_COMMIT: true

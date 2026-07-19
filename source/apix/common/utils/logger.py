@@ -8,7 +8,15 @@ import traceback
 from typing import Any
 import inspect
 
-from apix.config.base_config import BASE_DIR, DEBUG, TRACE, MAX_LOG_FILE_SIZE
+from apix.config.base_config import BASE_DIR, DEBUG_LEVEL, TRACE, MAX_LOG_FILE_SIZE
+
+
+LOG_LEVELS = {
+    "DEBUG": 0,
+    "INFO": 1,
+    "WARN": 2,
+    "ERROR": 3,
+}
 
 
 class Logger:
@@ -187,43 +195,45 @@ class Logger:
         print(colored_message, file=sys.stderr if level in ['error', 'exception'] else sys.stdout)
     
     def info(self, message, *args, **kwargs):
-        if not DEBUG: 
+        if LOG_LEVELS['INFO'] < LOG_LEVELS[DEBUG_LEVEL]: 
             return
         self._log('info', message, *args, **kwargs)
     
     def warning(self, message, *args, **kwargs):
-        if not DEBUG: 
+        if LOG_LEVELS['WARN'] < LOG_LEVELS[DEBUG_LEVEL]: 
             return
         self._log('warning', message, *args, **kwargs)
     
     def error(self, message, *args, **kwargs):
-        if not DEBUG: 
+        if LOG_LEVELS['ERROR'] < LOG_LEVELS[DEBUG_LEVEL]: 
             return
         self._log('error', message, *args, **kwargs)
     
     def exception(self, message, *args, **kwargs):
-        if not DEBUG: 
+        if LOG_LEVELS['ERROR'] < LOG_LEVELS[DEBUG_LEVEL]: 
             return
         self._log('error', message, *args, **kwargs)
     
     def success(self, message, *args, **kwargs):
-        if not DEBUG: 
+        if LOG_LEVELS['INFO'] < LOG_LEVELS[DEBUG_LEVEL]: 
             return
         self._log('success', message, *args, **kwargs)
     
     def debug(self, message, *args, **kwargs):
-        if not DEBUG: 
+        if LOG_LEVELS['DEBUG'] < LOG_LEVELS[DEBUG_LEVEL]: 
             return
         self._log('debug', message, *args, **kwargs)
     
-    def custom(self, message, *args, level='CUSTOM', color='light_yellow', **kwargs):
-        if not DEBUG: 
+    def custom(self, message, *args, level="DEBUG", color="light_yellow", **kwargs):
+        if level not in LOG_LEVELS:
             return
-        self._log(level, message, *args, color, **kwargs)
+
+        if LOG_LEVELS[level] < LOG_LEVELS[DEBUG_LEVEL]:
+            return
+
+        self._log(level.lower(), message, *args, color_name=color, **kwargs)
     
     def separator(self, length=50, char='-', color='light_yellow', *args, **kwargs):
-        if not DEBUG: 
-            return
         separator_line = char * length
         self.custom(separator_line, *args, level='SEPARATOR', color=color, **kwargs)
     

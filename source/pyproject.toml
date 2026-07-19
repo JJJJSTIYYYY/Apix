@@ -5,8 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiomysql>=0.3.2",
+    "fastapi>=0.139.2",
+    "httpx>=0.28.1",
     "inflect>=7.5.0",
     "pyyaml>=6.0.3",
+    "redis>=8.0.1",
 ]
 
 [tool.pytest.ini_options]
