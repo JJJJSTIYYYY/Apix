@@ -41,12 +41,12 @@ def _load_from_yaml(dir, key=None) -> dict | str:
 
 OPERATION_SYSTEM = platform.system().lower()
 SERVER_ID = "apix_service-"+uuid.uuid4().hex
-ORIGINAL_PROXY_ENV = {
+_ORIGINAL_PROXY_ENV = {
     "HTTP_PROXY": os.environ.get("HTTP_PROXY"),
     "HTTPS_PROXY": os.environ.get("HTTPS_PROXY"),
     "NO_PROXY": os.environ.get("NO_PROXY"),
 }
-BASE_URL = {       # Base URL for the LLM service
+_PROVIDER_BASE_URL = {
     # Ollama
     'ollama:local': 'http://localhost:11434',  # Local
     'ollama': 'https://ollama.com',  # Cloud
@@ -71,12 +71,13 @@ BASE_URL = {       # Base URL for the LLM service
 
     # XiaomiMIMO
     'xiaomimimo': 'https://api.xiaomimimo.com/v1',
-}
+} # Base URL for the LLM service
 
 _config = _load_from_yaml('./config.yaml') or {}
 
 BASE_URL = _config.get('BASE_URL', "http://localhost:2712")
 BASE_DIR = _config.get('BASE_DIR', "./.apix_data/") # Base log direction
+ORIGINAL_PROXY_ENV = _config.get('ORIGINAL_PROXY_ENV', _ORIGINAL_PROXY_ENV)
 
 DEBUG_LEVEL: Literal['DEBUG', 'INFO', 'WARN', 'ERROR'] = _config.get('DEBUG_LEVEL', 'DEBUG').upper()
 TRACE = _config.get('TRACE', True)
@@ -101,14 +102,16 @@ DATABASE_TYPE = _config.get('DATABASE_TYPE', 'mysql')
 
 # Config for cache
 CACHE_STORE_TYPE: Literal['builtin', 'redis'] = _config.get('CACHE_STORE_TYPE', "builtin")
+HOT_CACHE_DEFAULT_EXPIRE_SECONDS = _config.get('HOT_CACHE_DEFAULT_EXPIRE_SECONDS', 600) # For frequently changed data, such as messages.
+STATIC_CACHE_DEFAULT_EXPIRE_SECONDS = _config.get('STATIC_CACHE_DEFAULT_EXPIRE_SECONDS', 604800) # For frequently changed data, such as some ui cache.
 # Redis
 MEMO_REDIS_URL = _config.get('MEMO_REDIS_URL', "redis://localhost:6379")
 REDIS_POOL_SIZE = _config.get('REDIS_POOL_SIZE', 3)
-DEFAULT_EXPIRE_SECONDS = _config.get('DEFAULT_EXPIRE_SECONDS', 600)
 
 # Config for database
 DATA_STORE_TYPE: Literal['sqlite', 'mysql'] = _config.get('DATA_STORE_TYPE', "sqlite")
-SQLITE_DATABASE = _config.get('SQLITE_DATABASE', os.path.join(BASE_DIR, "apix.sqlite3"))
+# Sqlite
+SQLITE_DATABASE = _config.get('SQLITE_DATABASE', os.path.join(BASE_DIR, "sqlite", "apix.sqlite3"))
 # Mysql
 MYSQL_BASE_URL = _config.get('MYSQL_BASE_URL', "localhost")
 MYSQL_PORT = _config.get('MYSQL_PORT', 3307)
@@ -117,3 +120,5 @@ MYSQL_PASSWORD = _config.get('MYSQL_PASSWORD', "apixapix")
 MYSQL_DATABASE = _config.get('MYSQL_DATABASE', "apix_database")
 MYSQL_CHARSET = _config.get('MYSQL_CHARSET', "utf8mb4")
 AUTO_COMMIT = _config.get('AUTO_COMMIT', True)
+
+PROVIDER_BASE_URL = _config.get('PROVIDER_BASE_URL', _PROVIDER_BASE_URL)

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from apix.config.base_config import DEFAULT_EXPIRE_SECONDS
+from apix.config.base_config import HOT_CACHE_DEFAULT_EXPIRE_SECONDS
 
 
 class CacheServerBase(ABC):
@@ -60,7 +60,7 @@ class CacheServerBase(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def set_expire(self, payload: dict, ttl_seconds: int = DEFAULT_EXPIRE_SECONDS) -> dict:
+    async def set_expire(self, payload: dict, ttl_seconds: int = HOT_CACHE_DEFAULT_EXPIRE_SECONDS) -> dict:
         pass
 
     @abstractmethod

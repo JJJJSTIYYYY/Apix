@@ -78,18 +78,35 @@ class DataServerBase(ABC):
         pass
         
     # --------------------------------------------------
-    # Files
+    # Skills (meta only)
     # --------------------------------------------------
-    @abstractmethod
-    async def insert_file_info(self, payload: dict) -> dict:
+
+    async def insert_skill_info(self, payload: dict) -> dict:
+        pass
+
+    async def update_skill_status(self, payload: dict) -> dict:
         pass
         
-    @abstractmethod
-    async def update_file_info(self, payload: dict) -> dict:
+    async def fetch_available_skills(self, payload: dict) -> dict:
+        pass
+
+    async def fetch_target_skill(self, payload: dict) -> dict:
         pass
         
-    @abstractmethod
-    async def fetch_recent_files(self, payload: dict) -> dict:
+    # --------------------------------------------------
+    # Rag Document (meta only)
+    # --------------------------------------------------
+
+    async def insert_rag_document(self, payload: dict) -> dict:
+        pass
+
+    async def update_document_status(self, payload: dict) -> dict:
+        pass
+
+    async def fetch_available_documents(self, payload: dict) -> dict:
+        pass
+
+    async def fetch_target_document(self, payload: dict) -> dict:
         pass
         
     # --------------------------------------------------
@@ -147,6 +164,10 @@ class DataServerBase(ABC):
     @abstractmethod
     async def update_mcp_server(self, payload: dict) -> dict:
         pass
+        
+    # --------------------------------------------------
+    # Cron task
+    # --------------------------------------------------
 
     @abstractmethod
     async def create_cron_task(self, payload: dict) -> dict:

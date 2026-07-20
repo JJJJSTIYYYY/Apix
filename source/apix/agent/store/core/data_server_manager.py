@@ -22,6 +22,9 @@ elif DATA_STORE_TYPE == 'sqlite':
 else:
     raise NotImplementedError()
 
+from apix.agent.store.core.server.file_store.file_server import FileService, file_server
+from apix.agent.store.core.server.rag_store.rag_server import RagService, rag_server
+
 class DataServerManager:
 
     def __init__(
@@ -29,15 +32,16 @@ class DataServerManager:
         *,
         cache_store: CacheServerBase,
         data_store: DataServerBase,
+        file_server: FileService,
+        rag_server: RagService,
         worker_count: int = 4,
     ):
-        self._redis = cache_store
-        self._mysql = data_store
-
         # Execution layer
         self.executor = DataExecutors(
-            cache_store=self._redis,
-            data_store=self._mysql,
+            cache_store=cache_store,
+            data_store=data_store,
+            file_server=file_server,
+            rag_server=rag_server
         )
 
         # Action -> executor handler
@@ -157,5 +161,7 @@ class DataServerManager:
 data_server_manager = DataServerManager(
     cache_store=cache_server,
     data_store=data_server,
+    file_server=file_server,
+    rag_server=rag_server,
     worker_count=WORKER_COUNT,
 )

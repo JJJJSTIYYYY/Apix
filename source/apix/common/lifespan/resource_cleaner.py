@@ -95,7 +95,6 @@ class ResourceCleaner:
 
         self._task = asyncio.create_task(self._loop(), name="resource-cleaner")
 
-        logger.info("Cleanup loop started")
 
     async def stop(self):
         """
@@ -115,7 +114,6 @@ class ResourceCleaner:
 
             self._task = None
 
-        logger.info("Cleanup loop stopped")
 
     # -----------------------------
     # Core loop

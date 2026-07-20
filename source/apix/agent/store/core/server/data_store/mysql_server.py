@@ -15,7 +15,7 @@ from apix.common.utils.logger import logger
 
 class MysqlService(DataServerBase):
     """
-    MySQL service for persistent storage, include task info with status [done | failed] and dialog conversation history.
+    MySQL service for persistent storage.
     """
 
     def __init__(self, *, host, port, user, password, database, charset="utf8mb4"):
@@ -31,12 +31,14 @@ class MysqlService(DataServerBase):
             cursorclass=DictCursor,
         )
         self._pool_lock = asyncio.Lock()
+        
 
     async def start(self):
         """Initialize MySQL connection pool."""
         async with self._pool_lock:
             if not self._pool:
                 self._pool = await aiomysql.create_pool(**self._pool_args)
+
 
     async def stop(self):
         """Close MySQL connection pool."""
@@ -45,6 +47,7 @@ class MysqlService(DataServerBase):
                 self._pool.close()
                 await self._pool.wait_closed()
                 self._pool = None
+
     
     async def _call_procedure(self, proc_name: str, params: tuple | None = None):
         """
@@ -288,7 +291,7 @@ class MysqlService(DataServerBase):
             user_uid = payload["user_uid"]
             platform = payload.get("platform", "default")
             conversation_uid = self._conversation_id_generator()
-            title = payload.get("title", "新的聊天...")
+            title = payload.get("title", "New Conversation...")
             workspace = payload.get("workspace", None)
             is_cron = payload.get("is_cron", False)
 
@@ -599,149 +602,9 @@ class MysqlService(DataServerBase):
             }
         
     # --------------------------------------------------
-    # Files (meta only)
-    # --------------------------------------------------
-
-    async def insert_file_info(self, payload: dict) -> dict:
-        """
-        Insert uploaded file metadata into MySQL.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "file_info": [
-                    {
-                        "file_id": str,
-                        "file_name": str,
-                        "file_path": str,
-                        "file_size": int,   # e.g. 123456 (bytes)
-                        "file_type": str,   # e.g. "application/pdf"
-                        "sha256": str,
-                    },
-                    ...
-                ]
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "success" or "fail: {e}",
-            }
-        """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            file_info_list = payload.get("file_info", [])
-
-            for file_info in file_info_list:
-                file_id = file_info["file_id"]
-                file_name = file_info["file_name"]
-                file_path = file_info["file_path"]
-                file_size = file_info["file_size"]
-                mime_type = file_info.get("file_type", "unknown")
-                sha256 = file_info["sha256"]
-
-                await self._call_procedure(
-                    "insert_file_info", 
-                    (file_id, file_name, file_path, file_size, mime_type, user_uid, sha256)
-                )
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-     
-    async def update_file_status(self, payload: dict) -> dict:
-        """
-        Update one file's info uploaded by user. Call procedure update_file_status.
-        This method is only used to update delete mark at now. 
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str,
-                "file_id": str, 
-                "is_deleted": bool,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            file_id = payload.get("file_id")
-            is_deleted = payload.get("is_deleted")
-            await self._call_procedure("update_file_status", (file_id, user_uid, is_deleted))
-            return {
-                "success": True,
-                "messages": "success",
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-        
-    async def fetch_target_file(self, payload: dict) -> dict:
-        """
-        Get a specified file. Call procedure fetch_target_file.
-        Procedure fetch_target_file ONLY fetch those files uploaded in recent 5 days and limit 5.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str,
-                "file_id": str, 
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [
-                    {
-                        "file_id": str,
-                        "file_name": str, 
-                        "file_path": str, // Relative path based on the current runtime working directory.
-                        "upload_at": str,
-                        "file_size": int,   # e.g. 123456 (bytes)
-                        "mime_type": str,
-                        "sha256": str,
-                    }
-                ] (list of files dict),
-            }
-        """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            file_id = payload.get("file_id")
-            rows = await self._call_procedure("fetch_target_file", (user_uid, file_id))
-            return {
-                "success": True,
-                "messages": rows,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-    # --------------------------------------------------
     # Skills (meta only)
     # --------------------------------------------------
+
     async def insert_skill_info(self, payload: dict) -> dict:
         """
         Insert uploaded skill metadata into MySQL.
