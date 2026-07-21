@@ -501,7 +501,7 @@ class SqliteService(DataServerBase):
         try:
             user_uid = payload["user_uid"]
             params = []
-            for skill in payload.get("messages", []):
+            for skill in payload.get("skills", []):
                 params.append(
                     (
                         skill["skill_id"],

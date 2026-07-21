@@ -613,7 +613,7 @@ class MysqlService(DataServerBase):
             payload: Dict, the format is
             {
                 "user_uid": str,
-                "messages": [
+                "skills": [
                     {
                         "skill_id": str,
                         "skill_name": str,
@@ -637,7 +637,7 @@ class MysqlService(DataServerBase):
         logger.trace()
         try:
             user_uid = payload["user_uid"]
-            skill_info_list = payload.get("messages", [])
+            skill_info_list = payload.get("skills", [])
 
             for skill in skill_info_list:
                 skill_id = skill["skill_id"]

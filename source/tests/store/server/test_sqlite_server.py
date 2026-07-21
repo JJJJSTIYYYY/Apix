@@ -267,7 +267,7 @@ async def test_skills_documents_and_shortterm_memory(db, monkeypatch):
         },
     ]
     assert (await db.insert_skill_info(
-        {"user_uid": "user-1", "messages": skills}
+        {"user_uid": "user-1", "skills": skills}
     ))["success"]
     assert len((await db.fetch_available_skills(
         {"user_uid": "user-1", "limit": 1}

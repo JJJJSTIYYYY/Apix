@@ -90,6 +90,19 @@ class FileService:
     # Skills
     # --------------------------------------------------
 
+    @staticmethod
+    def _next_available_package_path(skills_dir: Path, file_name: str) -> Path:
+        """Return a free path, adding ``_<index>`` before the extension."""
+        source_name = Path(file_name)
+        candidate = skills_dir / source_name.name
+        index = 1
+
+        while candidate.exists():
+            candidate = skills_dir / f"{source_name.stem}_{index}{source_name.suffix}"
+            index += 1
+
+        return candidate
+
     async def handle_skill_package(self, payload: dict) -> dict:
         """
         Move and analyze uploaded skill zip files.
@@ -125,10 +138,12 @@ class FileService:
         user_uid = payload["user_uid"]
 
         try:
-            user_uid = payload["user_uid"]
+            user_uid: str = payload["user_uid"]
             source_paths: list[str] = payload["file_path"]
 
-            skills_dir = (Path(BASE_DIR) / "apix_skills").expanduser().resolve()
+            skills_dir = (
+                Path(BASE_DIR) / user_uid / "apix_skills"
+            ).expanduser().resolve()
             skills_dir.mkdir(parents=True, exist_ok=True)
 
             skills_info: list[dict] = []
@@ -144,8 +159,10 @@ class FileService:
 
                 skill_id = uuid.uuid4().hex
 
-                # Add skill_id to avoid overwriting packages with the same filename.
-                package_path = skills_dir / f"{skill_id}_{source.name}"
+                # Preserve the uploaded name and add an index on conflicts.
+                package_path = self._next_available_package_path(
+                    skills_dir, source.name
+                )
 
                 # Move the selected zip into BASE_DIR/apix_skills.
                 await asyncio.to_thread(shutil.move, str(source), str(package_path))

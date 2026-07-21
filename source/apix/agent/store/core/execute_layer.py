@@ -714,8 +714,12 @@ class DataExecutors:
             file_res = await self.file_server.handle_skill_package(payload)
             if not file_res.get("success"):
                 return file_res
-
-            mysql_res = await self.data_store.insert_skill_info(file_res)
+            
+            skill_payload = {
+                "user_uid": payload["user_uid"],
+                "skills": file_res.get("messages", []),
+            }
+            mysql_res = await self.data_store.insert_skill_info(skill_payload)
             if not mysql_res.get("success"):
                 return mysql_res
             

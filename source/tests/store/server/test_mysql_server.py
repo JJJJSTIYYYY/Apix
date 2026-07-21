@@ -383,7 +383,7 @@ async def test_skill_and_document_mutations(monkeypatch):
         },
     ]
     assert (await service.insert_skill_info(
-        {"user_uid": "u-1", "messages": skills}
+        {"user_uid": "u-1", "skills": skills}
     ))["success"]
     assert call.await_args_list[0].args == (
         "insert_agent_skill",

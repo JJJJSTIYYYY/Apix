@@ -69,6 +69,11 @@ def test_constructor_registers_executor_handlers_and_validates_worker_count():
         "append_message",
         "upload_file_to_workspace",
         "create_cron_task",
+        "upload_file_to_workspace",
+        "insert_skills",
+        "update_skill",
+        "fetch_skills",
+        "fetch_target_skill",
     }.issubset(manager._handle)
 
     with pytest.raises(ValueError, match="greater than zero"):

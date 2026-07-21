@@ -10,6 +10,7 @@ from apix.agent.store.core.server.file_store.file_server import FileService
 
 
 def make_skill_zip(path: Path, frontmatter: str | None, *, nested=True) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     member = "sample-skill/SKILL.md" if nested else "SKILL.md"
     with zipfile.ZipFile(path, "w") as archive:
         if frontmatter is not None:
@@ -91,7 +92,9 @@ async def test_handle_skill_package_moves_valid_zip_and_extracts_metadata(
         "skill_name": "demo",
         "skill_description": "Demo skill",
         "skill_version": "2.1.0",
-        "package_path": str(tmp_path / "data" / "apix_skills" / "fixedid_skill.zip"),
+        "package_path": str(
+            tmp_path / "data" / "user-1" / "apix_skills" / "skill.zip"
+        ),
         "package_size": expected_size,
         "package_sha256": expected_hash,
     }
@@ -117,6 +120,59 @@ async def test_handle_skill_package_uses_default_version(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_handle_skill_package_adds_incrementing_index_on_name_conflict(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path / "data"))
+    skills_dir = tmp_path / "data" / "user-1" / "apix_skills"
+    skills_dir.mkdir(parents=True)
+    existing = skills_dir / "skill.zip"
+    existing.write_bytes(b"existing package must not be overwritten")
+    frontmatter = "---\nname: demo\ndescription: Demo skill\n---\nbody\n"
+    first = make_skill_zip(tmp_path / "first" / "skill.zip", frontmatter)
+    second = make_skill_zip(tmp_path / "second" / "skill.zip", frontmatter)
+
+    result = await FileService().handle_skill_package(
+        {"user_uid": "user-1", "file_path": [str(first), str(second)]}
+    )
+
+    assert result["success"] is True
+    assert [Path(item["package_path"]).name for item in result["messages"]] == [
+        "skill_1.zip",
+        "skill_2.zip",
+    ]
+    assert existing.read_bytes() == b"existing package must not be overwritten"
+    assert sorted(path.name for path in skills_dir.iterdir()) == [
+        "skill.zip",
+        "skill_1.zip",
+        "skill_2.zip",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_same_package_name_is_isolated_by_user(monkeypatch, tmp_path):
+    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path / "data"))
+    frontmatter = "---\nname: demo\ndescription: Demo skill\n---\nbody\n"
+    first = make_skill_zip(tmp_path / "first" / "skill.zip", frontmatter)
+    second = make_skill_zip(tmp_path / "second" / "skill.zip", frontmatter)
+    service = FileService()
+
+    first_result = await service.handle_skill_package(
+        {"user_uid": "user-1", "file_path": [str(first)]}
+    )
+    second_result = await service.handle_skill_package(
+        {"user_uid": "user-2", "file_path": [str(second)]}
+    )
+
+    assert Path(first_result["messages"][0]["package_path"]) == (
+        tmp_path / "data" / "user-1" / "apix_skills" / "skill.zip"
+    )
+    assert Path(second_result["messages"][0]["package_path"]) == (
+        tmp_path / "data" / "user-2" / "apix_skills" / "skill.zip"
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "frontmatter,error_text",
     [
@@ -131,7 +187,7 @@ async def test_invalid_skill_package_is_deleted(
     monkeypatch, tmp_path, frontmatter, error_text
 ):
     monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path))
-    (tmp_path / "apix_skills").mkdir()
+    skills_dir = tmp_path / "user-1" / "apix_skills"
     source = make_skill_zip(tmp_path / "invalid.zip", frontmatter)
 
     result = await FileService().handle_skill_package(
@@ -140,7 +196,7 @@ async def test_invalid_skill_package_is_deleted(
 
     assert result["success"] is False
     assert error_text in result["messages"]
-    assert list((tmp_path / "apix_skills").iterdir()) == []
+    assert list(skills_dir.iterdir()) == []
     assert not source.exists(), "the selected archive was moved before validation"
 
 
@@ -149,7 +205,6 @@ async def test_handle_skill_package_rejects_non_zip_without_moving_it(
     monkeypatch, tmp_path
 ):
     monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path))
-    (tmp_path / "apix_skills").mkdir()
     source = tmp_path / "skill.txt"
     source.write_text("not a zip", encoding="utf-8")
 
