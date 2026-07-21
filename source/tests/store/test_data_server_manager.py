@@ -67,7 +67,7 @@ def test_constructor_registers_executor_handlers_and_validates_worker_count():
         "create_a_user",
         "create_new_conversation",
         "append_message",
-        "insert_file_info",
+        "upload_file_to_workspace",
         "create_cron_task",
     }.issubset(manager._handle)
 

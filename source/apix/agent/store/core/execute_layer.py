@@ -2,6 +2,7 @@ import inspect
 import json
 from typing import Callable, Dict
 from uuid import uuid4
+from datetime import datetime
 
 from apix.agent.store.utils.message_node_helper import MessageNodeHelper
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
@@ -671,19 +672,17 @@ class DataExecutors:
     # Files
     # --------------------------------------------------
 
-    @task_handler("insert_file_info")
-    async def insert_file_info(self, payload: dict) -> dict:
+    @task_handler("upload_file_to_workspace")
+    async def upload_file_to_workspace(self, payload: dict) -> dict:
         """
-        Insert new files info.
-
-        No redis invoke.
+        Move selected files into workspace.
         """
         try:
             logger.trace()
             res = await self.data_store.ensure_user_exists(payload)
             if not res.get("success"):
                 return res
-            return await self.data_store.insert_file_info(payload)
+            return await self.file_server.save_file(payload)
 
         except Exception as e:
             logger.exception(
@@ -694,17 +693,51 @@ class DataExecutors:
                 "messages": f"fail: {e}",
             }
 
-    @task_handler("update_file_info")
-    async def update_file_info(self, payload: dict) -> dict:
-        """
-        Fetch recent files info.
-        This method could used to delete a file record in mysql.
+    # ------------------------------------------------------------------
+    # Skills Files
+    # ------------------------------------------------------------------
 
-        No redis invoke.
+    @task_handler("insert_skills")
+    async def insert_skills(self, payload: dict) -> dict:
+        """
+        Fetch recent files uploaded by user.
+
+        Mention: This method does not fetch binary.
         """
         try:
             logger.trace()
-            return await self.data_store.update_file_info(payload)
+
+            res = await self.data_store.ensure_user_exists(payload)
+            if not res.get("success"):
+                return res
+
+            file_res = await self.file_server.handle_skill_package(payload)
+            if not file_res.get("success"):
+                return file_res
+
+            mysql_res = await self.data_store.insert_skill_info(file_res)
+            if not mysql_res.get("success"):
+                return mysql_res
+            
+            skill_info_list = file_res.get("messages", [])
+            visible_skill_info_list = []
+
+            for skill_info in skill_info_list:
+                visible_skill_info = {
+                    "skill_id": skill_info.get('skill_id'),
+                    "skill_name": skill_info.get('skill_name'),
+                    "skill_description": skill_info.get('skill_description'),
+                    "skill_version": skill_info.get('skill_version'),
+                    "package_size": skill_info.get('package_size'),
+                    "is_active": False,
+                    "upload_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                visible_skill_info_list.append(visible_skill_info)
+
+            return {
+                "success": True,
+                "messages": visible_skill_info_list,
+            }
 
         except Exception as e:
             logger.exception(
@@ -715,16 +748,55 @@ class DataExecutors:
                 "messages": f"fail: {e}",
             }
 
-    @task_handler("get_recent_files")
-    async def get_recent_files(self, payload: dict) -> dict:
+    @task_handler("update_skill")
+    async def update_skill(self, payload: dict) -> dict:
         """
-        Fetch recent files info.
-
-        No redis invoke.
+        Update skill info in MySQL.
+        Typically used to mark a file as deleted or active.
         """
         try:
             logger.trace()
-            return await self.data_store.fetch_recent_files(payload)
+            return await self.data_store.update_skill_status(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"Error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("fetch_skills")
+    async def fetch_skills(self, payload: dict) -> dict:
+        """
+        Fetch skills uploaded by user.
+
+        Mention: This method does not fetch binary.
+        """
+        try:
+            logger.trace()
+            return await self.data_store.fetch_available_skills(payload)
+
+        except Exception as e:
+            logger.exception(
+                f"Error: {e}"
+            )
+            return {
+                "success": False,
+                "messages": f"fail: {e}",
+            }
+
+    @task_handler("fetch_target_skill")
+    async def fetch_target_skill(self, payload: dict) -> dict:
+        """
+        Fetch target skill uploaded by user.
+
+        Mention: This method does not fetch binary.
+        """
+        try:
+            logger.trace()
+            return await self.data_store.fetch_target_skill(payload)
 
         except Exception as e:
             logger.exception(
