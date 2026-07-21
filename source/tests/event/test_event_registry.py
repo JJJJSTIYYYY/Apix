@@ -57,135 +57,486 @@ class TestEventRegistrySingleton:
 class TestFindInsertIndex:
     """Tests for _find_insert_index method."""
 
+    EVENT_NAME = "test.event"
+
     def _make_entries(self, names_and_priorities):
         """Create HandlerEntry list from (name, priority) pairs."""
         entries = []
+
         for i, (name, priority) in enumerate(names_and_priorities):
             entries.append(
                 HandlerEntry(
                     id=f"id_{name}",
                     name=name,
-                    subscribe="test.event",
+                    subscribe=self.EVENT_NAME,
                     callback=None,
                     priority=priority,
                     register_order=i,
                 )
             )
+
         return entries
 
     def test_priority_none_returns_end(self):
-        """When priority is None and no between, should return len(handlers)."""
+        """When priority is None and no between, return len(handlers)."""
         registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 1.0), ("h2", 2.0)])
-        idx = registry._find_insert_index(handlers, priority=None)
+        handlers = self._make_entries(
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=None,
+        )
+
         assert idx == len(handlers)
 
     def test_priority_higher_than_all_returns_zero(self):
         """Highest priority should be inserted at index 0."""
         registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 5.0), ("h2", 3.0)])
-        idx = registry._find_insert_index(handlers, priority=10.0)
+        handlers = self._make_entries(
+            [
+                ("h1", 5.0),
+                ("h2", 3.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=10.0,
+        )
+
         assert idx == 0
 
     def test_priority_equal_to_existing(self):
-        """Same priority should be appended at end (registration order)."""
-        registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 5.0), ("h2", 5.0)])
-        idx = registry._find_insert_index(handlers, priority=5.0)
-        assert idx == 2  # appended after both
-
-    def test_priority_between_existing(self):
-        """Priority between two values should insert in correct position."""
-        registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 10.0), ("h2", 5.0)])
-        idx = registry._find_insert_index(handlers, priority=7.0)
-        assert idx == 1  # after h1 (10.0), before h2 (5.0)
-
-    def test_priority_lower_than_all_returns_end(self):
-        """Lowest priority should be at end."""
-        registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 10.0), ("h2", 5.0)])
-        idx = registry._find_insert_index(handlers, priority=1.0)
-        assert idx == 2
-
-    def test_between_handlers_insert_before_right(self):
-        """between_handlers: insert after left, before right."""
+        """Same priority should preserve registration order."""
         registry = ApixEventRegistry()
         handlers = self._make_entries(
-            [("left_h", 10.0), ("mid_h", 5.0), ("right_h", 3.0)]
+            [
+                ("h1", 5.0),
+                ("h2", 5.0),
+            ]
         )
-        # left appears before right → right_index > left_index
-        # returns left_index if left_index >= right_index else right_index
-        # left_index=0, right_index=2 → returns right_index=2
+
         idx = registry._find_insert_index(
-            handlers,
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=5.0,
+        )
+
+        assert idx == 2
+
+    def test_priority_between_existing(self):
+        """Priority between two values should insert in the correct position."""
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 10.0),
+                ("h2", 5.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=7.0,
+        )
+
+        assert idx == 1
+
+    def test_priority_lower_than_all_returns_end(self):
+        """Lowest priority should be inserted at the end."""
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 10.0),
+                ("h2", 5.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=1.0,
+        )
+
+        assert idx == 2
+
+    def test_between_handlers_adjacent_boundaries(self):
+        """
+        When the boundaries are adjacent, insert immediately before
+        the right boundary.
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("left_h", 10.0),
+                ("right_h", 5.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
             priority=None,
             between_handlers=("left_h", "right_h"),
         )
-        assert idx == 2  # before right_h
+
+        assert idx == 1
+
+    def test_between_handlers_with_existing_middle_handlers(self):
+        """
+        When other handlers exist between the boundaries, insert immediately
+        before the right boundary.
+
+        Existing:
+            left_h, middle_a, middle_b, right_h
+
+        Result after handlers.insert(idx, new_handler):
+            left_h, middle_a, middle_b, new_handler, right_h
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("left_h", 10.0),
+                ("middle_a", 8.0),
+                ("middle_b", 5.0),
+                ("right_h", 3.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=None,
+            between_handlers=("left_h", "right_h"),
+        )
+
+        assert idx == 3
+        assert handlers[idx].name == "right_h"
+
+    def test_between_handlers_none_left_inserts_before_right(self):
+        """
+        (None, right_handler) should insert immediately before
+        right_handler.
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 10.0),
+                ("right_h", 5.0),
+                ("h2", 3.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=None,
+            between_handlers=(None, "right_h"),
+        )
+
+        assert idx == 1
+        assert handlers[idx].name == "right_h"
+
+    def test_between_handlers_none_right_inserts_after_left(self):
+        """
+        (left_handler, None) should insert immediately after
+        left_handler.
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 10.0),
+                ("left_h", 5.0),
+                ("h2", 3.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=None,
+            between_handlers=("left_h", None),
+        )
+
+        assert idx == 2
+        assert handlers[idx - 1].name == "left_h"
+
+    def test_between_handlers_left_at_end_with_none_right(self):
+        """
+        (left_handler, None) should return len(handlers) when the left
+        boundary is the final handler.
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 10.0),
+                ("left_h", 5.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=None,
+            between_handlers=("left_h", None),
+        )
+
+        assert idx == len(handlers)
+
+    def test_between_handlers_right_at_start_with_none_left(self):
+        """
+        (None, right_handler) should return zero when the right boundary
+        is the first handler.
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("right_h", 10.0),
+                ("h1", 5.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=None,
+            between_handlers=(None, "right_h"),
+        )
+
+        assert idx == 0
 
     def test_between_handlers_left_not_found_raises(self):
-        """between_handlers: left handler not found raises."""
+        """An unregistered left boundary should raise."""
         registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 1.0), ("h2", 2.0)])
-        with pytest.raises(EventHandlerNotRegistered) as exc_info:
+        handlers = self._make_entries(
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
+        )
+
+        with pytest.raises(
+            EventHandlerNotRegistered,
+            match="nonexistent",
+        ) as exc_info:
             registry._find_insert_index(
-                handlers,
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
                 priority=None,
                 between_handlers=("nonexistent", "h2"),
             )
-        assert "nonexistent" in str(exc_info.value)
+
+        assert self.EVENT_NAME in str(exc_info.value)
 
     def test_between_handlers_right_not_found_raises(self):
-        """between_handlers: right handler not found raises."""
+        """An unregistered right boundary should raise."""
         registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", 1.0), ("h2", 2.0)])
-        with pytest.raises(EventHandlerNotRegistered) as exc_info:
+        handlers = self._make_entries(
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
+        )
+
+        with pytest.raises(
+            EventHandlerNotRegistered,
+            match="nonexistent",
+        ) as exc_info:
             registry._find_insert_index(
-                handlers,
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
                 priority=None,
                 between_handlers=("h1", "nonexistent"),
             )
-        assert "nonexistent" in str(exc_info.value)
 
-    def test_between_handlers_right_before_left_raises(self):
+        assert self.EVENT_NAME in str(exc_info.value)
+
+    def test_between_handlers_none_left_right_not_found_raises(self):
         """
-        between_handlers: when right appears before left,
-        the loop breaks early at right and left_index stays None → raises.
+        (None, right_handler) should raise when right_handler is not
+        registered for the event.
         """
         registry = ApixEventRegistry()
-        # right_h comes first, left_h comes after
         handlers = self._make_entries(
-            [("right_h", 3.0), ("left_h", 10.0)]
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
         )
-        with pytest.raises(EventHandlerNotRegistered) as exc_info:
+
+        with pytest.raises(
+            EventHandlerNotRegistered,
+            match="right_h",
+        ):
             registry._find_insert_index(
-                handlers,
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
+                priority=None,
+                between_handlers=(None, "right_h"),
+            )
+
+    def test_between_handlers_none_right_left_not_found_raises(self):
+        """
+        (left_handler, None) should raise when left_handler is not
+        registered for the event.
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
+        )
+
+        with pytest.raises(
+            EventHandlerNotRegistered,
+            match="left_h",
+        ):
+            registry._find_insert_index(
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
+                priority=None,
+                between_handlers=("left_h", None),
+            )
+
+    def test_between_handlers_reversed_boundaries_raise(self):
+        """
+        When the supplied left boundary appears after the supplied right
+        boundary, registration should fail with ValueError.
+
+        Existing:
+            right_h, middle_h, left_h
+
+        Invalid:
+            between_handlers=("left_h", "right_h")
+        """
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("right_h", 10.0),
+                ("middle_h", 5.0),
+                ("left_h", 3.0),
+            ]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="must be before",
+        ):
+            registry._find_insert_index(
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
                 priority=None,
                 between_handlers=("left_h", "right_h"),
             )
-        # left_h was not found because loop broke at right_h
-        assert "left_h" in str(exc_info.value)
+
+    def test_between_handlers_same_boundary_raises(self):
+        """The same handler cannot be used as both boundaries."""
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="cannot be the same",
+        ):
+            registry._find_insert_index(
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
+                priority=None,
+                between_handlers=("h1", "h1"),
+            )
+
+    def test_between_handlers_both_none_raises(self):
+        """(None, None) does not specify an insertion boundary."""
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", 1.0),
+                ("h2", 2.0),
+            ]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"\(None, None\)",
+        ):
+            registry._find_insert_index(
+                event_name=self.EVENT_NAME,
+                handlers=handlers,
+                priority=None,
+                between_handlers=(None, None),
+            )
 
     def test_empty_handlers_priority_none_returns_zero(self):
-        """Empty handler list with None priority returns 0."""
+        """Empty handler list with None priority should return zero."""
         registry = ApixEventRegistry()
-        idx = registry._find_insert_index([], priority=None)
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=[],
+            priority=None,
+        )
+
         assert idx == 0
 
     def test_empty_handlers_priority_given_returns_zero(self):
-        """Empty handler list with a priority returns 0."""
+        """Empty handler list with a priority should return zero."""
         registry = ApixEventRegistry()
-        idx = registry._find_insert_index([], priority=5.0)
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=[],
+            priority=5.0,
+        )
+
         assert idx == 0
 
-    def test_priority_with_none_values_in_handlers(self):
-        """Handler with None priority should be skipped during comparison."""
+    def test_empty_handlers_with_between_raises(self):
+        """
+        An empty handler list cannot satisfy a non-None insertion
+        boundary.
+        """
         registry = ApixEventRegistry()
-        handlers = self._make_entries([("h1", None), ("h2", 5.0)])
-        # Iteration: h1.priority=None → not > priority, skip
-        # h2.priority=5.0 → priority(7.0) > 5.0 → return i=1
-        idx = registry._find_insert_index(handlers, priority=7.0)
+
+        with pytest.raises(
+            EventHandlerNotRegistered,
+            match="left_h",
+        ):
+            registry._find_insert_index(
+                event_name=self.EVENT_NAME,
+                handlers=[],
+                priority=None,
+                between_handlers=("left_h", None),
+            )
+
+    def test_priority_with_none_values_in_handlers(self):
+        """Handlers with None priority should be skipped during comparison."""
+        registry = ApixEventRegistry()
+        handlers = self._make_entries(
+            [
+                ("h1", None),
+                ("h2", 5.0),
+            ]
+        )
+
+        idx = registry._find_insert_index(
+            event_name=self.EVENT_NAME,
+            handlers=handlers,
+            priority=7.0,
+        )
+
         assert idx == 1
 
 
