@@ -3,6 +3,7 @@ import uuid
 from typing import Any, Dict, Callable
 
 from apix.agent.store.core.execute_layer import DataExecutors
+from apix.common.lifespan.auto_init import auto_init
 from apix.common.utils.logger import logger
 from apix.config.base_config import WORKER_COUNT, CACHE_STORE_TYPE, DATA_STORE_TYPE
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
@@ -56,13 +57,12 @@ class DataServerManager:
         self._queue: asyncio.Queue = asyncio.Queue()
         self._results: Dict[str, asyncio.Future] = {}
 
+        if worker_count < 1:
+            raise ValueError("worker_count must be greater than zero")
         self._worker_count = worker_count
-
-        # Start workers
-        self._workers = [
-            asyncio.create_task(self._worker_loop(worker_id))
-            for worker_id in range(worker_count)
-        ]
+        # Workers start lazily. This keeps module import safe when no event loop
+        # is running while still allowing submit_query() to work standalone.
+        self._workers: list[asyncio.Task] = []
 
     # --------------------------------------------------
     # Public API
@@ -75,6 +75,43 @@ class DataServerManager:
         self._handle[task_type] = handler
 
 
+    async def start(self) -> None:
+        """Start query workers once."""
+        if self._workers:
+            return
+
+        self._workers = [
+            asyncio.create_task(
+                self._worker_loop(worker_id),
+                name=f"data-server-worker-{worker_id}",
+            )
+            for worker_id in range(self._worker_count)
+        ]
+
+
+    async def stop(self) -> None:
+        """Cancel workers and pending queries, leaving the manager restartable."""
+        workers, self._workers = self._workers, []
+        for worker in workers:
+            worker.cancel()
+        if workers:
+            await asyncio.gather(*workers, return_exceptions=True)
+
+        for future in self._results.values():
+            if not future.done():
+                future.cancel()
+        self._results.clear()
+
+        # Remove tasks that were queued but never picked up by a worker.
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            else:
+                self._queue.task_done()
+
+
     async def submit_query(self, action: str, payload: dict) -> str:
         """
         Submit a query task.
@@ -83,6 +120,7 @@ class DataServerManager:
             query_id (uuid string)
         """
         logger.trace()
+        await self.start()
         query_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
         future = loop.create_future()
@@ -97,7 +135,7 @@ class DataServerManager:
         """
         logger.trace()
         future = self._results.get(query_id)
-        if not future:
+        if future is None:
             raise KeyError(f"Unknown query_id: {query_id}")
 
         try:
@@ -121,14 +159,12 @@ class DataServerManager:
 
         while True:
             query_id, action, payload = await self._queue.get()
-
-            future = self._results.get(query_id)
-            if not future:
-                # Task already cancelled or cleaned
-                self._queue.task_done()
-                continue
-
             try:
+                future = self._results.get(query_id)
+                if future is None or future.done():
+                    # Task already cancelled or cleaned.
+                    continue
+
                 handler = self._handle.get(action)
                 if not handler:
                     result = {
@@ -139,21 +175,24 @@ class DataServerManager:
                     # Bind executor instance explicitly
                     result = await handler(payload)
 
+                # Complete future safely.
+                if not future.done():
+                    future.set_result(result)
+
             except Exception as e:
-                # Executor layer should NOT raise, but double protection here
+                # Executor layer should NOT raise, but double protection here.
                 logger.exception(
                     f"Worker {worker_id}, action `{action}` error: {e}"
                 )
-                result = {
-                    "success": False,
-                    "messages": f"internal error: {e}",
-                }
-
-            # Complete future safely
-            if not future.done():
-                future.set_result(result)
-
-            self._queue.task_done()
+                if not future.done():
+                    future.set_result(
+                        {
+                            "success": False,
+                            "messages": f"internal error: {e}",
+                        }
+                    )
+            finally:
+                self._queue.task_done()
 
 
 
@@ -165,3 +204,4 @@ data_server_manager = DataServerManager(
     rag_server=rag_server,
     worker_count=WORKER_COUNT,
 )
+auto_init.register(data_server_manager)

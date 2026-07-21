@@ -17,7 +17,8 @@ class BuiltinService(CacheServerBase):
 
     def __init__(self, persistence_path: Optional[str | Path] = None):
         self._persistence_path = Path(
-            persistence_path or (Path(BASE_DIR) / "builtin_cache_store.json").expanduser().resolve(strict=True)
+            persistence_path
+            or (Path(BASE_DIR) / "builtin_cache_store.json").expanduser().resolve()
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()

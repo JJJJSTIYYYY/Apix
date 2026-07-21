@@ -658,6 +658,7 @@ class SqliteService(DataServerBase):
                     payload.get("description"),
                     embed_engine,
                     deleted,
+                    deleted,
                     payload["user_uid"],
                     payload["document_id"],
                 ),

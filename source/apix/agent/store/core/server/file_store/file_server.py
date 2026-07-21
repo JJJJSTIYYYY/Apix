@@ -128,7 +128,7 @@ class FileService:
             user_uid = payload["user_uid"]
             source_paths: list[str] = payload["file_path"]
 
-            skills_dir = (Path(BASE_DIR) / "apix_skills").expanduser().resolve(strict=True)
+            skills_dir = (Path(BASE_DIR) / "apix_skills").expanduser().resolve()
             skills_dir.mkdir(parents=True, exist_ok=True)
 
             skills_info: list[dict] = []
