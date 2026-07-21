@@ -713,6 +713,72 @@ class TestOnEventDecorator:
         with pytest.raises(ValueError, match="At least one event_name"):
             registry.subscribe()
 
+    @pytest.mark.parametrize(
+        "event_names",
+        [
+            ("",),
+            ("event.a", ""),
+        ],
+    )
+    def test_on_event_empty_event_name_raises_without_mutating_registry(
+        self, event_names
+    ):
+        """Every subscribed event name must be non-empty."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        with pytest.raises(ValueError, match="event_name cannot be empty"):
+            registry.subscribe(*event_names)
+
+        assert registry._handlers == {}
+        assert registry._handlers_meta == {}
+        assert registry._register_order == 0
+
+    @pytest.mark.parametrize(
+        "between_handlers",
+        [
+            ["left", "right"],
+            ("left",),
+            ("left", "middle", "right"),
+        ],
+    )
+    def test_on_event_malformed_between_handlers_raises(
+        self, between_handlers
+    ):
+        """between_handlers must be a two-item tuple."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        with pytest.raises(ValueError, match="exactly two handler names"):
+            registry.subscribe(
+                "test.event",
+                between_handlers=between_handlers,
+            )
+
+    def test_on_event_between_handlers_both_none_raises_before_decoration(self):
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        with pytest.raises(ValueError, match=r"cannot be \(None, None\)"):
+            registry.subscribe(
+                "test.event",
+                between_handlers=(None, None),
+            )
+
+        assert registry._register_order == 0
+
+    def test_on_event_between_handlers_same_name_raises_before_decoration(self):
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        with pytest.raises(ValueError, match="cannot be the same handler"):
+            registry.subscribe(
+                "test.event",
+                between_handlers=("same", "same"),
+            )
+
+        assert registry._register_order == 0
+
     def test_on_event_basic_registration(self):
         """Basic registration: handler is registered and returned unchanged."""
         registry = ApixEventRegistry()
@@ -743,6 +809,33 @@ class TestOnEventDecorator:
             assert len(handlers) == 1
             assert handlers[0].name == "multi_handler"
 
+    def test_on_event_duplicate_event_names_are_registered_once(self):
+        """Duplicate event arguments retain first-seen order without duplication."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def multi_handler(event: ApixEvent):
+            pass
+
+        registry.subscribe(
+            "event.b",
+            "event.a",
+            "event.b",
+            "event.a",
+        )(multi_handler)
+
+        assert [h.name for h in registry.get_handlers("event.a")] == [
+            "multi_handler"
+        ]
+        assert [h.name for h in registry.get_handlers("event.b")] == [
+            "multi_handler"
+        ]
+        assert registry.get_handler_meta("multi_handler")["subscribe"] == [
+            "event.b",
+            "event.a",
+        ]
+        assert registry._register_order == 1
+
     def test_on_event_duplicate_handler_raises(self):
         """Registering the same handler name twice should raise."""
         registry = ApixEventRegistry()
@@ -756,6 +849,76 @@ class TestOnEventDecorator:
         with pytest.raises(EventHandlerAlreadyRegistered) as exc_info:
             registry.subscribe("event.b")(my_handler)
         assert "my_handler" in str(exc_info.value)
+        assert registry.get_handlers("event.b") == []
+        assert registry._register_order == 1
+
+    def test_on_event_multiple_events_registration_is_atomic(self):
+        """A failed boundary on one event must not partially register another."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def left(event: ApixEvent):
+            pass
+
+        async def right(event: ApixEvent):
+            pass
+
+        async def candidate(event: ApixEvent):
+            pass
+
+        registry.subscribe("event.a", "event.b")(left)
+        registry.subscribe("event.a")(right)
+        register_order = registry._register_order
+
+        with pytest.raises(EventHandlerNotRegistered, match="right"):
+            registry.subscribe(
+                "event.a",
+                "event.b",
+                between_handlers=("left", "right"),
+            )(candidate)
+
+        assert [h.name for h in registry.get_handlers("event.a")] == [
+            "left",
+            "right",
+        ]
+        assert [h.name for h in registry.get_handlers("event.b")] == ["left"]
+        assert "candidate" not in registry._handlers_meta
+        assert registry._register_order == register_order
+
+    def test_on_event_between_handlers_applies_to_every_subscribed_event(self):
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def left(event: ApixEvent):
+            pass
+
+        async def right(event: ApixEvent):
+            pass
+
+        async def middle(event: ApixEvent):
+            pass
+
+        registry.subscribe("event.a", "event.b", priority=3)(left)
+        registry.subscribe("event.a", "event.b", priority=1)(right)
+        registry.subscribe(
+            "event.a",
+            "event.b",
+            between_handlers=("left", "right"),
+        )(middle)
+
+        for event_name in ("event.a", "event.b"):
+            handlers = registry.get_handlers(event_name)
+            assert [handler.name for handler in handlers] == [
+                "left",
+                "middle",
+                "right",
+            ]
+            assert handlers[1].priority is None
+
+        first_entry = registry.get_handlers("event.a")[1]
+        second_entry = registry.get_handlers("event.b")[1]
+        assert first_entry.id != second_entry.id
+        assert first_entry.register_order == second_entry.register_order
 
     def test_on_event_default_priority_is_1(self):
         """Default priority should be 1 when not specified."""
