@@ -7,7 +7,8 @@ import pytest_asyncio
 
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
-from apix.core.graph import END, START, Command, GraphManager
+from apix.common.type.exception import InvalidNodeReturns
+from apix.core.graph import END, START, Command, GraphManager, Node, NodeGraph
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -89,6 +90,62 @@ async def test_condition_true_routes_to_edge_target():
     assert calls == ["source", "target"]
 
 
+async def test_condition_false_routes_directly_to_end():
+    """A false condition terminates without executing its target node."""
+    target_called = False
+
+    def source(state):
+        return {"number": 1}
+
+    def target(state):
+        nonlocal target_called
+        target_called = True
+        return {"matched": True}
+
+    graph = (
+        GraphManager()
+        .add_nodes([source, target])
+        .add_edge(START, "source")
+        .add_edge("source", "target", lambda state: False)
+        .compile_graph()
+    )
+
+    assert await graph.invoke_graph({}) == {"number": 1}
+    assert target_called is False
+
+
+async def test_async_condition_is_awaited():
+    """Conditional edges support asynchronous predicates."""
+    async def condition(state):
+        await asyncio.sleep(0)
+        return state["enabled"]
+
+    graph = (
+        GraphManager()
+        .add_node(lambda state: {"matched": True}, "target")
+        .add_edge(START, "target", condition)
+        .compile_graph()
+    )
+
+    assert await graph.invoke_graph({"enabled": True}) == {
+        "enabled": True,
+        "matched": True,
+    }
+
+
+async def test_condition_rejects_non_boolean_result():
+    """A predicate result must be exactly a bool."""
+    graph = (
+        GraphManager()
+        .add_node(lambda state: {}, "target")
+        .add_edge(START, "target", lambda state: "yes")
+        .compile_graph()
+    )
+
+    with pytest.raises(TypeError, match="condition function must return bool"):
+        await graph.invoke_graph({})
+
+
 async def test_router_routes_to_selected_target():
     """A router's selected node name is used as Command.goto."""
     def source(state):
@@ -109,6 +166,203 @@ async def test_router_routes_to_selected_target():
     )
 
     assert await graph.invoke_graph({}) == {"route": "right", "result": "right"}
+
+
+async def test_async_router_accepts_mapping_goto():
+    """An async router may select a destination through a goto mapping."""
+    async def router(state):
+        await asyncio.sleep(0)
+        return {"goto": "target"}
+
+    graph = (
+        GraphManager()
+        .add_node(lambda state: {"source": True}, "source")
+        .add_node(lambda state: {"target": True}, "target")
+        .add_edge(START, "source")
+        .add_router("source", ["target", END], router)
+        .compile_graph()
+    )
+
+    assert await graph.invoke_graph({}) == {"source": True, "target": True}
+
+
+async def test_router_can_route_to_end():
+    """END is a valid declared router destination."""
+    graph = (
+        GraphManager()
+        .add_node(lambda state: {"finished": True}, "source")
+        .add_edge(START, "source")
+        .add_router("source", [END], lambda state: END)
+        .compile_graph()
+    )
+
+    assert await graph.invoke_graph({}) == {"finished": True}
+
+
+async def test_router_rejects_undeclared_target():
+    """A router cannot jump to a destination outside its declared targets."""
+    def source(state):
+        return {}
+
+    def target(state):
+        return {}
+
+    graph = (
+        GraphManager()
+        .add_nodes([source, target])
+        .add_edge(START, "source")
+        .add_router("source", ["target"], lambda state: "missing")
+        .compile_graph()
+    )
+
+    with pytest.raises(ValueError, match="returned invalid target `missing`"):
+        await graph.invoke_graph({})
+
+
+async def test_async_node_is_awaited_by_graph():
+    """The graph executes asynchronous user nodes before routing onward."""
+    async def async_node(state):
+        await asyncio.sleep(0)
+        return {"done": True}
+
+    graph = GraphManager().add_node(async_node).add_edge(START, "async_node").compile_graph()
+
+    assert await graph.invoke_graph({}) == {"done": True}
+
+
+async def test_node_command_can_override_default_transition():
+    """An explicit goto takes precedence over a manager-defined transition."""
+    def source(state):
+        return Command(update={"selected": True}, goto="target")
+
+    graph = (
+        GraphManager()
+        .add_node(source)
+        .add_node(lambda state: {"reached": True}, "target")
+        .add_edge(START, "source")
+        .compile_graph()
+    )
+
+    assert await graph.invoke_graph({}) == {"selected": True, "reached": True}
+
+
+async def test_explicit_none_goto_routes_to_end():
+    """An explicit None goto terminates the invocation."""
+    def source(state):
+        return Command(update={"finished": True}, goto=None)
+
+    graph = GraphManager().add_node(source).add_edge(START, "source").compile_graph()
+
+    assert await graph.invoke_graph({}) == {"finished": True}
+
+
+async def test_unknown_command_goto_is_propagated_to_caller():
+    """Runtime jumps to unknown nodes fail the graph invocation."""
+    def source(state):
+        return Command(update={}, goto="missing")
+
+    graph = GraphManager().add_node(source).add_edge(START, "source").compile_graph()
+
+    with pytest.raises(ValueError, match="Unknown graph node `missing`"):
+        await graph.invoke_graph({})
+
+
+async def test_node_exception_is_propagated_to_caller():
+    """Exceptions raised inside a node complete the invocation with that error."""
+    def fail(state):
+        raise RuntimeError("node failed")
+
+    graph = GraphManager().add_node(fail).add_edge(START, "fail").compile_graph()
+
+    with pytest.raises(RuntimeError, match="node failed"):
+        await graph.invoke_graph({})
+
+
+async def test_invalid_node_result_is_propagated_to_caller():
+    """Node return-contract violations are visible to graph callers."""
+    graph = (
+        GraphManager()
+        .add_node(lambda state: None, "invalid")
+        .add_edge(START, "invalid")
+        .compile_graph()
+    )
+
+    with pytest.raises(InvalidNodeReturns, match="must return a dict or Command"):
+        await graph.invoke_graph({})
+
+
+async def test_invalid_start_target_is_propagated_to_caller():
+    """A malformed direct NodeGraph fails while executing START."""
+    graph = NodeGraph({}, {START: "missing"})
+
+    with pytest.raises(ValueError, match="Unknown graph node `missing`"):
+        await graph.invoke_graph({})
+
+
+async def test_max_steps_stops_a_cycle():
+    """A cyclic graph fails once its configured execution limit is exceeded."""
+    loop_node = Node(lambda state: {"count": state.get("count", 0) + 1}, "loop")
+    graph = NodeGraph(
+        {"loop": loop_node},
+        {START: "loop", "loop": "loop"},
+        max_steps=2,
+    )
+
+    with pytest.raises(RecursionError, match="maximum of 2 steps"):
+        await graph.invoke_graph({})
+
+
+async def test_graph_requires_dict_state():
+    """Graph invocations reject non-dict state before posting an event."""
+    graph = GraphManager().add_node(lambda state: {}, "node").add_edge(START, "node").compile_graph()
+
+    with pytest.raises(TypeError, match="Graph state must be a dict"):
+        await graph.invoke_graph([])
+
+
+async def test_original_nested_input_is_not_mutated():
+    """Nodes receive a deep copy and cannot mutate their caller's input."""
+    original = {"wrapper": {"number": 1}}
+
+    def mutate(state):
+        state["wrapper"]["number"] = 2
+        return state
+
+    graph = GraphManager().add_node(mutate).add_edge(START, "mutate").compile_graph()
+
+    assert await graph.invoke_graph(original) == {"wrapper": {"number": 2}}
+    assert original == {"wrapper": {"number": 1}}
+
+
+async def test_graphs_with_same_node_name_do_not_handle_each_others_runs():
+    """Global event listeners filter invocations by their owning graph run ID."""
+    calls = []
+
+    def graph_a_node(state):
+        calls.append("a")
+        return {"graph": "a"}
+
+    def graph_b_node(state):
+        calls.append("b")
+        return {"graph": "b"}
+
+    graph_a = (
+        GraphManager()
+        .add_node(graph_a_node, "shared")
+        .add_edge(START, "shared")
+        .compile_graph()
+    )
+    graph_b = (
+        GraphManager()
+        .add_node(graph_b_node, "shared")
+        .add_edge(START, "shared")
+        .compile_graph()
+    )
+
+    results = await asyncio.gather(graph_a.invoke_graph({}), graph_b.invoke_graph({}))
+
+    assert results == [{"graph": "a"}, {"graph": "b"}]
+    assert sorted(calls) == ["a", "b"]
 
 
 async def test_concurrent_invocations_keep_context_state_isolated():
