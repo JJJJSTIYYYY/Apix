@@ -3,6 +3,9 @@
 import asyncio
 import copy
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import suppress
+from typing import Any
 
 from apix.core.event.base import ApixEvent, EventType
 from apix.core.event.event_loop import apix_event_loop
@@ -10,6 +13,12 @@ from apix.core.event.event_registry import apix_event_registry
 from apix.core.event.event_writer import event_pipe_writer
 from apix.core.graph.base import END, START, Command
 from apix.core.graph.node import Node
+from apix.core.stream.stream_writer import (
+    StreamChannel,
+    StreamWriter,
+    noop_stream_writer,
+    stream_writer_context,
+)
 
 
 class NodeGraph:
@@ -67,13 +76,51 @@ class NodeGraph:
         )
 
 
-    async def invoke_graph(self, state: dict) -> dict:
+    async def invoke(self, state: dict) -> dict:
         """Start a graph invocation at :data:`START` and return its final state.
 
         The input state is deep-copied into the first event context. Independent
         invocations may run concurrently because all evolving state stays in
         their event contexts rather than on this graph object.
         """
+        return await self._invoke(state, noop_stream_writer())
+
+
+    async def stream(self, state: dict) -> AsyncIterator[Any]:
+        """Yield custom chunks emitted by nodes during one graph invocation.
+
+        Nodes emit chunks by calling :func:`get_stream_writer` and invoking the
+        returned writer. The iterator ends when the graph reaches :data:`END`.
+        If graph execution fails, queued chunks are yielded first and then the
+        original exception is propagated to the stream consumer.
+
+        Args:
+            state: Initial graph state. It is deep-copied before execution.
+
+        Yields:
+            Custom chunks in the order in which nodes emitted them.
+        """
+        channel = StreamChannel()
+        execution_task = asyncio.create_task(
+            self._invoke(state, channel.writer),
+            name=f"graph-stream-{uuid.uuid4().hex}",
+        )
+        execution_task.add_done_callback(lambda task: channel.close())
+
+        try:
+            async for chunk in channel:
+                yield chunk
+            await execution_task
+        finally:
+            if not execution_task.done():
+                execution_task.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await execution_task
+            channel.close()
+
+
+    async def _invoke(self, state: dict, stream_writer: StreamWriter) -> dict:
+        """Run a graph with the writer assigned to each executing node."""
         if not isinstance(state, dict):
             raise TypeError("Graph state must be a dict.")
 
@@ -85,6 +132,7 @@ class NodeGraph:
             "state": copy.deepcopy(state),
             "steps": 0,
             "completion": completion,
+            "stream_writer": stream_writer,
         }
         self._active_runs.add(run_id)
         try:
@@ -105,7 +153,11 @@ class NodeGraph:
     async def _execute_node(self, node_name: str, context: dict) -> None:
         """Inject context state into one node and emit its next-node event."""
         try:
-            command = await self._nodes[node_name].execute(copy.deepcopy(context["state"]))
+            writer = context.get("stream_writer", noop_stream_writer())
+            with stream_writer_context(writer):
+                command = await self._nodes[node_name].execute(
+                    copy.deepcopy(context["state"])
+                )
             state, next_node = self.apply_command(command, node_name, context)
             next_context = {**context, "state": state, "steps": context["steps"] + 1}
             await self._post_next(next_node, next_context)

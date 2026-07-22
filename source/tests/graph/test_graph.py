@@ -11,10 +11,10 @@ from apix.common.type.exception import InvalidNodeReturns
 from apix.core.graph import END, START, Command, GraphManager, Node, NodeGraph
 
 
-pytestmark = pytest.mark.asyncio(loop_scope="module")
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-@pytest_asyncio.fixture(autouse=True, scope="module", loop_scope="module")
+@pytest_asyncio.fixture(autouse=True, scope="module", loop_scope="session")
 async def stop_event_loop_after_module():
     """Stop the shared event worker after this module's tests finish."""
     yield
@@ -32,7 +32,7 @@ async def test_start_node_routes_to_configured_node():
 
     graph = GraphManager().add_node(first).add_edge(START, "first").compile_graph()
 
-    await graph.invoke_graph({"value": 1})
+    await graph.invoke({"value": 1})
 
     assert calls == [{"value": 1}]
 
@@ -50,7 +50,7 @@ async def test_node_update_is_carried_to_end():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({"number": 1}) == {"number": 2}
+    assert await graph.invoke({"number": 1}) == {"number": 2}
 
 
 async def test_node_without_outgoing_edge_routes_to_end():
@@ -62,7 +62,7 @@ async def test_node_without_outgoing_edge_routes_to_end():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"finished": True}
+    assert await graph.invoke({}) == {"finished": True}
 
 
 async def test_condition_true_routes_to_edge_target():
@@ -86,7 +86,7 @@ async def test_condition_true_routes_to_edge_target():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"number": 2, "matched": True}
+    assert await graph.invoke({}) == {"number": 2, "matched": True}
     assert calls == ["source", "target"]
 
 
@@ -110,7 +110,7 @@ async def test_condition_false_routes_directly_to_end():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"number": 1}
+    assert await graph.invoke({}) == {"number": 1}
     assert target_called is False
 
 
@@ -127,7 +127,7 @@ async def test_async_condition_is_awaited():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({"enabled": True}) == {
+    assert await graph.invoke({"enabled": True}) == {
         "enabled": True,
         "matched": True,
     }
@@ -143,7 +143,7 @@ async def test_condition_rejects_non_boolean_result():
     )
 
     with pytest.raises(TypeError, match="condition function must return bool"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_router_routes_to_selected_target():
@@ -165,7 +165,7 @@ async def test_router_routes_to_selected_target():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"route": "right", "result": "right"}
+    assert await graph.invoke({}) == {"route": "right", "result": "right"}
 
 
 async def test_async_router_accepts_mapping_goto():
@@ -183,7 +183,7 @@ async def test_async_router_accepts_mapping_goto():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"source": True, "target": True}
+    assert await graph.invoke({}) == {"source": True, "target": True}
 
 
 async def test_router_can_route_to_end():
@@ -196,7 +196,7 @@ async def test_router_can_route_to_end():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"finished": True}
+    assert await graph.invoke({}) == {"finished": True}
 
 
 async def test_router_rejects_undeclared_target():
@@ -216,7 +216,7 @@ async def test_router_rejects_undeclared_target():
     )
 
     with pytest.raises(ValueError, match="returned invalid target `missing`"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_async_node_is_awaited_by_graph():
@@ -227,7 +227,7 @@ async def test_async_node_is_awaited_by_graph():
 
     graph = GraphManager().add_node(async_node).add_edge(START, "async_node").compile_graph()
 
-    assert await graph.invoke_graph({}) == {"done": True}
+    assert await graph.invoke({}) == {"done": True}
 
 
 async def test_node_command_can_override_default_transition():
@@ -243,7 +243,7 @@ async def test_node_command_can_override_default_transition():
         .compile_graph()
     )
 
-    assert await graph.invoke_graph({}) == {"selected": True, "reached": True}
+    assert await graph.invoke({}) == {"selected": True, "reached": True}
 
 
 async def test_explicit_none_goto_routes_to_end():
@@ -253,7 +253,7 @@ async def test_explicit_none_goto_routes_to_end():
 
     graph = GraphManager().add_node(source).add_edge(START, "source").compile_graph()
 
-    assert await graph.invoke_graph({}) == {"finished": True}
+    assert await graph.invoke({}) == {"finished": True}
 
 
 async def test_unknown_command_goto_is_propagated_to_caller():
@@ -264,7 +264,7 @@ async def test_unknown_command_goto_is_propagated_to_caller():
     graph = GraphManager().add_node(source).add_edge(START, "source").compile_graph()
 
     with pytest.raises(ValueError, match="Unknown graph node `missing`"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_node_exception_is_propagated_to_caller():
@@ -275,7 +275,7 @@ async def test_node_exception_is_propagated_to_caller():
     graph = GraphManager().add_node(fail).add_edge(START, "fail").compile_graph()
 
     with pytest.raises(RuntimeError, match="node failed"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_invalid_node_result_is_propagated_to_caller():
@@ -288,7 +288,7 @@ async def test_invalid_node_result_is_propagated_to_caller():
     )
 
     with pytest.raises(InvalidNodeReturns, match="must return a dict or Command"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_invalid_start_target_is_propagated_to_caller():
@@ -296,7 +296,7 @@ async def test_invalid_start_target_is_propagated_to_caller():
     graph = NodeGraph({}, {START: "missing"})
 
     with pytest.raises(ValueError, match="Unknown graph node `missing`"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_max_steps_stops_a_cycle():
@@ -309,7 +309,7 @@ async def test_max_steps_stops_a_cycle():
     )
 
     with pytest.raises(RecursionError, match="maximum of 2 steps"):
-        await graph.invoke_graph({})
+        await graph.invoke({})
 
 
 async def test_graph_requires_dict_state():
@@ -317,7 +317,7 @@ async def test_graph_requires_dict_state():
     graph = GraphManager().add_node(lambda state: {}, "node").add_edge(START, "node").compile_graph()
 
     with pytest.raises(TypeError, match="Graph state must be a dict"):
-        await graph.invoke_graph([])
+        await graph.invoke([])
 
 
 async def test_original_nested_input_is_not_mutated():
@@ -330,7 +330,7 @@ async def test_original_nested_input_is_not_mutated():
 
     graph = GraphManager().add_node(mutate).add_edge(START, "mutate").compile_graph()
 
-    assert await graph.invoke_graph(original) == {"wrapper": {"number": 2}}
+    assert await graph.invoke(original) == {"wrapper": {"number": 2}}
     assert original == {"wrapper": {"number": 1}}
 
 
@@ -359,7 +359,7 @@ async def test_graphs_with_same_node_name_do_not_handle_each_others_runs():
         .compile_graph()
     )
 
-    results = await asyncio.gather(graph_a.invoke_graph({}), graph_b.invoke_graph({}))
+    results = await asyncio.gather(graph_a.invoke({}), graph_b.invoke({}))
 
     assert results == [{"graph": "a"}, {"graph": "b"}]
     assert sorted(calls) == ["a", "b"]
@@ -379,8 +379,8 @@ async def test_concurrent_invocations_keep_context_state_isolated():
     )
 
     results = await asyncio.gather(
-        graph.invoke_graph({"number": 1}),
-        graph.invoke_graph({"number": 10}),
+        graph.invoke({"number": 1}),
+        graph.invoke({"number": 10}),
     )
 
     assert results == [{"number": 2}, {"number": 11}]
@@ -400,8 +400,8 @@ async def test_concurrent_invocations_keep_context_state_deep_isolated():
     )
 
     results = await asyncio.gather(
-        graph.invoke_graph({"number_wrapper": {"number": 1}}),
-        graph.invoke_graph({"number_wrapper": {"number": 10}}),
+        graph.invoke({"number_wrapper": {"number": 1}}),
+        graph.invoke({"number_wrapper": {"number": 10}}),
     )
 
     assert results == [{"number_wrapper": {"number": 2}}, {"number_wrapper": {"number": 11}}]

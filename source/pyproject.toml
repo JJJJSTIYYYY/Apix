@@ -12,6 +12,7 @@ dependencies = [
     "pysqlite3>=0.6.0",
     "pyyaml>=6.0.3",
     "redis>=8.0.1",
+    "uvicorn>=0.51.0",
 ]
 
 [tool.pytest.ini_options]

@@ -27,6 +27,8 @@ class ApixEventLoop:
         self._background_handler_tasks: set[asyncio.Task] = set()
         self._background_handler_semaphore = asyncio.Semaphore(100)
 
+        self.started = False
+
     async def start(self):
         """
         Start event consumer worker.
@@ -38,7 +40,7 @@ class ApixEventLoop:
                 self._event_consumer_loop(),
                 name="pipe-event-consumer",
             )
-
+            self.started = True
             logger.info("Worker started.")
 
     async def stop(self):

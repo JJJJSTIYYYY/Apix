@@ -1,46 +1,23 @@
 import functools
 import inspect
 from collections.abc import Awaitable, Callable, Mapping
+from abc import ABC, abstractmethod
 
 from apix.common.type.exception import InvalidNodeReturns
 from apix.core.graph.base import Command, NodeFunction
 
 
-class Node:
-    """A named graph node that normalises synchronous and asynchronous callables."""
+class BaseNode(ABC):
 
-    def __init__(self, func: NodeFunction, name: str | None = None):
-        """Create a node.
+    name: str
+    func: NodeFunction | list[NodeFunction]
 
-        Args:
-            func: Callable invoked with a copy of the current graph state.
-            name: Unique node name. Defaults to ``func.__name__``.
+    def __init__(self, *args, **kwargs):
+        pass
 
-        Raises:
-            ValueError: If no callable or usable name is supplied.
-        """
-        if func is None:
-            raise ValueError("A graph node requires a function.")
-        
-        self.name = name or func.__name__
-        if not self.name:
-            raise ValueError("A graph node requires a name.")
-        
-        self.func = self._wrap_func(func)
-
-
-    async def execute(self, state: dict) -> Command:
-        """Execute the wrapped callable and return its normalised command.
-
-        Args:
-            state: State snapshot supplied to the node callable.
-
-        Returns:
-            The command produced from the callable's return value.
-        """
-        return await self.func(state)
+    async def execute(self, state: dict) -> Command | list[Command]:
+        pass
     
-
     @staticmethod
     def _normalise_result(result: object) -> Command:
         """Convert a node return value into a :class:`Command`.
@@ -73,7 +50,9 @@ class Node:
     
 
     def _wrap_func(self, func: NodeFunction) -> Callable[[dict], Awaitable[Command]]:
-        """Wrap ``func`` so sync and async callables share one async interface."""
+        """Wrap ``func`` so sync and async callables share one async interface.
+        The func after wrapper should returns a Command.
+        """
         @functools.wraps(func)
         async def wrapped(state: dict) -> Command:
             """Invoke the original callable and normalise its returned value."""
@@ -82,3 +61,43 @@ class Node:
                 result = await result
             return self._normalise_result(result)
         return wrapped
+
+
+class Node(BaseNode):
+    """A named graph node that normalises synchronous and asynchronous callables.
+    A node should only contains a node function.
+    """
+
+    name: str
+    func: NodeFunction
+
+    def __init__(self, func: NodeFunction, name: str | None = None):
+        """Create a node.
+
+        Args:
+            func: Callable invoked with a copy of the current graph state.
+            name: Unique node name. Defaults to ``func.__name__``.
+
+        Raises:
+            ValueError: If no callable or usable name is supplied.
+        """
+        if func is None:
+            raise ValueError("A graph node requires a function.")
+        
+        self.name = name or func.__name__
+        if not self.name:
+            raise ValueError("A graph node requires a name.")
+        
+        self.func = self._wrap_func(func)
+
+
+    async def execute(self, state: dict) -> Command:
+        """Execute the wrapped callable and return its normalised command.
+
+        Args:
+            state: State snapshot supplied to the node callable.
+
+        Returns:
+            The command produced from the callable's return value.
+        """
+        return await self.func(state)
