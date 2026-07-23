@@ -2,7 +2,7 @@ import functools
 import inspect
 from collections.abc import Awaitable, Callable, Mapping
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TypeGuard
 
 from apix.common.type.exception import InvalidNodeReturns
 from apix.core.graph.base import Command, NodeFunction
@@ -17,22 +17,66 @@ class BaseNode(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, state: dict) -> Command:
+    async def execute(
+        self,
+        state: dict,
+    ) -> Command | list[Command]:
         pass
+
+    @staticmethod
+    def _is_command(value: Any) -> TypeGuard[Command]:
+        """Return whether a dictionary has the runtime shape of Command."""
+        if not isinstance(value, dict):
+            return False
+
+        if not set(value).issubset({"update", "goto"}):
+            return False
+
+        if (
+            "update" in value
+            and not isinstance(value["update"], dict)
+        ):
+            return False
+
+        if (
+            "goto" in value
+            and value["goto"] is not None
+            and not isinstance(value["goto"], str)
+        ):
+            return False
+
+        return True
     
     @staticmethod
-    def _normalise_result(result: object) -> Command:
-        """Convert a node return value into a :class:`Command`.
+    def _normalise_result(
+        result: object,
+    ) -> Command | list[Command]:
+        """Convert a node return value into one or more commands.
 
         A regular mapping is treated as a state update. A mapping containing
         ``goto``, or one using only the ``update``/``goto`` command keys, is
-        treated as a command.
+        treated as a command. Lists are normalised item by item and preserve
+        their original order.
 
         Raises:
             InvalidNodeReturns: If the value cannot represent a valid command.
         """
+        if isinstance(result, list):
+            return [
+                BaseNode._normalise_single_result(item)
+                for item in result
+            ]
+
+        return BaseNode._normalise_single_result(result)
+
+    @staticmethod
+    def _normalise_single_result(result: object) -> Command:
+        """Convert one node return value into a :class:`Command`."""
         if not isinstance(result, Mapping):
-            raise InvalidNodeReturns("Node functions must return a dict or Command, " f"got {type(result).__name__}.")
+            raise InvalidNodeReturns(
+                "Node functions must return a dict or Command, or "
+                f"list[Command], got {type(result).__name__}."
+            )
         
         # TypedDict values are ordinary dicts at runtime. ``goto`` therefore
         # distinguishes a Command from a normal state-update dictionary.
@@ -51,12 +95,20 @@ class BaseNode(ABC):
         return Command(update=dict(result))
     
 
-    def _wrap_func(self, func: NodeFunction) -> Callable[[dict], Awaitable[Command]]:
+    def _wrap_func(
+        self,
+        func: NodeFunction,
+    ) -> Callable[
+        [dict],
+        Awaitable[Command | list[Command]],
+    ]:
         """Wrap ``func`` so sync and async callables share one async interface.
-        The func after wrapper should returns a Command.
+        The wrapped function returns one command or an ordered command list.
         """
         @functools.wraps(func)
-        async def wrapped(state: dict) -> Command:
+        async def wrapped(
+            state: dict,
+        ) -> Command | list[Command]:
             """Invoke the original callable and normalise its returned value."""
             result = func(state)
             if inspect.isawaitable(result):
@@ -93,13 +145,16 @@ class Node(BaseNode):
         self.func = self._wrap_func(func)
 
 
-    async def execute(self, state: dict) -> Command:
-        """Execute the wrapped callable and return its normalised command.
+    async def execute(
+        self,
+        state: dict,
+    ) -> Command | list[Command]:
+        """Execute the callable and return its normalised command result.
 
         Args:
             state: State snapshot supplied to the node callable.
 
         Returns:
-            The command produced from the callable's return value.
+            One command or an ordered list of commands.
         """
         return await self.func(state)

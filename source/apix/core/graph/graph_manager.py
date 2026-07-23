@@ -30,12 +30,16 @@ class GraphManager:
                 preserves normal dictionary overwrite behaviour.
         """
         self._state_schema = state_schema
-        self._nodes: dict[str, Node] = {}
+        self._nodes: dict[str, BaseNode] = {}
         self._default_gotos: dict[str, str] = {}
         self._generated_names: set[str] = set()
 
 
-    def add_node(self, node_func: NodeFunction | Node, node_name: str | None = None):
+    def add_node(
+        self,
+        node_func: NodeFunction | BaseNode,
+        node_name: str | None = None,
+    ):
         """Register a user-defined state-processing node.
 
         Args:
@@ -48,7 +52,7 @@ class GraphManager:
         Raises:
             ValueError: If the name is reserved or already registered.
         """
-        if not isinstance(node_func, Node):
+        if not isinstance(node_func, BaseNode):
             node = Node(node_func, node_name)
         else:
             node = node_func

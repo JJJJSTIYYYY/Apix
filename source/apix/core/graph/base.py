@@ -5,14 +5,13 @@ from typing import (
     Annotated,
     Any,
     NotRequired,
+    TypeAlias,
     TypedDict,
     get_args,
     get_origin,
     get_type_hints,
 )
 from dataclasses import dataclass
-
-from apix.common.type.exception import CommandMergeError
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,10 +103,6 @@ START = "__start__"
 END = "__end__"
 """Predefined node name that completes every graph invocation."""
 
-NodeFunction = Callable[[dict], dict] | Callable[[dict], Awaitable[dict]]
-"""A synchronous or asynchronous callable that receives graph state."""
-
-
 class Command(TypedDict):
     """A node result that updates state and optionally chooses the next node.
 
@@ -124,3 +119,13 @@ class Command(TypedDict):
 
     update: NotRequired[dict[str, Any]]
     goto: NotRequired[str | None]
+
+
+NodeResult: TypeAlias = dict[str, Any] | Command | list[Command]
+"""A state update, one command, or an ordered list of commands."""
+
+NodeFunction: TypeAlias = (
+    Callable[[dict[str, Any]], NodeResult]
+    | Callable[[dict[str, Any]], Awaitable[NodeResult]]
+)
+"""A synchronous or asynchronous callable that receives graph state."""

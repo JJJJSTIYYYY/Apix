@@ -4,6 +4,7 @@ from apix.core.graph.base import (
     AutoIncrease,
     Command,
     NodeFunction,
+    NodeResult,
     Replace,
 )
 from apix.core.graph.graph_manager import GraphManager
@@ -18,6 +19,7 @@ __all__ = [
     "GraphManager",
     "Node",
     "NodeFunction",
+    "NodeResult",
     "NodeGraph",
     "Replace",
     "START",

@@ -1,9 +1,19 @@
+import asyncio
 from collections.abc import Awaitable
 import functools
 import inspect
-from typing import Annotated, Any, Callable, Mapping, TypeGuard, get_args, get_origin, get_type_hints
+from typing import (
+    Annotated,
+    Any,
+    Callable,
+    TypeGuard,
+    get_args,
+    get_origin,
+    get_type_hints,
+    overload,
+)
 
-from apix.common.type.exception import InvalidNodeReturns, InvalidToolArgs
+from apix.common.type.exception import InvalidToolArgs
 from apix.core.graph import Command, BaseNode
 from apix.agent.sdk.tool.base import ToolFunction
 from apix.agent.sdk.tool.context import ToolInjectionState, AutoInjection
@@ -23,7 +33,7 @@ class Tool:
     """
 
     name: str
-    func: Callable[..., Awaitable[Command]]
+    func: Callable[..., Awaitable[Any]]
     prompt: str
     describe: str
 
@@ -70,6 +80,7 @@ class Tool:
 
         self.prompt = self._build_prompt()
         self.func = self._wrap_func(func)
+        functools.update_wrapper(self, func)
 
     @staticmethod
     def _resolve_type_hints(
@@ -340,7 +351,7 @@ class Tool:
     def _wrap_func(
         self,
         func: ToolFunction,
-    ) -> Callable[..., Awaitable[Command]]:
+    ) -> Callable[..., Awaitable[Any]]:
         """Wrap sync and async tool functions with one async interface.
 
         The wrapped function accepts already-bound positional and keyword
@@ -406,13 +417,51 @@ class Tool:
         )
     
 
-def tool():
-    pass
+@overload
+def tool(
+    func: ToolFunction,
+    *,
+    describe: str | None = None,
+) -> Tool:
+    ...
+
+
+@overload
+def tool(
+    func: None = None,
+    *,
+    describe: str | None = None,
+) -> Callable[[ToolFunction], Tool]:
+    ...
+
+
+def tool(
+    func: ToolFunction | None = None,
+    *,
+    describe: str | None = None,
+) -> Tool | Callable[[ToolFunction], Tool]:
+    """Wrap a regular function as a :class:`Tool`.
+
+    Both ``@tool`` and ``@tool(describe="...")`` are supported. The wrapped
+    tool retains the original function name and metadata.
+    """
+    if func is None:
+        return lambda wrapped: Tool(
+            wrapped,
+            describe=describe,
+        )
+
+    if not callable(func):
+        raise TypeError("tool decorator requires a callable function.")
+
+    return Tool(
+        func,
+        describe=describe,
+    )
 
 
 class ToolNode(BaseNode):
-    """A router node for tool calls.
-    """
+    """Execute tool calls from the latest assistant message concurrently."""
 
     name: str
     tool_set: list[Tool]
@@ -420,10 +469,10 @@ class ToolNode(BaseNode):
     
     def __init__(
         self, 
-        tool_set: Tool | list[Tool] | ToolFunction | list[ToolFunction], 
+        tool_set: Tool | list[Tool] | ToolFunction | list[ToolFunction],
         name: str = "tools",
-        message_key: str = "messages"
-    ):
+        message_key: str = "messages",
+    ) -> None:
         """Create a node.
 
         Args:
@@ -434,23 +483,47 @@ class ToolNode(BaseNode):
             ValueError: If `tool_set` is not a ToolFunction or a list of ToolFunctions, 
                 or if `name` is empty.
         """
-        if not isinstance(tool_set, list):
-            tool_set = [tool_set]
-
-        if not name:
+        if not isinstance(name, str) or not name:
             raise ValueError("A tool node requires a name.")
-        
+        if not isinstance(message_key, str) or not message_key:
+            raise ValueError("A tool node requires a message key.")
+
+        candidates = (
+            tool_set
+            if isinstance(tool_set, list)
+            else [tool_set]
+        )
+
         self.name = name
         self.tool_set = []
         self.message_key = message_key
-        
-        for f in tool_set:
-            if not isinstance(f, (Callable, Tool)):
-                raise ValueError("A tool node requires a callable function." f"got {type(f).__name__}.")
-            self.tool_set.append(self._wrap_func(f))
+        self._tools_by_name: dict[str, Tool] = {}
+
+        for candidate in candidates:
+            if isinstance(candidate, Tool):
+                wrapped_tool = candidate
+            elif callable(candidate):
+                wrapped_tool = Tool(candidate)
+            else:
+                raise ValueError(
+                    "A tool node requires Tool objects or callable "
+                    f"functions, got {type(candidate).__name__}."
+                )
+
+            if wrapped_tool.name in self._tools_by_name:
+                raise ValueError(
+                    f"Tool {wrapped_tool.name!r} is already registered "
+                    f"in node {self.name!r}."
+                )
+
+            self.tool_set.append(wrapped_tool)
+            self._tools_by_name[wrapped_tool.name] = wrapped_tool
 
 
-    def _is_tool_call(self, value: Any) -> TypeGuard[ToolCall]:
+    @staticmethod
+    def _is_tool_call(
+        value: Any,
+    ) -> TypeGuard[ToolCall]:
         """
         Runtime validation for ToolCall.
 
@@ -459,31 +532,125 @@ class ToolNode(BaseNode):
         if not isinstance(value, dict):
             return False
 
-        if not isinstance(value.get("call_id"), str):
+        if not {
+            "call_id",
+            "tool_name",
+            "args",
+        }.issubset(value):
             return False
 
-        if not isinstance(value.get("tool_name"), str):
+        if (
+            not isinstance(value["call_id"], str)
+            or not value["call_id"]
+        ):
             return False
 
-        args = value.get("args")
+        if (
+            not isinstance(value["tool_name"], str)
+            or not value["tool_name"]
+        ):
+            return False
+
+        args = value["args"]
         if args is not None and not isinstance(args, dict):
             return False
 
         return True
 
 
-    def _is_tool_call_list(self, value: Any) -> TypeGuard[list[ToolCall]]:
+    @classmethod
+    def _is_tool_call_list(
+        cls,
+        value: Any,
+    ) -> TypeGuard[list[ToolCall]]:
         return (
             isinstance(value, list)
-            and all(self._is_tool_call(item) for item in value)
+            and all(cls._is_tool_call(item) for item in value)
         )
 
 
-    async def execute(self, state: dict[str, Any]) -> Command:
+    @staticmethod
+    def _make_tool_message(
+        content: str,
+        tool_call: ToolCall,
+    ) -> ApixToolMessage:
+        """Create the message corresponding to one completed tool call."""
+        return ApixToolMessage(
+            content=content,
+            name=tool_call["tool_name"],
+            tool_call_id=tool_call["call_id"],
+        )
+
+
+    def _normalise_tool_result(
+        self,
+        result: Any,
+        tool_call: ToolCall,
+    ) -> Command:
+        """Convert one raw tool result into exactly one command."""
+        if not self._is_command(result):
+            return Command(
+                update={
+                    self.message_key: [
+                        self._make_tool_message(
+                            str(result),
+                            tool_call,
+                        )
+                    ]
+                }
+            )
+
+        command = Command()
+
+        if "update" in result:
+            update = dict(result["update"])
+            message_update = update.get(self.message_key)
+
+            if isinstance(message_update, str):
+                update[self.message_key] = [
+                    self._make_tool_message(
+                        message_update,
+                        tool_call,
+                    )
+                ]
+
+            command["update"] = update
+
+        if "goto" in result:
+            command["goto"] = result["goto"]
+
+        return command
+
+
+    async def _execute_tool_call(
+        self,
+        state: dict[str, Any],
+        tool_call: ToolCall,
+    ) -> Command:
+        """Execute and normalise one validated tool call."""
+        selected_tool = self._tools_by_name[tool_call["tool_name"]]
+        result = await selected_tool.execute(
+            state,
+            tool_call,
+        )
+        return self._normalise_tool_result(
+            result,
+            tool_call,
+        )
+
+
+    async def execute(
+        self,
+        state: dict[str, Any],
+    ) -> list[Command]:
+        """Execute all tool calls concurrently and return them in call order."""
+        if not isinstance(state, dict):
+            raise TypeError("state must be a dictionary.")
+
         messages = state.get(self.message_key)
 
         if messages is None:
-            return Command()
+            return []
 
         if not isinstance(messages, list):
             raise ValueError(
@@ -492,22 +659,52 @@ class ToolNode(BaseNode):
             )
 
         if not messages:
-            return Command()
+            return []
 
         last_message = messages[-1]
 
         if not isinstance(last_message, ApixAiMessage):
-            return Command()
+            return []
 
         tool_calls = last_message.tool_calls
 
         if not tool_calls:
-            return Command()
+            return []
 
         if not self._is_tool_call_list(tool_calls):
             raise TypeError(
                 "ApixAiMessage.tool_calls must be a list of valid ToolCall objects."
             )
 
-        for call in tool_calls:
-            pass
+        for tool_call in tool_calls:
+            if tool_call["tool_name"] not in self._tools_by_name:
+                raise ValueError(
+                    f"Tool {tool_call['tool_name']!r} is not registered "
+                    f"in node {self.name!r}."
+                )
+
+        tasks = [
+            asyncio.create_task(
+                self._execute_tool_call(
+                    state,
+                    tool_call,
+                ),
+                name=(
+                    f"tool-{tool_call['tool_name']}-"
+                    f"{tool_call['call_id']}"
+                ),
+            )
+            for tool_call in tool_calls
+        ]
+
+        try:
+            return list(await asyncio.gather(*tasks))
+        except BaseException:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(
+                *tasks,
+                return_exceptions=True,
+            )
+            raise

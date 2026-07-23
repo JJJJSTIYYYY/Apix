@@ -43,6 +43,18 @@ async def test_async_node_is_awaited_and_normalised():
 
 
 @pytest.mark.asyncio
+async def test_node_preserves_an_ordered_command_list():
+    """A node may return several commands for sequential graph application."""
+    commands = [
+        Command(update={"value": 1}),
+        Command(update={"value": 2}, goto="next"),
+    ]
+    node = Node(lambda state: commands, "multi_command")
+
+    assert await node.execute({}) == commands
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("result", "expected"),
     [

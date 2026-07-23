@@ -98,6 +98,46 @@ async def test_annotated_state_field_auto_increases_across_nodes():
     }
 
 
+async def test_command_list_is_applied_sequentially_in_original_order():
+    """Each command sees state produced by the preceding command."""
+    def append_messages(state):
+        return [
+            Command(update={"messages": ["second"]}),
+            Command(update={"messages": ["third"]}),
+        ]
+
+    graph = (
+        GraphManager(AccumulatingState)
+        .add_node(append_messages)
+        .add_edge(START, "append_messages")
+        .compile_graph()
+    )
+
+    result = await graph.invoke(
+        {
+            "messages": ["first"],
+            "status": "unchanged",
+        }
+    )
+
+    assert result == {
+        "messages": ["first", "second", "third"],
+        "status": "unchanged",
+    }
+
+
+async def test_empty_command_list_is_a_noop_and_uses_default_route():
+    """An empty command list still completes the node transition."""
+    graph = (
+        GraphManager()
+        .add_node(lambda state: [], "no_op")
+        .add_edge(START, "no_op")
+        .compile_graph()
+    )
+
+    assert await graph.invoke({"value": 1}) == {"value": 1}
+
+
 async def test_replace_explicitly_overwrites_auto_increase_field():
     """A node can bypass AutoIncrease for one Command update."""
     def replace_messages(state):

@@ -128,7 +128,3 @@ class ChunkMergeError(ValueError):
 
 class IncompleteToolCallError(ValueError):
     """A streamed tool call cannot be converted into a complete tool call."""
-
-
-class CommandMergeError(ValueError):
-    """Raised when multiple commands contain conflicting routes."""

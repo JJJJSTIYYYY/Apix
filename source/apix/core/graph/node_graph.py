@@ -15,7 +15,7 @@ from apix.core.graph.base import (
     Replace,
     get_auto_increase_keys,
 )
-from apix.core.graph.node import Node
+from apix.core.graph.node import BaseNode
 from apix.core.stream import (
     StreamChannel,
     StreamWriter,
@@ -35,7 +35,7 @@ class NodeGraph:
 
     def __init__(
         self,
-        nodes: dict[str, Node],
+        nodes: dict[str, BaseNode],
         default_gotos: dict[str, str],
         *,
         max_steps: int = 1024,
@@ -172,10 +172,25 @@ class NodeGraph:
         try:
             writer = context.get("stream_writer", noop_stream_writer())
             with stream_writer_context(writer):
-                command = await self._nodes[node_name].execute(
+                result = await self._nodes[node_name].execute(
                     copy.deepcopy(context["state"])
                 )
-            state, next_node = self.apply_command(command, node_name, context)
+            commands = result if isinstance(result, list) else [result]
+            if not commands:
+                commands = [Command()]
+
+            state = context["state"]
+            next_node = self._default_gotos.get(node_name, END)
+            command_context = {**context}
+
+            for command in commands:
+                command_context["state"] = state
+                state, next_node = self.apply_command(
+                    command,
+                    node_name,
+                    command_context,
+                )
+
             next_context = {**context, "state": state, "steps": context["steps"] + 1}
             await self._post_next(next_node, next_context)
         except Exception as exc:
@@ -184,6 +199,11 @@ class NodeGraph:
 
     def apply_command(self, command: Command, node_name: str, context: dict) -> tuple[dict, str]:
         """Return updated state and the target selected by a node command."""
+        if not isinstance(command, dict):
+            raise TypeError(
+                "Node.execute must return a Command or list[Command]."
+            )
+
         update = command.get("update", {})
         if not isinstance(update, dict):
             raise TypeError("Command.update must be a dict.")
