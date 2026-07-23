@@ -2,6 +2,7 @@ import functools
 import inspect
 from collections.abc import Awaitable, Callable, Mapping
 from abc import ABC, abstractmethod
+from typing import Any
 
 from apix.common.type.exception import InvalidNodeReturns
 from apix.core.graph.base import Command, NodeFunction
@@ -10,12 +11,13 @@ from apix.core.graph.base import Command, NodeFunction
 class BaseNode(ABC):
 
     name: str
-    func: NodeFunction | list[NodeFunction]
+    func: Any
 
     def __init__(self, *args, **kwargs):
         pass
 
-    async def execute(self, state: dict) -> Command | list[Command]:
+    @abstractmethod
+    async def execute(self, state: dict) -> Command:
         pass
     
     @staticmethod
@@ -81,8 +83,8 @@ class Node(BaseNode):
         Raises:
             ValueError: If no callable or usable name is supplied.
         """
-        if func is None:
-            raise ValueError("A graph node requires a function.")
+        if func is None or not isinstance(func, Callable):
+            raise ValueError("A graph node requires a callable function.")
         
         self.name = name or func.__name__
         if not self.name:

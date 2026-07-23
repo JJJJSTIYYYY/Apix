@@ -7,13 +7,10 @@ from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import Any
 
-from apix.core.event.base import ApixEvent, EventType
-from apix.core.event.event_loop import apix_event_loop
-from apix.core.event.event_registry import apix_event_registry
-from apix.core.event.event_writer import event_pipe_writer
+from apix.core.event import ApixEvent, EventType, apix_event_loop, apix_event_registry, event_pipe_writer
 from apix.core.graph.base import END, START, Command
 from apix.core.graph.node import Node
-from apix.core.stream.stream_writer import (
+from apix.core.stream import (
     StreamChannel,
     StreamWriter,
     noop_stream_writer,
@@ -35,7 +32,7 @@ class NodeGraph:
         nodes: dict[str, Node],
         default_gotos: dict[str, str],
         *,
-        max_steps: int = 1000,
+        max_steps: int = 1024,
     ):
         """Create a compiled graph and register listeners for all node names."""
         self._nodes = dict(nodes)

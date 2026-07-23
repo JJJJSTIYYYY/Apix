@@ -8,7 +8,7 @@ from apix.core.graph import Command, Node
 
 def test_node_requires_a_function():
     """A node cannot be constructed without an executable function."""
-    with pytest.raises(ValueError, match="requires a function"):
+    with pytest.raises(ValueError, match="requires a callable function"):
         Node(None)
 
 

@@ -115,3 +115,20 @@ class InvalidNodeReturns(Exception):
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
         return f"{self.message}{error_details}"
+    
+
+class InvalidToolArgs(TypeError):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+class ChunkMergeError(ValueError):
+    """Chunks belonging to different streams were merged."""
+
+
+class IncompleteToolCallError(ValueError):
+    """A streamed tool call cannot be converted into a complete tool call."""
+
+
+class CommandMergeError(ValueError):
+    """Raised when multiple commands contain conflicting routes."""

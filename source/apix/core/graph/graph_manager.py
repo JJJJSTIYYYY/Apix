@@ -4,7 +4,7 @@ import inspect
 from collections.abc import Mapping
 
 from apix.core.graph.base import END, START, Command, NodeFunction
-from apix.core.graph.node import Node
+from apix.core.graph.node import BaseNode, Node
 from apix.core.graph.node_graph import NodeGraph
 
 
@@ -24,7 +24,7 @@ class GraphManager:
         self._generated_names: set[str] = set()
 
 
-    def add_node(self, node_func: NodeFunction, node_name: str | None = None):
+    def add_node(self, node_func: NodeFunction | Node, node_name: str | None = None):
         """Register a user-defined state-processing node.
 
         Args:
@@ -37,7 +37,10 @@ class GraphManager:
         Raises:
             ValueError: If the name is reserved or already registered.
         """
-        node = Node(node_func, node_name)
+        if not isinstance(node_func, Node):
+            node = Node(node_func, node_name)
+        else:
+            node = node_func
 
         if node.name in (START, END):
             raise ValueError(f"`{node.name}` is a reserved graph node name.")
@@ -48,7 +51,7 @@ class GraphManager:
         return self
 
 
-    def add_nodes(self, node_list: list[NodeFunction]):
+    def add_nodes(self, node_list: list[NodeFunction | BaseNode]):
         """Register several nodes using each callable's name.
 
         Args:

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
-from apix.core.event.event_loop import apix_event_loop
+from apix.core.event import apix_event_loop
 from apix.common.utils.logger import Logger, logger
 
 
