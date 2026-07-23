@@ -1,6 +1,7 @@
 """Behaviour tests for the event-driven graph runtime."""
 
 import asyncio
+from typing import Annotated, TypedDict
 
 import pytest
 import pytest_asyncio
@@ -8,7 +9,16 @@ import pytest_asyncio
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.common.type.exception import InvalidNodeReturns
-from apix.core.graph import END, START, Command, GraphManager, Node, NodeGraph
+from apix.core.graph import (
+    AutoIncrease,
+    END,
+    START,
+    Command,
+    GraphManager,
+    Node,
+    NodeGraph,
+    Replace,
+)
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -51,6 +61,70 @@ async def test_node_update_is_carried_to_end():
     )
 
     assert await graph.invoke({"number": 1}) == {"number": 2}
+
+
+class AccumulatingState(TypedDict):
+    """Graph state containing additive and replacement fields."""
+
+    messages: Annotated[list[str], AutoIncrease()]
+    status: str
+
+
+async def test_annotated_state_field_auto_increases_across_nodes():
+    """GraphManager forwards its schema to the compiled runtime."""
+    def append_message(state):
+        return {
+            "messages": ["second"],
+            "status": "updated",
+        }
+
+    graph = (
+        GraphManager(AccumulatingState)
+        .add_node(append_message)
+        .add_edge(START, "append_message")
+        .compile_graph()
+    )
+
+    result = await graph.invoke(
+        {
+            "messages": ["first"],
+            "status": "initial",
+        }
+    )
+
+    assert result == {
+        "messages": ["first", "second"],
+        "status": "updated",
+    }
+
+
+async def test_replace_explicitly_overwrites_auto_increase_field():
+    """A node can bypass AutoIncrease for one Command update."""
+    def replace_messages(state):
+        return Command(
+            update={
+                "messages": Replace(["replacement"]),
+            }
+        )
+
+    graph = (
+        GraphManager(AccumulatingState)
+        .add_node(replace_messages)
+        .add_edge(START, "replace_messages")
+        .compile_graph()
+    )
+
+    result = await graph.invoke(
+        {
+            "messages": ["original"],
+            "status": "unchanged",
+        }
+    )
+
+    assert result == {
+        "messages": ["replacement"],
+        "status": "unchanged",
+    }
 
 
 async def test_node_without_outgoing_edge_routes_to_end():

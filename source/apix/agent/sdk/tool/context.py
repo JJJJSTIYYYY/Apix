@@ -31,3 +31,4 @@ class ToolInjectionState:
     
 
 # injection: Annotated[ToolInjectionState, AutoInjection()]
+# injection: Annotated[ToolInjectionState, AutoInjection]

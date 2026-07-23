@@ -1,10 +1,17 @@
 """Focused unit tests for NodeGraph defensive runtime behaviour."""
 
 import asyncio
+from typing import Annotated, TypedDict
 
 import pytest
 
-from apix.core.graph import END, START, NodeGraph
+from apix.core.graph import (
+    AutoIncrease,
+    END,
+    START,
+    NodeGraph,
+    Replace,
+)
 
 
 def _graph_context(state=None):
@@ -29,6 +36,136 @@ def test_apply_command_rejects_non_string_goto():
 
     with pytest.raises(TypeError, match="Command.goto must be a string or None"):
         graph.apply_command({"goto": 1}, START, _graph_context())
+
+
+class AutoIncreaseState(TypedDict):
+    """State schema used to exercise annotated update behaviour."""
+
+    values: Annotated[list[int], AutoIncrease()]
+    total: Annotated[int, AutoIncrease]
+    replaced: list[int]
+
+
+def test_apply_command_auto_increases_annotated_fields():
+    """Marked existing fields call __add__; unmarked fields are replaced."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoIncreaseState,
+    )
+    context = _graph_context(
+        {
+            "values": [1],
+            "total": 2,
+            "replaced": [1],
+        }
+    )
+
+    state, next_node = graph.apply_command(
+        {
+            "update": {
+                "values": [2, 3],
+                "total": 4,
+                "replaced": [2],
+            }
+        },
+        START,
+        context,
+    )
+
+    assert state == {
+        "values": [1, 2, 3],
+        "total": 6,
+        "replaced": [2],
+    }
+    assert next_node == END
+    assert context["state"] == {
+        "values": [1],
+        "total": 2,
+        "replaced": [1],
+    }
+
+
+def test_apply_command_initializes_missing_auto_increase_field():
+    """A marked field without a current value is assigned directly."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoIncreaseState,
+    )
+
+    state, _ = graph.apply_command(
+        {"update": {"values": [1]}},
+        START,
+        _graph_context(),
+    )
+
+    assert state == {"values": [1]}
+
+
+def test_replace_bypasses_auto_increase_and_is_unwrapped():
+    """Replace forces assignment for both marked and ordinary fields."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoIncreaseState,
+    )
+    context = _graph_context(
+        {
+            "values": [1, 2],
+            "replaced": [1, 2],
+        }
+    )
+
+    state, _ = graph.apply_command(
+        {
+            "update": {
+                "values": Replace([3]),
+                "replaced": Replace([4]),
+            }
+        },
+        START,
+        context,
+    )
+
+    assert state == {
+        "values": [3],
+        "replaced": [4],
+    }
+    assert context["state"] == {
+        "values": [1, 2],
+        "replaced": [1, 2],
+    }
+
+
+def test_replace_initializes_missing_auto_increase_field():
+    """Replace is also unwrapped when the marked field has no old value."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoIncreaseState,
+    )
+
+    state, _ = graph.apply_command(
+        {"update": {"values": Replace([1])}},
+        START,
+        _graph_context(),
+    )
+
+    assert state == {"values": [1]}
+
+
+def test_node_graph_rejects_non_class_state_schema():
+    """Annotated metadata must come from a schema class."""
+    with pytest.raises(
+        TypeError,
+        match="state_schema.*class or None",
+    ):
+        NodeGraph(
+            {},
+            {START: END},
+            state_schema={},
+        )
 
 
 @pytest.mark.asyncio

@@ -17,8 +17,19 @@ class GraphManager:
     by routing to :data:`END`.
     """
 
-    def __init__(self):
-        """Create an empty graph definition."""
+    def __init__(
+        self,
+        state_schema: type | None = None,
+    ):
+        """Create an empty graph definition.
+
+        Args:
+            state_schema:
+                Optional annotated state schema. ``NodeGraph`` uses it to
+                discover fields marked with ``AutoIncrease``. Omitting it
+                preserves normal dictionary overwrite behaviour.
+        """
+        self._state_schema = state_schema
         self._nodes: dict[str, Node] = {}
         self._default_gotos: dict[str, str] = {}
         self._generated_names: set[str] = set()
@@ -174,4 +185,8 @@ class GraphManager:
         """
         if START not in self._default_gotos:
             raise ValueError("A graph must define an outgoing transition from `START`.")
-        return NodeGraph(self._nodes, self._default_gotos)
+        return NodeGraph(
+            self._nodes,
+            self._default_gotos,
+            state_schema=self._state_schema,
+        )

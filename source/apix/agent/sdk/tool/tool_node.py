@@ -4,7 +4,7 @@ import inspect
 from typing import Annotated, Any, Callable, Mapping, TypeGuard, get_args, get_origin, get_type_hints
 
 from apix.common.type.exception import InvalidNodeReturns, InvalidToolArgs
-from apix.core.graph import Command, merge_commands, BaseNode
+from apix.core.graph import Command, BaseNode
 from apix.agent.sdk.tool.base import ToolFunction
 from apix.agent.sdk.tool.context import ToolInjectionState, AutoInjection
 from apix.agent.sdk.utils.message import ApixAiMessage, ToolCall, ApixToolMessage

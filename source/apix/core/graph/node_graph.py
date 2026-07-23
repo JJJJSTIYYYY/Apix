@@ -8,7 +8,13 @@ from contextlib import suppress
 from typing import Any
 
 from apix.core.event import ApixEvent, EventType, apix_event_loop, apix_event_registry, event_pipe_writer
-from apix.core.graph.base import END, START, Command
+from apix.core.graph.base import (
+    END,
+    START,
+    Command,
+    Replace,
+    get_auto_increase_keys,
+)
 from apix.core.graph.node import Node
 from apix.core.stream import (
     StreamChannel,
@@ -33,11 +39,25 @@ class NodeGraph:
         default_gotos: dict[str, str],
         *,
         max_steps: int = 1024,
+        state_schema: type | None = None,
     ):
-        """Create a compiled graph and register listeners for all node names."""
+        """Create a compiled graph and register listeners for all node names.
+
+        Args:
+            nodes: Nodes keyed by their graph names.
+            default_gotos: Manager-defined transitions.
+            max_steps: Maximum number of user-node executions in one run.
+            state_schema: Optional annotated state schema. Fields marked with
+                ``Annotated[..., AutoIncrease()]`` are combined through their
+                current value's ``__add__`` method when updated.
+        """
         self._nodes = dict(nodes)
         self._default_gotos = dict(default_gotos)
         self._max_steps = max_steps
+        self._state_schema = state_schema
+        self._auto_increase_keys = get_auto_increase_keys(
+            state_schema
+        )
         self._active_runs: set[str] = set()
         self._listener_namespace = uuid.uuid4().hex
         self._register_node_listeners()
@@ -172,7 +192,41 @@ class NodeGraph:
             raise RecursionError(f"Graph exceeded its maximum of {self._max_steps} steps.")
 
         state = copy.deepcopy(context["state"])
-        state.update(copy.deepcopy(update))
+        update = copy.deepcopy(update)
+
+        for key, value in update.items():
+            if isinstance(value, Replace):
+                state[key] = value.value
+            elif (
+                key in self._auto_increase_keys
+                and key in state
+            ):
+                current_value = state[key]
+                add_method = getattr(
+                    current_value,
+                    "__add__",
+                    None,
+                )
+
+                if not callable(add_method):
+                    raise TypeError(
+                        f"State field `{key}` is marked AutoIncrease, "
+                        f"but {type(current_value).__name__} does not "
+                        "provide a callable __add__ method."
+                    )
+
+                increased_value = add_method(value)
+
+                if increased_value is NotImplemented:
+                    raise TypeError(
+                        f"State field `{key}` could not add an update "
+                        f"of type {type(value).__name__}."
+                    )
+
+                state[key] = increased_value
+            else:
+                state[key] = value
+
         next_node = command.get("goto") if "goto" in command else self._default_gotos.get(node_name, END)
         if next_node is None:
             next_node = END
