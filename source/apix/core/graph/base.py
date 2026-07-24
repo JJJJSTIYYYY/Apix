@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class AutoIncrease:
+class AutoMerge:
     """Mark an ``Annotated`` state field as auto-increasing.
 
     This class contains no runtime data. It is only metadata inspected by
@@ -26,22 +26,22 @@ class AutoIncrease:
     present in state is initialized directly from the update value.
 
     Example:
-        ``messages: Annotated[list, AutoIncrease()]``
+        ``messages: Annotated[list, AutoMerge()]``
     """
 
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class Replace:
+class Reset:
     """Explicitly replace a state field during a command update.
 
-    ``Replace`` is primarily used to bypass :class:`AutoIncrease` for one
+    ``Reset`` is primarily used to bypass :class:`AutoMerge` for one
     update. The graph unwraps it before storing the value, so the wrapper never
     becomes part of the resulting state.
 
     Example:
-        ``Command(update={"messages": Replace([])})``
+        ``Command(update={"messages": Reset([])})``
     """
 
     value: Any
@@ -50,13 +50,13 @@ class Replace:
 def get_auto_increase_keys(
     state_schema: type | None,
 ) -> frozenset[str]:
-    """Return fields marked with :class:`AutoIncrease` in a state schema.
+    """Return fields marked with :class:`AutoMerge` in a state schema.
 
     ``state_schema`` is normally a ``TypedDict`` class. Regular annotated
     classes are also accepted because only their resolved type hints are
     inspected.
 
-    Both ``AutoIncrease`` and ``AutoIncrease()`` metadata forms are supported.
+    Both ``AutoMerge`` and ``AutoMerge()`` metadata forms are supported.
 
     Args:
         state_schema:
@@ -89,8 +89,8 @@ def get_auto_increase_keys(
         if (
             get_origin(annotation) is Annotated
             and any(
-                marker is AutoIncrease
-                or isinstance(marker, AutoIncrease)
+                marker is AutoMerge
+                or isinstance(marker, AutoMerge)
                 for marker in get_args(annotation)[1:]
             )
         )
@@ -109,9 +109,9 @@ class Command(TypedDict):
     Attributes:
         update:
             Values merged into the state carried by the next event.
-            Wrapping a value in :class:`Replace` explicitly replaces that
+            Wrapping a value in :class:`Reset` explicitly replaces that
             field even when its state annotation contains
-            :class:`AutoIncrease`.
+            :class:`AutoMerge`.
         goto:
             The next node name. ``None`` explicitly routes to ``END``;
             omitting this key permits a manager-defined default transition.

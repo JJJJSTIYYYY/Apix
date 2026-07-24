@@ -14,7 +14,7 @@ from apix.agent.sdk.utils.message import (
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.core.graph import (
-    AutoIncrease,
+    AutoMerge,
     START,
     Command,
     GraphManager,
@@ -41,8 +41,8 @@ async def stop_event_loop_after_module():
 class AgentState(TypedDict, total=False):
     """State schema used by the complete agent-tool graph."""
 
-    messages: Annotated[list[Any], AutoIncrease()]
-    audit: Annotated[list[str], AutoIncrease()]
+    messages: Annotated[list[Any], AutoMerge()]
+    audit: Annotated[list[str], AutoMerge()]
     winner: str
     observed: dict[str, Any]
     route: str

@@ -26,7 +26,7 @@ class GraphManager:
         Args:
             state_schema:
                 Optional annotated state schema. ``NodeGraph`` uses it to
-                discover fields marked with ``AutoIncrease``. Omitting it
+                discover fields marked with ``AutoMerge``. Omitting it
                 preserves normal dictionary overwrite behaviour.
         """
         self._state_schema = state_schema

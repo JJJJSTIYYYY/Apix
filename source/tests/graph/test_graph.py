@@ -10,14 +10,14 @@ from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.common.type.exception import InvalidNodeReturns
 from apix.core.graph import (
-    AutoIncrease,
+    AutoMerge,
     END,
     START,
     Command,
     GraphManager,
     Node,
     NodeGraph,
-    Replace,
+    Reset,
 )
 
 
@@ -66,7 +66,7 @@ async def test_node_update_is_carried_to_end():
 class AccumulatingState(TypedDict):
     """Graph state containing additive and replacement fields."""
 
-    messages: Annotated[list[str], AutoIncrease()]
+    messages: Annotated[list[str], AutoMerge()]
     status: str
 
 
@@ -139,11 +139,11 @@ async def test_empty_command_list_is_a_noop_and_uses_default_route():
 
 
 async def test_replace_explicitly_overwrites_auto_increase_field():
-    """A node can bypass AutoIncrease for one Command update."""
+    """A node can bypass AutoMerge for one Command update."""
     def replace_messages(state):
         return Command(
             update={
-                "messages": Replace(["replacement"]),
+                "messages": Reset(["replacement"]),
             }
         )
 

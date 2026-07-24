@@ -6,11 +6,11 @@ from typing import Annotated, TypedDict
 import pytest
 
 from apix.core.graph import (
-    AutoIncrease,
+    AutoMerge,
     END,
     START,
     NodeGraph,
-    Replace,
+    Reset,
 )
 
 
@@ -38,11 +38,11 @@ def test_apply_command_rejects_non_string_goto():
         graph.apply_command({"goto": 1}, START, _graph_context())
 
 
-class AutoIncreaseState(TypedDict):
+class AutoMergeState(TypedDict):
     """State schema used to exercise annotated update behaviour."""
 
-    values: Annotated[list[int], AutoIncrease()]
-    total: Annotated[int, AutoIncrease]
+    values: Annotated[list[int], AutoMerge()]
+    total: Annotated[int, AutoMerge]
     replaced: list[int]
 
 
@@ -51,7 +51,7 @@ def test_apply_command_auto_increases_annotated_fields():
     graph = NodeGraph(
         {},
         {START: END},
-        state_schema=AutoIncreaseState,
+        state_schema=AutoMergeState,
     )
     context = _graph_context(
         {
@@ -91,7 +91,7 @@ def test_apply_command_initializes_missing_auto_increase_field():
     graph = NodeGraph(
         {},
         {START: END},
-        state_schema=AutoIncreaseState,
+        state_schema=AutoMergeState,
     )
 
     state, _ = graph.apply_command(
@@ -104,11 +104,11 @@ def test_apply_command_initializes_missing_auto_increase_field():
 
 
 def test_replace_bypasses_auto_increase_and_is_unwrapped():
-    """Replace forces assignment for both marked and ordinary fields."""
+    """Reset forces assignment for both marked and ordinary fields."""
     graph = NodeGraph(
         {},
         {START: END},
-        state_schema=AutoIncreaseState,
+        state_schema=AutoMergeState,
     )
     context = _graph_context(
         {
@@ -120,8 +120,8 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
     state, _ = graph.apply_command(
         {
             "update": {
-                "values": Replace([3]),
-                "replaced": Replace([4]),
+                "values": Reset([3]),
+                "replaced": Reset([4]),
             }
         },
         START,
@@ -139,15 +139,15 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
 
 
 def test_replace_initializes_missing_auto_increase_field():
-    """Replace is also unwrapped when the marked field has no old value."""
+    """Reset is also unwrapped when the marked field has no old value."""
     graph = NodeGraph(
         {},
         {START: END},
-        state_schema=AutoIncreaseState,
+        state_schema=AutoMergeState,
     )
 
     state, _ = graph.apply_command(
-        {"update": {"values": Replace([1])}},
+        {"update": {"values": Reset([1])}},
         START,
         _graph_context(),
     )

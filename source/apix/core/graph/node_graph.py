@@ -12,7 +12,7 @@ from apix.core.graph.base import (
     END,
     START,
     Command,
-    Replace,
+    Reset,
     get_auto_increase_keys,
 )
 from apix.core.graph.node import BaseNode
@@ -48,7 +48,7 @@ class NodeGraph:
             default_gotos: Manager-defined transitions.
             max_steps: Maximum number of user-node executions in one run.
             state_schema: Optional annotated state schema. Fields marked with
-                ``Annotated[..., AutoIncrease()]`` are combined through their
+                ``Annotated[..., AutoMerge()]`` are combined through their
                 current value's ``__add__`` method when updated.
         """
         self._nodes = dict(nodes)
@@ -215,7 +215,7 @@ class NodeGraph:
         update = copy.deepcopy(update)
 
         for key, value in update.items():
-            if isinstance(value, Replace):
+            if isinstance(value, Reset):
                 state[key] = value.value
             elif (
                 key in self._auto_increase_keys
@@ -230,7 +230,7 @@ class NodeGraph:
 
                 if not callable(add_method):
                     raise TypeError(
-                        f"State field `{key}` is marked AutoIncrease, "
+                        f"State field `{key}` is marked AutoMerge, "
                         f"but {type(current_value).__name__} does not "
                         "provide a callable __add__ method."
                     )

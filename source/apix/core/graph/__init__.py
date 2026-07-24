@@ -1,18 +1,18 @@
 from apix.core.graph.base import (
     END,
     START,
-    AutoIncrease,
+    AutoMerge,
     Command,
     NodeFunction,
     NodeResult,
-    Replace,
+    Reset,
 )
 from apix.core.graph.graph_manager import GraphManager
 from apix.core.graph.node import Node, BaseNode
 from apix.core.graph.node_graph import NodeGraph
 
 __all__ = [
-    "AutoIncrease",
+    "AutoMerge",
     "BaseNode",
     "Command",
     "END",
@@ -21,7 +21,7 @@ __all__ = [
     "NodeFunction",
     "NodeResult",
     "NodeGraph",
-    "Replace",
+    "Reset",
     "START",
 ]
 """Public API for APIX's event-driven graph execution module."""

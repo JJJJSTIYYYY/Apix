@@ -48,7 +48,7 @@ def test_tool_decorator_preserves_function_name_and_metadata():
         """Direct tool."""
         return str(value)
 
-    @tool(describe="Custom description")
+    @tool(description="Custom description")
     def configured(value: int) -> str:
         return str(value)
 
@@ -60,7 +60,7 @@ def test_tool_decorator_preserves_function_name_and_metadata():
 
     assert isinstance(configured, Tool)
     assert configured.name == "configured"
-    assert configured.describe == "Custom description"
+    assert configured.description == "Custom description"
 
 
 @pytest.mark.asyncio

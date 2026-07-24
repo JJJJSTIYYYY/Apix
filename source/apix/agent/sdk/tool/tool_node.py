@@ -35,19 +35,19 @@ class Tool:
     name: str
     func: Callable[..., Awaitable[Any]]
     prompt: str
-    describe: str
+    description: str
 
     def __init__(
         self,
         func: ToolFunction,
-        describe: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Create a tool.
 
         Args:
             func: Function invoked when this tool is called.
             name: Tool name. Defaults to ``func.__name__``.
-            describe: Tool description. Defaults to the function docstring.
+            description: Tool description. Defaults to the function docstring.
 
         Raises:
             ValueError: If the function or tool name is invalid, or if more
@@ -62,9 +62,9 @@ class Tool:
         if not self.name:
             raise ValueError("A tool requires a non-empty name.")
 
-        self.describe = (
-            describe
-            if describe is not None
+        self.description = (
+            description
+            if description is not None
             else inspect.getdoc(func) or ""
         ).strip()
 
@@ -207,8 +207,7 @@ class Tool:
                 raise TypeError(
                     f"Tool {self.name!r} contains positional-only "
                     f"parameter {parameter.name!r}. Tool functions must "
-                    "accept arguments by keyword because ToolCall.args is "
-                    "a dictionary."
+                    "accept arguments by keyword."
                 )
 
     def _public_signature(self) -> inspect.Signature:
@@ -245,10 +244,14 @@ class Tool:
             f"Arguments: {signature}",
         ]
 
-        if self.describe:
-            lines.append(f"Description: {self.describe}")
+        if self.description:
+            lines.append(f"Description: {self.description}")
 
         return "\n".join(lines)
+    
+    def get_prompt(self) -> str:
+        "Get prompt about the tool, including tool name, arguments and description."
+        return self.prompt
 
     @staticmethod
     def _validate_tool_call(
@@ -421,7 +424,7 @@ class Tool:
 def tool(
     func: ToolFunction,
     *,
-    describe: str | None = None,
+    description: str | None = None,
 ) -> Tool:
     ...
 
@@ -430,7 +433,7 @@ def tool(
 def tool(
     func: None = None,
     *,
-    describe: str | None = None,
+    description: str | None = None,
 ) -> Callable[[ToolFunction], Tool]:
     ...
 
@@ -438,17 +441,17 @@ def tool(
 def tool(
     func: ToolFunction | None = None,
     *,
-    describe: str | None = None,
+    description: str | None = None,
 ) -> Tool | Callable[[ToolFunction], Tool]:
     """Wrap a regular function as a :class:`Tool`.
 
-    Both ``@tool`` and ``@tool(describe="...")`` are supported. The wrapped
+    Both ``@tool`` and ``@tool(description="...")`` are supported. The wrapped
     tool retains the original function name and metadata.
     """
     if func is None:
         return lambda wrapped: Tool(
             wrapped,
-            describe=describe,
+            description=description,
         )
 
     if not callable(func):
@@ -456,7 +459,7 @@ def tool(
 
     return Tool(
         func,
-        describe=describe,
+        description=description,
     )
 
 
