@@ -30,7 +30,7 @@ from uuid import UUID
 from apix.common.type.exception import InvalidToolArgs
 from apix.core.graph import Command, BaseNode
 from apix.agent.sdk.tool.base import ToolFunction
-from apix.agent.sdk.tool.context import ToolInjectionState, AutoInjection
+from apix.agent.sdk.tool.tool_context import ToolInjectionState, AutoInjection
 from apix.agent.sdk.utils.message import ApixAiMessage, ToolCall, ApixToolMessage
 
 

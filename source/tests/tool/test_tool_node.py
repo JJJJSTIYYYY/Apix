@@ -1,10 +1,28 @@
 """Tests for agent tool wrapping and ToolNode execution."""
 
 import asyncio
-from typing import Annotated, Literal
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
+import inspect
+from pathlib import Path
+import typing
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    NotRequired,
+    Required,
+    TypedDict,
+)
+from uuid import UUID
 
 import pytest
+from pydantic import BaseModel
 
+import apix.agent.sdk.tool.tool_node as tool_node_module
 from apix.agent.sdk.tool import (
     AutoInjection,
     Tool,
@@ -16,7 +34,57 @@ from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
 )
+from apix.common.type.exception import InvalidToolArgs
 from apix.core.graph import Command, GraphManager
+
+
+class TextUnit(Enum):
+    CELSIUS = "celsius"
+    FAHRENHEIT = "fahrenheit"
+
+
+class MixedUnit(Enum):
+    NAME = "named"
+    INDEX = 1
+
+
+class RequestPayload(TypedDict, total=False):
+    name: Required[str]
+    count: NotRequired[int]
+
+
+class OptionalPayload(TypedDict, total=False):
+    name: str
+
+
+@dataclass
+class Coordinates:
+    latitude: float
+    label: str = "unknown"
+
+
+@dataclass
+class DefaultsOnly:
+    enabled: bool = True
+
+
+class QueryModel(BaseModel):
+    query: str
+    limit: int = 10
+
+
+class InvalidSchemaModel:
+    @classmethod
+    def model_json_schema(cls):
+        return "not a schema"
+
+
+class UnknownAnnotation:
+    pass
+
+
+class DescriptionMetadata:
+    description = "Metadata description."
 
 
 def _tool_call(
@@ -299,3 +367,569 @@ def test_graph_manager_accepts_tool_node_as_base_node():
     manager = GraphManager().add_node(node)
 
     assert manager._nodes[node.name] is node
+
+
+@pytest.mark.parametrize(
+    ("annotation", "expected"),
+    [
+        (Any, {}),
+        (
+            list[str],
+            {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        ),
+        (
+            set[int],
+            {
+                "type": "array",
+                "items": {"type": "integer"},
+                "uniqueItems": True,
+            },
+        ),
+        (
+            frozenset[bool],
+            {
+                "type": "array",
+                "items": {"type": "boolean"},
+                "uniqueItems": True,
+            },
+        ),
+        (
+            Sequence[float],
+            {
+                "type": "array",
+                "items": {"type": "number"},
+            },
+        ),
+        (
+            tuple[str, ...],
+            {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        ),
+        (
+            tuple[str, int],
+            {
+                "type": "array",
+                "prefixItems": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                ],
+                "minItems": 2,
+                "maxItems": 2,
+            },
+        ),
+        (typing.Tuple, {"type": "array"}),
+        (
+            Mapping[str, int],
+            {
+                "type": "object",
+                "additionalProperties": {"type": "integer"},
+            },
+        ),
+        (
+            typing.Mapping,
+            {
+                "type": "object",
+                "additionalProperties": True,
+            },
+        ),
+        (
+            typing.List,
+            {
+                "type": "array",
+                "items": {},
+            },
+        ),
+        (
+            typing.Sequence,
+            {
+                "type": "array",
+                "items": {},
+            },
+        ),
+        (list, {"type": "array"}),
+        (tuple, {"type": "array"}),
+        (Sequence, {"type": "array"}),
+        (
+            set,
+            {
+                "type": "array",
+                "uniqueItems": True,
+            },
+        ),
+        (
+            frozenset,
+            {
+                "type": "array",
+                "uniqueItems": True,
+            },
+        ),
+        (dict, {"type": "object"}),
+        (Mapping, {"type": "object"}),
+        (datetime, {"type": "string", "format": "date-time"}),
+        (date, {"type": "string", "format": "date"}),
+        (time, {"type": "string", "format": "time"}),
+        (UUID, {"type": "string", "format": "uuid"}),
+        (Path, {"type": "string"}),
+        (bytes, {"type": "string"}),
+        (bytearray, {"type": "string"}),
+        (Decimal, {"type": "number"}),
+        (
+            TextUnit,
+            {
+                "enum": ["celsius", "fahrenheit"],
+                "type": "string",
+            },
+        ),
+        (
+            MixedUnit,
+            {
+                "enum": ["named", 1],
+            },
+        ),
+        (
+            RequestPayload,
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "count": {"type": "integer"},
+                },
+                "additionalProperties": False,
+                "required": ["name"],
+            },
+        ),
+        (
+            OptionalPayload,
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+        ),
+        (
+            Coordinates,
+            {
+                "type": "object",
+                "properties": {
+                    "latitude": {"type": "number"},
+                    "label": {"type": "string"},
+                },
+                "additionalProperties": False,
+                "required": ["latitude"],
+            },
+        ),
+        (
+            DefaultsOnly,
+            {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                },
+                "additionalProperties": False,
+            },
+        ),
+        (QueryModel, QueryModel.model_json_schema()),
+        (InvalidSchemaModel, {}),
+        (UnknownAnnotation, {}),
+    ],
+)
+def test_annotation_to_json_schema_supported_types(annotation, expected):
+    """Every advertised annotation family has an explicit schema test."""
+    assert Tool._annotation_to_json_schema(annotation) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, "null"),
+        (True, "boolean"),
+        (1, "integer"),
+        (1.5, "number"),
+        ("value", "string"),
+        (object(), None),
+    ],
+)
+def test_json_type_for_literal_values(value, expected):
+    assert Tool._json_type_for_value(value) == expected
+
+
+def test_annotated_metadata_object_supplies_parameter_description():
+    schema = Tool._annotation_to_json_schema(
+        Annotated[str, DescriptionMetadata()]
+    )
+
+    assert schema == {
+        "type": "string",
+        "description": "Metadata description.",
+    }
+
+
+def test_annotated_without_description_preserves_underlying_schema():
+    assert Tool._annotation_to_json_schema(
+        Annotated[int, object()]
+    ) == {"type": "integer"}
+    assert Tool._metadata_description((object(),)) is None
+
+
+def test_heterogeneous_literal_and_recursive_guard_are_unconstrained():
+    assert Tool._annotation_to_json_schema(
+        Literal["name", 1]
+    ) == {
+        "enum": ["name", 1],
+    }
+    assert Tool._annotation_to_json_schema(
+        str,
+        seen=frozenset({id(str)}),
+    ) == {}
+
+
+def test_non_json_default_is_omitted_from_schema():
+    sentinel = object()
+
+    def opaque(value: object = sentinel):
+        return value
+
+    wrapped = Tool(opaque)
+    value_schema = (
+        wrapped.schema["function"]["parameters"]["properties"]["value"]
+    )
+
+    assert value_schema == {}
+    assert Tool._json_default(sentinel) is inspect.Signature.empty
+
+
+@pytest.mark.parametrize("invalid_func", [None, 1, "not callable"])
+def test_tool_rejects_non_callable_values(invalid_func):
+    with pytest.raises(ValueError, match="requires a callable"):
+        Tool(invalid_func)
+
+
+def test_tool_rejects_callable_without_a_name():
+    class CallableWithoutName:
+        def __call__(self):
+            return None
+
+    with pytest.raises(ValueError, match="non-empty name"):
+        Tool(CallableWithoutName())
+
+
+def test_unresolved_forward_reference_falls_back_to_unconstrained_schema():
+    def unresolved(value: "TypeThatDoesNotExist"):
+        return value
+
+    wrapped = Tool(unresolved)
+
+    assert wrapped._type_hints == {}
+    assert (
+        wrapped.schema["function"]["parameters"]["properties"]["value"]
+        == {}
+    )
+
+
+def test_auto_injection_rejects_unsupported_value_type():
+    def invalid(runtime: Annotated[int, AutoInjection()]):
+        return runtime
+
+    with pytest.raises(TypeError, match="only supports ToolInjectionState"):
+        Tool(invalid)
+
+
+def test_parse_injection_handles_malformed_annotated_metadata(monkeypatch):
+    """A defensive empty-args branch remains safe for malformed metadata."""
+    malformed = object()
+    original_get_origin = tool_node_module.get_origin
+    original_get_args = tool_node_module.get_args
+
+    monkeypatch.setattr(
+        tool_node_module,
+        "get_origin",
+        lambda annotation: (
+            Annotated
+            if annotation is malformed
+            else original_get_origin(annotation)
+        ),
+    )
+    monkeypatch.setattr(
+        tool_node_module,
+        "get_args",
+        lambda annotation: (
+            ()
+            if annotation is malformed
+            else original_get_args(annotation)
+        ),
+    )
+
+    assert Tool._parse_injection_annotation(malformed) is None
+
+
+def test_tool_rejects_multiple_injected_parameters():
+    Injection = Annotated[ToolInjectionState, AutoInjection]
+
+    def duplicate(first: Injection, second: Injection):
+        return first, second
+
+    with pytest.raises(ValueError, match="at most one"):
+        Tool(duplicate)
+
+
+def test_injected_parameter_must_be_keyword_capable():
+    Injection = Annotated[ToolInjectionState, AutoInjection()]
+
+    def invalid(*runtime: Injection):
+        return runtime
+
+    with pytest.raises(TypeError, match="normal or keyword-only"):
+        Tool(invalid)
+
+
+def test_tool_rejects_positional_only_parameter():
+    def positional(value, /):
+        return value
+
+    with pytest.raises(TypeError, match="positional-only"):
+        Tool(positional)
+
+
+def test_tool_decorator_rejects_non_callable_value():
+    with pytest.raises(TypeError, match="requires a callable"):
+        tool(123)
+
+
+@pytest.mark.asyncio
+async def test_tool_execute_injects_state_and_applies_defaults():
+    observed = {}
+
+    @tool
+    def inspect_runtime(
+        value: str = "default",
+        *,
+        runtime: Annotated[
+            ToolInjectionState,
+            AutoInjection(),
+        ],
+    ) -> str:
+        observed["value"] = value
+        observed["state"] = runtime.state
+        observed["call"] = runtime.tool_call
+        return runtime.tool_call_id
+
+    state = {"value": 3}
+    call = _tool_call("inspect_runtime", "call-runtime")
+    result = await inspect_runtime.execute(state, call)
+
+    assert result == "call-runtime"
+    assert observed == {
+        "value": "default",
+        "state": state,
+        "call": call,
+    }
+
+    with pytest.raises(TypeError, match="automatically injected"):
+        await inspect_runtime.execute(
+            state,
+            _tool_call(
+                "inspect_runtime",
+                "call-invalid-injection",
+                {"runtime": "user supplied"},
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_tool_execute_validates_state_name_and_bound_arguments():
+    @tool
+    def required(value: str):
+        return value
+
+    with pytest.raises(TypeError, match="state must be"):
+        await required.execute(
+            [],
+            _tool_call("required", "call-state", {"value": "ok"}),
+        )
+
+    with pytest.raises(ValueError, match="targets 'other'"):
+        await required.execute(
+            {},
+            _tool_call("other", "call-name", {"value": "ok"}),
+        )
+
+    with pytest.raises(InvalidToolArgs, match="Invalid arguments"):
+        await required.execute(
+            {},
+            _tool_call("required", "call-args"),
+        )
+
+
+@pytest.mark.parametrize(
+    ("tool_call", "error", "match"),
+    [
+        ([], TypeError, "compatible dictionary"),
+        ({}, ValueError, "missing required fields"),
+        (
+            {"call_id": "", "tool_name": "tool", "args": {}},
+            TypeError,
+            "call_id",
+        ),
+        (
+            {"call_id": 1, "tool_name": "tool", "args": {}},
+            TypeError,
+            "call_id",
+        ),
+        (
+            {"call_id": "id", "tool_name": "", "args": {}},
+            TypeError,
+            "tool_name",
+        ),
+        (
+            {"call_id": "id", "tool_name": 1, "args": {}},
+            TypeError,
+            "tool_name",
+        ),
+        (
+            {"call_id": "id", "tool_name": "tool", "args": []},
+            TypeError,
+            "args",
+        ),
+    ],
+)
+def test_validate_tool_call_rejects_invalid_shapes(tool_call, error, match):
+    with pytest.raises(error, match=match):
+        Tool._validate_tool_call(tool_call)
+
+
+@pytest.mark.parametrize("name", ["", None, 1])
+def test_tool_node_rejects_invalid_name(name):
+    with pytest.raises(ValueError, match="requires a name"):
+        ToolNode(lambda: None, name=name)
+
+
+@pytest.mark.parametrize("message_key", ["", None, 1])
+def test_tool_node_rejects_invalid_message_key(message_key):
+    with pytest.raises(ValueError, match="message key"):
+        ToolNode(lambda: None, message_key=message_key)
+
+
+def test_tool_node_rejects_invalid_and_duplicate_tools():
+    with pytest.raises(ValueError, match="Tool objects or callable"):
+        ToolNode([object()])
+
+    @tool
+    def duplicate():
+        return None
+
+    with pytest.raises(ValueError, match="already registered"):
+        ToolNode([duplicate, duplicate])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        {},
+        {"call_id": "id", "tool_name": "tool"},
+        {"call_id": "", "tool_name": "tool", "args": {}},
+        {"call_id": 1, "tool_name": "tool", "args": {}},
+        {"call_id": "id", "tool_name": "", "args": {}},
+        {"call_id": "id", "tool_name": 1, "args": {}},
+        {"call_id": "id", "tool_name": "tool", "args": []},
+    ],
+)
+def test_tool_node_tool_call_type_guard_rejects_invalid_values(value):
+    assert ToolNode._is_tool_call(value) is False
+
+
+def test_tool_node_tool_call_list_guard_checks_container_and_items():
+    valid = _tool_call("tool", "call")
+
+    assert ToolNode._is_tool_call(valid) is True
+    assert ToolNode._is_tool_call_list("not a list") is False
+    assert ToolNode._is_tool_call_list([valid, {}]) is False
+    assert ToolNode._is_tool_call_list([valid]) is True
+
+
+def test_normalise_command_covers_empty_non_string_update_and_goto_only():
+    node = ToolNode(lambda: None)
+    call = _tool_call("<lambda>", "call-normalise")
+    existing_message = ApixToolMessage(
+        content="existing",
+        tool_call_id="existing-call",
+    )
+
+    assert node._normalise_tool_result(Command(), call) == {}
+    assert node._normalise_tool_result(
+        Command(update={"messages": [existing_message], "value": 1}),
+        call,
+    ) == {
+        "update": {
+            "messages": [existing_message],
+            "value": 1,
+        }
+    }
+    assert node._normalise_tool_result(
+        Command(goto=None),
+        call,
+    ) == {"goto": None}
+
+
+@pytest.mark.asyncio
+async def test_tool_node_execute_rejects_invalid_state_and_messages():
+    node = ToolNode(lambda: None)
+
+    with pytest.raises(TypeError, match="state must be"):
+        await node.execute([])
+
+    with pytest.raises(ValueError, match="must be a message list"):
+        await node.execute({"messages": "invalid"})
+
+    with pytest.raises(TypeError, match="must be a list of valid"):
+        await node.execute(
+            {
+                "messages": [
+                    ApixAiMessage(tool_calls=[{}]),
+                ]
+            }
+        )
+
+
+@pytest.mark.asyncio
+async def test_tool_node_cancels_sibling_tasks_after_failure():
+    blocker_started = asyncio.Event()
+    blocker_cancelled = asyncio.Event()
+    never_finishes = asyncio.Event()
+
+    @tool
+    async def failing() -> str:
+        await blocker_started.wait()
+        raise RuntimeError("expected failure")
+
+    @tool
+    async def blocking() -> str:
+        blocker_started.set()
+        try:
+            await never_finishes.wait()
+        except asyncio.CancelledError:
+            blocker_cancelled.set()
+            raise
+        return "unreachable"
+
+    node = ToolNode([failing, blocking])
+
+    with pytest.raises(RuntimeError, match="expected failure"):
+        await asyncio.wait_for(
+            node.execute(
+                _state_with_calls(
+                    _tool_call("failing", "call-failing"),
+                    _tool_call("blocking", "call-blocking"),
+                )
+            ),
+            timeout=1,
+        )
+
+    assert blocker_cancelled.is_set()

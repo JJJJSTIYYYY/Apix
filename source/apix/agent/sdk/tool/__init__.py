@@ -1,4 +1,4 @@
-from apix.agent.sdk.tool.context import (
+from apix.agent.sdk.tool.tool_context import (
     AutoInjection,
     ToolInjectionState,
 )

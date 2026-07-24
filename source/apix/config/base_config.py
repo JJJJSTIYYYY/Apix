@@ -122,3 +122,4 @@ MYSQL_CHARSET = _config.get('MYSQL_CHARSET', "utf8mb4")
 AUTO_COMMIT = _config.get('AUTO_COMMIT', True)
 
 PROVIDER_BASE_URL = _config.get('PROVIDER_BASE_URL', _PROVIDER_BASE_URL)
+LLM_MAX_RETRY = _config.get('LLM_MAX_RETRY', 3)
