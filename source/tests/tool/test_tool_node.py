@@ -1,10 +1,17 @@
 """Tests for agent tool wrapping and ToolNode execution."""
 
 import asyncio
+from typing import Annotated, Literal
 
 import pytest
 
-from apix.agent.sdk.tool import Tool, ToolNode, tool
+from apix.agent.sdk.tool import (
+    AutoInjection,
+    Tool,
+    ToolInjectionState,
+    ToolNode,
+    tool,
+)
 from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
@@ -61,6 +68,92 @@ def test_tool_decorator_preserves_function_name_and_metadata():
     assert isinstance(configured, Tool)
     assert configured.name == "configured"
     assert configured.description == "Custom description"
+
+
+def test_tool_builds_openai_function_calling_schema():
+    """Tool annotations become a native Chat Completions tool definition."""
+    @tool(description="Get the weather forecast.")
+    def weather(
+        location: Annotated[str, "City and country."],
+        days: int,
+        runtime: Annotated[
+            ToolInjectionState,
+            AutoInjection(),
+        ],
+        units: Literal["celsius", "fahrenheit"] = "celsius",
+        options: dict[str, bool] | None = None,
+    ) -> str:
+        return location
+
+    assert weather.schema == {
+        "type": "function",
+        "function": {
+            "name": "weather",
+            "description": "Get the weather forecast.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "City and country.",
+                    },
+                    "days": {"type": "integer"},
+                    "units": {
+                        "enum": ["celsius", "fahrenheit"],
+                        "type": "string",
+                        "default": "celsius",
+                    },
+                    "options": {
+                        "anyOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "boolean",
+                                },
+                            },
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
+                },
+                "required": ["location", "days"],
+                "additionalProperties": False,
+            },
+        },
+    }
+    assert "runtime" not in (
+        weather.schema["function"]["parameters"]["properties"]
+    )
+    assert not hasattr(weather, "prompt")
+
+
+def test_tool_schema_accessors_return_independent_copies_in_order():
+    """Callers can safely pass and mutate schemas without changing tools."""
+    @tool
+    def first(value: str) -> str:
+        return value
+
+    @tool
+    def second(count: int = 1) -> str:
+        return str(count)
+
+    schema = first.get_schema()
+    schema["function"]["name"] = "changed"
+
+    assert first.schema["function"]["name"] == "first"
+    assert [
+        item["function"]["name"]
+        for item in ToolNode([first, second]).get_schemas()
+    ] == ["first", "second"]
+
+
+def test_tool_rejects_variadic_parameters_not_supported_by_json_schema():
+    """Function Calling requires explicitly named model arguments."""
+    def variadic(*values: str) -> str:
+        return ",".join(values)
+
+    with pytest.raises(TypeError, match="variadic parameter"):
+        Tool(variadic)
 
 
 @pytest.mark.asyncio

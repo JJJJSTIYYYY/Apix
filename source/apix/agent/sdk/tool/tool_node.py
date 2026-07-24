@@ -1,17 +1,31 @@
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Mapping, Sequence
+from copy import deepcopy
+from dataclasses import MISSING, fields, is_dataclass
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
 import functools
 import inspect
+import json
+from pathlib import Path
+import types
 from typing import (
     Annotated,
     Any,
     Callable,
+    Literal,
+    NotRequired,
+    Required,
     TypeGuard,
+    Union,
     get_args,
     get_origin,
     get_type_hints,
+    is_typeddict,
     overload,
 )
+from uuid import UUID
 
 from apix.common.type.exception import InvalidToolArgs
 from apix.core.graph import Command, BaseNode
@@ -21,20 +35,20 @@ from apix.agent.sdk.utils.message import ApixAiMessage, ToolCall, ApixToolMessag
 
 
 class Tool:
-    """An executable tool node.
+    """An executable tool with an OpenAI Function Calling schema.
 
     Tool functions receive arguments from ``ToolCall.args``. A function may
     declare at most one runtime-injected argument:
 
         injection: Annotated[ToolInjectionState, AutoInjection()]
 
-    The injected argument is excluded from the tool prompt and cannot be
+    The injected argument is excluded from the model-facing schema and cannot be
     supplied through ``ToolCall.args``.
     """
 
     name: str
     func: Callable[..., Awaitable[Any]]
-    prompt: str
+    schema: dict[str, Any]
     description: str
 
     def __init__(
@@ -78,7 +92,7 @@ class Tool:
 
         self._validate_signature()
 
-        self.prompt = self._build_prompt()
+        self.schema = self._build_schema()
         self.func = self._wrap_func(func)
         functools.update_wrapper(self, func)
 
@@ -209,10 +223,313 @@ class Tool:
                     f"parameter {parameter.name!r}. Tool functions must "
                     "accept arguments by keyword."
                 )
+            if parameter.kind in {
+                inspect.Parameter.VAR_POSITIONAL,
+                inspect.Parameter.VAR_KEYWORD,
+            }:
+                raise TypeError(
+                    f"Tool {self.name!r} contains variadic parameter "
+                    f"{parameter.name!r}. OpenAI Function Calling schemas "
+                    "require explicitly declared named parameters."
+                )
 
-    def _public_signature(self) -> inspect.Signature:
-        """Return the function signature visible to the model."""
-        parameters: list[inspect.Parameter] = []
+    @staticmethod
+    def _json_type_for_value(value: Any) -> str | None:
+        """Return the JSON Schema primitive type for a literal value."""
+        if value is None:
+            return "null"
+        if isinstance(value, bool):
+            return "boolean"
+        if isinstance(value, int):
+            return "integer"
+        if isinstance(value, float):
+            return "number"
+        if isinstance(value, str):
+            return "string"
+        return None
+
+    @staticmethod
+    def _metadata_description(metadata: tuple[Any, ...]) -> str | None:
+        """Read an optional parameter description from Annotated metadata."""
+        for item in metadata:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+
+            description = getattr(item, "description", None)
+            if isinstance(description, str) and description.strip():
+                return description.strip()
+
+        return None
+
+    @classmethod
+    def _annotation_to_json_schema(
+        cls,
+        annotation: Any,
+        *,
+        seen: frozenset[int] = frozenset(),
+    ) -> dict[str, Any]:
+        """Convert a Python type annotation to a JSON Schema fragment."""
+        if annotation in {
+            inspect.Signature.empty,
+            Any,
+            object,
+        }:
+            return {}
+
+        annotation_id = id(annotation)
+        if annotation_id in seen:
+            return {}
+        nested_seen = seen | {annotation_id}
+
+        origin = get_origin(annotation)
+
+        if origin is Annotated:
+            value_type, *metadata = get_args(annotation)
+            schema = cls._annotation_to_json_schema(
+                value_type,
+                seen=nested_seen,
+            )
+            description = cls._metadata_description(tuple(metadata))
+            if description:
+                schema["description"] = description
+            return schema
+
+        if origin in {Union, types.UnionType}:
+            variants = [
+                cls._annotation_to_json_schema(
+                    variant,
+                    seen=nested_seen,
+                )
+                for variant in get_args(annotation)
+            ]
+            return {"anyOf": variants}
+
+        if origin is Literal:
+            values = list(get_args(annotation))
+            schema: dict[str, Any] = {"enum": values}
+            value_types = {
+                cls._json_type_for_value(value)
+                for value in values
+            }
+            value_types.discard(None)
+            if len(value_types) == 1:
+                schema["type"] = value_types.pop()
+            return schema
+
+        if origin in {
+            list,
+            set,
+            frozenset,
+            Sequence,
+        }:
+            item_args = get_args(annotation)
+            item_annotation = item_args[0] if item_args else Any
+            schema = {
+                "type": "array",
+                "items": cls._annotation_to_json_schema(
+                    item_annotation,
+                    seen=nested_seen,
+                ),
+            }
+            if origin in {set, frozenset}:
+                schema["uniqueItems"] = True
+            return schema
+
+        if origin is tuple:
+            item_args = get_args(annotation)
+
+            if not item_args:
+                return {"type": "array"}
+
+            if (
+                len(item_args) == 2
+                and item_args[1] is Ellipsis
+            ):
+                return {
+                    "type": "array",
+                    "items": cls._annotation_to_json_schema(
+                        item_args[0],
+                        seen=nested_seen,
+                    ),
+                }
+
+            return {
+                "type": "array",
+                "prefixItems": [
+                    cls._annotation_to_json_schema(
+                        item_annotation,
+                        seen=nested_seen,
+                    )
+                    for item_annotation in item_args
+                ],
+                "minItems": len(item_args),
+                "maxItems": len(item_args),
+            }
+
+        if origin in {dict, Mapping}:
+            mapping_args = get_args(annotation)
+            value_annotation = (
+                mapping_args[1]
+                if len(mapping_args) == 2
+                else Any
+            )
+            value_schema = cls._annotation_to_json_schema(
+                value_annotation,
+                seen=nested_seen,
+            )
+            return {
+                "type": "object",
+                "additionalProperties": value_schema or True,
+            }
+
+        if annotation in {list, tuple, Sequence}:
+            return {"type": "array"}
+
+        if annotation in {set, frozenset}:
+            return {
+                "type": "array",
+                "uniqueItems": True,
+            }
+
+        if annotation in {dict, Mapping}:
+            return {"type": "object"}
+
+        primitive_types = {
+            str: "string",
+            int: "integer",
+            float: "number",
+            bool: "boolean",
+            type(None): "null",
+        }
+        if annotation in primitive_types:
+            return {"type": primitive_types[annotation]}
+
+        string_formats = {
+            datetime: "date-time",
+            date: "date",
+            time: "time",
+            UUID: "uuid",
+        }
+        if annotation in string_formats:
+            return {
+                "type": "string",
+                "format": string_formats[annotation],
+            }
+
+        if annotation in {Path, bytes, bytearray}:
+            return {"type": "string"}
+
+        if annotation is Decimal:
+            return {"type": "number"}
+
+        if (
+            inspect.isclass(annotation)
+            and issubclass(annotation, Enum)
+        ):
+            values = [member.value for member in annotation]
+            schema = {"enum": values}
+            value_types = {
+                cls._json_type_for_value(value)
+                for value in values
+            }
+            value_types.discard(None)
+            if len(value_types) == 1:
+                schema["type"] = value_types.pop()
+            return schema
+
+        if is_typeddict(annotation):
+            type_hints = get_type_hints(
+                annotation,
+                include_extras=True,
+            )
+            required_keys = set(
+                getattr(annotation, "__required_keys__", ())
+            )
+            properties: dict[str, Any] = {}
+
+            for name, value_type in type_hints.items():
+                value_origin = get_origin(value_type)
+                if value_origin in {Required, NotRequired}:
+                    value_type = get_args(value_type)[0]
+                properties[name] = cls._annotation_to_json_schema(
+                    value_type,
+                    seen=nested_seen,
+                )
+
+            schema = {
+                "type": "object",
+                "properties": properties,
+                "additionalProperties": False,
+            }
+            if required_keys:
+                schema["required"] = [
+                    name
+                    for name in properties
+                    if name in required_keys
+                ]
+            return schema
+
+        if inspect.isclass(annotation) and is_dataclass(annotation):
+            type_hints = get_type_hints(
+                annotation,
+                include_extras=True,
+            )
+            properties: dict[str, Any] = {}
+            required: list[str] = []
+
+            for data_field in fields(annotation):
+                value_type = type_hints.get(
+                    data_field.name,
+                    data_field.type,
+                )
+                properties[data_field.name] = (
+                    cls._annotation_to_json_schema(
+                        value_type,
+                        seen=nested_seen,
+                    )
+                )
+                if (
+                    data_field.default is MISSING
+                    and data_field.default_factory is MISSING
+                ):
+                    required.append(data_field.name)
+
+            schema = {
+                "type": "object",
+                "properties": properties,
+                "additionalProperties": False,
+            }
+            if required:
+                schema["required"] = required
+            return schema
+
+        model_json_schema = getattr(
+            annotation,
+            "model_json_schema",
+            None,
+        )
+        if callable(model_json_schema):
+            generated_schema = model_json_schema()
+            if isinstance(generated_schema, dict):
+                return generated_schema
+
+        # An unconstrained JSON value is more accurate than guessing a type
+        # for an annotation that JSON Schema cannot represent.
+        return {}
+
+    @staticmethod
+    def _json_default(value: Any) -> Any:
+        """Return a JSON-compatible copy of a Python default value."""
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            return inspect.Signature.empty
+        return deepcopy(value)
+
+    def _build_parameters_schema(self) -> dict[str, Any]:
+        """Build the model-visible JSON Schema for function arguments."""
+        properties: dict[str, Any] = {}
+        required: list[str] = []
 
         for parameter in self._signature.parameters.values():
             if (
@@ -222,36 +539,44 @@ class Tool:
             ):
                 continue
 
-            annotation = self._get_parameter_annotation(
-                parameter
+            annotation = self._get_parameter_annotation(parameter)
+            parameter_schema = self._annotation_to_json_schema(
+                annotation
             )
 
-            parameters.append(
-                parameter.replace(annotation=annotation)
-            )
+            if parameter.default is inspect.Signature.empty:
+                required.append(parameter.name)
+            else:
+                default = self._json_default(parameter.default)
+                if default is not inspect.Signature.empty:
+                    parameter_schema["default"] = default
 
-        return self._signature.replace(
-            parameters=parameters,
-            return_annotation=inspect.Signature.empty,
-        )
+            properties[parameter.name] = parameter_schema
 
-    def _build_prompt(self) -> str:
-        """Build a prompt using description and non-injected parameters."""
-        signature = self._public_signature()
+        parameters: dict[str, Any] = {
+            "type": "object",
+            "properties": properties,
+            "additionalProperties": False,
+        }
+        if required:
+            parameters["required"] = required
 
-        lines = [
-            f"Tool: {self.name}",
-            f"Arguments: {signature}",
-        ]
+        return parameters
 
-        if self.description:
-            lines.append(f"Description: {self.description}")
+    def _build_schema(self) -> dict[str, Any]:
+        """Build an OpenAI Chat Completions function tool definition."""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self._build_parameters_schema(),
+            },
+        }
 
-        return "\n".join(lines)
-    
-    def get_prompt(self) -> str:
-        "Get prompt about the tool, including tool name, arguments and description."
-        return self.prompt
+    def get_schema(self) -> dict[str, Any]:
+        """Return a copy safe to pass in the OpenAI ``tools`` list."""
+        return deepcopy(self.schema)
 
     @staticmethod
     def _validate_tool_call(
@@ -522,6 +847,12 @@ class ToolNode(BaseNode):
             self.tool_set.append(wrapped_tool)
             self._tools_by_name[wrapped_tool.name] = wrapped_tool
 
+    def get_schemas(self) -> list[dict[str, Any]]:
+        """Return OpenAI tool definitions in registration order."""
+        return [
+            registered_tool.get_schema()
+            for registered_tool in self.tool_set
+        ]
 
     @staticmethod
     def _is_tool_call(
