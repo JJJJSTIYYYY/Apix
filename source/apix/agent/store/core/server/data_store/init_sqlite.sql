@@ -64,7 +64,6 @@ CREATE TABLE IF NOT EXISTS messages (
     info TEXT CHECK (info IS NULL OR json_valid(info)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     msg_cursor INTEGER NOT NULL,
-    msg_timestamp INTEGER NOT NULL DEFAULT 0,
     is_deleted INTEGER NOT NULL DEFAULT 0,
     UNIQUE (conversation_id, msg_cursor),
     FOREIGN KEY (user_uid) REFERENCES users(user_uid) ON DELETE CASCADE,
@@ -77,8 +76,6 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_node
     ON messages(conversation_id, node_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_parent
     ON messages(conversation_id, parent_id);
-CREATE INDEX IF NOT EXISTS idx_messages_conversation_timestamp
-    ON messages(conversation_id, msg_timestamp);
 
 CREATE TABLE IF NOT EXISTS rag_documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

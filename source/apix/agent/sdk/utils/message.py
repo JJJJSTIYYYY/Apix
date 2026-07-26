@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, TypeAlias, TypedDict
 from uuid import uuid4
 
-from apix.common.type.exception import ChunkMergeError, IncompleteToolCallError
+from apix.common.type import ChunkMergeError, IncompleteToolCallError
 
 
 # ============================================================
@@ -17,7 +17,7 @@ MessageRole = Literal[
     "developer",
     "system",
     "user",
-    "assistant",
+    "ai",
     "tool",
     "info",
 ]
@@ -44,17 +44,6 @@ class ToolCall(TypedDict):
     call_id: str
     tool_name: str
     args: dict[str, Any] | None
-
-
-class MessageContext(TypedDict):
-    """
-    The context for a message.
-
-    Include generation id and parent node id.
-    """
-
-    generation_id: str
-    parent_id: str
 
 
 # ============================================================
@@ -87,22 +76,17 @@ class ApixMessageBase:
     name: str | None = None
 
     id: str = field(default_factory=_new_message_id)
-    node_id: str = ""
-    context: MessageContext = field(default_factory=lambda: {
-        "generation_id": "",
-        "parent_id": ""
-    })
 
     timestamp: str = field(default_factory=_utc_now_iso)
 
-    info: dict[str, Any] = field(default_factory=dict)
-    extra: dict[str, Any] = field(default_factory=dict)
+    info: dict[str, Any] = field(default_factory=dict) # Message information, usually contains name, token usage, duration and provider information.
+    extra: dict[str, Any] = field(default_factory=dict) # Extra but important information, usually contains info such as raw tool calls for an ai message, upload files meta in user message and so on.
 
 
 @dataclass(slots=True, kw_only=True)
 class ApixAiMessage(ApixMessageBase):
-    role: Literal["assistant"] = field(
-        default="assistant",
+    role: Literal["ai"] = field(
+        default="ai",
         init=False,
     )
 
@@ -157,23 +141,6 @@ class ApixToolMessage(ApixMessageBase):
 class ApixUserMessage(ApixMessageBase):
     role: Literal["user"] = field(
         default="user",
-        init=False,
-    )
-
-    content: str | list[ContentPart] = ""
-
-
-@dataclass(slots=True, kw_only=True)
-class ApixInfoMessage(ApixMessageBase):
-    """
-    Internal message.
-
-    This role should normally be filtered out before sending messages
-    to an external model provider.
-    """
-
-    role: Literal["info"] = field(
-        default="info",
         init=False,
     )
 
@@ -360,8 +327,8 @@ class ApixAiMessageChunk:
     Neither chunk1 nor chunk2 is modified.
     """
 
-    role: Literal["assistant"] = field(
-        default="assistant",
+    role: Literal["ai"] = field(
+        default="ai",
         init=False,
     )
 
@@ -379,11 +346,6 @@ class ApixAiMessageChunk:
     # generated ID would cause every chunk to appear to belong to a different
     # message.
     id: str = ""
-    node_id: str = ""
-    context: MessageContext = field(default_factory=lambda: {
-        "generation_id": "",
-        "parent_id": ""
-    })
 
     name: str | None = None
 
@@ -426,23 +388,6 @@ class ApixAiMessageChunk:
                 self.id,
                 other.id,
             ),
-            node_id=_merge_identity(
-                "node_id",
-                self.node_id,
-                other.node_id,
-            ),
-            context={
-                "ggeneration_ide": _merge_identity(
-                    "generation_id",
-                    self.context.generation_id,
-                    other.context.generation_id,
-                ),
-                "parent_id": _merge_identity(
-                    "parent_id",
-                    self.context.parent_id,
-                    other.context.parent_id,
-                ),
-            },
             name=_merge_optional_identity(
                 "name",
                 self.name,
@@ -501,8 +446,6 @@ class ApixAiMessageChunk:
             content=self.content_delta or None,
             name=self.name,
             id=self.id or _new_message_id(),
-            node_id=self.node_id,
-            context=self.context,
             timestamp=(
                 self.timestamp
                 or _utc_now_iso()
@@ -620,7 +563,6 @@ CompleteMessage: TypeAlias = (
     | ApixAiMessage
     | ApixToolMessage
     | ApixSystemMessage
-    | ApixInfoMessage
     | ApixDeveloperMessage
 )
 

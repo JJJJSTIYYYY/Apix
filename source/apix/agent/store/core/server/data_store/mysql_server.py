@@ -359,14 +359,14 @@ class MysqlService(DataServerBase):
 
     async def append_message(self, payload: dict) -> dict:
         """
-        Persist a peice of message. Call procedure append_message.
-        If len of messages list in payload is over one piece, only append the last one.
+        Persist a message. Call procedure append_message.
 
         Args:
             payload: Dict, the format is {
                 "user_uid": user id,
                 "conversation_uid": conversation id,
-                "messages": {
+                "message": {
+                    "generation_id": str,
                     "role": 'user', 'ai', 'system', 'tool', 'info'
                     "content": "message content",
                     "think": "",
@@ -380,7 +380,6 @@ class MysqlService(DataServerBase):
                     }, 
                     "node_id": str,
                     "parent_id": str,
-                    "timestamp": int,
                 }
             }
 
@@ -394,20 +393,19 @@ class MysqlService(DataServerBase):
         try:
             user_uid = payload["user_uid"]
             conversation_uid = payload["conversation_uid"]
-            messages = payload["messages"]
+            message = payload["message"]
             
-            if not messages:
-                raise ValueError("Messages list is empty")
+            if not message:
+                raise ValueError("Messages is empty")
             
-            role = messages["role"]
-            content = messages["content"]
-            think = messages.get("think", "")
-            extra = messages.get("extra", {})
-            info = messages.get("info", {})
-            generation_id = messages.get("generation_id", "")
-            node_id = messages.get("node_id", "")
-            parent_id = messages.get("parent_id", "")
-            timestamp = messages["timestamp"]
+            role = message["role"]
+            content = message["content"]
+            think = message.get("think", "")
+            extra = message.get("extra", {})
+            info = message.get("info", {})
+            generation_id = message.get("generation_id", "")
+            node_id = message.get("node_id", "")
+            parent_id = message.get("parent_id", "")
 
             if extra is None:
                 extra = {}
@@ -419,12 +417,9 @@ class MysqlService(DataServerBase):
             if not isinstance(info, str):
                 info = json.dumps(info, ensure_ascii=False)
 
-            if not timestamp:
-                raise ValueError("Message timestamp is empty")
-                
             result = await self._call_procedure(
                 "append_message", 
-                (user_uid, conversation_uid, role, content, think, extra, info, generation_id, node_id, parent_id, timestamp)
+                (user_uid, conversation_uid, role, content, think, extra, info, generation_id, node_id, parent_id)
             )
             cursor =  result[0].get("msg_cursor", -1)
             created_at = result[0].get("created_at")

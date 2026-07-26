@@ -2,7 +2,7 @@
 
 import pytest
 
-from apix.common.type.exception import InvalidNodeReturns
+from apix.common.type import InvalidNodeReturns
 from apix.core.graph import Command, Node
 
 

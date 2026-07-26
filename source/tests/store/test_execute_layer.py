@@ -658,7 +658,7 @@ def test_build_visible_messages_skips_duplicate_branch_parents(monkeypatch):
     [
         (
             "get_messages",
-            ("user", "ai", "system", "tool"),
+            ("user", "ai", "system", "tool", "info"),
             False,
         ),
         ("get_messages_for_user", ("user", "ai", "info"), True),

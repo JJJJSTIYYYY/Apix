@@ -3,6 +3,7 @@ from collections.abc import Awaitable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import MISSING, fields, is_dataclass
 from datetime import date, datetime, time
+import time as time_module
 from decimal import Decimal
 from enum import Enum
 import functools
@@ -27,10 +28,11 @@ from typing import (
 )
 from uuid import UUID
 
-from apix.common.type.exception import InvalidToolArgs
+from apix.agent.sdk.utils.funcs import timer
+from apix.common.type import InvalidToolArgs
 from apix.core.graph import Command, BaseNode
 from apix.agent.sdk.tool.base import ToolFunction
-from apix.agent.sdk.tool.tool_context import ToolInjectionState, AutoInjection
+from apix.agent.sdk.tool.tool_context import ToolInjectionContext, AutoInjection
 from apix.agent.sdk.utils.message import ApixAiMessage, ToolCall, ApixToolMessage
 
 
@@ -40,7 +42,7 @@ class Tool:
     Tool functions receive arguments from ``ToolCall.args``. A function may
     declare at most one runtime-injected argument:
 
-        injection: Annotated[ToolInjectionState, AutoInjection()]
+        injection: Annotated[ToolInjectionContext, AutoInjection()]
 
     The injected argument is excluded from the model-facing schema and cannot be
     supplied through ``ToolCall.args``.
@@ -125,12 +127,12 @@ class Tool:
     @staticmethod
     def _parse_injection_annotation(
         annotation: Any,
-    ) -> type[ToolInjectionState] | None:
-        """Return ToolInjectionState when annotation is auto-injected.
+    ) -> type[ToolInjectionContext] | None:
+        """Return ToolInjectionContext when annotation is auto-injected.
 
         Supported form:
 
-            Annotated[ToolInjectionState, AutoInjection()]
+            Annotated[ToolInjectionContext, AutoInjection()]
         """
         if get_origin(annotation) is not Annotated:
             return None
@@ -150,9 +152,9 @@ class Tool:
         if not has_auto_injection:
             return None
 
-        if value_type is not ToolInjectionState:
+        if value_type is not ToolInjectionContext:
             raise TypeError(
-                "Tool node only supports ToolInjectionState."f"got {value_type.__name__}"
+                "Tool node only supports ToolInjectionContext."f"got {value_type.__name__}"
             )
 
         return value_type
@@ -168,13 +170,13 @@ class Tool:
 
         return (
             self._parse_injection_annotation(annotation)
-            is ToolInjectionState
+            is ToolInjectionContext
         )
 
     def _find_injection_parameter(
         self,
     ) -> inspect.Parameter | None:
-        """Find the optional ToolInjectionState parameter.
+        """Find the optional ToolInjectionContext parameter.
 
         Raises:
             ValueError: If more than one injection parameter is declared.
@@ -193,7 +195,7 @@ class Tool:
 
             raise ValueError(
                 f"Tool {self.name!r} may declare at most one "
-                "ToolInjectionState parameter, "
+                "ToolInjectionContext parameter, "
                 f"but found: {parameter_names}."
             )
 
@@ -649,7 +651,7 @@ class Tool:
                 "must not be supplied through ToolCall.args."
             )
 
-        arguments[injection_name] = ToolInjectionState(
+        arguments[injection_name] = ToolInjectionContext(
             state=state,
             tool_call=tool_call,
         )
@@ -907,11 +909,17 @@ class ToolNode(BaseNode):
     def _make_tool_message(
         content: str,
         tool_call: ToolCall,
+        duration: int = 0
     ) -> ApixToolMessage:
         """Create the message corresponding to one completed tool call."""
         return ApixToolMessage(
             content=content,
             name=tool_call["tool_name"],
+            info={
+                "name": tool_call["tool_name"],
+                "tool_call_id": tool_call["call_id"],
+                "duration": duration
+            },
             tool_call_id=tool_call["call_id"],
         )
 
@@ -920,6 +928,7 @@ class ToolNode(BaseNode):
         self,
         result: Any,
         tool_call: ToolCall,
+        duration: int = 0
     ) -> Command:
         """Convert one raw tool result into exactly one command."""
         if not self._is_command(result):
@@ -929,6 +938,7 @@ class ToolNode(BaseNode):
                         self._make_tool_message(
                             str(result),
                             tool_call,
+                            duration=duration
                         )
                     ]
                 }
@@ -945,8 +955,11 @@ class ToolNode(BaseNode):
                     self._make_tool_message(
                         message_update,
                         tool_call,
+                        duration=duration
                     )
                 ]
+            else:
+                update[self.message_key] 
 
             command["update"] = update
 
@@ -962,15 +975,17 @@ class ToolNode(BaseNode):
         tool_call: ToolCall,
     ) -> Command:
         """Execute and normalise one validated tool call."""
-        selected_tool = self._tools_by_name[tool_call["tool_name"]]
-        result = await selected_tool.execute(
-            state,
-            tool_call,
-        )
-        return self._normalise_tool_result(
-            result,
-            tool_call,
-        )
+        with timer(name="ToolExecution") as start:
+            selected_tool = self._tools_by_name[tool_call["tool_name"]]
+            result = await selected_tool.execute(
+                state,
+                tool_call,
+            )
+            return self._normalise_tool_result(
+                result,
+                tool_call,
+                duration = time_module.perf_counter() - start
+            )
 
 
     async def execute(

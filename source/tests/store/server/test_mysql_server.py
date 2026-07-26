@@ -189,10 +189,9 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
         "generation_id": "g-1",
         "node_id": "n-1",
         "parent_id": "root",
-        "timestamp": 123,
     }
     result = await service.append_message(
-        {"user_uid": "u-1", "conversation_uid": "conv-1", "messages": message}
+        {"user_uid": "u-1", "conversation_uid": "conv-1", "message": message}
     )
     assert result == {
         "success": True,
@@ -202,22 +201,16 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
     assert call.await_args.args[0] == "append_message"
     assert json.loads(params[5]) == {"x": "你好"}
     assert json.loads(params[6]) == {}
+    assert params[7:] == ("g-1", "n-1", "root")
     assert (await service.append_message(
-        {"user_uid": "u-1", "conversation_uid": "conv-1", "messages": {}}
-    ))["success"] is False
-    assert (await service.append_message(
-        {
-            "user_uid": "u-1",
-            "conversation_uid": "conv-1",
-            "messages": {"role": "user", "content": "x", "timestamp": 0},
-        }
+        {"user_uid": "u-1", "conversation_uid": "conv-1", "message": {}}
     ))["success"] is False
     call.return_value = [{"msg_cursor": -1}]
     assert (await service.append_message(
         {
             "user_uid": "u-1",
             "conversation_uid": "conv-1",
-            "messages": {"role": "user", "content": "x", "timestamp": 1},
+            "message": {"role": "user", "content": "x"},
         }
     ))["success"] is False
 

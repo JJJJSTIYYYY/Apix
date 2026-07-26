@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-from apix.agent.sdk.utils.trans_data import convert_generation_id_to_message_node_id
+from apix.agent.sdk.utils.funcs import convert_generation_id_to_message_node_id
 from apix.agent.sdk.adapter.model.base_model import BaseModel
 from apix.config.base_config import PROVIDER_BASE_URL
 

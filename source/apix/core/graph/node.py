@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from abc import ABC, abstractmethod
 from typing import Any, TypeGuard
 
-from apix.common.type.exception import InvalidNodeReturns
+from apix.common.type import InvalidNodeReturns
 from apix.core.graph.base import Command, NodeFunction
 
 

@@ -313,13 +313,9 @@ class SqliteService(DataServerBase):
         try:
             user_uid = payload["user_uid"]
             conversation_uid = payload["conversation_uid"]
-            message = payload["messages"]
+            message = payload["message"]
             if not message:
                 raise ValueError("Messages list is empty")
-
-            timestamp = message["timestamp"]
-            if not timestamp:
-                raise ValueError("Message timestamp is empty")
 
             role = message["role"]
             extra = self._json(message.get("extra"), {})
@@ -329,7 +325,7 @@ class SqliteService(DataServerBase):
                 connection.execute("BEGIN IMMEDIATE")
                 conversation = connection.execute(
                     """
-                    SELECT id, latest_cursor, latest_timestamp
+                    SELECT id, latest_cursor
                     FROM conversations
                     WHERE user_uid = ? AND conversation_uid = ?
                       AND is_deleted = 0
@@ -345,8 +341,8 @@ class SqliteService(DataServerBase):
                     INSERT INTO messages (
                         user_uid, conversation_id, conversation_uid, role,
                         content, think, extra, info, msg_cursor, generation_id,
-                        node_id, parent_id, msg_timestamp
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        node_id, parent_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_uid,
@@ -361,22 +357,18 @@ class SqliteService(DataServerBase):
                         message.get("generation_id", ""),
                         message.get("node_id", ""),
                         message.get("parent_id", ""),
-                        timestamp,
                     ),
                 )
                 connection.execute(
                     """
                     UPDATE conversations
                     SET latest_cursor = ?,
-                        latest_timestamp = MAX(COALESCE(latest_timestamp, ?), ?),
                         last_active_at = CURRENT_TIMESTAMP,
                         has_new_message = ?
                     WHERE id = ?
                     """,
                     (
                         cursor,
-                        timestamp,
-                        timestamp,
                         0 if role == "user" else 1,
                         conversation["id"],
                     ),

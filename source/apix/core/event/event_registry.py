@@ -7,7 +7,7 @@ from apix.core.event.base import (
     HandlerEntry,
     HandlerMeta,
 )
-from apix.common.type.exception import EventHandlerNotRegistered, EventHandlerAlreadyRegistered
+from apix.common.type import EventHandlerNotRegistered, EventHandlerAlreadyRegistered
 from apix.common.utils.logger import logger
 
 

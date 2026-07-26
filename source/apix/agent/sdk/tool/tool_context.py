@@ -17,7 +17,7 @@ class AutoInjection:
 
 
 @dataclass(slots=True)
-class ToolInjectionState:
+class ToolInjectionContext:
     """
     Runtime values available for automatic tool argument injection.
     """
@@ -30,5 +30,5 @@ class ToolInjectionState:
         return self.tool_call["call_id"]
     
 
-# injection: Annotated[ToolInjectionState, AutoInjection()]
-# injection: Annotated[ToolInjectionState, AutoInjection]
+# injection: Annotated[ToolInjectionContext, AutoInjection()]
+# injection: Annotated[ToolInjectionContext, AutoInjection]

@@ -128,3 +128,6 @@ class ChunkMergeError(ValueError):
 
 class IncompleteToolCallError(ValueError):
     """A streamed tool call cannot be converted into a complete tool call."""
+
+class IdentityError(ValueError):
+    """Ambiguous apix identity. Unknow user_uid, platform or conversation_uid"""

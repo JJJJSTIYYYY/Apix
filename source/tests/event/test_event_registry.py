@@ -8,7 +8,7 @@ error handling, and metadata retrieval.
 import pytest
 
 from apix.core.event.base import ApixEvent, HandlerEntry
-from apix.common.type.exception import (
+from apix.common.type import (
     EventHandlerNotRegistered,
     EventHandlerAlreadyRegistered,
 )

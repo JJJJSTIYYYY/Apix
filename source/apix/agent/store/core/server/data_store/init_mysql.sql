@@ -112,7 +112,6 @@ CREATE TABLE messages (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     msg_cursor BIGINT NOT NULL COMMENT 'Message cursor in one conversation',
-    msg_timestamp BIGINT NOT NULL DEFAULT 0,
 
     is_deleted BOOLEAN DEFAULT FALSE,
 
@@ -126,8 +125,6 @@ CREATE TABLE messages (
 
     INDEX uk_conv_node (conversation_id, node_id),
     INDEX idx_conv_parent (conversation_id, parent_id),
-
-    INDEX idx_conv_timestamp (conversation_id, msg_timestamp),
 
     CONSTRAINT fk_message_user_uid
         FOREIGN KEY (user_uid)
@@ -604,13 +601,11 @@ CREATE PROCEDURE append_message (
     IN p_info JSON,
     IN p_generation_id VARCHAR(64),
     IN p_node_id VARCHAR(32),
-    IN p_parent_id VARCHAR(32),
-    IN p_msg_timestamp BIGINT
+    IN p_parent_id VARCHAR(32)
 )
 BEGIN
     DECLARE v_conversation_id BIGINT;
     DECLARE v_next_cursor BIGINT;
-    DECLARE v_latest_timestamp BIGINT;
     DECLARE v_not_found INT DEFAULT 0;
     DECLARE v_message_id BIGINT;
 
@@ -622,12 +617,10 @@ BEGIN
     -- 1. Lock conversation row
     SELECT
         id,
-        latest_cursor,
-        latest_timestamp
+        latest_cursor
     INTO
         v_conversation_id,
-        v_next_cursor,
-        v_latest_timestamp
+        v_next_cursor
     FROM conversations
     WHERE user_uid = p_user_uid
       AND conversation_uid = p_conversation_uid
@@ -656,8 +649,7 @@ BEGIN
         msg_cursor,
         generation_id,
         node_id,
-        parent_id,
-        msg_timestamp
+        parent_id
     )
     VALUES (
         p_user_uid,
@@ -671,20 +663,15 @@ BEGIN
         v_next_cursor,
         p_generation_id,
         p_node_id,
-        p_parent_id,
-        p_msg_timestamp
+        p_parent_id
     );
 
     SET v_message_id = LAST_INSERT_ID();
 
-    -- 4. Update conversation (no strict timestamp monotonicity)
+    -- 4. Update conversation
     UPDATE conversations
     SET
         latest_cursor = v_next_cursor,
-        latest_timestamp = GREATEST(
-            IFNULL(latest_timestamp, p_msg_timestamp),
-            p_msg_timestamp
-        ),
         last_active_at = CURRENT_TIMESTAMP,
         has_new_message = IF(p_role = 'user', FALSE, TRUE)
     WHERE id = v_conversation_id;
@@ -693,7 +680,6 @@ BEGIN
     SELECT
         v_message_id AS msg_id,
         v_next_cursor AS msg_cursor,
-        p_msg_timestamp AS msg_timestamp,
         NOW() AS created_at;
 
     COMMIT;

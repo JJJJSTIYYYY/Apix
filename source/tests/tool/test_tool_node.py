@@ -26,7 +26,7 @@ import apix.agent.sdk.tool.tool_node as tool_node_module
 from apix.agent.sdk.tool import (
     AutoInjection,
     Tool,
-    ToolInjectionState,
+    ToolInjectionContext,
     ToolNode,
     tool,
 )
@@ -34,7 +34,7 @@ from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
 )
-from apix.common.type.exception import InvalidToolArgs
+from apix.common.type import InvalidToolArgs
 from apix.core.graph import Command, GraphManager
 
 
@@ -145,7 +145,7 @@ def test_tool_builds_openai_function_calling_schema():
         location: Annotated[str, "City and country."],
         days: int,
         runtime: Annotated[
-            ToolInjectionState,
+            ToolInjectionContext,
             AutoInjection(),
         ],
         units: Literal["celsius", "fahrenheit"] = "celsius",
@@ -637,7 +637,7 @@ def test_auto_injection_rejects_unsupported_value_type():
     def invalid(runtime: Annotated[int, AutoInjection()]):
         return runtime
 
-    with pytest.raises(TypeError, match="only supports ToolInjectionState"):
+    with pytest.raises(TypeError, match="only supports ToolInjectionContext"):
         Tool(invalid)
 
 
@@ -670,7 +670,7 @@ def test_parse_injection_handles_malformed_annotated_metadata(monkeypatch):
 
 
 def test_tool_rejects_multiple_injected_parameters():
-    Injection = Annotated[ToolInjectionState, AutoInjection]
+    Injection = Annotated[ToolInjectionContext, AutoInjection]
 
     def duplicate(first: Injection, second: Injection):
         return first, second
@@ -680,7 +680,7 @@ def test_tool_rejects_multiple_injected_parameters():
 
 
 def test_injected_parameter_must_be_keyword_capable():
-    Injection = Annotated[ToolInjectionState, AutoInjection()]
+    Injection = Annotated[ToolInjectionContext, AutoInjection()]
 
     def invalid(*runtime: Injection):
         return runtime
@@ -711,7 +711,7 @@ async def test_tool_execute_injects_state_and_applies_defaults():
         value: str = "default",
         *,
         runtime: Annotated[
-            ToolInjectionState,
+            ToolInjectionContext,
             AutoInjection(),
         ],
     ) -> str:
@@ -866,6 +866,7 @@ def test_normalise_command_covers_empty_non_string_update_and_goto_only():
     assert node._normalise_tool_result(
         Command(update={"messages": [existing_message], "value": 1}),
         call,
+        duration=123
     ) == {
         "update": {
             "messages": [existing_message],

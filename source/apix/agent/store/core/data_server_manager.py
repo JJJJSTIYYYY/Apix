@@ -205,3 +205,14 @@ data_server_manager = DataServerManager(
     worker_count=WORKER_COUNT,
 )
 auto_init.register(data_server_manager)
+
+
+async def query_store(action: str, payload: dict) -> dict:
+    """Public api to access stre."""
+    query_id = await data_server_manager.submit_query(
+        action=action,
+        payload=payload,
+    )
+    result = await data_server_manager.wait_result(query_id)
+    if not result.get("success"):
+        logger.error(f"Failed to access store: {result.get("messages")}")

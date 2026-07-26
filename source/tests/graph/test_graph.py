@@ -8,7 +8,7 @@ import pytest_asyncio
 
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
-from apix.common.type.exception import InvalidNodeReturns
+from apix.common.type import InvalidNodeReturns
 from apix.core.graph import (
     AutoMerge,
     END,

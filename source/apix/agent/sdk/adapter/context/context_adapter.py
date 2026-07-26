@@ -1,3 +1,4 @@
+from collections import defaultdict, deque
 import copy
 import hashlib
 from pathlib import Path
@@ -9,176 +10,498 @@ import os
 from fastapi import HTTPException
 import httpx
 
-from apix.agent.sdk.utils.message import ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
-from apix.agent.sdk.utils.trans_data import convert_generation_id_to_message_node_id
-from apix.agent.sdk.graph.state import MainAgentState, MemoItem
+from apix.agent.store import query_store
+from apix.agent.sdk.utils.message import ApixMessageBase, ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage, _utc_now_iso
+from apix.agent.sdk.utils.funcs import check_identity, convert_generation_id_to_message_node_id
+from apix.agent.sdk.graph.state import MainAgentState, MemoItem, Todo
+from apix.common.type import ApixIdentity
 from apix.common.utils.logger import logger
 from apix.common.utils.yaml import load_from_yaml
 
 
-class AIContextManager:
-    
-    # ------------------------------------------------------------------
-    # Data related API
-    # ------------------------------------------------------------------
+class AIContextAdapter:
+    """Context adapter and store api encapsulation for agent."""
 
-    async def append_to_messages(
+    _MISSING_TOOL_OUTPUT = (
+        "[The outputs of this tool have been lost, or the tool's execution was interrupted by the user.]"
+    )
+
+    def _ensure_tool_message(
+        self,
+        agent_messages: list[AnyMessage],
+    ) -> None:
+        """
+        Make sure tool messages match tool calls in terms of ID, quantity, and order.
+
+        For every ApixAiMessage containing tool calls:
+
+        1. Tool messages immediately follow the corresponding AI message.
+        2. Each tool call has exactly one corresponding tool message.
+        3. Tool messages follow the order defined by tool_calls.
+        4. Existing tool messages are matched using tool_call_id.
+        5. Missing tool messages are replaced with placeholder messages.
+        6. Duplicate and unmatched tool messages in the contiguous tool
+           message block are discarded.
+
+        The original list object is preserved.
+        """
+        if not agent_messages:
+            return
+
+        normalized_messages: list[AnyMessage] = []
+
+        cursor = 0
+        total_messages = len(agent_messages)
+
+        while cursor < total_messages:
+            current_message = agent_messages[cursor]
+            normalized_messages.append(current_message)
+            cursor += 1
+
+            if not (
+                isinstance(current_message, ApixAiMessage)
+                and current_message.tool_calls
+            ):
+                continue
+
+            # Match only the contiguous ToolMessage block immediately following the current AI message.
+            # setdefault keeps the first message when duplicate IDs occur.
+            existing_by_call_id: dict[str, ApixToolMessage] = {}
+
+            while (
+                cursor < total_messages
+                and isinstance(agent_messages[cursor], ApixToolMessage)
+            ):
+                tool_message = agent_messages[cursor]
+
+                existing_by_call_id.setdefault(
+                    tool_message.tool_call_id,
+                    tool_message,
+                )
+
+                cursor += 1
+
+            seen_call_ids: set[str] = set()
+
+            for tool_index, tool_call in enumerate(
+                current_message.tool_calls
+            ):
+                try:
+                    tool_call_id = tool_call["call_id"]
+                    tool_name = tool_call["tool_name"]
+                except (KeyError, TypeError) as exc:
+                    raise ValueError(
+                        "Invalid tool call structure: "
+                        f"message_index={cursor}, "
+                        f"tool_call_index={tool_index}, "
+                        f"tool_call={tool_call!r}"
+                    ) from exc
+
+                if not tool_call_id:
+                    raise ValueError(
+                        "Tool call must contain a non-empty call_id: "
+                        f"tool_call_index={tool_index}"
+                    )
+
+                # A repeated call_id makes one-to-one matching ambiguous.
+                if tool_call_id in seen_call_ids:
+                    raise ValueError(
+                        "Duplicate tool call ID found: "
+                        f"tool_call_id={tool_call_id!r}, "
+                        f"tool_call_index={tool_index}"
+                    )
+
+                seen_call_ids.add(tool_call_id)
+
+                tool_message = existing_by_call_id.get(tool_call_id)
+
+                if tool_message is None:
+                    tool_message = ApixToolMessage(
+                        content=self._MISSING_TOOL_OUTPUT,
+                        name=tool_name,
+                        tool_call_id=tool_call_id,
+                    )
+
+                normalized_messages.append(tool_message)
+
+        # Preserve the identity of the input list.
+        agent_messages[:] = normalized_messages
+
+
+    def convert_to_apix_messages(
+        self,
+        dict_messages: list[dict],
+        *,
+        strict: bool = True
+    ) -> Tuple[list[AnyMessage], list[Todo]]:
+        """
+        Create apix messages list (dict list -> apix message objects list).
+
+        This method is a pure converter:
+        - Only transforms dict messages into apix messages.
+
+        Args:
+            dict_messages: Message dict list with format:
+
+                ```python
+                {
+                    "generation_id": str, # uuid4, tips: messages generated within the same graph loop share the same generation id.
+                    "role": str,
+                    "content": str | list,
+                    "created_at": int
+                    "node_id": str
+                    "parent_id": str,
+                    "think": str, # optional
+                    "extra": dict, # optional, contains key: `active_file: str` `referenced_message: dict` `system_instruction: list`
+                    "info": dict, # optional
+                }
+                ```
+
+        Returns:
+            tuple: A tuple containing two lists:
+                - The first element is a list of :class:`ApixMessageBase` objects.
+                - The second element is a list of the latest :class:`Todo` items.
+        """
+        logger.trace()
+        logger.info(f"Get dict messages: {len(dict_messages)}.")
+
+        messages = []
+        todo: list[Todo] = None
+
+        for msg_dict in dict_messages:
+            role = msg_dict.get("role")
+            content = str(msg_dict.get("content", ""))
+            think = str(msg_dict.get("think", ""))
+            extra = msg_dict.get("extra", {})
+            if extra and not isinstance(extra, dict):
+                extra = json.loads(extra)
+            info = msg_dict.get("info", {})
+            if info and not isinstance(info, dict):
+                info = json.loads(info)
+            created_at = msg_dict.get("created_at", "")
+            name = info.get("name")
+            id = info.get("id")
+
+            if role == "user":
+                name = name or "user"
+                active_file = extra.get("active_file", '') or ''
+                referenced_message = extra.get("referenced_message", {}) or {}
+                system_instruction = extra.get("system_instruction", []) or []
+                upload_files = extra.get("uploaded_files", []) or []
+
+                parts = []
+
+                if referenced_message and isinstance(referenced_message, dict):
+                    role = referenced_message.get("role", "`[UNKNOWN]`") or "`[UNKNOWN]`"
+                    content = referenced_message.get("content", "`[CONTENT MISSED]`") or "`[CONTENT MISSED]`"
+                    parts.append(
+                        f"> **Referenced Message**  \n"
+                        f"> Role: {role}  \n"
+                        f"> Content: {content}"
+                    )
+
+                if active_file:
+                    parts.append(f"> **Referenced File**  \n> `{active_file}`")
+
+                if upload_files:
+                    file_list = '\n'.join(f'- `./upload_files/{f}`' for f in upload_files)
+                    parts.append(f"**User Uploaded:**  \n{file_list}")
+
+                if system_instruction and isinstance(system_instruction, list):
+                    prompt_items = []
+                    for item in system_instruction:
+                        if isinstance(item, dict) and 'prompt' in item:
+                            prompt_items.extend(item['prompt'])
+                        elif isinstance(item, str):
+                            prompt_items.append(item)
+                    if prompt_items:
+                        prompt_list = '\n'.join(f'- {p}' for p in prompt_items)
+                        parts.append(f"**System Instruction:**  \n{prompt_list}")
+
+                if parts:
+                    message_prefix = "\n\n".join(parts)
+                    message_prefix = "<context>\n" + message_prefix + "</context>\n\n"
+                    content = message_prefix + content
+                else:
+                    pass
+
+                if not content:
+                    continue
+
+                msg = ApixUserMessage(
+                    id=id, 
+                    content=content, 
+                    name=name, 
+                    timestamp=created_at, 
+                    info=info, 
+                    extra=extra
+                )
+                messages.append(msg)
+
+            elif role == "ai":
+                name = name or "assistant"
+                suffix = "[Conversation Abort]"
+                if content.endswith(suffix):
+                    content = content[:-len(suffix)]
+                if think.endswith(suffix):
+                    think = think[:-len(suffix)]
+                tool_calls = extra.get("tool_calls")
+                if not content and not think and not tool_calls:
+                    continue  # Skip empty AI message
+
+                msg = ApixAiMessage(
+                    id=id,
+                    content=content,
+                    name=name,
+                    timestamp=created_at, 
+                    info=info, 
+                    extra=extra,
+                    tool_calls=tool_calls,
+                    reasoning=think
+                )
+
+                messages.append(msg)
+
+            elif role == "system":
+                if not content:
+                    continue
+
+                msg = ApixSystemMessage(
+                    id=id,
+                    content=content,
+                    name='system',
+                    timestamp=created_at, 
+                    info=info, 
+                    extra=extra,
+                )
+                messages.append(msg)
+
+            elif role == "tool":
+                if not content:
+                    continue
+
+                msg = ApixToolMessage(
+                    id=id,
+                    content=content,
+                    name=info.get("tool_name") or name,
+                    tool_call_id=info.get("tool_call_id"),
+                )
+                messages.append(msg)
+
+            elif role == "info":
+                if name == "todo":
+                    todo = extra.get("todo_list") if extra.get("todo_list")[-1]["status"] != "completed" else None
+
+            else:
+                logger.warning(f"Unknown role or empty content ignored: {role}")
+
+        if strict: self._ensure_tool_message(messages)
+        return messages, todo
+    
+    
+    def convert_to_dict_message(
+        self,
+        message: AnyMessage,
+        generation_id: str,
+        parent_id: str = '-',
+        *,
+        filter: bool = False,
+    ) -> dict:
+        """
+        Convert an Apix message object into a dictionary representation.
+
+        Args:
+            message: An instance of :class:`ApixMessageBase` to be converted.
+            generation_id: The unique identifier for the current generation loop.
+            parent_id: The node ID of the parent message. Defaults to '-'.
+            filter: If True, returns a simplified dictionary containing only essential keys
+
+        Returns:
+            A dictionary representing the message. The full structure (when `filter=False`) is as follows:
+
+            ```python
+            {
+                "generation_id": str,   # UUID4; shared by all messages in the same graph loop
+                "role": str,
+                "content": str | list,
+                "created_at": int,
+                "node_id": str,
+                "parent_id": str,
+                "think": str,           # optional
+                "extra": dict,          # optional; may contains key: `active_file: str` `referenced_message: dict` `system_instruction: list` `upload_files: list`
+                "info": dict            # optional
+            }
+            ```
+
+            When `filter=True`, the returned dict will only contains `role`, `content`, `think` and `extra`.
+        """
+        logger.trace()
+        dict_message: dict = {}
+        think = message.reasoning or ""
+        content = message.content or ""
+        role = message.role
+        created_at = message.timestamp or _utc_now_iso()
+        node_id = convert_generation_id_to_message_node_id(generation_id, role)
+        extra = message.extra
+        info = message.info
+
+
+        if role == 'ai':
+            think = message.reasoning
+            extra = {'tool_calls': message.tool_calls} if message.tool_calls else {}
+            info = message.info
+
+            if filter:
+                dict_message = {
+                    "role": "ai",
+                    "content": message.content,
+                    "think": think,
+                    "extra": extra,
+                }
+            else:
+                dict_message = {
+                    "generation_id": generation_id,
+                    "role": "ai",
+                    "content": message.content,
+                    "created_at": message.timestamp,
+                    "node_id": 
+                    "parent_id": parent_id,
+                    "think": think,
+                    "extra": extra,
+                    "info": info,
+                }
+
+        elif isinstance(message, ApixToolMessage):
+            message_info = {
+                "tool_name": message.name,
+                "task_id": message.tool_call_id,
+            }
+            content = str(message.content)
+            if filter:
+                dict_message = {
+                    "role": "tools",
+                    "content": content,
+                    "info": message_info,
+                }
+            else:
+                dict_message = {
+                    "role": "tools",
+                    "content": content,
+                    "info": message_info,
+                    "generation_id": generation_id,
+                }
+
+        elif isinstance(message, ApixSystemMessage):
+            dict_message = {
+                "role": "system",
+                "content": message.content,
+                "generation_id": generation_id,
+            }
+
+        else:
+            logger.warning(
+                f"Unsupported message type ignored: {type(message)}"
+            )
+
+        return dict_message
+    
+
+    async def append_to_store(
         self, 
-        user_uid: str, 
-        conversation_uid: str, 
-        message: dict,
+        message: AnyMessage | dict,
+        identity: ApixIdentity,
+        generation_id: str,
         parent_id: str = '-',
     ) -> None:
         """
-        Append single message to store.
+        Append a single message to the store.
 
         Args:
-            user_uid: "Id to indicate which user the data is from.",
-            conversation_uid: "Id to indicate which history the data belong to.",
-            message (dict): Single message dict. Format:
-                {
-                    "role": "human/ai/system/tools",
-                    "content": str,
-                    "think": str, // optional
-                    "extra": dict, // optional
-                    "info": dict, // optional
-                    "timestamp": int,
-                    "generation_id": str,
-                }
+            message: An instance of :class:`ApixMessageBase` or a dict representing the message.
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
+            generation_id: The unique identifier for the current generation loop.
+            parent_id: The node ID of the parent message. Defaults to '-'.
 
-        Returns:
-            None
+        Raises:
+            IdentityError: If the identity is not provided or is ambiguous.
+            RuntimeError: If `generation_id` is not provided.
+
+        Notes:
+            When `message` is provided as a dict, it must follow this structure:
+
+            ```python
+            {
+                "generation_id": str,   # UUID4; all messages in the same graph loop share this ID
+                "role": str,
+                "content": str | list,
+                "created_at": int,
+                "node_id": str,
+                "parent_id": str,
+                "think": str,           # optional
+                "extra": dict,          # optional; may contains key: `active_file: str` `referenced_message: dict` `system_instruction: list` `upload_files: list`
+                "info": dict            # optional
+            }
+            ```
+
+        parent_id only be used to :meth:`AIContextAdapter.convert_to_dict_message` for ApixMessageBase.
         """
         logger.trace()
 
-        if "extra" in message and "user_meta_data" in message["extra"]:
-            # file_id and file name should be contained in meta_data list.
-            files = message["extra"]["user_meta_data"]
-            if files.get("uploaded_files"):
-                timestamp = message.get("timestamp", 0)
-                generation_id = message.get("generation_id", "")
-                sys_message = {
-                    "role": "system",
-                    "content": f"User upload file(s): {str(files.get("uploaded_files"))}",
-                    "timestamp": timestamp,
-                    "generation_id": generation_id,
-                    "node_id": convert_generation_id_to_message_node_id(generation_id, 'user'),
-                    "parent_id": message.get("parent_id") or parent_id
-                }
-                sys_payload = {
-                    "user_uid": user_uid,
-                    "conversation_uid": conversation_uid,
-                    "messages": sys_message,
-                }
+        if not message: return
+        user_uid, _, conversation_uid, _ = check_identity(identity)
 
-                async with httpx.AsyncClient(timeout=5) as client:
-                    resp = await client.post(
-                        f"{MEMORY_SERVICE_BASE_URL}/memory/memory/append_message",
-                        json=sys_payload,
-                    )
+        if conversation_uid.startswith("sub_"): 
+            logger.info("Sub-assistant conversation, skip.")
+            return
 
-                if resp.status_code != 200 or not resp.json().get('success'):
-                    raise HTTPException(
-                        status_code=resp.status_code,
-                        detail=f"Failed to append memory: {resp.text}",
-                    )
-                
-        generation_id = message.get("generation_id", "")
-        role = message.get("role", "")
-        message["node_id"] = convert_generation_id_to_message_node_id(generation_id, role)
-
-        if role == 'human': 
-            message["parent_id"] = message.get("parent_id") or parent_id
-        else:
-            message["parent_id"] = parent_id
+        if not isinstance(message, dict):
+            message = self.convert_to_dict_message(message, generation_id, parent_id)
 
         payload = {
             "user_uid": user_uid,
             "conversation_uid": conversation_uid,
-            "messages": message,
+            "message": message,
         }
 
-        logger.info(f"[append_to_messages] payload: {json.dumps(payload, ensure_ascii=False)[:1000]}")
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/append_message",
-                json=payload,
-            )
-
-        logger.info(f"[append_to_messages] response status={resp.status_code}, body={resp.text[:1000]}")
-        if resp.status_code != 200 or not resp.json().get('success'):
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to append memory: {resp.text}",
-            )
-    
-
-    def _extract_mes_info(
-        self, 
-        message: ApixAiMessage | ApixAiMessageChunk,
-        *,
-        fallback_model_provider: str = 'Custom Provider',
-        fallback_model_name: str = 'Custom Model',
-        fallback_timestamp: int = 0,
-    ) -> dict:
-        current_timestamp = int(time.time() * 1000)
-        if not message.response_metadata:
-            message.response_metadata = {}
-        message_info = {
-            "model_provider": fallback_model_provider or message.response_metadata.get("model_provider", 'Custom Provider'),
-            "model": fallback_model_name or message.response_metadata.get("model", 'Custom Model'),
-            "total_duration":  current_timestamp - (fallback_timestamp or current_timestamp),
-            "total_tokens": (message.usage_metadata or {}).get("total_tokens", 0),
-            "id": message.id,
-        }
-        return message_info
+        await query_store(action="append_message", payload=payload)
     
     
-    async def append_info_message(
+    async def append_info_to_store(
         self,
+        extra: dict,
+        info: dict,
+        identity: ApixIdentity,
         generation_id: str,
-        user_uid: str,
-        conversation_uid: str,
-        timestamp: int,
-        additional_info: dict,
         parent_id: str = '-'
     ):
         """
-        Append decorated message to memory service (LangChain message -> memory dict).
-
-        This method is a side-effect method and directly writes to memory service.
-
-        Compare to `create_dict_message` (formerly `create_memory`):
-        - This method DOES append to memory service internally.
-        - This method allows injecting `additional_info` into the message `extra` field.
-        - This method is intended for cases where extra runtime/contextual metadata
-        needs to be persisted together with the message.
-        - Message parsing capability is the same: ApixAiMessage / ApixAiMessageChunk / ApixToolMessage,
-        text content only at present.
+        Append an empty message that only contains `info` and `extra` to store.
 
         Args:
-            user_uid: Id to indicate which user the data is from.
-            conversation_uid: Id to indicate which history the data belong to.
-            message (ApixAiMessage | ApixAiMessageChunk | ApixToolMessage):
-                Message object returned from LangGraph / LLM / Tool node.
-            additional_info (dict):
-                Extra metadata to be attached to memory message (stored in `extra` field).
+            extra: A dictionary of extra information.
+            info: Information dictionary.
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
+            generation_id: The unique identifier for the current generation loop.
+            parent_id: The node ID of the parent message. Defaults to '-'.
 
         Returns:
             None
         """
-        if conversation_uid.startswith("sub_"): return
+        user_uid, _, conversation_uid, _ = check_identity(identity)
+        # if conversation_uid.startswith("sub_"): return
         logger.trace()
-        extra = additional_info
         message = {
-            "role": "info", 
-            "content": "", 
-            "extra": extra, 
-            "info": {}, 
-            "timestamp": timestamp, 
-            "generation_id": generation_id
+            "generation_id": generation_id,
+            "role": "info",
+            "content": "",
+            "created_at": _utc_now_iso(),
+            "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
+            "parent_id": parent_id,
+            "think": "",
+            "extra": extra,
+            "info": info
         }
-        await self.append_to_messages(user_uid, conversation_uid, message, parent_id)
+        await self.append_to_store(user_uid, conversation_uid, message, parent_id)
 
         
     async def insert_shortterm_memory(self, user_uid: str, conversation_uid: str, memory_id: str, content: str):
@@ -307,292 +630,6 @@ class AIContextManager:
 
         resp_content = resp.json()
         messages = resp_content.get("messages", []) or []
-
-        return messages
-    
-    
-    def _ensure_tool_message(self, agent_messages: list[AnyMessage]):
-        if not agent_messages:
-            return
-
-        cursor = 0
-        total_messages = len(agent_messages)
-
-        while cursor < total_messages:
-            current_msg = agent_messages[cursor]
-
-            # Only process AI message with tool_calls
-            if isinstance(current_msg, (ApixAiMessage, ApixAiMessageChunk)) and getattr(current_msg, "tool_calls", None):
-                tool_calls = current_msg.tool_calls or []
-                expected_tool_count = len(tool_calls)
-
-                # Scan existing ToolMessages right after this ApixAiMessage
-                scan_index = cursor + 1
-                existing_tool_count = 0
-
-                while (
-                    scan_index < total_messages
-                    and isinstance(agent_messages[scan_index], ApixToolMessage)
-                ):
-                    existing_tool_count += 1
-                    scan_index += 1
-
-                # Calculate how many ToolMessages are missing
-                missing_tool_count = expected_tool_count - existing_tool_count
-
-                if missing_tool_count > 0:
-                    # Inject missing ToolMessages at the correct position
-                    for tool_idx in range(existing_tool_count, expected_tool_count):
-                        tool_call = tool_calls[tool_idx]
-
-                        new_msg = ApixToolMessage(
-                            content="[The outputs of this tool have been lost, or the tool's execution was interrupted by the user.]",
-                            name=tool_call.get("name"),
-                            tool_call_id=tool_call.get("id"),
-                        )
-
-                        agent_messages.insert(scan_index, new_msg)
-                        scan_index += 1
-                        total_messages += 1  # Keep length in sync
-
-                # Move cursor to the end of this AI + Tool block
-                cursor = scan_index
-            else:
-                cursor += 1
-
-
-    def create_agent_messages(
-        self,
-        client_messages: list[dict],
-        remain_tool_message: bool = True,
-        *,
-        after_index: str | int = None,
-        reasoning: bool = False
-    ) -> list[AnyMessage]:
-        """
-        Create agent messages list (dict list -> LangChain message objects).
-
-        This method is now a pure converter:
-        - Only transforms dict messages into LangChain messages
-
-        Args:
-            client_messages (list[dict]): Message dict list with format:
-                {
-                    "generation_id": "uuid4", # Messages generated within the same graph loop share the same generation_id.
-                    "role": "human/ai/system/tools",
-                    "content": str | list,
-                    "extra": dict,   # optional
-                    "info": dict,    # optional
-                    "timestamp": int
-                }
-            remain_tool_message (bool): Whether keep tool message.
-            after_index: Return only messages after this marker if not None.
-
-        Returns:
-            list: List of LangChain message objects
-            list: List of LangChain message objects after after_index
-
-        NOTE:
-        after_index should equals to msg_dict.get("info").get("id") when its ai message,
-        or equals to msg_dict.get("info").get("task_id") when its tool message, but in 
-        """
-        logger.trace()
-        logger.info(f"client_messages count: {len(client_messages)}, after index: {after_index}")
-        # logger.info(f"client_messages: {client_messages}")
-
-        messages = []
-        messages_after_index = []
-        begin_to_append = not bool(after_index)
-
-        for msg_dict in client_messages:
-            id = msg_dict.get("generation_id")
-            role = msg_dict.get("role")
-            raw_text = msg_dict.get("content", "")
-            raw_think = msg_dict.get("think", "")
-
-            if role == "human":
-                name = msg_dict.get("name", "user")
-                extra = msg_dict.get("extra", {})
-                if not isinstance(extra, dict) and extra:
-                    extra = json.loads(extra)
-
-                active_file = extra.get("active_file", '') or ''
-                referenced_message = extra.get("referenced_message", {}) or {}
-                system_instruction = extra.get("system_instruction", []) or []
-
-                if referenced_message and isinstance(referenced_message, dict):
-                    raw_text = f"Referenced Message:  \n" \
-                        f"> Role: {referenced_message.get("role", "`[unknow]`") or '`[unknow]`'}  " \
-                        f"Content: \"{referenced_message.get("content", "`[content missed]`") or '`[content missed]`'}\""\
-                        f"\n\n{raw_text}"
-                    
-                if active_file:
-                    raw_text = f"Referenced File:  \n> \"{active_file}\"\n\n{raw_text}"
-
-                if system_instruction and isinstance(system_instruction, dict):
-                    raw_text = f"System Instruction:  \n \"{'\n-'.join(system_instruction.get('prompt', []))}\"\n\n{raw_text}"
-
-                msg = ApixUserMessage(content=raw_text, name=name)
-                messages.append(msg)
-                if begin_to_append: messages_after_index.append(msg)
-
-            elif role == "ai":
-                info = msg_dict.get("info", {})
-                extra = msg_dict.get("extra", {})
-                if not isinstance(extra, dict) and extra:
-                    extra = json.loads(extra)
-                if not isinstance(info, dict) and info:
-                    info = json.loads(info)
-                index = info.get("id", "")
-
-                content = str(raw_text) if raw_text else ""
-                think = str(raw_think if raw_think else "")
-                suffix = "[Conversation Abort]"
-                if content.endswith(suffix):
-                    content = content[:-len(suffix)]
-                if think.endswith(suffix):
-                    think = think[:-len(suffix)]
-                tool_calls = extra.get("tool_calls")
-                if (not content and not think) and not remain_tool_message:
-                    continue  # Skip empty AI message
-                additional_kwargs = {}
-                additional_kwargs["reasoning_content"] = think
-
-                msg = ApixAiMessage(
-                    id=index,
-                    content=content,
-                    additional_kwargs=additional_kwargs
-                )
-                
-                if remain_tool_message:
-                    if not isinstance(tool_calls, list) and tool_calls:
-                        tool_calls = json.loads(tool_calls)
-                    if tool_calls:
-                        msg.tool_calls = tool_calls
-
-                messages.append(msg)
-                if not begin_to_append and index == after_index: 
-                    begin_to_append = True
-                    continue
-                if begin_to_append: messages_after_index.append(msg)
-
-            elif role == "system":
-                msg = ApixSystemMessage(content=str(raw_text))
-                messages.append(msg)
-                if begin_to_append:
-                    messages_after_index.append(msg)
-
-            elif role in ("tool", "tools"):
-                if not remain_tool_message: continue
-                info = msg_dict.get("info", {})
-                if not isinstance(info, dict) and info:
-                    info = json.loads(info)
-
-                msg = ApixToolMessage(
-                    content=str(raw_text),
-                    name=info.get("tool_name"),
-                    tool_call_id=info.get("task_id"),
-                )
-                messages.append(msg)
-                if begin_to_append: messages_after_index.append(msg)
-
-            else:
-                logger.warning(f"Unknown role or empty content ignored: {role}")
-
-        while messages_after_index and isinstance(messages_after_index[0], ApixToolMessage):
-            messages_after_index.pop(0)
-
-        if after_index and messages_after_index:
-            self._ensure_tool_message(messages_after_index)
-            return messages_after_index
-        self._ensure_tool_message(messages)
-        return messages
-    
-    
-    def create_dict_message(
-        self,
-        generation_id: str,
-        message: ApixAiMessage | ApixAiMessageChunk | ApixToolMessage | ApixSystemMessage,
-        timestamp: int, 
-        *,
-        fallback_model_provider: str = 'Custom Provider',
-        fallback_model_name: str = 'Custom Model',
-        fallback_timestamp: int = 0,
-        filter: bool = False,
-    ) -> dict:
-        """
-        Create memory dict messages (LangChain message -> dict list).
-
-        This method no longer appends to memory service.
-        It only converts LangChain messages into structured dicts.
-
-        Args: 
-            filter[bool]: Provide simpler dict message.
-            fallback_timestamp[int]: Generation timestamp in second.
-
-        Returns:
-            list[dict]: Memory message dicts list (len 1)
-        """
-        logger.trace()
-        messages: dict = {}
-
-        if isinstance(message, (ApixAiMessage, ApixAiMessageChunk)):
-            think_content = (message.additional_kwargs or {}).get("reasoning_content", "")
-            tool_calls = (message.tool_calls or [])
-            extra = {'tool_calls': tool_calls} if tool_calls else {}
-            message_info = self._extract_mes_info(message, fallback_model_name=fallback_model_name, fallback_model_provider=fallback_model_provider, fallback_timestamp=fallback_timestamp)
-
-            if filter:
-                messages = {
-                    "role": "ai",
-                    "content": message.content,
-                    "think": think_content,
-                    "extra": extra,
-                }
-            else:
-                messages = {
-                    "role": "ai",
-                    "content": message.content,
-                    "think": think_content,
-                    "extra": extra,
-                    "info": message_info,
-                    "generation_id": generation_id,
-                    "timestamp": timestamp,
-                }
-
-        elif isinstance(message, ApixToolMessage):
-            message_info = {
-                "tool_name": message.name,
-                "task_id": message.tool_call_id,
-            }
-            content = str(message.content)
-            if filter:
-                messages = {
-                    "role": "tools",
-                    "content": content,
-                    "info": message_info,
-                }
-            else:
-                messages = {
-                    "role": "tools",
-                    "content": content,
-                    "info": message_info,
-                    "generation_id": generation_id,
-                    "timestamp": timestamp,
-                }
-
-        elif isinstance(message, ApixSystemMessage):
-            messages = {
-                "role": "system",
-                "content": message.content,
-                "generation_id": generation_id,
-                "timestamp": timestamp,
-            }
-
-        else:
-            logger.warning(
-                f"Unsupported message type ignored: {type(message)}"
-            )
 
         return messages
     
@@ -1325,4 +1362,4 @@ User-facing output:
 
 
 
-ai_context_manager = AIContextManager()
+ai_context_manager = AIContextAdapter()

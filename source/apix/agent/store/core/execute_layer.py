@@ -494,7 +494,7 @@ class DataExecutors:
                 parsed_messages, branches, node_id_chain = self._build_visible_messages(
                     messages,
                     current_node_id,
-                    allow_roles=('user', 'ai', 'system', 'tool'),
+                    allow_roles=('user', 'ai', 'system', 'tool', 'info'),
                     guess_children=False
                 )
 
@@ -531,7 +531,7 @@ class DataExecutors:
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
-                allow_roles=('user', 'ai', 'system', 'tool'),
+                allow_roles=('user', 'ai', 'system', 'tool', 'info'),
                 guess_children=False
             )
 

@@ -152,10 +152,9 @@ async def test_users_conversations_and_messages(db, monkeypatch):
         {
             "user_uid": "user-1",
             "conversation_uid": "conv-1",
-            "messages": {
+            "message": {
                 "role": "user",
                 "content": "hello sqlite",
-                "timestamp": 100,
                 "node_id": "node-1",
                 "extra": None,
                 "info": {"id": "info-1"},
@@ -166,10 +165,9 @@ async def test_users_conversations_and_messages(db, monkeypatch):
         {
             "user_uid": "user-1",
             "conversation_uid": "conv-1",
-            "messages": {
+            "message": {
                 "role": "ai",
                 "content": "hello back",
-                "timestamp": 90,
                 "generation_id": "gen-1",
                 "node_id": "node-2",
                 "parent_id": "node-1",
@@ -182,12 +180,11 @@ async def test_users_conversations_and_messages(db, monkeypatch):
     assert "T" in first["messages"]["created_at"]
     conversation_row = (
         await db._fetch_all(
-            "SELECT latest_cursor, latest_timestamp, has_new_message FROM conversations"
+            "SELECT latest_cursor, has_new_message FROM conversations"
         )
     )[0]
     assert conversation_row == {
         "latest_cursor": 2,
-        "latest_timestamp": 100,
         "has_new_message": 1,
     }
 
@@ -228,14 +225,7 @@ async def test_users_conversations_and_messages(db, monkeypatch):
 
     for result in (
         await db.append_message(
-            {"user_uid": "user-1", "conversation_uid": "conv-1", "messages": {}}
-        ),
-        await db.append_message(
-            {
-                "user_uid": "user-1",
-                "conversation_uid": "conv-1",
-                "messages": {"role": "user", "content": "x", "timestamp": 0},
-            }
+            {"user_uid": "user-1", "conversation_uid": "conv-1", "message": {}}
         ),
         await db.delete_messages(
             {"user_uid": "user-1", "conversation_uid": "conv-1", "messages": []}
