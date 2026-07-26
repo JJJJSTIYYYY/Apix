@@ -123,3 +123,4 @@ AUTO_COMMIT = _config.get('AUTO_COMMIT', True)
 
 PROVIDER_BASE_URL = _config.get('PROVIDER_BASE_URL', _PROVIDER_BASE_URL)
 LLM_MAX_RETRY = _config.get('LLM_MAX_RETRY', 3)
+LLM_TIMEOUT = _config.get('LLM_TIMEOUT', 30)

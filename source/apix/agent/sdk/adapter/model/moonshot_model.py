@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from apix.agent.sdk.adapter.model.base import (
+from apix.agent.sdk.adapter.model.base_model import (
     OpenAICompatibleChatBot,
     OpenAICompatibleProvider,
     ReasoningEffort,

@@ -1,3 +1,75 @@
+"""
+Message Dictionary Schema for Storage:
+
+```python
+{
+    "generation_id": str,
+    "role": Literal["system", "user", "ai", "tool", "info"], # correspond to ApixMessageBase.role
+    "content": str, # correspond to ApixMessageBase.content
+    "created_at": str, # correspond to ApixMessageBase.timestamp
+    "node_id": str,
+    "parent_id": str,
+    "think": str, # optional, reasoning content for ai message, correspond to ApixMessageBase.reasoning
+    "extra": {
+        "tool_calls": [
+            {
+                "id": str, 
+                "args": {
+                    "arg_1": Any,
+                    "arg_2": Any,
+                }, 
+                "name": str, 
+                "type": Literal["tool_call"]
+            },
+            ...
+        ], # optional, tool calls list for ai message, correspond to ApixMessageBase.tool_calls
+        "uploaded_files": list[str] # optional, uploaded file path list for user message
+        "active_file": str # optional, the file currently open in the workspace
+        "referenced_message": {
+            "role": Literal["user", "ai", "tool"],
+            "name": str,
+            "content": str,
+        }, # optional, the message referenced by the user message in the current context chain
+        "task": {
+            "type": Literal["automated_task", "cron_task"],
+            "name": str,
+            "prompt": str,
+        }, # optional, task metadata in user message
+    }, # optional, correspond to ApixMessageBase.extra
+    "info": {
+        "id": str, # message id for any message, correspond to ApixMessageBase.id
+        "name": str, # assistant(ai)/user/tool name, for `info`, its  Literal["todo", "search"] correspond to ApixMessageBase.name
+        "duration": str,
+        # Following key only used when role is `ai`
+        "model": str,
+        "provider": str,
+        "usage": {
+            "input_token": int,
+            "output_token": int,
+        }
+        # Following key only used when role is `tool`
+        "tool_call_id": str
+        # Following key only used when role is `info`
+        "todo_list": list[Todo],
+        "search_key_word": list[str], # online search (by key word)
+        "search_key_word_provider": str, # such as DuckDuckGo
+        "search_urls": list[str] # online search (by url)
+        "search_urls_provider": str, # such as Tavily
+    } # correspond to ApixMessageBase.info
+}
+```
+
+For role `info`
+- What is it?
+> It is a branch of ai message which contains no think and no content.
+- When to use it?
+> Use when you want to append some message information in database, but you can not modify an existing ai message.
+> An ai message without think and content is not recommanded.
+> Such as: use when a todo list is written, a web search tool is called by assistant and some website is visited.
+info message does not provided a class, use ai_context_adapter.append_to_store(...) to store.
+"""
+
+
 from __future__ import annotations
 
 import json
@@ -14,7 +86,6 @@ from apix.common.type import ChunkMergeError, IncompleteToolCallError
 # ============================================================
 
 MessageRole = Literal[
-    "developer",
     "system",
     "user",
     "ai",

@@ -6,9 +6,8 @@ import time
 from typing import List, Tuple
 import json
 import os
-
-from fastapi import HTTPException
-import httpx
+from typing import Any
+from xml.sax.saxutils import escape
 
 from apix.agent.store import query_store
 from apix.agent.sdk.utils.message import ApixMessageBase, ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage, _utc_now_iso
@@ -26,10 +25,97 @@ class AIContextAdapter:
         "[The outputs of this tool have been lost, or the tool's execution was interrupted by the user.]"
     )
 
-    def _ensure_tool_message(
-        self,
-        agent_messages: list[AnyMessage],
-    ) -> None:
+    def _build_user_context(self, extra: dict[str, Any], todo: list[Todo] = None) -> str:
+        context_parts: list[str] = []
+
+        referenced_message = extra.get("referenced_message") or {}
+        if isinstance(referenced_message, dict) and referenced_message:
+            referenced_role = referenced_message.get("role") or "[UNKNOWN]"
+            referenced_speaker = referenced_message.get("name") or "[UNKNOWN]"
+            referenced_content = (
+                referenced_message.get("content")
+                or "[CONTENT MISSED]"
+            )
+
+            context_parts.append(
+                "<referenced_message>\n"
+                f"  <role>{escape(str(referenced_role))}</role>\n"
+                f"  <speaker>{escape(str(referenced_speaker))}</speaker>\n"
+                f"  <content>{escape(str(referenced_content))}</content>\n"
+                "</referenced_message>"
+            )
+
+        active_file = extra.get("active_file") or ""
+        if active_file:
+            context_parts.append(
+                f"<active_file>{escape(str(active_file))}</active_file>"
+            )
+
+        uploaded_files = extra.get("uploaded_files") or []
+        if isinstance(uploaded_files, list) and uploaded_files:
+            files_xml = "\n".join(
+                f"  <file>{escape(f'./upload_files/{filename}')}</file>"
+                for filename in uploaded_files
+            )
+
+            context_parts.append(
+                "<uploaded_files>\n"
+                f"{files_xml}\n"
+                "</uploaded_files>"
+            )
+
+        if todo:
+            todo_list = []
+            for index, item in enumerate(todo, start=1):
+                todo_list.append(f"{index}. {item['content']}--{item['status']};")
+            todo_list = "\n".join(todo_list)
+            context_parts.append(
+                "<todo_list>\n"
+                f"{todo_list}\n"
+                "</todo_list>"
+            )
+
+        task = extra.get("task") or {}
+        if isinstance(task, dict) and task:
+            task_type = task.get("type")
+            task_name = task.get("name")
+            task_prompt = task.get("prompt")
+
+            task_parts: list[str] = []
+
+            if task_type:
+                task_parts.append(
+                    f"  <type>{escape(str(task_type))}</type>"
+                )
+
+            if task_name:
+                task_parts.append(
+                    f"  <name>{escape(str(task_name))}</name>"
+                )
+
+            if task_prompt:
+                task_parts.append(
+                    f"  <prompt>{escape(str(task_prompt))}</prompt>"
+                )
+
+            if task_parts:
+                context_parts.append(
+                    "<task>\n"
+                    f"{'\n'.join(task_parts)}\n"
+                    "</task>"
+                )
+
+        if not context_parts:
+            return ""
+
+        return (
+            "<context>\n"
+            f"{'\n\n'.join(context_parts)}\n"
+            "</context>\n\n"
+        )
+
+
+    def _ensure_tool_message(self, agent_messages: list[AnyMessage]) -> None:
         """
         Make sure tool messages match tool calls in terms of ID, quantity, and order.
 
@@ -168,10 +254,13 @@ class AIContextAdapter:
         messages = []
         todo: list[Todo] = None
 
+        index = 0
+        messages_len = len(messages)
         for msg_dict in dict_messages:
+            index = index + 1
             role = msg_dict.get("role")
-            content = str(msg_dict.get("content", ""))
-            think = str(msg_dict.get("think", ""))
+            content = str(msg_dict.get("content", "") or "")
+            think = str(msg_dict.get("think", "") or "")
             extra = msg_dict.get("extra", {})
             if extra and not isinstance(extra, dict):
                 extra = json.loads(extra)
@@ -184,46 +273,8 @@ class AIContextAdapter:
 
             if role == "user":
                 name = name or "user"
-                active_file = extra.get("active_file", '') or ''
-                referenced_message = extra.get("referenced_message", {}) or {}
-                system_instruction = extra.get("system_instruction", []) or []
-                upload_files = extra.get("uploaded_files", []) or []
-
-                parts = []
-
-                if referenced_message and isinstance(referenced_message, dict):
-                    role = referenced_message.get("role", "`[UNKNOWN]`") or "`[UNKNOWN]`"
-                    content = referenced_message.get("content", "`[CONTENT MISSED]`") or "`[CONTENT MISSED]`"
-                    parts.append(
-                        f"> **Referenced Message**  \n"
-                        f"> Role: {role}  \n"
-                        f"> Content: {content}"
-                    )
-
-                if active_file:
-                    parts.append(f"> **Referenced File**  \n> `{active_file}`")
-
-                if upload_files:
-                    file_list = '\n'.join(f'- `./upload_files/{f}`' for f in upload_files)
-                    parts.append(f"**User Uploaded:**  \n{file_list}")
-
-                if system_instruction and isinstance(system_instruction, list):
-                    prompt_items = []
-                    for item in system_instruction:
-                        if isinstance(item, dict) and 'prompt' in item:
-                            prompt_items.extend(item['prompt'])
-                        elif isinstance(item, str):
-                            prompt_items.append(item)
-                    if prompt_items:
-                        prompt_list = '\n'.join(f'- {p}' for p in prompt_items)
-                        parts.append(f"**System Instruction:**  \n{prompt_list}")
-
-                if parts:
-                    message_prefix = "\n\n".join(parts)
-                    message_prefix = "<context>\n" + message_prefix + "</context>\n\n"
-                    content = message_prefix + content
-                else:
-                    pass
+                should_inject_todo = bool(todo) and index == messages_len
+                content = self._build_user_context(extra, todo=(todo if should_inject_todo else None)) + (content or "")
 
                 if not content:
                     continue
@@ -240,7 +291,7 @@ class AIContextAdapter:
 
             elif role == "ai":
                 name = name or "assistant"
-                suffix = "[Conversation Abort]"
+                suffix = "<conversation_abort>"
                 if content.endswith(suffix):
                     content = content[:-len(suffix)]
                 if think.endswith(suffix):
@@ -283,8 +334,11 @@ class AIContextAdapter:
                 msg = ApixToolMessage(
                     id=id,
                     content=content,
-                    name=info.get("tool_name") or name,
+                    name=name,
                     tool_call_id=info.get("tool_call_id"),
+                    timestamp=created_at,
+                    info=info,
+                    extra=extra,
                 )
                 messages.append(msg)
 
@@ -308,7 +362,7 @@ class AIContextAdapter:
         filter: bool = False,
     ) -> dict:
         """
-        Convert an Apix message object into a dictionary representation.
+        Convert an AI or tool Apix message into a dictionary representation.
 
         Args:
             message: An instance of :class:`ApixMessageBase` to be converted.
@@ -328,82 +382,77 @@ class AIContextAdapter:
                 "node_id": str,
                 "parent_id": str,
                 "think": str,           # optional
-                "extra": dict,          # optional; may contains key: `active_file: str` `referenced_message: dict` `system_instruction: list` `upload_files: list`
+                "extra": dict,          # optional
                 "info": dict            # optional
             }
             ```
-
-            When `filter=True`, the returned dict will only contains `role`, `content`, `think` and `extra`.
+        
+        Raises:
+            TypeError: If message is not an ApixAiMessage or ApixToolMessage.
+            
+        When `filter=True`, the returned dict will only contains `role`, `content` and optional `think` and `extra`.
         """
         logger.trace()
-        dict_message: dict = {}
-        think = message.reasoning or ""
-        content = message.content or ""
-        role = message.role
-        created_at = message.timestamp or _utc_now_iso()
-        node_id = convert_generation_id_to_message_node_id(generation_id, role)
-        extra = message.extra
-        info = message.info
 
-
-        if role == 'ai':
-            think = message.reasoning
-            extra = {'tool_calls': message.tool_calls} if message.tool_calls else {}
-            info = message.info
-
-            if filter:
-                dict_message = {
-                    "role": "ai",
-                    "content": message.content,
-                    "think": think,
-                    "extra": extra,
-                }
-            else:
-                dict_message = {
-                    "generation_id": generation_id,
-                    "role": "ai",
-                    "content": message.content,
-                    "created_at": message.timestamp,
-                    "node_id": 
-                    "parent_id": parent_id,
-                    "think": think,
-                    "extra": extra,
-                    "info": info,
-                }
-
-        elif isinstance(message, ApixToolMessage):
-            message_info = {
-                "tool_name": message.name,
-                "task_id": message.tool_call_id,
-            }
-            content = str(message.content)
-            if filter:
-                dict_message = {
-                    "role": "tools",
-                    "content": content,
-                    "info": message_info,
-                }
-            else:
-                dict_message = {
-                    "role": "tools",
-                    "content": content,
-                    "info": message_info,
-                    "generation_id": generation_id,
-                }
-
-        elif isinstance(message, ApixSystemMessage):
-            dict_message = {
-                "role": "system",
-                "content": message.content,
-                "generation_id": generation_id,
-            }
-
-        else:
-            logger.warning(
-                f"Unsupported message type ignored: {type(message)}"
+        if not isinstance(message, (ApixAiMessage, ApixToolMessage)):
+            raise TypeError(
+                "message must be an ApixAiMessage or ApixToolMessage, "
+                f"got {type(message).__name__}."
             )
 
-        return dict_message
+        info: dict[str, Any] = copy.deepcopy(message.info or {})
+        extra: dict[str, Any] = copy.deepcopy(message.extra or {})
+        content = str(message.content or "")
+        think = ""
+
+        if message.id is not None:
+            info["id"] = message.id
+        if message.name is not None:
+            info["name"] = message.name
+
+        if isinstance(message, ApixAiMessage):
+            role = "ai"
+            think = str(message.reasoning or "")
+            if message.tool_calls:
+                extra["tool_calls"] = copy.deepcopy(message.tool_calls)
+            else:
+                extra.pop("tool_calls", None)
+
+        else:
+            role = "tool"
+            if message.tool_call_id is not None:
+                info["tool_call_id"] = message.tool_call_id
+            else:
+                info.pop("tool_call_id", None)
+
+        if filter:
+            result = {
+                "role": role,
+                "content": content,
+            }
+            if think:
+                result["think"] = think
+            if extra:
+                result["extra"] = extra
+            return result
+
+        result = {
+            "generation_id": generation_id,
+            "role": role,
+            "content": content,
+            "created_at": message.timestamp,
+            "node_id": message.id,
+            "parent_id": parent_id,
+        }
+
+        if think:
+            result["think"] = think
+        if extra:
+            result["extra"] = extra
+        if info:
+            result["info"] = info
+
+        return result
     
 
     async def append_to_store(
@@ -443,7 +492,7 @@ class AIContextAdapter:
             }
             ```
 
-        parent_id only be used to :meth:`AIContextAdapter.convert_to_dict_message` for ApixMessageBase.
+        parent_id only be used to call :meth:`AIContextAdapter.convert_to_dict_message` for ApixMessageBase.
         """
         logger.trace()
 
@@ -1362,4 +1411,4 @@ User-facing output:
 
 
 
-ai_context_manager = AIContextAdapter()
+ai_context_adapter = AIContextAdapter()
