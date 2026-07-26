@@ -1,5 +1,7 @@
 """Unit tests for graph node result normalisation."""
 
+from dataclasses import is_dataclass
+
 import pytest
 
 from apix.common.type import InvalidNodeReturns
@@ -54,20 +56,48 @@ async def test_node_preserves_an_ordered_command_list():
     assert await node.execute({}) == commands
 
 
+def test_command_is_a_dataclass_with_independent_update_defaults():
+    """Commands have an unambiguous runtime type and no shared update state."""
+    first = Command()
+    second = Command()
+
+    first.update["value"] = 1
+
+    assert is_dataclass(Command)
+    assert first.update == {"value": 1}
+    assert second.update == {}
+    assert first.has_goto is False
+    assert Command(goto=None).has_goto is True
+
+
+def test_is_command_requires_an_actual_command_instance():
+    """Command-looking dictionaries are not mistaken for Commands."""
+    assert Node._is_command(Command()) is True
+    assert Node._is_command({"update": {}, "goto": None}) is False
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("result", "expected"),
     [
-        ({"update": {"value": 2}}, Command(update={"value": 2})),
+        (
+            {"update": {"value": 2}},
+            Command(update={"update": {"value": 2}}),
+        ),
         (
             {"update": {"value": 2}, "goto": "next"},
-            Command(update={"value": 2}, goto="next"),
+            Command(
+                update={
+                    "update": {"value": 2},
+                    "goto": "next",
+                }
+            ),
         ),
-        ({"goto": None}, Command(update={}, goto=None)),
+        ({"goto": None}, Command(update={"goto": None})),
     ],
 )
-async def test_command_mappings_are_preserved(result, expected):
-    """Command-shaped mappings retain their update and goto semantics."""
+async def test_command_looking_mappings_are_state_updates(result, expected):
+    """Only Command instances receive command routing semantics."""
     node = Node(lambda state: result, "command_node")
 
     assert await node.execute({}) == expected
@@ -86,7 +116,10 @@ async def test_node_rejects_non_mapping_results(result):
 @pytest.mark.asyncio
 async def test_node_rejects_non_mapping_command_update():
     """Command.update must itself be a mapping."""
-    node = Node(lambda state: {"update": [], "goto": "next"}, "invalid_update")
+    node = Node(
+        lambda state: Command(update=[]),
+        "invalid_update",
+    )
 
     with pytest.raises(InvalidNodeReturns, match="Command.update must be a dict"):
         await node.execute({})
@@ -95,7 +128,7 @@ async def test_node_rejects_non_mapping_command_update():
 @pytest.mark.asyncio
 async def test_node_rejects_non_string_command_goto():
     """Command.goto accepts only node names or None."""
-    node = Node(lambda state: {"update": {}, "goto": 1}, "invalid_goto")
+    node = Node(lambda state: Command(goto=1), "invalid_goto")
 
     with pytest.raises(InvalidNodeReturns, match="Command.goto must be a string or None"):
         await node.execute({})

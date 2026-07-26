@@ -108,7 +108,7 @@ def _state_with_calls(*calls: dict) -> dict:
 
 
 def _message_from(command: Command) -> ApixToolMessage:
-    messages = command["update"]["messages"]
+    messages = command.update["messages"]
     assert isinstance(messages, list)
     assert len(messages) == 1
     message = messages[0]
@@ -268,7 +268,7 @@ async def test_tool_node_executes_concurrently_but_returns_call_order():
 
 @pytest.mark.asyncio
 async def test_plain_dict_result_is_stringified_into_tool_message():
-    """A dict that is not Command-shaped is normal tool output."""
+    """A plain dict is normal tool output."""
     def payload() -> dict:
         return {"answer": 42}
 
@@ -286,13 +286,95 @@ async def test_plain_dict_result_is_stringified_into_tool_message():
 
 
 @pytest.mark.asyncio
-async def test_command_result_is_preserved_and_string_message_is_converted():
-    """Command routing and updates survive ToolNode normalisation."""
+async def test_string_result_creates_tool_message_with_runtime_metadata():
+    """A string result becomes one fully attributed tool message."""
+    def text() -> str:
+        return "finished"
+
+    node = ToolNode(text)
+    commands = await node.execute(
+        _state_with_calls(
+            _tool_call("text", "call-text"),
+        )
+    )
+
+    assert len(commands) == 1
+    message = _message_from(commands[0])
+    assert message.content == "finished"
+    assert message.name == "text"
+    assert message.tool_call_id == "call-text"
+    assert message.info["name"] == "text"
+    assert message.info["tool_call_id"] == "call-text"
+    assert message.info["duration"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_tool_message_result_has_runtime_metadata_overwritten():
+    """A returned ApixToolMessage is reused with current call metadata."""
+    returned_message = ApixToolMessage(
+        content="finished",
+        name="stale-name",
+        info={"stale": True},
+        tool_call_id="stale-call",
+    )
+
+    def message() -> ApixToolMessage:
+        return returned_message
+
+    node = ToolNode(message)
+    commands = await node.execute(
+        _state_with_calls(
+            _tool_call("message", "call-message"),
+        )
+    )
+
+    normalised_message = _message_from(commands[0])
+    assert normalised_message is returned_message
+    assert normalised_message.name == "message"
+    assert normalised_message.tool_call_id == "call-message"
+    assert normalised_message.info["name"] == "message"
+    assert normalised_message.info["tool_call_id"] == "call-message"
+    assert normalised_message.info["duration"] >= 0
+    assert "stale" not in normalised_message.info
+
+
+@pytest.mark.asyncio
+async def test_command_looking_dict_result_is_still_plain_tool_output():
+    """Only Command instances receive command routing semantics."""
+    def payload() -> dict:
+        return {
+            "update": {"value": 3},
+            "goto": "next",
+        }
+
+    node = ToolNode(payload)
+    commands = await node.execute(
+        _state_with_calls(
+            _tool_call("payload", "call-payload"),
+        )
+    )
+
+    assert _message_from(commands[0]).content == (
+        "{'update': {'value': 3}, 'goto': 'next'}"
+    )
+    assert commands[0].has_goto is False
+
+
+@pytest.mark.asyncio
+async def test_command_result_is_preserved_and_message_metadata_is_overwritten():
+    """Valid Command updates and routing survive ToolNode normalisation."""
+    returned_message = ApixToolMessage(
+        content="finished",
+        name="stale-name",
+        info={"stale": True},
+        tool_call_id="stale-call",
+    )
+
     @tool
     def update_state() -> Command:
         return Command(
             update={
-                "messages": "finished",
+                "messages": [returned_message],
                 "value": 3,
             },
             goto="next",
@@ -306,11 +388,17 @@ async def test_command_result_is_preserved_and_string_message_is_converted():
     )
 
     assert len(commands) == 1
-    assert commands[0]["goto"] == "next"
-    assert commands[0]["update"]["value"] == 3
+    assert commands[0].goto == "next"
+    assert commands[0].update["value"] == 3
     message = _message_from(commands[0])
+    assert message is returned_message
     assert message.content == "finished"
+    assert message.name == "update_state"
     assert message.tool_call_id == "call-update"
+    assert message.info["name"] == "update_state"
+    assert message.info["tool_call_id"] == "call-update"
+    assert message.info["duration"] >= 0
+    assert "stale" not in message.info
 
 
 @pytest.mark.asyncio
@@ -854,29 +942,137 @@ def test_tool_node_tool_call_list_guard_checks_container_and_items():
     assert ToolNode._is_tool_call_list([valid]) is True
 
 
-def test_normalise_command_covers_empty_non_string_update_and_goto_only():
+def test_normalise_valid_command_preserves_updates_and_goto():
     node = ToolNode(lambda: None)
     call = _tool_call("<lambda>", "call-normalise")
     existing_message = ApixToolMessage(
         content="existing",
+        name="old-name",
+        info={"old": True},
         tool_call_id="existing-call",
     )
 
-    assert node._normalise_tool_result(Command(), call) == {}
-    assert node._normalise_tool_result(
+    command = node._normalise_tool_result(
         Command(update={"messages": [existing_message], "value": 1}),
         call,
         duration=123
-    ) == {
-        "update": {
+    )
+
+    assert command == Command(
+        update={
             "messages": [existing_message],
             "value": 1,
         }
+    )
+    assert existing_message.name == "<lambda>"
+    assert existing_message.tool_call_id == "call-normalise"
+    assert existing_message.info == {
+        "name": "<lambda>",
+        "tool_call_id": "call-normalise",
+        "duration": 123,
     }
-    assert node._normalise_tool_result(
-        Command(goto=None),
+
+    goto_command = node._normalise_tool_result(
+        Command(
+            update={
+                "messages": [
+                    ApixToolMessage(
+                        content="done",
+                        tool_call_id="old",
+                    )
+                ]
+            },
+            goto=None,
+        ),
         call,
-    ) == {"goto": None}
+    )
+    assert goto_command.goto is None
+    assert goto_command.has_goto is True
+
+
+def test_normalise_tool_result_uses_configured_message_key():
+    node = ToolNode(lambda: None, message_key="history")
+    call = _tool_call("<lambda>", "call-history")
+
+    command = node._normalise_tool_result("finished", call)
+
+    assert set(command.update) == {"history"}
+    assert len(command.update["history"]) == 1
+    message = command.update["history"][0]
+    assert isinstance(message, ApixToolMessage)
+    assert message.content == "finished"
+    assert message.tool_call_id == "call-history"
+
+
+@pytest.mark.parametrize(
+    ("message_update", "error_type", "message"),
+    [
+        (
+            None,
+            TypeError,
+            r"Command\.update\['messages'\] must be a list",
+        ),
+        (
+            "finished",
+            TypeError,
+            r"Command\.update\['messages'\] must be a list",
+        ),
+        (
+            [],
+            ValueError,
+            r"must contain exactly one ApixToolMessage",
+        ),
+        (
+            [
+                ApixToolMessage(content="first", tool_call_id="first"),
+                ApixToolMessage(content="second", tool_call_id="second"),
+            ],
+            ValueError,
+            r"must contain exactly one ApixToolMessage",
+        ),
+        (
+            ["not a message"],
+            TypeError,
+            r"Command\.update\['messages'\] must be a list",
+        ),
+    ],
+)
+def test_normalise_command_requires_exactly_one_tool_message(
+    message_update,
+    error_type,
+    message,
+):
+    node = ToolNode(lambda: None)
+    call = _tool_call("<lambda>", "call-normalise")
+    update = (
+        {}
+        if message_update is None
+        else {"messages": message_update}
+    )
+
+    with pytest.raises(error_type, match=message):
+        node._normalise_tool_result(
+            Command(update=update),
+            call,
+        )
+
+
+@pytest.mark.parametrize(
+    ("command", "message"),
+    [
+        (Command(update=[]), "Command.update must be a dict"),
+        (Command(goto=1), "Command.goto must be a string or None"),
+    ],
+)
+def test_normalise_tool_result_rejects_invalid_command_fields(
+    command,
+    message,
+):
+    node = ToolNode(lambda: None)
+    call = _tool_call("<lambda>", "call-normalise")
+
+    with pytest.raises(TypeError, match=message):
+        node._normalise_tool_result(command, call)
 
 
 @pytest.mark.asyncio

@@ -661,7 +661,7 @@ def test_build_visible_messages_skips_duplicate_branch_parents(monkeypatch):
             ("user", "ai", "system", "tool", "info"),
             False,
         ),
-        ("get_messages_for_user", ("user", "ai", "info"), True),
+        ("get_messages_for_user", ("user", "ai", "info", "tool"), True),
     ],
 )
 async def test_get_messages_uses_cached_chain_and_recent_messages(

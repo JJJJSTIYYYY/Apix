@@ -5,7 +5,6 @@ import time
 from typing import Callable, Generator, Literal, Tuple
 import inflect
 
-from apix.agent.sdk.utils.message import AnyMessage, MessageRole
 from apix.common.type import IdentityError, ApixIdentity
 from apix.common.utils.logger import logger
 
@@ -96,4 +95,3 @@ def timer(name: str = "CodeBlock", callback: Callable = None) -> Generator[None,
     elapsed = time.perf_counter() - start
     if callback:
         callback(elapsed = elapsed)
-    logger.info(f"{name} - duration: {elapsed}")

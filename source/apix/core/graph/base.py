@@ -1,17 +1,16 @@
 """Shared types and predefined node names for graph execution."""
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import (
     Annotated,
     Any,
-    NotRequired,
     TypeAlias,
-    TypedDict,
     get_args,
     get_origin,
     get_type_hints,
 )
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +102,18 @@ START = "__start__"
 END = "__end__"
 """Predefined node name that completes every graph invocation."""
 
-class Command(TypedDict):
+
+class _UnsetGoto(Enum):
+    """Sentinel used to distinguish an omitted route from ``goto=None``."""
+
+    VALUE = "unset"
+
+
+_UNSET_GOTO = _UnsetGoto.VALUE
+
+
+@dataclass(slots=True)
+class Command:
     """A node result that updates state and optionally chooses the next node.
 
     Attributes:
@@ -117,8 +127,13 @@ class Command(TypedDict):
             omitting this key permits a manager-defined default transition.
     """
 
-    update: NotRequired[dict[str, Any]]
-    goto: NotRequired[str | None]
+    update: dict[str, Any] = field(default_factory=dict)
+    goto: str | None | _UnsetGoto = _UNSET_GOTO
+
+    @property
+    def has_goto(self) -> bool:
+        """Return whether ``goto`` was explicitly supplied."""
+        return self.goto is not _UNSET_GOTO
 
 
 NodeResult: TypeAlias = dict[str, Any] | Command | list[Command]

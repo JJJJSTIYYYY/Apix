@@ -7,6 +7,7 @@ import pytest
 
 from apix.core.graph import (
     AutoMerge,
+    Command,
     END,
     START,
     NodeGraph,
@@ -27,7 +28,7 @@ def test_apply_command_rejects_non_dict_update():
     graph = NodeGraph({}, {START: END})
 
     with pytest.raises(TypeError, match="Command.update must be a dict"):
-        graph.apply_command({"update": []}, START, _graph_context())
+        graph.apply_command(Command(update=[]), START, _graph_context())
 
 
 def test_apply_command_rejects_non_string_goto():
@@ -35,7 +36,15 @@ def test_apply_command_rejects_non_string_goto():
     graph = NodeGraph({}, {START: END})
 
     with pytest.raises(TypeError, match="Command.goto must be a string or None"):
-        graph.apply_command({"goto": 1}, START, _graph_context())
+        graph.apply_command(Command(goto=1), START, _graph_context())
+
+
+def test_apply_command_rejects_plain_dict():
+    """Only Command instances satisfy the direct runtime contract."""
+    graph = NodeGraph({}, {START: END})
+
+    with pytest.raises(TypeError, match="must return a Command"):
+        graph.apply_command({}, START, _graph_context())
 
 
 class AutoMergeState(TypedDict):
@@ -62,13 +71,13 @@ def test_apply_command_auto_increases_annotated_fields():
     )
 
     state, next_node = graph.apply_command(
-        {
-            "update": {
+        Command(
+            update={
                 "values": [2, 3],
                 "total": 4,
                 "replaced": [2],
             }
-        },
+        ),
         START,
         context,
     )
@@ -95,7 +104,7 @@ def test_apply_command_initializes_missing_auto_increase_field():
     )
 
     state, _ = graph.apply_command(
-        {"update": {"values": [1]}},
+        Command(update={"values": [1]}),
         START,
         _graph_context(),
     )
@@ -118,12 +127,12 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
     )
 
     state, _ = graph.apply_command(
-        {
-            "update": {
+        Command(
+            update={
                 "values": Reset([3]),
                 "replaced": Reset([4]),
             }
-        },
+        ),
         START,
         context,
     )
@@ -147,7 +156,7 @@ def test_replace_initializes_missing_auto_increase_field():
     )
 
     state, _ = graph.apply_command(
-        {"update": {"values": Reset([1])}},
+        Command(update={"values": Reset([1])}),
         START,
         _graph_context(),
     )

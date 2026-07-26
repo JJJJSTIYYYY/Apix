@@ -300,6 +300,24 @@ async def test_async_router_accepts_mapping_goto():
     assert await graph.invoke({}) == {"source": True, "target": True}
 
 
+async def test_router_accepts_command_goto():
+    """A router may select a destination with the Command dataclass."""
+    graph = (
+        GraphManager()
+        .add_node(lambda state: {"source": True}, "source")
+        .add_node(lambda state: {"target": True}, "target")
+        .add_edge(START, "source")
+        .add_router(
+            "source",
+            ["target", END],
+            lambda state: Command(goto="target"),
+        )
+        .compile_graph()
+    )
+
+    assert await graph.invoke({}) == {"source": True, "target": True}
+
+
 async def test_router_can_route_to_end():
     """END is a valid declared router destination."""
     graph = (

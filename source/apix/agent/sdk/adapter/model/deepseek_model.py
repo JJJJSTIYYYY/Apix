@@ -1,21 +1,37 @@
-from openai import OpenAI
+"""DeepSeek chat provider."""
 
-from apix.agent.sdk.utils.funcs import convert_generation_id_to_message_node_id
-from apix.agent.sdk.adapter.model.base_model import BaseModel
+from typing import ClassVar
+
+from apix.agent.sdk.adapter.model.base import (
+    OpenAICompatibleChatBot,
+    OpenAICompatibleProvider,
+    ReasoningEffort,
+)
 from apix.config.base_config import PROVIDER_BASE_URL
 
 
-class DeepSeekModel(BaseModel):
-    """DeepSeek adapter.
-    """
-    provider: str
-    default_max_retry: int
-    base_url: str
-    api_key: str
+class DeepSeekChatBot(OpenAICompatibleChatBot):
+    """A named DeepSeek chat bot."""
 
-    def __init__(self, base_url, api_key):
-        super().__init__(base_url, api_key)
-        self.provider = "deepseek"
-        if not base_url:
-            self.base_url = PROVIDER_BASE_URL.get("deepseek", "https://api.deepseek.com")
+    supports_reasoning_content = True
+    thinking_switch = True
+    reasoning_effort_map: ClassVar[dict[ReasoningEffort, str]] = {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+    }
+
+
+class DeepSeekProvider(
+    OpenAICompatibleProvider[DeepSeekChatBot]
+):
+    """Create :class:`DeepSeekChatBot` instances."""
+
+    provider = "deepseek"
+    api_key_env = "DEEPSEEK_API_KEY"
+    default_base_url = PROVIDER_BASE_URL.get(
+        "deepseek",
+        "https://api.deepseek.com/v1",
+    )
+    chat_bot_class = DeepSeekChatBot
         

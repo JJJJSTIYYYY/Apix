@@ -72,7 +72,12 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
         completion_order.append("first")
         return Command(
             update={
-                "messages": f"first:{value}",
+                "messages": [
+                    ApixToolMessage(
+                        content=f"first:{value}",
+                        tool_call_id="placeholder",
+                    )
+                ],
                 "audit": ["first"],
                 "winner": "first",
             }
@@ -84,7 +89,12 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
         completion_order.append("second")
         return Command(
             update={
-                "messages": f"second:{value}",
+                "messages": [
+                    ApixToolMessage(
+                        content=f"second:{value}",
+                        tool_call_id="placeholder",
+                    )
+                ],
                 "audit": ["second"],
                 "winner": "second",
             }
@@ -182,7 +192,14 @@ async def test_tool_command_goto_overrides_manager_default_edge():
     @tool
     def choose_route() -> Command:
         return Command(
-            update={"messages": "selected"},
+            update={
+                "messages": [
+                    ApixToolMessage(
+                        content="selected",
+                        tool_call_id="placeholder",
+                    )
+                ]
+            },
             goto="selected",
         )
 

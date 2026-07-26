@@ -25,27 +25,8 @@ class BaseNode(ABC):
 
     @staticmethod
     def _is_command(value: Any) -> TypeGuard[Command]:
-        """Return whether a dictionary has the runtime shape of Command."""
-        if not isinstance(value, dict):
-            return False
-
-        if not set(value).issubset({"update", "goto"}):
-            return False
-
-        if (
-            "update" in value
-            and not isinstance(value["update"], dict)
-        ):
-            return False
-
-        if (
-            "goto" in value
-            and value["goto"] is not None
-            and not isinstance(value["goto"], str)
-        ):
-            return False
-
-        return True
+        """Return whether ``value`` is an actual :class:`Command` instance."""
+        return isinstance(value, Command)
     
     @staticmethod
     def _normalise_result(
@@ -53,10 +34,9 @@ class BaseNode(ABC):
     ) -> Command | list[Command]:
         """Convert a node return value into one or more commands.
 
-        A regular mapping is treated as a state update. A mapping containing
-        ``goto``, or one using only the ``update``/``goto`` command keys, is
-        treated as a command. Lists are normalised item by item and preserve
-        their original order.
+        A regular mapping is always treated as a state update. Only an actual
+        :class:`Command` instance may select a route. Lists are normalised item
+        by item and preserve their original order.
 
         Raises:
             InvalidNodeReturns: If the value cannot represent a valid command.
@@ -72,26 +52,31 @@ class BaseNode(ABC):
     @staticmethod
     def _normalise_single_result(result: object) -> Command:
         """Convert one node return value into a :class:`Command`."""
+        if BaseNode._is_command(result):
+            update = result.update
+            goto = result.goto
+
+            if not isinstance(update, Mapping):
+                raise InvalidNodeReturns("Command.update must be a dict.")
+            if (
+                result.has_goto
+                and goto is not None
+                and not isinstance(goto, str)
+            ):
+                raise InvalidNodeReturns(
+                    "Command.goto must be a string or None."
+                )
+
+            if result.has_goto:
+                return Command(update=dict(update), goto=goto)
+            return Command(update=dict(update))
+
         if not isinstance(result, Mapping):
             raise InvalidNodeReturns(
                 "Node functions must return a dict or Command, or "
                 f"list[Command], got {type(result).__name__}."
             )
-        
-        # TypedDict values are ordinary dicts at runtime. ``goto`` therefore
-        # distinguishes a Command from a normal state-update dictionary.
-        command_keys = {"update", "goto"}
-        if "goto" in result or (set(result).issubset(command_keys) and "update" in result and isinstance(result["update"], Mapping)):
-            update = result.get("update", {})
-            goto = result.get("goto")
-            if not isinstance(update, Mapping):
-                raise InvalidNodeReturns("Command.update must be a dict.")
-            if goto is not None and not isinstance(goto, str):
-                raise InvalidNodeReturns("Command.goto must be a string or None.")
-            command = Command(update=dict(update))
-            if "goto" in result:
-                command["goto"] = goto
-            return command
+
         return Command(update=dict(result))
     
 

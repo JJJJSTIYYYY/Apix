@@ -199,12 +199,12 @@ class NodeGraph:
 
     def apply_command(self, command: Command, node_name: str, context: dict) -> tuple[dict, str]:
         """Return updated state and the target selected by a node command."""
-        if not isinstance(command, dict):
+        if not isinstance(command, Command):
             raise TypeError(
                 "Node.execute must return a Command or list[Command]."
             )
 
-        update = command.get("update", {})
+        update = command.update
         if not isinstance(update, dict):
             raise TypeError("Command.update must be a dict.")
         steps = context.get("steps", 0) + 1
@@ -247,7 +247,11 @@ class NodeGraph:
             else:
                 state[key] = value
 
-        next_node = command.get("goto") if "goto" in command else self._default_gotos.get(node_name, END)
+        next_node = (
+            command.goto
+            if command.has_goto
+            else self._default_gotos.get(node_name, END)
+        )
         if next_node is None:
             next_node = END
         if not isinstance(next_node, str):
