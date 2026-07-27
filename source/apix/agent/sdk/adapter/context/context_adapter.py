@@ -362,10 +362,10 @@ class AIContextAdapter:
         filter: bool = False,
     ) -> dict:
         """
-        Convert an AI or tool Apix message into a dictionary representation.
+        Convert an :class:`ApixAiMessage` or :class:`ApixToolMessage` into a dictionary representation.
 
         Args:
-            message: An instance of :class:`ApixMessageBase` to be converted.
+            message: An instance of `ApixMessageBase` to be converted.
             generation_id: The unique identifier for the current generation loop.
             parent_id: The node ID of the parent message. Defaults to '-'.
             filter: If True, returns a simplified dictionary containing only essential keys

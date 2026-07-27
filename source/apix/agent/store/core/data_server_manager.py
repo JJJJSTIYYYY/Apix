@@ -207,8 +207,8 @@ data_server_manager = DataServerManager(
 auto_init.register(data_server_manager)
 
 
-async def query_store(action: str, payload: dict) -> dict:
-    """Public api to access stre."""
+async def query_store(action: str, payload: dict) -> Any:
+    """Public api to access store."""
     query_id = await data_server_manager.submit_query(
         action=action,
         payload=payload,
@@ -216,3 +216,6 @@ async def query_store(action: str, payload: dict) -> dict:
     result = await data_server_manager.wait_result(query_id)
     if not result.get("success"):
         logger.error(f"Failed to access store: {result.get("messages")}")
+        raise RuntimeError("Some error occured in store layer, please check the logs for detail.")
+
+    return result["messages"]

@@ -1,6 +1,7 @@
 import inspect
 import json
-from typing import Callable, Dict
+from functools import wraps
+from typing import Any, Awaitable, Callable, Dict, TypeVar, cast
 from uuid import uuid4
 from datetime import datetime
 
@@ -11,6 +12,42 @@ from apix.agent.store.core.server.file_store.file_server import FileService
 from apix.agent.store.core.server.rag_store.rag_server import RagService
 from apix.agent.store.utils.decorator import task_handler
 from apix.common.utils.logger import logger
+
+
+TaskHandler = TypeVar(
+    "TaskHandler",
+    bound=Callable[..., Awaitable[dict]],
+)
+
+
+def data_task_handler(name: str) -> Callable[[TaskHandler], TaskHandler]:
+    """Register a data task and normalize unhandled handler failures.
+
+    The decorated executor keeps the existing contract that task handlers do
+    not leak ordinary exceptions to :class:`DataServerManager`. Local
+    best-effort operations should still catch and downgrade their own errors
+    inside the handler when execution is expected to continue.
+    """
+
+    def decorator(func: TaskHandler) -> TaskHandler:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> dict:
+            logger.trace()
+            try:
+                return await func(*args, **kwargs)
+            except Exception as exc:
+                logger.exception(
+                    f"Task handler `{name}` failed: {exc}"
+                )
+                return {
+                    "success": False,
+                    "messages": f"fail: {exc}",
+                }
+
+        registered = task_handler(name)(wrapper)
+        return cast(TaskHandler, registered)
+
+    return decorator
 
 
 class DataExecutors:
@@ -64,7 +101,7 @@ class DataExecutors:
 
         return handlers
         
-    @task_handler("create_a_user")
+    @data_task_handler("create_a_user")
     async def create_a_user(self, payload: dict) -> dict:
         """
         Ensure user exists in persistent storage.
@@ -75,24 +112,13 @@ class DataExecutors:
 
         Redis is NOT involved.
         """
-        try:
-            logger.trace()
-            res = await self.data_store.ensure_user_exists(payload, exist=False)
-            if not res.get("success"):
-                return res
+        res = await self.data_store.ensure_user_exists(payload, exist=False)
+        if not res.get("success"):
+            return res
             
-            return await self.data_store.create_a_user(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.create_a_user(payload)
         
-    @task_handler("verify_user")
+    @data_task_handler("verify_user")
     async def verify_user(self, payload: dict) -> dict:
         """
         Ensure user exists in persistent storage.
@@ -103,44 +129,22 @@ class DataExecutors:
 
         Redis is NOT involved.
         """
-        try:
-            logger.trace()
-            return await self.data_store.verify_user(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.verify_user(payload)
         
-    @task_handler("ensure_user_exists")
+    @data_task_handler("ensure_user_exists")
     async def ensure_user_exists(self, payload: dict) -> dict:
         """
         Ensure user exists in persistent storage.
 
         Redis is NOT involved.
         """
-        try:
-            logger.trace()
-            return await self.data_store.ensure_user_exists(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.ensure_user_exists(payload)
         
     # --------------------------------------------------
     # Conversations
     # --------------------------------------------------
 
-    @task_handler("create_new_conversation")
+    @data_task_handler("create_new_conversation")
     async def create_new_conversation(self, payload: dict) -> dict:
         """
         Create a new conversation record.
@@ -151,26 +155,14 @@ class DataExecutors:
 
         Redis is NOT involved.
         """
-        try:
-            logger.trace()
-            # 1. Ensure user exists (idempotent)
-            res = await self.data_store.ensure_user_exists(payload)
-            if not res.get("success"):
-                return res
+        res = await self.data_store.ensure_user_exists(payload)
+        if not res.get("success"):
+            return res
 
-            # 2. Create conversation
-            return await self.data_store.create_conversation(payload)
+        # 2. Create conversation
+        return await self.data_store.create_conversation(payload)
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-    @task_handler("update_conversation")
+    @data_task_handler("update_conversation")
     async def update_conversation(self, payload: dict) -> dict:
         """
         Update a conversation record.
@@ -182,70 +174,36 @@ class DataExecutors:
 
         Redis failure NOT fail the whole operation.
         """
-        try:
-            logger.trace()
-            # 1. Update redis
-            if payload.get("is_deleted", False):
-                expire_payload = payload.copy()
-                expire_payload.pop("task_hash", "")
-                await self.cache_store.expire_immediately(expire_payload)
-            # 2. Update conversation
-            return await self.data_store.update_conversation(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        if payload.get("is_deleted", False):
+            expire_payload = payload.copy()
+            expire_payload.pop("task_hash", "")
+            await self.cache_store.expire_immediately(expire_payload)
+        # 2. Update conversation
+        return await self.data_store.update_conversation(payload)
         
-    @task_handler("fetch_conversation_list")
+    @data_task_handler("fetch_conversation_list")
     async def fetch_conversation_list(self, payload: dict) -> dict:
         """
         Fetch user's conversation list.
 
         Redis is NOT involved.
         """
-        try:
-            logger.trace()
-            return await self.data_store.fetch_conversation_list(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.fetch_conversation_list(payload)
         
-    @task_handler("get_conversation_meta_by_id")
+    @data_task_handler("get_conversation_meta_by_id")
     async def get_conversation_meta_by_id(self, payload: dict) -> dict:
         """
         Fetch user's conversation list.
 
         Redis is NOT involved.
         """
-        try:
-            logger.trace()
-            return await self.data_store.get_conversation_meta_by_id(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.get_conversation_meta_by_id(payload)
         
     # --------------------------------------------------
     # Conversation Messages
     # --------------------------------------------------
 
-    @task_handler("append_message")
+    @data_task_handler("append_message")
     async def append_message(self, payload: dict) -> dict:
         """
         Append a single message to MySQL and try to backfill Redis.
@@ -256,58 +214,47 @@ class DataExecutors:
 
         Redis failure NOT fail the whole operation.
         """
+        messages = payload["messages"]
+        # 1. Persist to MySQL
+        res = await self.data_store.append_message(payload)
+        if not res.get("success"):
+            return res
+
+        # 2. Best-effort backfill Redis
+        messages_redis = payload.get("messages")
+        messages_redis.update(res.get("messages"))
+        messages_redis["is_deleted"] = False
+        payload.update({
+            "messages": messages_redis
+        })
         try:
-            logger.trace()
-            messages = payload["messages"]
-            # 1. Persist to MySQL
-            res = await self.data_store.append_message(payload)
-            if not res.get("success"):
-                return res
-
-            # 2. Best-effort backfill Redis
-            messages_redis = payload.get("messages")
-            messages_redis.update(res.get("messages"))
-            messages_redis["is_deleted"] = False
-            payload.update({
-                "messages": messages_redis
-            })
-            try:
-                logger.info(
-                    f"Redis backfill payload: {payload}"
-                )
-                await self.cache_store.append_messages(payload)
-            except Exception as e:
-                # Redis failure should not break main flow
-                logger.warning(
-                    f"Redis backfill failed: {e}"
-                )
-
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            node_id = messages.get("node_id", "")
-            parent_id = messages.get("parent_id", "")
-            await self.cache_store.update_current_messages_branch_chain_cache({
-                "user_uid": user_uid,
-                "conversation_uid": conversation_uid,
-                "node_id": node_id,
-                "parent_id": parent_id,
-            })
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
+            logger.info(
+                f"Redis backfill payload: {payload}"
             )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+            await self.cache_store.append_messages(payload)
+        except Exception as e:
+            # Redis failure should not break main flow
+            logger.warning(
+                f"Redis backfill failed: {e}"
+            )
 
-    @task_handler("delete_messages")
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        node_id = messages.get("node_id", "")
+        parent_id = messages.get("parent_id", "")
+        await self.cache_store.update_current_messages_branch_chain_cache({
+            "user_uid": user_uid,
+            "conversation_uid": conversation_uid,
+            "node_id": node_id,
+            "parent_id": parent_id,
+        })
+
+        return {
+            "success": True,
+            "messages": "success",
+        }
+
+    @data_task_handler("delete_messages")
     async def delete_messages(self, payload: dict) -> dict:
         """
         Delete one or more message from MySQL and try to expire Redis.
@@ -319,51 +266,39 @@ class DataExecutors:
         Redis failure NOT fail the whole operation.
         """
         try:
-            logger.trace()
+            await self.cache_store.expire_immediately(payload)
+        except Exception as e:
+            # Redis failure should not break main flow
+            logger.warning(
+                f"Redis backfill failed: {e}"
+            )
 
-            try:
-                await self.cache_store.expire_immediately(payload)
-            except Exception as e:
-                # Redis failure should not break main flow
-                logger.warning(
-                    f"Redis backfill failed: {e}"
-                )
+        res = await self.data_store.delete_messages(payload)
+        if not res.get("success"):
+            return res
+            
+        msg_info = res.get("messages", []) or []
+        mem_ids = []
+        for info in msg_info:
+            mem_id = info.get("id")
+            if not mem_id: continue
+            mem_ids.append(mem_id)
 
-            res = await self.data_store.delete_messages(payload)
+        if mem_ids:
+            sm_payload = {
+                "user_uid": payload.get("user_uid", ""),
+                "conversation_uid": payload.get("conversation_uid", ""),
+                "memory_ids": mem_ids
+            }
+
+            res = await self.data_store.delete_shortterm_memory(sm_payload)
             if not res.get("success"):
                 return res
-            
-            msg_info = res.get("messages", []) or []
-            mem_ids = []
-            for info in msg_info:
-                mem_id = info.get("id")
-                if not mem_id: continue
-                mem_ids.append(mem_id)
 
-            if mem_ids:
-                sm_payload = {
-                    "user_uid": payload.get("user_uid", ""),
-                    "conversation_uid": payload.get("conversation_uid", ""),
-                    "memory_ids": mem_ids
-                }
-
-                res = await self.data_store.delete_shortterm_memory(sm_payload)
-                if not res.get("success"):
-                    return res
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
     def _build_visible_messages(
         self,
@@ -464,70 +399,30 @@ class DataExecutors:
 
         return parsed, branches, node_id_chain
 
-    @task_handler("get_messages")
+    @data_task_handler("get_messages")
     async def get_messages(self, payload: dict) -> dict:
+        current_node_id = payload.get("current_node_id")
+
         try:
-            logger.trace()
+            if current_node_id == '-':
+                cache_chain_res = await self.cache_store.get_current_messages_branch_chain({
+                    "user_uid": payload["user_uid"],
+                    "conversation_uid": payload["conversation_uid"],
+                })
+                if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
+                    cached_chain = cache_chain_res.get("messages")
+                    if isinstance(cached_chain, list) and len(cached_chain)>0:
+                        current_node_id = cached_chain[-1]
+        except Exception as e:
+            logger.warning(
+                f"Get cached message id chain fialed: {e}, skip."
+            )
 
-            current_node_id = payload.get("current_node_id")
+        # 1. Redis
+        redis_res = await self.cache_store.get_recent_messages(payload)
+        if redis_res.get("success") and redis_res.get("cache_hit"):
+            messages = redis_res.get("messages", [])
 
-            try:
-                if current_node_id == '-':
-                    cache_chain_res = await self.cache_store.get_current_messages_branch_chain({
-                        "user_uid": payload["user_uid"],
-                        "conversation_uid": payload["conversation_uid"],
-                    })
-                    if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
-                        cached_chain = cache_chain_res.get("messages")
-                        if isinstance(cached_chain, list) and len(cached_chain)>0:
-                            current_node_id = cached_chain[-1]
-            except Exception as e:
-                logger.warning(
-                    f"Get cached message id chain fialed: {e}, skip."
-                )
-
-            # 1. Redis
-            redis_res = await self.cache_store.get_recent_messages(payload)
-            if redis_res.get("success") and redis_res.get("cache_hit"):
-                messages = redis_res.get("messages", [])
-
-                parsed_messages, branches, node_id_chain = self._build_visible_messages(
-                    messages,
-                    current_node_id,
-                    allow_roles=('user', 'ai', 'system', 'tool', 'info'),
-                    guess_children=False
-                )
-
-                payload["node_id_chain"] = node_id_chain
-                await self.cache_store.cache_current_messages_branch_chain(payload)
-
-                redis_res["messages"] = parsed_messages
-                redis_res["branches"] = branches
-                return redis_res
-
-            # 2. MySQL
-            mysql_payload = payload.copy()
-            mysql_payload["cursor"] = 1
-
-            mysql_res = await self.data_store.fetch_messages_after_cursor(mysql_payload)
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            messages = mysql_res.get("messages", [])
-            if not messages:
-                return mysql_res
-
-            # 3. backfill
-            try:
-                backfill_payload = payload.copy()
-                backfill_payload["messages"] = messages
-                await self.cache_store.backfill_messages(backfill_payload)
-            except Exception as e:
-                logger.warning(
-                    f"Redis backfill failed: {e}"
-                )
-
-            # 4. build branch
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
@@ -535,747 +430,497 @@ class DataExecutors:
                 guess_children=False
             )
 
-            # 5. cache current node chain
             payload["node_id_chain"] = node_id_chain
             await self.cache_store.cache_current_messages_branch_chain(payload)
 
-            mysql_res["messages"] = parsed_messages
-            mysql_res["branches"] = branches
+            redis_res["messages"] = parsed_messages
+            redis_res["branches"] = branches
+            return redis_res
+
+        # 2. MySQL
+        mysql_payload = payload.copy()
+        mysql_payload["cursor"] = 1
+
+        mysql_res = await self.data_store.fetch_messages_after_cursor(mysql_payload)
+        if not mysql_res.get("success"):
             return mysql_res
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        messages = mysql_res.get("messages", [])
+        if not messages:
+            return mysql_res
 
-    @task_handler("get_messages_for_user")
-    async def get_messages_for_user(self, payload: dict) -> dict:
+        # 3. backfill
         try:
-            logger.trace()
+            backfill_payload = payload.copy()
+            backfill_payload["messages"] = messages
+            await self.cache_store.backfill_messages(backfill_payload)
+        except Exception as e:
+            logger.warning(
+                f"Redis backfill failed: {e}"
+            )
 
-            current_node_id = payload.get("current_node_id")
+        # 4. build branch
+        parsed_messages, branches, node_id_chain = self._build_visible_messages(
+            messages,
+            current_node_id,
+            allow_roles=('user', 'ai', 'system', 'tool', 'info'),
+            guess_children=False
+        )
 
-            try:
-                if current_node_id == '-':
-                    cache_chain_res = await self.cache_store.get_current_messages_branch_chain({
-                        "user_uid": payload["user_uid"],
-                        "conversation_uid": payload["conversation_uid"],
-                    })
-                    if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
-                        cached_chain = cache_chain_res.get("messages")
-                        if isinstance(cached_chain, list) and len(cached_chain)>0:
-                            current_node_id = cached_chain[-1]
-            except Exception as e:
-                logger.warning(
-                    f"Get cached message id chain fialed: {e}, skip."
-                )
+        # 5. cache current node chain
+        payload["node_id_chain"] = node_id_chain
+        await self.cache_store.cache_current_messages_branch_chain(payload)
 
-            # 1. Redis
-            redis_res = await self.cache_store.get_recent_messages(payload)
-            if redis_res.get("success") and redis_res.get("cache_hit"):
-                messages = redis_res.get("messages", [])
+        mysql_res["messages"] = parsed_messages
+        mysql_res["branches"] = branches
+        return mysql_res
 
-                parsed_messages, branches, node_id_chain = self._build_visible_messages(
-                    messages,
-                    current_node_id,
-                    allow_roles=('user', 'ai', 'info', 'tool')
-                )
+    @data_task_handler("get_messages_for_user")
+    async def get_messages_for_user(self, payload: dict) -> dict:
+        current_node_id = payload.get("current_node_id")
 
-                payload["node_id_chain"] = node_id_chain
-                await self.cache_store.cache_current_messages_branch_chain(payload)
+        try:
+            if current_node_id == '-':
+                cache_chain_res = await self.cache_store.get_current_messages_branch_chain({
+                    "user_uid": payload["user_uid"],
+                    "conversation_uid": payload["conversation_uid"],
+                })
+                if cache_chain_res.get("success") and cache_chain_res.get("cache_hit"):
+                    cached_chain = cache_chain_res.get("messages")
+                    if isinstance(cached_chain, list) and len(cached_chain)>0:
+                        current_node_id = cached_chain[-1]
+        except Exception as e:
+            logger.warning(
+                f"Get cached message id chain fialed: {e}, skip."
+            )
 
-                redis_res["messages"] = parsed_messages
-                redis_res["branches"] = branches
-                return redis_res
+        # 1. Redis
+        redis_res = await self.cache_store.get_recent_messages(payload)
+        if redis_res.get("success") and redis_res.get("cache_hit"):
+            messages = redis_res.get("messages", [])
 
-            # 2. MySQL
-            mysql_payload = payload.copy()
-            mysql_payload["cursor"] = 1
-
-            mysql_res = await self.data_store.fetch_messages_after_cursor(mysql_payload)
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            messages = mysql_res.get("messages", [])
-            if not messages:
-                return mysql_res
-
-            # 3. backfill
-            try:
-                backfill_payload = payload.copy()
-                backfill_payload["messages"] = messages
-                await self.cache_store.backfill_messages(backfill_payload)
-            except Exception as e:
-                logger.warning(
-                    f"Redis backfill failed: {e}"
-                )
-
-            # 4. build branch
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
                 allow_roles=('user', 'ai', 'info', 'tool')
             )
 
-            # 5. cache current node chain
             payload["node_id_chain"] = node_id_chain
             await self.cache_store.cache_current_messages_branch_chain(payload)
 
-            mysql_res["messages"] = parsed_messages
-            mysql_res["branches"] = branches
+            redis_res["messages"] = parsed_messages
+            redis_res["branches"] = branches
+            return redis_res
+
+        # 2. MySQL
+        mysql_payload = payload.copy()
+        mysql_payload["cursor"] = 1
+
+        mysql_res = await self.data_store.fetch_messages_after_cursor(mysql_payload)
+        if not mysql_res.get("success"):
             return mysql_res
 
+        messages = mysql_res.get("messages", [])
+        if not messages:
+            return mysql_res
+
+        # 3. backfill
+        try:
+            backfill_payload = payload.copy()
+            backfill_payload["messages"] = messages
+            await self.cache_store.backfill_messages(backfill_payload)
         except Exception as e:
-            logger.exception(
-                f"Error: {e}"
+            logger.warning(
+                f"Redis backfill failed: {e}"
             )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+
+        # 4. build branch
+        parsed_messages, branches, node_id_chain = self._build_visible_messages(
+            messages,
+            current_node_id,
+            allow_roles=('user', 'ai', 'info', 'tool')
+        )
+
+        # 5. cache current node chain
+        payload["node_id_chain"] = node_id_chain
+        await self.cache_store.cache_current_messages_branch_chain(payload)
+
+        mysql_res["messages"] = parsed_messages
+        mysql_res["branches"] = branches
+        return mysql_res
         
-    @task_handler("search_messages_by_keyword")
+    @data_task_handler("search_messages_by_keyword")
     async def search_messages_by_keyword(self, payload: dict) -> dict:
-        try:
-            logger.trace()
-            return await self.data_store.search_messages_by_keyword(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.search_messages_by_keyword(payload)
         
-    @task_handler("get_current_messages_branch_chain")
+    @data_task_handler("get_current_messages_branch_chain")
     async def get_current_messages_branch_chain(self, payload: dict) -> dict:
-        try:
-            logger.trace()
-            return await self.cache_store.get_current_messages_branch_chain(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.cache_store.get_current_messages_branch_chain(payload)
         
     # --------------------------------------------------
     # Files
     # --------------------------------------------------
 
-    @task_handler("upload_file_to_workspace")
+    @data_task_handler("upload_file_to_workspace")
     async def upload_file_to_workspace(self, payload: dict) -> dict:
         """
         Move selected files into workspace.
         """
-        try:
-            logger.trace()
-            res = await self.data_store.ensure_user_exists(payload)
-            if not res.get("success"):
-                return res
-            return await self.file_server.save_file(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        res = await self.data_store.ensure_user_exists(payload)
+        if not res.get("success"):
+            return res
+        return await self.file_server.save_file(payload)
 
     # ------------------------------------------------------------------
     # Skills Files
     # ------------------------------------------------------------------
 
-    @task_handler("insert_skills")
+    @data_task_handler("insert_skills")
     async def insert_skills(self, payload: dict) -> dict:
         """
         Fetch recent files uploaded by user.
 
         Mention: This method does not fetch binary.
         """
-        try:
-            logger.trace()
+        res = await self.data_store.ensure_user_exists(payload)
+        if not res.get("success"):
+            return res
 
-            res = await self.data_store.ensure_user_exists(payload)
-            if not res.get("success"):
-                return res
-
-            file_res = await self.file_server.handle_skill_package(payload)
-            if not file_res.get("success"):
-                return file_res
+        file_res = await self.file_server.handle_skill_package(payload)
+        if not file_res.get("success"):
+            return file_res
             
-            skill_payload = {
-                "user_uid": payload["user_uid"],
-                "skills": file_res.get("messages", []),
-            }
-            mysql_res = await self.data_store.insert_skill_info(skill_payload)
-            if not mysql_res.get("success"):
-                return mysql_res
+        skill_payload = {
+            "user_uid": payload["user_uid"],
+            "skills": file_res.get("messages", []),
+        }
+        mysql_res = await self.data_store.insert_skill_info(skill_payload)
+        if not mysql_res.get("success"):
+            return mysql_res
             
-            skill_info_list = file_res.get("messages", [])
-            visible_skill_info_list = []
+        skill_info_list = file_res.get("messages", [])
+        visible_skill_info_list = []
 
-            for skill_info in skill_info_list:
-                visible_skill_info = {
-                    "skill_id": skill_info.get('skill_id'),
-                    "skill_name": skill_info.get('skill_name'),
-                    "skill_description": skill_info.get('skill_description'),
-                    "skill_version": skill_info.get('skill_version'),
-                    "package_size": skill_info.get('package_size'),
-                    "is_active": False,
-                    "upload_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-                visible_skill_info_list.append(visible_skill_info)
-
-            return {
-                "success": True,
-                "messages": visible_skill_info_list,
+        for skill_info in skill_info_list:
+            visible_skill_info = {
+                "skill_id": skill_info.get('skill_id'),
+                "skill_name": skill_info.get('skill_name'),
+                "skill_description": skill_info.get('skill_description'),
+                "skill_version": skill_info.get('skill_version'),
+                "package_size": skill_info.get('package_size'),
+                "is_active": False,
+                "upload_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
+            visible_skill_info_list.append(visible_skill_info)
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return {
+            "success": True,
+            "messages": visible_skill_info_list,
+        }
 
-    @task_handler("update_skill")
+    @data_task_handler("update_skill")
     async def update_skill(self, payload: dict) -> dict:
         """
         Update skill info in MySQL.
         Typically used to mark a file as deleted or active.
         """
-        try:
-            logger.trace()
-            return await self.data_store.update_skill_status(payload)
+        return await self.data_store.update_skill_status(payload)
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-    @task_handler("fetch_skills")
+    @data_task_handler("fetch_skills")
     async def fetch_skills(self, payload: dict) -> dict:
         """
         Fetch skills uploaded by user.
 
         Mention: This method does not fetch binary.
         """
-        try:
-            logger.trace()
-            return await self.data_store.fetch_available_skills(payload)
+        return await self.data_store.fetch_available_skills(payload)
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-    @task_handler("fetch_target_skill")
+    @data_task_handler("fetch_target_skill")
     async def fetch_target_skill(self, payload: dict) -> dict:
         """
         Fetch target skill uploaded by user.
 
         Mention: This method does not fetch binary.
         """
-        try:
-            logger.trace()
-            return await self.data_store.fetch_target_skill(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.fetch_target_skill(payload)
 
     # --------------------------------------------------
     # Short-term Memory
     # --------------------------------------------------
     
-    @task_handler("fetch_shortterm_memory")
+    @data_task_handler("fetch_shortterm_memory")
     async def fetch_shortterm_memory(self, payload: dict) -> dict:
         """
         Fetch shortterm memory.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.fetch_shortterm_memory(payload)
 
-            mysql_res = await self.data_store.fetch_shortterm_memory(payload)
-
-            return mysql_res
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return mysql_res
         
-    @task_handler("insert_shortterm_memory")
+    @data_task_handler("insert_shortterm_memory")
     async def insert_shortterm_memory(self, payload: dict) -> dict:
         """
         Insert shortterm memory.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.insert_shortterm_memory(payload)
 
-            mysql_res = await self.data_store.insert_shortterm_memory(payload)
-
-            return mysql_res
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return mysql_res
 
     # --------------------------------------------------
     # LLM Provider
     # --------------------------------------------------
 
-    @task_handler("create_llm_provider")
+    @data_task_handler("create_llm_provider")
     async def create_llm_provider(self, payload: dict) -> dict:
         """
         Insert a llm provider meta in database.
         """
-        try:
-            logger.trace()
-            provider_id = str(uuid4().hex)
-            payload["provider_id"] = provider_id
+        provider_id = str(uuid4().hex)
+        payload["provider_id"] = provider_id
 
-            return await self.data_store.create_llm_provider(payload)
+        return await self.data_store.create_llm_provider(payload)
         
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-    @task_handler("get_llm_providers")
+    @data_task_handler("get_llm_providers")
     async def get_llm_providers(self, payload: dict) -> dict:
         """
         Get all llm provider meta in database.
         """
-        try:
-            logger.trace()
-
-            mysql_res = await self.data_store.get_llm_providers(payload)
-            if not mysql_res.get("success"):
-                return mysql_res
-            
-            parsed = []
-            providers = mysql_res.get("messages", []) or []
-            for p in providers:
-                model_list = p.get("model_list", []) or []
-                if not isinstance(model_list, list):
-                    p["model_list"] = json.loads(model_list)
-                parsed.append(p)
-            
-            mysql_res["messages"] = parsed
+        mysql_res = await self.data_store.get_llm_providers(payload)
+        if not mysql_res.get("success"):
             return mysql_res
+            
+        parsed = []
+        providers = mysql_res.get("messages", []) or []
+        for p in providers:
+            model_list = p.get("model_list", []) or []
+            if not isinstance(model_list, list):
+                p["model_list"] = json.loads(model_list)
+            parsed.append(p)
+            
+        mysql_res["messages"] = parsed
+        return mysql_res
         
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-    @task_handler("get_llm_provider_by_id")
+    @data_task_handler("get_llm_provider_by_id")
     async def get_llm_provider_by_id(self, payload: dict) -> dict:
         """
         Get a llm provider meta in database.
         """
-        try:
-            logger.trace()
-
-            mysql_res = await self.data_store.get_llm_provider_by_id(payload)
-            if not mysql_res.get("success"):
-                return mysql_res
-            
-            parsed = []
-            providers = mysql_res.get("messages", []) or []
-            for p in providers:
-                model_list = p.get("model_list", []) or []
-                if not isinstance(model_list, list):
-                    p["model_list"] = json.loads(model_list)
-                parsed.append(p)
-            
-            mysql_res["messages"] = parsed
+        mysql_res = await self.data_store.get_llm_provider_by_id(payload)
+        if not mysql_res.get("success"):
             return mysql_res
+            
+        parsed = []
+        providers = mysql_res.get("messages", []) or []
+        for p in providers:
+            model_list = p.get("model_list", []) or []
+            if not isinstance(model_list, list):
+                p["model_list"] = json.loads(model_list)
+            parsed.append(p)
+            
+        mysql_res["messages"] = parsed
+        return mysql_res
         
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-    @task_handler("update_llm_provider")
+    @data_task_handler("update_llm_provider")
     async def update_llm_provider(self, payload: dict) -> dict:
         """
         Update a llm provider meta in database, include is_deleted status.
         """
-        try:
-            logger.trace()
-
-            return await self.data_store.update_llm_provider(payload)
-        
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.update_llm_provider(payload)
         
     # --------------------------------------------------
     # MCP Server
     # --------------------------------------------------
 
-    @task_handler("create_mcp_server")
+    @data_task_handler("create_mcp_server")
     async def create_mcp_server(self, payload: dict) -> dict:
         """
         Insert a mcp server meta in database.
         """
-        try:
-            logger.trace()
+        mcp_id = str(uuid4().hex)
+        payload["mcp_id"] = mcp_id
 
-            mcp_id = str(uuid4().hex)
-            payload["mcp_id"] = mcp_id
-
-            return await self.data_store.create_mcp_server(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.create_mcp_server(payload)
 
 
-    @task_handler("get_mcp_servers")
+    @data_task_handler("get_mcp_servers")
     async def get_mcp_servers(self, payload: dict) -> dict:
         """
         Get all mcp server meta in database.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.get_mcp_servers(payload)
 
-            mysql_res = await self.data_store.get_mcp_servers(payload)
-
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            parsed = []
-
-            servers = mysql_res.get("messages", []) or []
-
-            for server in servers:
-
-                config = server.get("config")
-
-                if config and not isinstance(config, (dict, list)):
-                    try:
-                        server["config"] = json.loads(config)
-                    except Exception:
-                        server["config"] = {}
-
-                parsed.append(server)
-
-            mysql_res["messages"] = parsed
-
+        if not mysql_res.get("success"):
             return mysql_res
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
+        parsed = []
 
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        servers = mysql_res.get("messages", []) or []
+
+        for server in servers:
+
+            config = server.get("config")
+
+            if config and not isinstance(config, (dict, list)):
+                try:
+                    server["config"] = json.loads(config)
+                except Exception:
+                    server["config"] = {}
+
+            parsed.append(server)
+
+        mysql_res["messages"] = parsed
+
+        return mysql_res
 
 
-    @task_handler("get_enabled_mcp_servers")
+    @data_task_handler("get_enabled_mcp_servers")
     async def get_enabled_mcp_servers(self, payload: dict) -> dict:
         """
         Get enabled mcp server meta in database.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.get_enabled_mcp_servers(payload)
 
-            mysql_res = await self.data_store.get_enabled_mcp_servers(payload)
-
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            parsed = []
-
-            servers = mysql_res.get("messages", []) or []
-
-            for server in servers:
-
-                config = server.get("config")
-
-                if config and not isinstance(config, (dict, list)):
-                    try:
-                        server["config"] = json.loads(config)
-                    except Exception:
-                        server["config"] = {}
-
-                parsed.append(server)
-
-            mysql_res["messages"] = parsed
-
+        if not mysql_res.get("success"):
             return mysql_res
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
+        parsed = []
 
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        servers = mysql_res.get("messages", []) or []
+
+        for server in servers:
+
+            config = server.get("config")
+
+            if config and not isinstance(config, (dict, list)):
+                try:
+                    server["config"] = json.loads(config)
+                except Exception:
+                    server["config"] = {}
+
+            parsed.append(server)
+
+        mysql_res["messages"] = parsed
+
+        return mysql_res
 
 
-    @task_handler("update_mcp_server")
+    @data_task_handler("update_mcp_server")
     async def update_mcp_server(self, payload: dict) -> dict:
         """
         Update a mcp server meta in database,
         include enabled/tool_count/is_deleted status.
         """
-        try:
-            logger.trace()
-
-            return await self.data_store.update_mcp_server(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.update_mcp_server(payload)
         
 
-    @task_handler("create_cron_task")
+    @data_task_handler("create_cron_task")
     async def create_cron_task(self, payload: dict) -> dict:
         """
         Insert a cron task meta in database.
         """
-        try:
-            logger.trace()
+        task_id = str(uuid4().hex)
+        payload["task_id"] = task_id
 
-            task_id = str(uuid4().hex)
-            payload["task_id"] = task_id
-
-            return await self.data_store.create_cron_task(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.create_cron_task(payload)
         
 
-    @task_handler("get_all_enabled_cron_tasks")
+    @data_task_handler("get_all_enabled_cron_tasks")
     async def get_all_enabled_cron_tasks(self, payload: dict) -> dict:
         """
         Get all cron task meta in database.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.get_all_enabled_cron_tasks(payload)
 
-            mysql_res = await self.data_store.get_all_enabled_cron_tasks(payload)
-
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            parsed = []
-
-            crons = mysql_res.get("messages", []) or []
-
-            for cron in crons:
-
-                config = cron.get("extra_config")
-
-                if config and not isinstance(config, (dict, list)):
-                    try:
-                        cron["extra_config"] = json.loads(config)
-                    except Exception:
-                        cron["extra_config"] = {}
-
-                parsed.append(cron)
-
-            mysql_res["messages"] = parsed
-
+        if not mysql_res.get("success"):
             return mysql_res
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
+        parsed = []
 
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        crons = mysql_res.get("messages", []) or []
+
+        for cron in crons:
+
+            config = cron.get("extra_config")
+
+            if config and not isinstance(config, (dict, list)):
+                try:
+                    cron["extra_config"] = json.loads(config)
+                except Exception:
+                    cron["extra_config"] = {}
+
+            parsed.append(cron)
+
+        mysql_res["messages"] = parsed
+
+        return mysql_res
         
 
-    @task_handler("get_cron_tasks")
+    @data_task_handler("get_cron_tasks")
     async def get_cron_tasks(self, payload: dict) -> dict:
         """
         Get all cron task meta in database.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.get_cron_tasks(payload)
 
-            mysql_res = await self.data_store.get_cron_tasks(payload)
-
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            parsed = []
-
-            crons = mysql_res.get("messages", []) or []
-
-            for cron in crons:
-
-                config = cron.get("extra_config")
-
-                if config and not isinstance(config, (dict, list)):
-                    try:
-                        cron["extra_config"] = json.loads(config)
-                    except Exception:
-                        cron["extra_config"] = {}
-
-                parsed.append(cron)
-
-            mysql_res["messages"] = parsed
-
+        if not mysql_res.get("success"):
             return mysql_res
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
+        parsed = []
 
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        crons = mysql_res.get("messages", []) or []
+
+        for cron in crons:
+
+            config = cron.get("extra_config")
+
+            if config and not isinstance(config, (dict, list)):
+                try:
+                    cron["extra_config"] = json.loads(config)
+                except Exception:
+                    cron["extra_config"] = {}
+
+            parsed.append(cron)
+
+        mysql_res["messages"] = parsed
+
+        return mysql_res
         
 
-    @task_handler("get_cron_task_by_id")
+    @data_task_handler("get_cron_task_by_id")
     async def get_cron_task_by_id(self, payload: dict) -> dict:
         """
         Get a cron task meta in database.
         """
-        try:
-            logger.trace()
+        mysql_res = await self.data_store.get_cron_task_by_id(payload)
 
-            mysql_res = await self.data_store.get_cron_task_by_id(payload)
-
-            if not mysql_res.get("success"):
-                return mysql_res
-
-            parsed = []
-
-            crons = mysql_res.get("messages", []) or []
-
-            for cron in crons:
-
-                config = cron.get("extra_config")
-
-                if config and not isinstance(config, (dict, list)):
-                    try:
-                        cron["extra_config"] = json.loads(config)
-                    except Exception:
-                        cron["extra_config"] = {}
-
-                parsed.append(cron)
-
-            mysql_res["messages"] = parsed
-
+        if not mysql_res.get("success"):
             return mysql_res
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
+        parsed = []
 
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        crons = mysql_res.get("messages", []) or []
+
+        for cron in crons:
+
+            config = cron.get("extra_config")
+
+            if config and not isinstance(config, (dict, list)):
+                try:
+                    cron["extra_config"] = json.loads(config)
+                except Exception:
+                    cron["extra_config"] = {}
+
+            parsed.append(cron)
+
+        mysql_res["messages"] = parsed
+
+        return mysql_res
         
 
-    @task_handler("update_cron_task")
+    @data_task_handler("update_cron_task")
     async def update_cron_task(self, payload: dict) -> dict:
         """
         Update a cron task meta in database,
         include enabled/is_deleted status.
         """
-        try:
-            logger.trace()
-
-            return await self.data_store.update_cron_task(payload)
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {e}"
-            )
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return await self.data_store.update_cron_task(payload)
