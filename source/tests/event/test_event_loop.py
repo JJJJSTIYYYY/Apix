@@ -59,7 +59,7 @@ def _make_event(event_name="test.event", accepted=False):
     """Create a test ApixEvent."""
     return ApixEvent(
         event_id="event-"+uuid4().hex,
-        event_type=EventType.INFO,
+        event_type=EventType.WORKFLOW,
         event_name=event_name,
         context=None,
         timestamp=0.0,

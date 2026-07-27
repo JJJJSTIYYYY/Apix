@@ -35,7 +35,7 @@ import pytest
 def sample_event():
     """Create a basic sample event."""
     return ApixEvent(
-        event_type=EventType.INFO,
+        event_type=EventType.WORKFLOW,
         event_name="test.event",
         context={"key": "value"},
         timestamp=time.time(),
@@ -47,7 +47,7 @@ def sample_event():
 def sample_event_no_name():
     """Create event with empty name."""
     return ApixEvent(
-        event_type=EventType.INFO,
+        event_type=EventType.WORKFLOW,
         event_name="",
         context=None,
         timestamp=time.time(),
@@ -62,7 +62,7 @@ def make_event():
     def _make(event_name="test.event", event_type=None, context=None):
         return ApixEvent(
             event_id="event-"+uuid4().hex,
-            event_type=event_type or EventType.INFO,
+            event_type=event_type or EventType.WORKFLOW,
             event_name=event_name,
             context=context,
             timestamp=time.time(),

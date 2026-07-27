@@ -264,7 +264,7 @@ class NodeGraph:
         if node_name not in (START, END) and node_name not in self._nodes:
             raise ValueError(f"Unknown graph node `{node_name}`.")
         await event_pipe_writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name=node_name,
             context=context,
         )

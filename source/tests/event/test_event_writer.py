@@ -26,7 +26,7 @@ class TestEventPipeWriterPostEvent:
         await writer.clear()
 
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="test.event",
             context={"key": "val"},
         )
@@ -34,7 +34,7 @@ class TestEventPipeWriterPostEvent:
         event = await writer.get_event()
 
         assert isinstance(event, ApixEvent)
-        assert event.event_type == EventType.INFO
+        assert event.event_type == EventType.WORKFLOW
         assert event.event_name == "test.event"
         assert event.context == {"key": "val"}
         assert isinstance(event.timestamp, float)
@@ -62,7 +62,7 @@ class TestEventPipeWriterPostEvent:
 
         before = time.time()
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="time.event",
         )
         after = time.time()
@@ -77,11 +77,11 @@ class TestEventPipeWriterPostEvent:
         await writer.clear()
 
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="event.1",
         )
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="event.2",
         )
         await writer.post_event(
@@ -109,7 +109,7 @@ class TestEventPipeWriterGetEvent:
         await writer.clear()
 
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="test.event",
         )
 
@@ -142,15 +142,15 @@ class TestEventPipeWriterClear:
         await writer.clear()
 
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="e1",
         )
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="e2",
         )
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="e3",
         )
 
@@ -168,11 +168,11 @@ class TestEventPipeWriterClear:
         await writer.clear()
 
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="keep",
         )
         await writer.post_event(
-            event_type=EventType.INFO,
+            event_type=EventType.WORKFLOW,
             event_name="discard",
         )
 
