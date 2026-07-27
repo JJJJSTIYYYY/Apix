@@ -15,7 +15,12 @@ class Todo(TypedDict):
     status: Literal["pending", "in_progress", "completed"]
 
 
-class MemoItem(TypedDict):
+class Skill(TypedDict):
+    name: str
+    description: Literal["pending", "in_progress", "completed"]
+
+
+class Memory(TypedDict):
     title: str
     date: str # 2025-06-07
     content: str
@@ -44,7 +49,7 @@ class AgentConfigSchema(TypedDict):
     use_model_vision: bool  # If true, the picture will be sent to the LLM to analyze if the LLM supports picture input.
 
     # Agent Runtime Behavior
-    work_dir: str
+    workspace: str
 
     # Memory Strategy
     enable_longterm_memory: bool
@@ -104,7 +109,7 @@ class MainAgentState(GraphRuntimeContext):
     context_fold_split_mark: NotRequired[str] # Split by completed | in_progress & pending todos, store with message id
     sandbox: str # Docker container id
     todos: NotRequired[list[Todo]]
-    memorandum: NotRequired[list[MemoItem]]
+    memorandum: NotRequired[list[Memory]]
     skills: list # Include available skills name and description
     loaded_skills_cache: list[tuple[str, bool, str]] # (name, injected, content): Skill name, injection status, and SKILL.md content
 

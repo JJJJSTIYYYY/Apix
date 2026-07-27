@@ -6,7 +6,7 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 from apix.agent.sdk.utils.message import ApixMessageBase, ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
-from apix.agent.sdk.graph.state import MainAgentState, MemoItem, Todo
+from apix.agent.sdk.graph.state import MainAgentState, Memory, Skill, Todo, Memory
 from apix.common.utils.logger import logger
 
 
@@ -17,6 +17,34 @@ class AIContextAdapter:
     _MISSING_TOOL_OUTPUT = (
         "[The outputs of this tool have been lost, or the tool's execution was interrupted by the user.]"
     )
+
+    def build_runtime_context(
+            self, 
+            agent_messages: list[AnyMessage], 
+            *,
+            todo: list[Todo] | None = None,
+            skill: list[Skill] | None = None,
+            memory: list[Memory] | None = None,
+            workspace: str | None = None
+        ) -> list[AnyMessage]:
+        """Build a frequently updated prompt and inject it into the last message object.
+        The last object in `agent_messages` should be a :class:`ApixUserMessage`.
+
+        Args:
+            agent_messages: A list of :class:`ApixMessageBase` instances.
+            todo: Optional, the current todo list.
+            skill: Optional, the current skill list.
+            memory: Optional, the current memory list.
+            workspace: Optional, the current workspace directory in the sandbox.
+
+        Returns:
+            list[AnyMessage]: The message list after injection.
+
+        Raises:
+            ValueError: If the last message in the list is not a :class:`ApixUserMessage`.
+        """
+        pass
+    
 
     def _build_user_context(self, extra: dict[str, Any], todo: list[Todo] = None) -> str:
         context_parts: list[str] = []
@@ -894,13 +922,13 @@ class AIContextAdapter:
     ) -> str:
         sandbox = state.get("sandbox", "")
         config = state.get("config", {})
-        work_dir = config.get("work_dir", "")
+        workspace = config.get("workspace", "")
 
-        if not work_dir:
+        if not workspace:
             return "## No workspace directory has been specified by the user.\n\n"
 
-        if not os.path.exists(work_dir):
-            raise FileNotFoundError(f"Workspace directory does not exist: {work_dir}")
+        if not os.path.exists(workspace):
+            raise FileNotFoundError(f"Workspace directory does not exist: {workspace}")
 
         if not sandbox:
             return "## Sandbox configuration failed.\n\n"
@@ -910,13 +938,13 @@ class AIContextAdapter:
 An Ubuntu sandbox is available and shared with the user.
 
 Workspace mapping:
-{work_dir} → /workspace
+{workspace} → /workspace
 
 Rules:
 - Use `/workspace` as the workspace root inside the sandbox.
 - Prefer relative paths in project code file whenever possible.
 - Never expose `/workspace` in user-facing responses.
-- When showing file paths to the user, always use `{work_dir}`.
+- When showing file paths to the user, always use `{workspace}`.
 
 Examples:
 
@@ -926,8 +954,8 @@ Sandbox usage:
 - Preferred in project code: open("data/input.csv")
 
 User-facing output:
-- Show image in Markdown: ![Image]({work_dir}/images/result.png)
-- Report output file: File saved to: {work_dir}/report.pdf
+- Show image in Markdown: ![Image]({workspace}/images/result.png)
+- Report output file: File saved to: {workspace}/report.pdf
 """
     
 
@@ -956,7 +984,7 @@ User-facing output:
         state: MainAgentState,
         agent_role: str = None,
     ) -> str:
-        memorandum_list: List[MemoItem] = state.get("memorandum", [])
+        memorandum_list: List[Memory] = state.get("memorandum", [])
 
         if not memorandum_list:
             return "## No memories available.\n\n"

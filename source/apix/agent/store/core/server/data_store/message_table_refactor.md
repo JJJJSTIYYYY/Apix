@@ -32,6 +32,8 @@
 - 同步对齐apix/agent/store/core/server/cache_store缓存模块；
 - 同步对齐apix/agent/store/core/execute_layer.py业务执行层代码；
 - 同步对齐store模块的测试；
-- 同步对齐apix/agent/sdk/utils/message.py的消息对象定义，暂不修改消息对象的使用处；
+- 同步对齐apix/agent/sdk/utils/message.py的消息对象定义，同步修改消息对象的使用处；
 - 数据库中可以自动创建的部分，如时间戳、自增的主键id，不需要在消息对象中保存，以免不一致；
 - 消息对象中善用@property，以便捷获取extensions字段中的数据；
+- 告知我重构时修改过的文件；
+- ** 项目正处在快速迭代阶段，无需考虑兼容旧数据模型 **

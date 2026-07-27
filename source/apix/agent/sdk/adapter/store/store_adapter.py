@@ -4,7 +4,7 @@ from pathlib import Path
 from apix.agent.store import query_store
 from apix.agent.sdk.utils.message import AnyMessage, _utc_now_iso
 from apix.agent.sdk.utils.funcs import check_identity, convert_generation_id_to_message_node_id
-from apix.agent.sdk.graph.state import MainAgentState, MemoItem, Todo
+from apix.agent.sdk.graph.state import MainAgentState, Memory, Todo
 from apix.common.type import ApixIdentity
 from apix.common.utils.logger import logger
 from apix.common.utils.yaml import load_from_yaml
@@ -289,14 +289,14 @@ class AIStoreAdapter:
     def init_memorandum_list(self, state: MainAgentState):
         user_uid = state.get("user_uid", "")
         conversation_uid = state.get("conversation_uid", "")
-        workspace = state.get("config", {}).get("work_dir")
+        workspace = state.get("config", {}).get("workspace")
 
         memo_namespace = user_uid + ":" + (workspace or conversation_uid) + ":" + state.get("agent_role")
         fallback_memo_namespace = user_uid + ":" + conversation_uid + ":" + state.get("agent_role")
 
         memo_dir = Path(BASE_DIR) / "memo"
 
-        def load_memories(namespace: str) -> list[MemoItem]:
+        def load_memories(namespace: str) -> list[Memory]:
             hash_input = namespace.encode("utf-8")
             memo_filename = hashlib.sha256(hash_input).hexdigest()
             memo_path = memo_dir / f"{memo_filename}.yaml"
