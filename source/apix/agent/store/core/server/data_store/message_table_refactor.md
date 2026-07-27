@@ -5,7 +5,8 @@
 ### 保留及新增字段：
 
 - `id` - 数据库内部自增主键 (保持原设计)
-- `message_uid` - 消息的unique id，
+- `message_uid` - 消息的unique id
+- `msg_cursor` - 业务id字段 (保持原设计)
 - `user_uid` - 用户归属 (保持原设计)
 - `conversation_id` - 数据库内部join id，提升join性能用，为conversation表的主键id (保持原设计)
 - `conversation_uid` - 会话归属 (保持原设计)
@@ -25,7 +26,6 @@
 - `extra`
 - `info`
 - `think`
-- `msg_cursor` - 需要同步修改conversation表的latest_cursor，使用消息的数据库内部自增主键id替代
 
 ### 注：
 
