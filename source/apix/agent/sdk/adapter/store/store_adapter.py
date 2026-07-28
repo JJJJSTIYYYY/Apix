@@ -6,7 +6,7 @@ from apix.agent.store import query_store
 from apix.agent.sdk.utils.message import AnyMessage
 from apix.agent.sdk.adapter.context.context_adapter import ai_context_adapter
 from apix.agent.sdk.utils.funcs import check_identity, convert_generation_id_to_message_node_id
-from apix.agent.sdk.graph.state import MainAgentState, Memory, Todo
+from apix.agent.sdk.graph.state import MainAgentState, LongtermMemory, ShorttermMemory, Skill, Todo
 from apix.common.type import ApixIdentity
 from apix.common.utils.logger import logger
 from apix.common.utils.yaml import load_from_yaml
@@ -16,7 +16,7 @@ class AIStoreAdapter:
     """Store adapter for agent sdk."""
 
 
-    async def append_to_store(
+    async def append_message_to_store(
         self, 
         message: AnyMessage | dict,
         identity: ApixIdentity,
@@ -115,7 +115,7 @@ class AIStoreAdapter:
             "metadata": metadata or {},
             "extensions": extensions or {},
         }
-        await self.append_to_store(
+        await self.append_message_to_store(
             message,
             identity,
             generation_id,
@@ -123,22 +123,24 @@ class AIStoreAdapter:
         )
 
         
-    async def insert_shortterm_memory(self, user_uid: str, conversation_uid: str, memory_id: str, content: str):
+    async def append_shortterm_to_store(self, content: str, identity: ApixIdentity, memory_id: str):
         """
-        Insert shortterm memory to memory service.
+        Append a shortterm memory to store.
 
         Args:
-            user_uid: "Id to indicate which user the data is from.",
-            conversation_uid: history id,
+            content: the content of this shortterm memory.
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
             memory_id: The related message's ``message_uid``.
-            content: shortterm memory content
 
         Returns:
             None
         """
         logger.trace()
         content = content.strip()
-        if not content: return
+        if not content: 
+            logger.error("Can not append an empty memory to database.")
+            return
+        user_uid, _, conversation_uid, _ = check_identity(identity)
         
         payload = {
             "memory_id": memory_id,
@@ -147,216 +149,135 @@ class AIStoreAdapter:
             "content": content
         }
 
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/insert_shortterm",
-                json=payload,
-            )
-
-        if resp.status_code != 200 or not resp.json().get('success'):
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to append memory: {resp.text}",
-            )
+        await query_store(action="insert_shortterm_memory", payload=payload)
         
         
-    async def fetch_messages(
+    async def get_messages_from_store(
         self,
-        user_uid: str,
-        conversation_uid: str,
-        cursor: int = 0,
+        identity: ApixIdentity,
         current_node_id: str = '-',
+        preserved_context_window: int = 999
     ) -> tuple[list[dict], str]:
         """
-        Fetch messages from memory service.
+        Get messages from store.
 
         Args:
-            user_uid: Id to indicate which user the data is from.
-            conversation_uid: Id to indicate which history the data belong to.
-            cursor: Cursor for pagination (reserved).
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
+            current_node_id: The currently visible latest message node id.
 
         Returns:
             list[dict]: Message dict list returned by memory service.
         """
         logger.trace()
-        logger.info(
-            f"user_uid={user_uid}, conversation_uid={conversation_uid}, cursor={cursor}"
-        )
-        # msg_cursor = msg_dict.get("msg_cursor", 0)  # reserved
 
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/messages",
-                json={
-                    "user_uid": user_uid,
-                    "conversation_uid": conversation_uid,
-                    "current_node_id": current_node_id,
-                    "cursor": cursor,  # reserved
-                },
-            )
+        user_uid, _, conversation_uid, _ = check_identity(identity)
+        payload = {
+            "user_uid": user_uid,
+            "conversation_uid": conversation_uid,
+            "current_node_id": current_node_id,
+            "cursor": 0,  # reserved
+            "limit": preserved_context_window
+        }
 
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to get memory: {resp.text}",
-            )
+        result = await query_store(action="get_messages", payload=payload)
 
-        resp_content = resp.json()
-        messages = resp_content.get("messages", [])
+        messages = result.get("messages", [])
+        chain = result.get("current_chain", [])
+        if len(chain) == 0:
+            chain = ['-']
 
-        logger.info(f"Fetched {len(messages)} messages")
+        logger.info(f"Fetched {len(messages)} messages. Current message chain: {chain}")
 
-        return messages, messages[-1].get('node_id')
+        return messages, chain[-1]
     
 
-    async def fetch_shortterm_memory(self, user_uid: str, conversation_uid: str) -> list[dict]:
+    async def get_shortterm_from_store(self, identity: ApixIdentity) -> list[ShorttermMemory]:
         """
-        Fetch shortterm memory from memory service.
+        Get shortterm memory from store.
 
         Args:
-            user_uid: Id to indicate which user the data is to get.
-            conversation_uid: I do not want to write docsting anymore.
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
 
         Returns:
-            list[dict]: Memory message dict list returned by memory service. With format 
-            [
-                {
-                    "memory_id": str,
-                    "content": str,
-                    "created_timestamp": int,
-                }
-            ]
+            list[ShorttermMemory]: :class:`ShorttermMemory` dict list.
         """
         logger.trace()
-        logger.info(
-            f"user_uid={user_uid}, conversation_uid={conversation_uid}"
-        )
 
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.post(
-                f"{MEMORY_SERVICE_BASE_URL}/memory/memory/shortterm",
-                json={
-                    "user_uid": user_uid,
-                    "conversation_uid": conversation_uid,
-                },
-            )
+        user_uid, _, conversation_uid, _ = check_identity(identity)
+        try:
+            payload = {
+                "user_uid": user_uid,
+                "conversation_uid": conversation_uid,
+            }
 
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=f"Failed to get memory: {resp.text}",
-            )
+            result = await query_store(action="fetch_shortterm_memory", payload=payload)
+            return result.get("messages", [])
+            
+        except Exception as e:
+            logger.error(f"Load shortterm memory error: {e}, skip.")
+            return []
+    
+    
+    async def get_longterm_from_store(self, identity: ApixIdentity, workspace: str | None = None) -> list[LongtermMemory]:
+        """
+        Get the longterm memory from store.
+        A longterm memory should be separated by workspace or conversation.
 
-        resp_content = resp.json()
-        messages = resp_content.get("messages", []) or []
+        Args:
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
 
-        return messages
+        Returns: 
+            list[LongtermMemory]: :class:`LongtermMemory` dict list.
+        """
+        logger.trace()
+
+        user_uid, _, conversation_uid, _ = check_identity(identity)
+        try:
+            payload = {
+                "user_uid": user_uid,
+                "conversation_uid": conversation_uid,
+                "workspace": workspace
+            }
+
+            result = await query_store(action="fetch_longterm_memory", payload=payload)
+            return result.get("messages", [])
+            
+        except Exception as e:
+            logger.error(f"Load longterm memory error: {e}, skip.")
+            return []
     
 
-    async def fetch_available_skills(self, user_uid: str) -> list:
+    async def get_skills_from_store(self, identity: ApixIdentity) -> list[Skill]:
         """
-        Get the skills metadata from file service.
+        Get the skills metadata from store.
 
-        Returns: list [
-            {
-                "skill_id": str,
-                "skill_name": str,
-                "skill_description": str,
-                "skill_version": str,
-                "package_size": int,
-                "is_active": bool,
-                "upload_at": str,
-            },
-            ...
-        ]
+        Args:
+            identity: An instance of :class:`ApixIdentity` representing the identity context.
+
+        Returns: 
+            list[Skill]: :class:`Skill` dict list.
         """
+        user_uid, _, _, _ = check_identity(identity)
         try:
             payload = {
                 "user_uid": user_uid,
                 "limit": 999
             }
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(
-                        f"{FILE_SERVICE_URL}/file/skills/get_available_skills",
-                        json=payload,
-                    )
-                data = resp.json()
-        except Exception:
-            return []
-
-        if not data.get("success"):
-            return []
-
-        skills = data.get("messages", [])
-
-        visible_skills = []
-        for skill in skills:
-            if skill.get("is_active"):
-                visible_skills.append(skill)
-
-        return visible_skills
-    
-    
-    def init_memorandum_list(self, state: MainAgentState):
-        user_uid = state.get("user_uid", "")
-        conversation_uid = state.get("conversation_uid", "")
-        workspace = state.get("config", {}).get("work_dir")
-
-        memo_namespace = user_uid + ":" + (workspace or conversation_uid) + ":" + state.get("agent_role")
-        fallback_memo_namespace = user_uid + ":" + conversation_uid + ":" + state.get("agent_role")
-
-        memo_dir = Path(BASE_DIR) / "memo"
-
-        def load_memories(namespace: str) -> list[Memory]:
-            hash_input = namespace.encode("utf-8")
-            memo_filename = hashlib.sha256(hash_input).hexdigest()
-            memo_path = memo_dir / f"{memo_filename}.yaml"
-
-            logger.info(f"Trying to load memorandum list from {memo_path}")
-
-            if not memo_path.exists():
-                return []
-
-            memorandum_list = load_from_yaml(memo_path) or []
-
-            if not isinstance(memorandum_list, list):
-                logger.warning(
-                    f"Invalid memorandum yaml structure for client {user_uid}: {memorandum_list}"
-                )
-                return []
-
-            return memorandum_list
-
-        merged_memorandum_map = {}
-
-        for memo in load_memories(memo_namespace):
-            title = memo.get("title")
-            if title:
-                merged_memorandum_map[title] = memo
-
-        if memo_namespace != fallback_memo_namespace:
-            for memo in load_memories(fallback_memo_namespace):
-                title = memo.get("title")
-
-                if not title:
-                    continue
-
-                existing = merged_memorandum_map.get(title)
-
-                # Keep newer memo with same title
-                if existing is None or memo.get("date", "") > existing.get("date", ""):
-                    merged_memorandum_map[title] = memo
-
-        memorandum_list = list(merged_memorandum_map.values())
-
-        logger.info(
-            f"Initialized memorandum list for client {user_uid}, "
-            f"conversation {conversation_uid}: {memorandum_list}"
-        )
-
-        state["memorandum"].clear()
-        state["memorandum"].extend(memorandum_list)
+            result = await query_store(action="get_messages", payload=payload)
+            skills = result.get("messages", []) or []
+            visible_skills = []
+            for skill in skills:
+                if skill.get("is_active"):
+                    visible_skills.append(Skill(
+                        skill_id=skill.get("skill_id"),
+                        skill_name=skill.get("skill_name"),
+                        description=skill.get("skill_description")
+                    ))
+            return visible_skills
         
+        except Exception as e:
+            logger.error(f"Load skills error: {e}, skip.")
+            return []
 
 
 

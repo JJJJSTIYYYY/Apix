@@ -16,15 +16,22 @@ class Todo(TypedDict):
 
 
 class Skill(TypedDict):
-    name: str
+    skill_id: str
+    skill_name: str
     description: Literal["pending", "in_progress", "completed"]
 
 
-class Memory(TypedDict):
+class LongtermMemory(TypedDict):
     title: str
     date: str # 2025-06-07
     content: str
     source: Literal["conversation", "workspace"]
+
+
+class ShorttermMemory(TypedDict):
+    memory_id: str # The related message's ``message_uid``.
+    content: str
+    created_timestamp: int # Linux timestamp
 
 
 class AgentConfigSchema(TypedDict):
@@ -109,7 +116,7 @@ class MainAgentState(GraphRuntimeContext):
     context_fold_split_mark: NotRequired[str] # Split by completed | in_progress & pending todos, store with message id
     sandbox: str # Docker container id
     todos: NotRequired[list[Todo]]
-    memorandum: NotRequired[list[Memory]]
+    memorandum: NotRequired[list[LongtermMemory]]
     skills: list # Include available skills name and description
     loaded_skills_cache: list[tuple[str, bool, str]] # (name, injected, content): Skill name, injection status, and SKILL.md content
 

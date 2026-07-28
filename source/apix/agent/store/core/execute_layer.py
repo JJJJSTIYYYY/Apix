@@ -430,6 +430,7 @@ class DataExecutors:
 
             redis_res["messages"] = parsed_messages
             redis_res["branches"] = branches
+            redis_res["current_chain"] = node_id_chain
             return redis_res
 
         # 2. MySQL
@@ -442,6 +443,8 @@ class DataExecutors:
 
         messages = mysql_res.get("messages", [])
         if not messages:
+            mysql_res["branches"] = {}
+            mysql_res["current_chain"] = []
             return mysql_res
 
         # 3. backfill
@@ -468,6 +471,7 @@ class DataExecutors:
 
         mysql_res["messages"] = parsed_messages
         mysql_res["branches"] = branches
+        mysql_res["current_chain"] = node_id_chain
         return mysql_res
 
     @data_task_handler("get_messages_for_user")

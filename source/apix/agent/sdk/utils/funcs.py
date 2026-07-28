@@ -55,6 +55,13 @@ def convert_generation_id_to_message_node_id(
 def check_identity(identity: ApixIdentity | None) -> Tuple[str, str, str, dict | None]:
     '''Check if the identity is available.
 
+    Returns:
+        Tuple:
+            - user_uid
+            - platform
+            - conversation_uid
+            - associated_account
+
     Raises:
         `IdentityError` when identity is not provided or ambiguous apix identity.
         `RuntimeError` when generation_id is not provided.

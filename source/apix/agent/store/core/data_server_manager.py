@@ -218,4 +218,4 @@ async def query_store(action: str, payload: dict) -> Any:
         logger.error(f"Failed to access store: {result.get("messages")}")
         raise RuntimeError("Some error occured in store layer, please check the logs for detail.")
 
-    return result["messages"]
+    return result

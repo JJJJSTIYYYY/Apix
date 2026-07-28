@@ -796,16 +796,16 @@ CREATE PROCEDURE fetch_messages_after_cursor (
 BEGIN
     SELECT
         message_uid,
+        generation_id,
         role,
         name,
         content,
+        node_id,
+        parent_id,
         metadata,
         extensions,
         msg_cursor,
         timestamp,
-        generation_id,
-        node_id,
-        parent_id,
         is_deleted
     FROM messages
     WHERE user_uid = p_user_uid

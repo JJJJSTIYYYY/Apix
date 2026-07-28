@@ -7,7 +7,7 @@ from xml.sax.saxutils import escape
 
 from apix.agent.sdk.utils.message import ApixMessageBase, ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
 from apix.agent.sdk.utils.funcs import convert_generation_id_to_message_node_id
-from apix.agent.sdk.graph.state import MainAgentState, Memory, Skill, Todo
+from apix.agent.sdk.graph.state import MainAgentState, LongtermMemory, Skill, Todo
 from apix.common.utils.logger import logger
 
 
@@ -25,7 +25,7 @@ class AIContextAdapter:
             *,
             todo: list[Todo] | None = None,
             skill: list[Skill] | None = None,
-            memory: list[Memory] | None = None,
+            memory: list[LongtermMemory] | None = None,
             workspace: str | None = None
         ) -> list[AnyMessage]:
         """Build a frequently updated prompt and inject it into the last message object.
@@ -986,7 +986,7 @@ User-facing output:
         state: MainAgentState,
         agent_role: str = None,
     ) -> str:
-        memorandum_list: List[Memory] = state.get("memorandum", [])
+        memorandum_list: List[LongtermMemory] = state.get("memorandum", [])
 
         if not memorandum_list:
             return "## No memories available.\n\n"

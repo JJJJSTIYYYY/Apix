@@ -131,7 +131,7 @@ def test_store_adapter_sends_the_canonical_message_payload():
             reasoning="because",
         )
         asyncio.run(
-            AIStoreAdapter().append_to_store(
+            AIStoreAdapter().append_message_to_store(
                 message,
                 {
                     "id": "user-1",
