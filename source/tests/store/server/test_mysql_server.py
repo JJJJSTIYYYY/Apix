@@ -179,13 +179,14 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
         ("u-1", "conv-1", "New", "/new", True, False, True),
     )
 
-    call.return_value = [{"msg_cursor": 3, "created_at": "now"}]
+    call.return_value = [{"msg_cursor": 3, "timestamp": "now"}]
     message = {
+        "message_uid": "message-1",
         "role": "ai",
+        "name": "assistant",
         "content": "answer",
-        "think": "thought",
-        "extra": {"x": "你好"},
-        "info": None,
+        "metadata": None,
+        "extensions": {"reasoning": "thought", "x": "你好"},
         "generation_id": "g-1",
         "node_id": "n-1",
         "parent_id": "root",
@@ -195,13 +196,21 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
     )
     assert result == {
         "success": True,
-        "messages": {"msg_cursor": 3, "created_at": "now"},
+        "messages": {"msg_cursor": 3, "timestamp": "now"},
     }
     params = call.await_args.args[1]
     assert call.await_args.args[0] == "append_message"
-    assert json.loads(params[5]) == {"x": "你好"}
+    assert params[:6] == (
+        "u-1",
+        "conv-1",
+        "message-1",
+        "ai",
+        "assistant",
+        "answer",
+    )
     assert json.loads(params[6]) == {}
-    assert params[7:] == ("g-1", "n-1", "root")
+    assert json.loads(params[7]) == {"reasoning": "thought", "x": "你好"}
+    assert params[8:] == ("g-1", "n-1", "root")
     assert (await service.append_message(
         {"user_uid": "u-1", "conversation_uid": "conv-1", "message": {}}
     ))["success"] is False
@@ -221,8 +230,8 @@ async def test_message_delete_fetch_and_search(monkeypatch):
     call = AsyncMock()
     monkeypatch.setattr(service, "_call_procedure", call)
     call.side_effect = [
-        [{"info": '{"id":"one"}'}, {"info": "invalid"}, "ignored"],
-        [{"info": {"id": "two"}}, {"info": None}],
+        [{"message_uid": "one"}, {"message_uid": ""}, "ignored"],
+        [{"message_uid": "two"}, {"message_uid": None}],
     ]
     deleted = await service.delete_messages(
         {
@@ -233,7 +242,10 @@ async def test_message_delete_fetch_and_search(monkeypatch):
     )
     assert deleted == {
         "success": True,
-        "messages": [{"id": "one"}, {"id": "two"}],
+        "messages": [
+            {"message_uid": "one"},
+            {"message_uid": "two"},
+        ],
     }
     assert call.await_args_list[0].args == (
         "delete_messages_node",

@@ -366,18 +366,13 @@ class MysqlService(DataServerBase):
                 "user_uid": user id,
                 "conversation_uid": conversation id,
                 "message": {
+                    "message_uid": unique message id,
                     "generation_id": str,
                     "role": 'user', 'ai', 'system', 'tool', 'info'
+                    "name": "assistant / user / tool name",
                     "content": "message content",
-                    "think": "",
-                    "extra": {...},
-                    "info": {
-                        "model": "...",
-                        "total_duration": "...",
-                        "model_provider": "...",
-                        "total_tokens": int,
-                        "id": "",
-                    }, 
+                    "metadata": {...},
+                    "extensions": {...},
                     "node_id": str,
                     "parent_id": str,
                 }
@@ -398,37 +393,50 @@ class MysqlService(DataServerBase):
             if not message:
                 raise ValueError("Messages is empty")
             
+            message_uid = message["message_uid"]
             role = message["role"]
+            name = message.get("name")
             content = message["content"]
-            think = message.get("think", "")
-            extra = message.get("extra", {})
-            info = message.get("info", {})
+            metadata = message.get("metadata", {})
+            extensions = message.get("extensions", {})
             generation_id = message.get("generation_id", "")
             node_id = message.get("node_id", "")
             parent_id = message.get("parent_id", "")
 
-            if extra is None:
-                extra = {}
-            if not isinstance(extra, str):
-                extra = json.dumps(extra, ensure_ascii=False)
+            if metadata is None:
+                metadata = {}
+            if not isinstance(metadata, str):
+                metadata = json.dumps(metadata, ensure_ascii=False)
 
-            if info is None:
-                info = {}
-            if not isinstance(info, str):
-                info = json.dumps(info, ensure_ascii=False)
+            if extensions is None:
+                extensions = {}
+            if not isinstance(extensions, str):
+                extensions = json.dumps(extensions, ensure_ascii=False)
 
             result = await self._call_procedure(
                 "append_message", 
-                (user_uid, conversation_uid, role, content, think, extra, info, generation_id, node_id, parent_id)
+                (
+                    user_uid,
+                    conversation_uid,
+                    message_uid,
+                    role,
+                    name,
+                    content,
+                    metadata,
+                    extensions,
+                    generation_id,
+                    node_id,
+                    parent_id,
+                )
             )
             cursor =  result[0].get("msg_cursor", -1)
-            created_at = result[0].get("created_at")
+            timestamp = result[0].get("timestamp")
             if cursor == -1: raise ValueError("Invalid cursor the database returned.")
             return {
                 "success": True,
                 "messages": {
                     "msg_cursor": cursor,
-                    "created_at": created_at
+                    "timestamp": timestamp,
                 }
             }
         except Exception as e:
@@ -469,28 +477,19 @@ class MysqlService(DataServerBase):
             if not messages:
                 raise ValueError("Messages list is empty")
                 
-            msg_info = []
+            message_uids = []
             for node_id in messages:
                 res = await self._call_procedure("delete_messages_node", (user_uid, conversation_uid, node_id))
                 for row in res:
                     if not isinstance(row, dict):
                         continue
-                    raw = row.get("info")
-                    if isinstance(raw, str):
-                        try:
-                            parsed = json.loads(raw)
-                        except Exception:
-                            continue
-                    elif isinstance(raw, dict):
-                        parsed = raw
-                    else:
-                        continue
-
-                    msg_info.append(parsed)
+                    message_uid = row.get("message_uid")
+                    if message_uid:
+                        message_uids.append({"message_uid": message_uid})
             
             return {
                 "success": True,
-                "messages": msg_info
+                "messages": message_uids,
             }
         except Exception as e:
             logger.exception(f"Error: {type(e).__name__}: {e}")
@@ -1078,7 +1077,7 @@ class MysqlService(DataServerBase):
 
         Args:
             payload: Dict, the format is {
-                "memory_id": str, # Message's id generated by langChain (task_id in tool massage or id in ai message)
+                "memory_id": str, # Related message_uid
                 "user_uid": user id,,
                 "conversation_uid": conversation id,
                 "content": str,
@@ -1116,7 +1115,7 @@ class MysqlService(DataServerBase):
 
         Args:
             payload: Dict, the format is {
-                "memory_ids": list[str], # Message's id generated by langChain (task_id in tool massage or id in ai message)
+                "memory_ids": list[str], # Related message_uid values
                 "user_uid": user id,,
                 "conversation_uid": conversation id,
             }

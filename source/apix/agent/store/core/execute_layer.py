@@ -1,3 +1,4 @@
+import copy
 import inspect
 import json
 from functools import wraps
@@ -214,24 +215,21 @@ class DataExecutors:
 
         Redis failure NOT fail the whole operation.
         """
-        messages = payload["messages"]
+        message = payload["message"]
         # 1. Persist to MySQL
-        res = await self.data_store.append_message(payload)
+        res = await self.data_store.append_message(copy.deepcopy(payload))
         if not res.get("success"):
             return res
 
         # 2. Best-effort backfill Redis
-        messages_redis = payload.get("messages")
-        messages_redis.update(res.get("messages"))
-        messages_redis["is_deleted"] = False
+        message.update(res.get("messages") or {})
+        message["is_deleted"] = False
         payload.update({
-            "messages": messages_redis
+            "message": message
         })
         try:
-            logger.info(
-                f"Redis backfill payload: {payload}"
-            )
-            await self.cache_store.append_messages(payload)
+            logger.info(f"Redis backfill payload: {payload}")
+            await self.cache_store.append_message(payload)
         except Exception as e:
             # Redis failure should not break main flow
             logger.warning(
@@ -240,8 +238,8 @@ class DataExecutors:
 
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
-        node_id = messages.get("node_id", "")
-        parent_id = messages.get("parent_id", "")
+        node_id = message.get("node_id", "")
+        parent_id = message.get("parent_id", "")
         await self.cache_store.update_current_messages_branch_chain_cache({
             "user_uid": user_uid,
             "conversation_uid": conversation_uid,
@@ -277,10 +275,10 @@ class DataExecutors:
         if not res.get("success"):
             return res
             
-        msg_info = res.get("messages", []) or []
+        deleted_messages = res.get("messages", []) or []
         mem_ids = []
-        for info in msg_info:
-            mem_id = info.get("id")
+        for message in deleted_messages:
+            mem_id = message.get("message_uid")
             if not mem_id: continue
             mem_ids.append(mem_id)
 
@@ -309,7 +307,7 @@ class DataExecutors:
     ):
 
         if not messages:
-            return [], {}
+            return [], {}, []
 
         helper = MessageNodeHelper(messages)
 
@@ -347,23 +345,8 @@ class DataExecutors:
             if msg.get("role") not in allow_roles:
                 continue
 
-            extra = msg.get("extra", {})
-            info = msg.get("info", {})
-
-            try:
-                if not isinstance(extra, dict) and extra:
-                    extra = json.loads(extra)
-            except Exception:
-                extra = {}
-
-            try:
-                if not isinstance(info, dict) and info:
-                    info = json.loads(info)
-            except Exception:
-                info = {}
-
-            msg["extra"] = extra
-            msg["info"] = info
+            msg["metadata"] = self._decode_json_object(msg.get("metadata"))
+            msg["extensions"] = self._decode_json_object(msg.get("extensions"))
 
             parsed.append(msg)
             if len(node_id_chain) == 0 or node_id_chain[-1] != msg.get("node_id"):
@@ -398,6 +381,18 @@ class DataExecutors:
                     ]
 
         return parsed, branches, node_id_chain
+
+    @staticmethod
+    def _decode_json_object(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if not value or not isinstance(value, str):
+            return {}
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
 
     @data_task_handler("get_messages")
     async def get_messages(self, payload: dict) -> dict:

@@ -9,7 +9,7 @@ from apix.agent.store.core.server.rag_store.rag_server import RagService, rag_se
 
 
 class ConcreteCacheServer(CacheServerBase):
-    append_messages = AsyncMock()
+    append_message = AsyncMock()
     backfill_messages = AsyncMock()
     get_recent_messages = AsyncMock()
     cache_current_messages_branch_chain = AsyncMock()

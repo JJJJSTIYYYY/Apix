@@ -62,6 +62,28 @@ async def test_lifecycle_helpers_and_transaction_rollback(tmp_path):
         "mcp_server",
         "cron_task",
     }
+    message_columns = [
+        row["name"]
+        for row in await service._fetch_all("PRAGMA table_info(messages)")
+    ]
+    assert message_columns == [
+        "id",
+        "message_uid",
+        "msg_cursor",
+        "user_uid",
+        "conversation_id",
+        "conversation_uid",
+        "generation_id",
+        "node_id",
+        "parent_id",
+        "role",
+        "name",
+        "content",
+        "metadata",
+        "extensions",
+        "timestamp",
+        "is_deleted",
+    ]
 
     def fail_after_insert(conn):
         conn.execute(
@@ -79,8 +101,16 @@ async def test_lifecycle_helpers_and_transaction_rollback(tmp_path):
     assert service._json(["a"], []) == '["a"]'
     assert service._json('{"already":"json"}', {}) == '{"already":"json"}'
     assert service._normalize_row(
-        {"created_at": "2026-01-02 03:04:05", "content": "leave me alone"}
-    ) == {"created_at": "2026-01-02T03:04:05", "content": "leave me alone"}
+        {
+            "created_at": "2026-01-02 03:04:05",
+            "timestamp": "2026-01-02 03:04:06",
+            "content": "leave me alone",
+        }
+    ) == {
+        "created_at": "2026-01-02T03:04:05",
+        "timestamp": "2026-01-02T03:04:06",
+        "content": "leave me alone",
+    }
 
     await service.stop()
     await service.stop()
@@ -153,11 +183,13 @@ async def test_users_conversations_and_messages(db, monkeypatch):
             "user_uid": "user-1",
             "conversation_uid": "conv-1",
             "message": {
+                "message_uid": "message-1",
                 "role": "user",
+                "name": "alice",
                 "content": "hello sqlite",
                 "node_id": "node-1",
-                "extra": None,
-                "info": {"id": "info-1"},
+                "metadata": None,
+                "extensions": {"uploaded_files": ["brief.pdf"]},
             },
         }
     )
@@ -166,18 +198,21 @@ async def test_users_conversations_and_messages(db, monkeypatch):
             "user_uid": "user-1",
             "conversation_uid": "conv-1",
             "message": {
+                "message_uid": "message-2",
                 "role": "ai",
+                "name": "assistant",
                 "content": "hello back",
                 "generation_id": "gen-1",
                 "node_id": "node-2",
                 "parent_id": "node-1",
-                "info": {"id": "info-2"},
+                "metadata": {"model": "demo-model"},
+                "extensions": {"reasoning": "because"},
             },
         }
     )
     assert first["messages"]["msg_cursor"] == 1
     assert second["messages"]["msg_cursor"] == 2
-    assert "T" in first["messages"]["created_at"]
+    assert "T" in first["messages"]["timestamp"]
     conversation_row = (
         await db._fetch_all(
             "SELECT latest_cursor, has_new_message FROM conversations"
@@ -198,7 +233,12 @@ async def test_users_conversations_and_messages(db, monkeypatch):
     )
     assert [row["msg_cursor"] for row in fetched["messages"]] == [1]
     assert fetched["next_cursor"] == 2
-    assert json.loads(fetched["messages"][0]["extra"]) == {}
+    assert fetched["messages"][0]["message_uid"] == "message-1"
+    assert fetched["messages"][0]["name"] == "alice"
+    assert json.loads(fetched["messages"][0]["metadata"]) == {}
+    assert json.loads(fetched["messages"][0]["extensions"]) == {
+        "uploaded_files": ["brief.pdf"]
+    }
     assert (await db.fetch_messages_after_cursor(
         {"user_uid": "user-1", "conversation_uid": "conv-1", "cursor": 99}
     ))["next_cursor"] == 99
@@ -218,7 +258,10 @@ async def test_users_conversations_and_messages(db, monkeypatch):
             "messages": ["node-1", "missing"],
         }
     )
-    assert deleted == {"success": True, "messages": [{"id": "info-1"}]}
+    assert deleted == {
+        "success": True,
+        "messages": [{"message_uid": "message-1"}],
+    }
     assert (await db.search_messages_by_keyword(
         {"user_uid": "user-1", "keyword": "sqlite"}
     ))["messages"] == []

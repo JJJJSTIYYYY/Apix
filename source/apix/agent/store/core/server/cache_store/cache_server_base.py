@@ -4,6 +4,13 @@ from apix.config.base_config import HOT_CACHE_DEFAULT_EXPIRE_SECONDS
 
 
 class CacheServerBase(ABC):
+    """Cache contract for canonical stored-message dictionaries.
+
+    Message payloads use ``message_uid``, ``name``, ``metadata``,
+    ``extensions`` and the database-generated ``timestamp``.  Cache
+    implementations must preserve those fields without translating them into
+    a second schema.
+    """
 
     def __init__(self,):
         pass
@@ -32,7 +39,7 @@ class CacheServerBase(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def append_messages(self, payload: dict) -> dict:
+    async def append_message(self, payload: dict) -> dict:
         pass
         
     @abstractmethod

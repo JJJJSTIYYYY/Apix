@@ -3,7 +3,6 @@ from datetime import datetime
 import json
 import time
 from typing import Callable, Generator, Literal, Tuple
-import inflect
 
 from apix.common.type import IdentityError, ApixIdentity
 from apix.common.utils.logger import logger
@@ -14,6 +13,8 @@ def get_date_natural_language() -> str:
 
     Example: "Wednesday, April 15th, 2026"
     '''
+
+    import inflect
 
     now = datetime.now()
     
@@ -32,7 +33,7 @@ def get_date_natural_language() -> str:
 
 def convert_generation_id_to_message_node_id(
     generation_id: str | list[str] | set[str],
-    role: Literal['user', 'ai', 'assistant', 'info']
+    role: Literal['user', 'ai', 'assistant', 'system', 'tool', 'info']
 ) -> str | list[str] | set[str]:
     '''Convert generation id to message node id.
     '''

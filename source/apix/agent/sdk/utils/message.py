@@ -1,72 +1,41 @@
-"""
-Message Dictionary Schema for Storage:
+"""Message objects and their storage representation.
 
-```python
-{
-    "generation_id": str,
-    "role": Literal["system", "user", "ai", "tool", "info"], # correspond to ApixMessageBase.role
-    "content": str, # correspond to ApixMessageBase.content
-    "created_at": str, # correspond to ApixMessageBase.timestamp
-    "node_id": str,
-    "parent_id": str,
-    "think": str, # optional, reasoning content for ai message, correspond to ApixMessageBase.reasoning
-    "extra": {
-        "tool_calls": [
-            {
-                "id": str, 
-                "args": {
-                    "arg_1": Any,
-                    "arg_2": Any,
-                }, 
-                "name": str, 
-                "type": Literal["tool_call"]
-            },
-            ...
-        ], # optional, tool calls list for ai message, correspond to ApixMessageBase.tool_calls
-        "uploaded_files": list[str] # optional, uploaded file path list for user message
-        "active_file": str # optional, the file currently open in the workspace
-        "referenced_message": {
-            "role": Literal["user", "ai", "tool"],
-            "name": str,
-            "content": str,
-        }, # optional, the message referenced by the user message in the current context chain
-        "task": {
-            "type": Literal["automated_task", "cron_task"],
-            "name": str,
-            "prompt": str,
-        }, # optional, task metadata in user message
-    }, # optional, correspond to ApixMessageBase.extra
-    "info": {
-        "id": str, # message id for any message, correspond to ApixMessageBase.id
-        "name": str, # assistant(ai)/user/tool name, for `info`, its  Literal["todo", "search"] correspond to ApixMessageBase.name
-        "duration": str,
-        # Following key only used when role is `ai`
-        "model": str,
-        "provider": str,
-        "usage": {
-            "input_token": int,
-            "output_token": int,
-        }
-        # Following key only used when role is `tool`
-        "tool_call_id": str
-        # Following key only used when role is `info`
-        "todo_list": list[Todo],
-        "search_key_word": list[str], # online search (by key word)
-        "search_key_word_provider": str, # such as DuckDuckGo
-        "search_urls": list[str] # online search (by url)
-        "search_urls_provider": str, # such as Tavily
-    } # correspond to ApixMessageBase.info
-}
-```
+Database-generated values such as the internal primary key and ``timestamp``
+are deliberately absent from message objects.  A stored message contains the
+following application-owned values::
 
-For role `info`
-- What is it?
-> It is a branch of ai message which contains no think and no content.
-- When to use it?
-> Use when you want to append some message information in database, but you can not modify an existing ai message.
-> An ai message without think and content is not recommanded.
-> Such as: use when a todo list is written, a web search tool is called by assistant and some website is visited.
-info message does not provided a class, use ai_context_adapter.append_to_store(...) to store.
+    {
+        "message_uid": str,
+        "generation_id": str,
+        "role": Literal["system", "user", "ai", "tool", "info"],
+        "name": str | None,
+        "content": str | list | None,
+        "node_id": str,
+        "parent_id": str,
+        "metadata": {
+            "duration": float,
+            "model": str,
+            "provider": str,
+            "usage": dict,
+        },
+        "extensions": {
+            "reasoning": str,
+            "tool_calls": list[ToolCall],
+            "tool_call_id": str,
+            "uploaded_files": list[str],
+            "active_file": str,
+            "referenced_message": dict,
+            "task": dict,
+            "todo_list": list,
+            "search_key_word": list[str],
+            "search_urls": list[str],
+        },
+    }
+
+``metadata`` is reserved for model/provider/usage and execution measurements.
+``extensions`` carries business payloads.  Frequently used extension values
+are exposed as properties below so callers do not need to manipulate the
+dictionary directly.
 """
 
 
@@ -74,8 +43,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Literal, TypeAlias, TypedDict
+from typing import Any, ClassVar, Literal, TypeAlias, TypedDict
 from uuid import uuid4
 
 from apix.common.type import ChunkMergeError, IncompleteToolCallError
@@ -86,6 +54,7 @@ from apix.common.type import ChunkMergeError, IncompleteToolCallError
 # ============================================================
 
 MessageRole = Literal[
+    "developer",
     "system",
     "user",
     "ai",
@@ -121,12 +90,8 @@ class ToolCall(TypedDict):
 # Helpers
 # ============================================================
 
-def _new_message_id() -> str:
+def _new_message_uid() -> str:
     return uuid4().hex
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 # ============================================================
@@ -138,82 +103,215 @@ class ApixMessageBase:
     """
     Base class for complete messages.
 
-    role is supplied by subclasses and cannot be passed manually.
+    ``role`` is supplied by subclasses and cannot be passed manually.
     """
 
-    role: MessageRole = field(init=False)
+    role: ClassVar[MessageRole]
 
     content: MessageContent = None
     name: str | None = None
+    message_uid: str = field(default_factory=_new_message_uid)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    extensions: dict[str, Any] = field(default_factory=dict)
 
-    id: str = field(default_factory=_new_message_id)
+    @property
+    def uploaded_files(self) -> list[str]:
+        value = self.extensions.get("uploaded_files")
+        return value if isinstance(value, list) else []
 
-    timestamp: str = field(default_factory=_utc_now_iso)
+    @uploaded_files.setter
+    def uploaded_files(self, value: list[str]) -> None:
+        self.extensions["uploaded_files"] = value
 
-    info: dict[str, Any] = field(default_factory=dict) # Message information, usually contains name, token usage, duration and provider information.
-    extra: dict[str, Any] = field(default_factory=dict) # Extra but important information, usually contains info such as raw tool calls for an ai message, upload files meta in user message and so on.
+    @property
+    def active_file(self) -> str | None:
+        value = self.extensions.get("active_file")
+        return value if isinstance(value, str) else None
+
+    @active_file.setter
+    def active_file(self, value: str | None) -> None:
+        if value is None:
+            self.extensions.pop("active_file", None)
+        else:
+            self.extensions["active_file"] = value
+
+    @property
+    def referenced_message(self) -> dict[str, Any] | None:
+        value = self.extensions.get("referenced_message")
+        return value if isinstance(value, dict) else None
+
+    @referenced_message.setter
+    def referenced_message(self, value: dict[str, Any] | None) -> None:
+        if value is None:
+            self.extensions.pop("referenced_message", None)
+        else:
+            self.extensions["referenced_message"] = value
+
+    @property
+    def task(self) -> dict[str, Any] | None:
+        value = self.extensions.get("task")
+        return value if isinstance(value, dict) else None
+
+    @task.setter
+    def task(self, value: dict[str, Any] | None) -> None:
+        if value is None:
+            self.extensions.pop("task", None)
+        else:
+            self.extensions["task"] = value
+
+    @property
+    def todo_list(self) -> list[dict[str, Any]]:
+        value = self.extensions.get("todo_list")
+        return value if isinstance(value, list) else []
+
+    @todo_list.setter
+    def todo_list(self, value: list[dict[str, Any]]) -> None:
+        self.extensions["todo_list"] = value
+
+    @property
+    def system_instruction(self) -> list[str]:
+        value = self.extensions.get("system_instruction")
+        return value if isinstance(value, list) else []
+
+    @system_instruction.setter
+    def system_instruction(self, value: list[str]) -> None:
+        self.extensions["system_instruction"] = value
 
 
-@dataclass(slots=True, kw_only=True)
 class ApixAiMessage(ApixMessageBase):
-    role: Literal["ai"] = field(
-        default="ai",
-        init=False,
-    )
+    __slots__ = ()
+    role: ClassVar[Literal["ai"]] = "ai"
 
-    content: MessageContent = None
+    def __init__(
+        self,
+        *,
+        content: MessageContent = None,
+        name: str | None = None,
+        message_uid: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        extensions: dict[str, Any] | None = None,
+        tool_calls: list[ToolCall] | None = None,
+        refusal: str | None = None,
+        reasoning: str | None = None,
+        finish_reason: FinishReason | None = None,
+    ) -> None:
+        super().__init__(
+            content=content,
+            name=name,
+            message_uid=message_uid or _new_message_uid(),
+            metadata=dict(metadata or {}),
+            extensions=dict(extensions or {}),
+        )
+        if tool_calls is not None:
+            self.tool_calls = tool_calls
+        if refusal is not None:
+            self.refusal = refusal
+        if reasoning is not None:
+            self.reasoning = reasoning
+        if finish_reason is not None:
+            self.finish_reason = finish_reason
 
-    tool_calls: list[ToolCall] = field(default_factory=list)
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        value = self.extensions.get("tool_calls")
+        return value if isinstance(value, list) else []
 
-    refusal: str | None = None
-    reasoning: str | None = None
+    @tool_calls.setter
+    def tool_calls(self, value: list[ToolCall]) -> None:
+        self.extensions["tool_calls"] = value
 
-    finish_reason: FinishReason | None = None
+    @property
+    def refusal(self) -> str | None:
+        value = self.extensions.get("refusal")
+        return value if isinstance(value, str) else None
+
+    @refusal.setter
+    def refusal(self, value: str | None) -> None:
+        if value is None:
+            self.extensions.pop("refusal", None)
+        else:
+            self.extensions["refusal"] = value
+
+    @property
+    def reasoning(self) -> str | None:
+        value = self.extensions.get("reasoning")
+        return value if isinstance(value, str) else None
+
+    @reasoning.setter
+    def reasoning(self, value: str | None) -> None:
+        if value is None:
+            self.extensions.pop("reasoning", None)
+        else:
+            self.extensions["reasoning"] = value
+
+    @property
+    def finish_reason(self) -> FinishReason | None:
+        return self.metadata.get("finish_reason")
+
+    @finish_reason.setter
+    def finish_reason(self, value: FinishReason | None) -> None:
+        if value is None:
+            self.metadata.pop("finish_reason", None)
+        else:
+            self.metadata["finish_reason"] = value
 
 
 @dataclass(slots=True, kw_only=True)
 class ApixDeveloperMessage(ApixMessageBase):
-    role: Literal["developer"] = field(
-        default="developer",
-        init=False,
-    )
+    role: ClassVar[Literal["developer"]] = "developer"
 
     content: str = ""
 
 
 @dataclass(slots=True, kw_only=True)
 class ApixSystemMessage(ApixMessageBase):
-    role: Literal["system"] = field(
-        default="system",
-        init=False,
-    )
+    role: ClassVar[Literal["system"]] = "system"
 
     content: str = ""
 
 
-@dataclass(slots=True, kw_only=True)
 class ApixToolMessage(ApixMessageBase):
-    role: Literal["tool"] = field(
-        default="tool",
-        init=False,
-    )
+    __slots__ = ()
+    role: ClassVar[Literal["tool"]] = "tool"
 
-    content: str = ""
-
-    # Required for tool messages.
-    tool_call_id: str
-
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        tool_call_id: str | None = None,
+        content: str = "",
+        name: str | None = None,
+        message_uid: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        extensions: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            content=content,
+            name=name,
+            message_uid=message_uid or _new_message_uid(),
+            metadata=dict(metadata or {}),
+            extensions=dict(extensions or {}),
+        )
+        if tool_call_id is not None:
+            self.tool_call_id = tool_call_id
         if not self.tool_call_id:
             raise ValueError("tool_call_id cannot be empty")
+
+    @property
+    def tool_call_id(self) -> str | None:
+        value = self.extensions.get("tool_call_id")
+        return value if isinstance(value, str) else None
+
+    @tool_call_id.setter
+    def tool_call_id(self, value: str | None) -> None:
+        if value is None:
+            self.extensions.pop("tool_call_id", None)
+        else:
+            self.extensions["tool_call_id"] = value
 
 
 @dataclass(slots=True, kw_only=True)
 class ApixUserMessage(ApixMessageBase):
-    role: Literal["user"] = field(
-        default="user",
-        init=False,
-    )
+    role: ClassVar[Literal["user"]] = "user"
 
     content: str | list[ContentPart] = ""
 
@@ -398,10 +496,7 @@ class ApixAiMessageChunk:
     Neither chunk1 nor chunk2 is modified.
     """
 
-    role: Literal["ai"] = field(
-        default="ai",
-        init=False,
-    )
+    role: ClassVar[Literal["ai"]] = "ai"
 
     content_delta: str = ""
     reasoning_delta: str = ""
@@ -416,15 +511,12 @@ class ApixAiMessageChunk:
     # These fields are intentionally empty by default. Giving each chunk a
     # generated ID would cause every chunk to appear to belong to a different
     # message.
-    id: str = ""
+    message_uid: str = ""
 
     name: str | None = None
 
-    # The first timestamp encountered is retained during aggregation.
-    timestamp: str = ""
-
-    info: dict[str, Any] = field(default_factory=dict)
-    extra: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    extensions: dict[str, Any] = field(default_factory=dict)
 
     def __add__(
         self,
@@ -454,28 +546,24 @@ class ApixAiMessageChunk:
                 self.finish_reason,
                 other.finish_reason,
             ),
-            id=_merge_identity(
-                "id",
-                self.id,
-                other.id,
+            message_uid=_merge_identity(
+                "message_uid",
+                self.message_uid,
+                other.message_uid,
             ),
             name=_merge_optional_identity(
                 "name",
                 self.name,
                 other.name,
             ),
-            timestamp=(
-                self.timestamp
-                or other.timestamp
-            ),
-            # Metadata uses last-write-wins semantics.
-            info={
-                **self.info,
-                **other.info,
+            # Metadata and extensions uses last-write-wins semantics.
+            metadata={
+                **self.metadata,
+                **other.metadata,
             },
-            extra={
-                **self.extra,
-                **other.extra,
+            extensions={
+                **self.extensions,
+                **other.extensions,
             },
         )
 
@@ -516,13 +604,9 @@ class ApixAiMessageChunk:
         return ApixAiMessage(
             content=self.content_delta or None,
             name=self.name,
-            id=self.id or _new_message_id(),
-            timestamp=(
-                self.timestamp
-                or _utc_now_iso()
-            ),
-            info=dict(self.info),
-            extra=dict(self.extra),
+            message_uid=self.message_uid or _new_message_uid(),
+            metadata=dict(self.metadata),
+            extensions=dict(self.extensions),
             tool_calls=tool_calls,
             refusal=self.refusal_delta or None,
             reasoning=self.reasoning_delta or None,

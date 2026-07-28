@@ -114,7 +114,9 @@ async def test_lifecycle_closes_client(service):
 
 @pytest.mark.asyncio
 async def test_message_cache_miss_backfill_append_and_read(service, payload):
-    assert await service.append_messages({**payload, "messages": {"id": 2}}) == {
+    assert await service.append_message(
+        {**payload, "message": {"message_uid": "message-2"}}
+    ) == {
         "success": True,
         "messages": "success",
     }
@@ -124,7 +126,14 @@ async def test_message_cache_miss_backfill_append_and_read(service, payload):
         "cache_hit": False,
     }
 
-    messages = [{"id": 1, "content": "你好"}]
+    messages = [
+        {
+            "message_uid": "message-1",
+            "content": "你好",
+            "metadata": {},
+            "extensions": {},
+        }
+    ]
     assert await service.backfill_messages({**payload, "messages": messages}) == {
         "success": True,
         "messages": "success",
@@ -132,10 +141,12 @@ async def test_message_cache_miss_backfill_append_and_read(service, payload):
     key = "memo:user-1:conversation-1"
     assert service._memo_redis.expiries[key] == redis_module.HOT_CACHE_DEFAULT_EXPIRE_SECONDS
 
-    await service.append_messages({**payload, "messages": {"id": 2}})
+    await service.append_message(
+        {**payload, "message": {"message_uid": "message-2"}}
+    )
     assert await service.get_recent_messages(payload) == {
         "success": True,
-        "messages": [messages[0], {"id": 2}],
+        "messages": [messages[0], {"message_uid": "message-2"}],
         "cache_hit": True,
     }
 

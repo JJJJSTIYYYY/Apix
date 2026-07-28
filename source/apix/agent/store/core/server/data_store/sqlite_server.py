@@ -144,7 +144,7 @@ class SqliteService(DataServerBase):
         for key, value in row.items():
             if not isinstance(value, str):
                 continue
-            if key.endswith("_at") or key == "exec_time":
+            if key.endswith("_at") or key in {"exec_time", "timestamp"}:
                 if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", value):
                     row[key] = value.replace(" ", "T", 1)
         return row
@@ -318,8 +318,8 @@ class SqliteService(DataServerBase):
                 raise ValueError("Messages list is empty")
 
             role = message["role"]
-            extra = self._json(message.get("extra"), {})
-            info = self._json(message.get("info"), {})
+            metadata = self._json(message.get("metadata"), {})
+            extensions = self._json(message.get("extensions"), {})
 
             def operation(connection: sqlite3.Connection) -> dict[str, Any]:
                 connection.execute("BEGIN IMMEDIATE")
@@ -339,24 +339,25 @@ class SqliteService(DataServerBase):
                 insert_cursor = connection.execute(
                     """
                     INSERT INTO messages (
-                        user_uid, conversation_id, conversation_uid, role,
-                        content, think, extra, info, msg_cursor, generation_id,
-                        node_id, parent_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        message_uid, msg_cursor, user_uid, conversation_id,
+                        conversation_uid, generation_id, node_id, parent_id,
+                        role, name, content, metadata, extensions
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
+                        message["message_uid"],
+                        cursor,
                         user_uid,
                         conversation["id"],
                         conversation_uid,
-                        role,
-                        message["content"],
-                        message.get("think", ""),
-                        extra,
-                        info,
-                        cursor,
                         message.get("generation_id", ""),
                         message.get("node_id", ""),
                         message.get("parent_id", ""),
+                        role,
+                        message.get("name"),
+                        message["content"],
+                        metadata,
+                        extensions,
                     ),
                 )
                 connection.execute(
@@ -374,10 +375,13 @@ class SqliteService(DataServerBase):
                     ),
                 )
                 created = connection.execute(
-                    "SELECT created_at FROM messages WHERE id = ?",
+                    "SELECT timestamp FROM messages WHERE id = ?",
                     (insert_cursor.lastrowid,),
                 ).fetchone()
-                result = {"msg_cursor": cursor, "created_at": created["created_at"]}
+                result = {
+                    "msg_cursor": cursor,
+                    "timestamp": created["timestamp"],
+                }
                 return self._normalize_row(result)
 
             result = await self._run(operation)
@@ -399,7 +403,7 @@ class SqliteService(DataServerBase):
                 for node_id in node_ids:
                     rows = connection.execute(
                         """
-                        SELECT id, info FROM messages
+                        SELECT id, message_uid FROM messages
                         WHERE user_uid = ? AND conversation_uid = ? AND node_id = ?
                         """,
                         (user_uid, conversation_uid, node_id),
@@ -409,19 +413,11 @@ class SqliteService(DataServerBase):
                             "UPDATE messages SET is_deleted = 1 WHERE id = ?",
                             [(row["id"],) for row in rows],
                         )
-                    for row in rows:
-                        raw = row["info"]
-                        if isinstance(raw, str):
-                            try:
-                                parsed = json.loads(raw)
-                            except Exception:
-                                continue
-                        elif isinstance(raw, dict):
-                            parsed = raw
-                        else:
-                            continue
-                        if isinstance(parsed, dict):
-                            result.append(parsed)
+                    result.extend(
+                        {"message_uid": row["message_uid"]}
+                        for row in rows
+                        if row["message_uid"]
+                    )
                 return result
 
             return {"success": True, "messages": await self._run(operation)}
@@ -435,8 +431,9 @@ class SqliteService(DataServerBase):
             limit = int(payload.get("limit", 65535))
             rows = await self._fetch_all(
                 """
-                SELECT role, content, think, extra, info, msg_cursor,
-                       created_at, generation_id, node_id, parent_id, is_deleted
+                SELECT message_uid, msg_cursor, role, name, content, metadata,
+                       extensions, timestamp, generation_id, node_id, parent_id,
+                       is_deleted
                 FROM messages
                 WHERE user_uid = ? AND conversation_uid = ? AND msg_cursor >= ?
                 ORDER BY msg_cursor ASC

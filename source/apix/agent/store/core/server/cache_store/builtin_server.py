@@ -13,7 +13,7 @@ from apix.config.base_config import BASE_DIR, HOT_CACHE_DEFAULT_EXPIRE_SECONDS, 
 
 
 class BuiltinService(CacheServerBase):
-    """A TTL-aware in-memory cache persisted when the application stops."""
+    """A TTL-aware cache that preserves canonical message dictionaries."""
 
     def __init__(self, persistence_path: Optional[str | Path] = None):
         self._persistence_path = Path(
@@ -69,17 +69,17 @@ class BuiltinService(CacheServerBase):
                 raise
 
 
-    async def append_messages(self, payload: dict) -> dict:
+    async def append_message(self, payload: dict) -> dict:
         logger.trace()
         try:
             key = self._build_memo_key(payload)
-            messages = payload.get("messages", {})
+            message = payload.get("message", {})
             async with self._lock:
                 item = self._get_item(key)
                 if item is None:
                     logger.warning("Builtin cache key not exists.")
                     return {"success": True, "messages": "success"}
-                item["value"].append(copy.deepcopy(messages))
+                item["value"].append(copy.deepcopy(message))
                 item["expires_at"] = time.time() + HOT_CACHE_DEFAULT_EXPIRE_SECONDS
             return {"success": True, "messages": "success"}
         except Exception as error:

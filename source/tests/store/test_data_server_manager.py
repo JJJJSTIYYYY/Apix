@@ -13,7 +13,7 @@ from apix.common.lifespan.auto_init import auto_init
 
 def make_dependencies():
     cache_store = SimpleNamespace(
-        append_messages=AsyncMock(return_value={"success": True}),
+        append_message=AsyncMock(return_value={"success": True}),
         expire_immediately=AsyncMock(return_value={"success": True}),
         update_current_messages_branch_chain_cache=AsyncMock(
             return_value={"success": True}

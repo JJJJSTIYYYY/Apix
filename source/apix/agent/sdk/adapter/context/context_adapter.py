@@ -6,7 +6,8 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 from apix.agent.sdk.utils.message import ApixMessageBase, ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
-from apix.agent.sdk.graph.state import MainAgentState, Memory, Skill, Todo, Memory
+from apix.agent.sdk.utils.funcs import convert_generation_id_to_message_node_id
+from apix.agent.sdk.graph.state import MainAgentState, Memory, Skill, Todo
 from apix.common.utils.logger import logger
 
 
@@ -43,13 +44,20 @@ class AIContextAdapter:
         Raises:
             ValueError: If the last message in the list is not a :class:`ApixUserMessage`.
         """
-        pass
-    
+        if not isinstance(agent_messages, list) or not agent_messages:
+            raise ValueError(f"`agent_message` should be a no-empty list, got {type(agent_messages).__name__}")
 
-    def _build_user_context(self, extra: dict[str, Any], todo: list[Todo] = None) -> str:
+        if not isinstance(agent_messages[-1], ApixUserMessage):
+            raise ValueError(f"The last message in agent_message list should be `ApixUserMessage`, got {type(agent_messages[-1]).__name__}")
+
+    def _build_user_context(
+        self,
+        extensions: dict[str, Any],
+        todo: list[Todo] = None,
+    ) -> str:
         context_parts: list[str] = []
 
-        referenced_message = extra.get("referenced_message") or {}
+        referenced_message = extensions.get("referenced_message") or {}
         if isinstance(referenced_message, dict) and referenced_message:
             referenced_role = referenced_message.get("role") or "[UNKNOWN]"
             referenced_speaker = referenced_message.get("name") or "[UNKNOWN]"
@@ -66,13 +74,13 @@ class AIContextAdapter:
                 "</referenced_message>"
             )
 
-        active_file = extra.get("active_file") or ""
+        active_file = extensions.get("active_file") or ""
         if active_file:
             context_parts.append(
                 f"<active_file>{escape(str(active_file))}</active_file>"
             )
 
-        uploaded_files = extra.get("uploaded_files") or []
+        uploaded_files = extensions.get("uploaded_files") or []
         if isinstance(uploaded_files, list) and uploaded_files:
             files_xml = "\n".join(
                 f"  <file>{escape(f'./upload_files/{filename}')}</file>"
@@ -96,7 +104,7 @@ class AIContextAdapter:
                 "</todo_list>"
             )
 
-        task = extra.get("task") or {}
+        task = extensions.get("task") or {}
         if isinstance(task, dict) and task:
             task_type = task.get("type")
             task_name = task.get("name")
@@ -252,15 +260,15 @@ class AIContextAdapter:
 
                 ```python
                 {
+                    "message_uid": str,
                     "generation_id": str, # uuid4, tips: messages generated within the same graph loop share the same generation id.
                     "role": str,
+                    "name": str | None,
                     "content": str | list,
-                    "created_at": int
                     "node_id": str
                     "parent_id": str,
-                    "think": str, # optional
-                    "extra": dict, # optional, contains key: `active_file: str` `referenced_message: dict` `system_instruction: list`
-                    "info": dict, # optional
+                    "metadata": dict,
+                    "extensions": dict,
                 }
                 ```
 
@@ -276,60 +284,57 @@ class AIContextAdapter:
         todo: list[Todo] = None
 
         index = 0
-        messages_len = len(messages)
+        messages_len = len(dict_messages)
         for msg_dict in dict_messages:
             index = index + 1
             role = msg_dict.get("role")
             content = str(msg_dict.get("content", "") or "")
-            think = str(msg_dict.get("think", "") or "")
-            extra = msg_dict.get("extra", {})
-            if extra and not isinstance(extra, dict):
-                extra = json.loads(extra)
-            info = msg_dict.get("info", {})
-            if info and not isinstance(info, dict):
-                info = json.loads(info)
-            created_at = msg_dict.get("created_at", "")
-            name = info.get("name")
-            id = info.get("id")
+            metadata = self._decode_json_object(msg_dict.get("metadata"))
+            extensions = self._decode_json_object(msg_dict.get("extensions"))
+            name = msg_dict.get("name")
+            message_uid = msg_dict.get("message_uid")
+            message_kwargs = {
+                "metadata": metadata,
+                "extensions": extensions,
+            }
+            if message_uid:
+                message_kwargs["message_uid"] = message_uid
 
             if role == "user":
                 name = name or "user"
                 should_inject_todo = bool(todo) and index == messages_len
-                content = self._build_user_context(extra, todo=(todo if should_inject_todo else None)) + (content or "")
+                content = self._build_user_context(
+                    extensions,
+                    todo=(todo if should_inject_todo else None),
+                ) + (content or "")
 
                 if not content:
                     continue
 
                 msg = ApixUserMessage(
-                    id=id, 
-                    content=content, 
-                    name=name, 
-                    timestamp=created_at, 
-                    info=info, 
-                    extra=extra
+                    **message_kwargs,
+                    content=content,
+                    name=name,
                 )
                 messages.append(msg)
 
             elif role == "ai":
                 name = name or "assistant"
                 suffix = "<conversation_abort>"
+                reasoning = str(extensions.get("reasoning", "") or "")
                 if content.endswith(suffix):
                     content = content[:-len(suffix)]
-                if think.endswith(suffix):
-                    think = think[:-len(suffix)]
-                tool_calls = extra.get("tool_calls")
-                if not content and not think and not tool_calls:
+                if reasoning.endswith(suffix):
+                    reasoning = reasoning[:-len(suffix)]
+                    extensions["reasoning"] = reasoning
+                tool_calls = extensions.get("tool_calls")
+                if not content and not reasoning and not tool_calls:
                     continue  # Skip empty AI message
 
                 msg = ApixAiMessage(
-                    id=id,
+                    **message_kwargs,
                     content=content,
                     name=name,
-                    timestamp=created_at, 
-                    info=info, 
-                    extra=extra,
-                    tool_calls=tool_calls,
-                    reasoning=think
                 )
 
                 messages.append(msg)
@@ -339,12 +344,9 @@ class AIContextAdapter:
                     continue
 
                 msg = ApixSystemMessage(
-                    id=id,
+                    **message_kwargs,
                     content=content,
-                    name='system',
-                    timestamp=created_at, 
-                    info=info, 
-                    extra=extra,
+                    name=name or "system",
                 )
                 messages.append(msg)
 
@@ -353,19 +355,22 @@ class AIContextAdapter:
                     continue
 
                 msg = ApixToolMessage(
-                    id=id,
+                    **message_kwargs,
                     content=content,
                     name=name,
-                    tool_call_id=info.get("tool_call_id"),
-                    timestamp=created_at,
-                    info=info,
-                    extra=extra,
+                    tool_call_id=extensions.get("tool_call_id"),
                 )
                 messages.append(msg)
 
             elif role == "info":
                 if name == "todo":
-                    todo = extra.get("todo_list") if extra.get("todo_list")[-1]["status"] != "completed" else None
+                    todo_list = extensions.get("todo_list") or []
+                    todo = (
+                        todo_list
+                        if todo_list
+                        and todo_list[-1].get("status") != "completed"
+                        else None
+                    )
 
             else:
                 logger.warning(f"Unknown role or empty content ignored: {role}")
@@ -399,19 +404,19 @@ class AIContextAdapter:
                 "generation_id": str,   # UUID4; shared by all messages in the same graph loop
                 "role": str,
                 "content": str | list,
-                "created_at": int,
+                "message_uid": str,
                 "node_id": str,
                 "parent_id": str,
-                "think": str,           # optional
-                "extra": dict,          # optional
-                "info": dict            # optional
+                "metadata": dict,
+                "extensions": dict,
             }
             ```
         
         Raises:
             TypeError: If message is not an ApixAiMessage or ApixToolMessage.
             
-        When `filter=True`, the returned dict will only contains `role`, `content` and optional `think` and `extra`.
+            When ``filter=True``, the returned dict contains ``role``,
+            ``content`` and optional ``extensions``.
         """
         logger.trace()
 
@@ -421,59 +426,52 @@ class AIContextAdapter:
                 f"got {type(message).__name__}."
             )
 
-        info: dict[str, Any] = copy.deepcopy(message.info or {})
-        extra: dict[str, Any] = copy.deepcopy(message.extra or {})
+        metadata: dict[str, Any] = copy.deepcopy(message.metadata or {})
+        extensions: dict[str, Any] = copy.deepcopy(message.extensions or {})
         content = str(message.content or "")
-        think = ""
-
-        if message.id is not None:
-            info["id"] = message.id
-        if message.name is not None:
-            info["name"] = message.name
 
         if isinstance(message, ApixAiMessage):
             role = "ai"
-            think = str(message.reasoning or "")
-            if message.tool_calls:
-                extra["tool_calls"] = copy.deepcopy(message.tool_calls)
-            else:
-                extra.pop("tool_calls", None)
-
         else:
             role = "tool"
-            if message.tool_call_id is not None:
-                info["tool_call_id"] = message.tool_call_id
-            else:
-                info.pop("tool_call_id", None)
 
         if filter:
             result = {
                 "role": role,
                 "content": content,
             }
-            if think:
-                result["think"] = think
-            if extra:
-                result["extra"] = extra
+            if extensions:
+                result["extensions"] = extensions
             return result
 
         result = {
+            "message_uid": message.message_uid,
             "generation_id": generation_id,
             "role": role,
+            "name": message.name,
             "content": content,
-            "created_at": message.timestamp,
-            "node_id": message.id,
+            "node_id": convert_generation_id_to_message_node_id(
+                generation_id,
+                role,
+            ),
             "parent_id": parent_id,
+            "metadata": metadata,
+            "extensions": extensions,
         }
 
-        if think:
-            result["think"] = think
-        if extra:
-            result["extra"] = extra
-        if info:
-            result["info"] = info
-
         return result
+
+    @staticmethod
+    def _decode_json_object(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if not value or not isinstance(value, str):
+            return {}
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
     
 
     def drop_tool_messages(
@@ -648,10 +646,14 @@ class AIContextAdapter:
                 messages.append(ApixUserMessage(content=content, name=name))
 
             elif isinstance(input_msg, ApixAiMessage) or isinstance(input_msg, ApixAiMessageChunk):
-                think_content = (input_msg.additional_kwargs or {}).get("reasoning_content", "")
+                think_content = (
+                    input_msg.reasoning
+                    if isinstance(input_msg, ApixAiMessage)
+                    else input_msg.reasoning_delta
+                ) or ""
                 content = think_content + '\n\n' + content
                 msg = ApixAiMessage(content=content)
-                index = input_msg.id
+                index = input_msg.message_uid
                 if not content: continue
                 messages.append(msg)
 
@@ -922,13 +924,13 @@ class AIContextAdapter:
     ) -> str:
         sandbox = state.get("sandbox", "")
         config = state.get("config", {})
-        workspace = config.get("workspace", "")
+        work_dir = config.get("work_dir", "")
 
-        if not workspace:
+        if not work_dir:
             return "## No workspace directory has been specified by the user.\n\n"
 
-        if not os.path.exists(workspace):
-            raise FileNotFoundError(f"Workspace directory does not exist: {workspace}")
+        if not os.path.exists(work_dir):
+            raise FileNotFoundError(f"Workspace directory does not exist: {work_dir}")
 
         if not sandbox:
             return "## Sandbox configuration failed.\n\n"
@@ -938,13 +940,13 @@ class AIContextAdapter:
 An Ubuntu sandbox is available and shared with the user.
 
 Workspace mapping:
-{workspace} → /workspace
+{work_dir} → /workspace
 
 Rules:
 - Use `/workspace` as the workspace root inside the sandbox.
 - Prefer relative paths in project code file whenever possible.
 - Never expose `/workspace` in user-facing responses.
-- When showing file paths to the user, always use `{workspace}`.
+- When showing file paths to the user, always use `{work_dir}`.
 
 Examples:
 
@@ -954,8 +956,8 @@ Sandbox usage:
 - Preferred in project code: open("data/input.csv")
 
 User-facing output:
-- Show image in Markdown: ![Image]({workspace}/images/result.png)
-- Report output file: File saved to: {workspace}/report.pdf
+- Show image in Markdown: ![Image]({work_dir}/images/result.png)
+- Report output file: File saved to: {work_dir}/report.pdf
 """
     
 

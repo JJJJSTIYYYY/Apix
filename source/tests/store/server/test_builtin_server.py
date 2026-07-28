@@ -14,7 +14,15 @@ def payload():
 @pytest.mark.asyncio
 async def test_message_cache_workflow_is_copy_safe(tmp_path, payload):
     service = BuiltinService(tmp_path / "cache.json")
-    original = [{"role": "user", "content": "hello"}]
+    original = [
+        {
+            "message_uid": "message-1",
+            "role": "user",
+            "content": "hello",
+            "metadata": {},
+            "extensions": {},
+        }
+    ]
 
     assert await service.backfill_messages({**payload, "messages": original}) == {
         "success": True,
@@ -25,13 +33,30 @@ async def test_message_cache_workflow_is_copy_safe(tmp_path, payload):
     result = await service.get_recent_messages(payload)
     assert result == {
         "success": True,
-        "messages": [{"role": "user", "content": "hello"}],
+        "messages": [
+            {
+                "message_uid": "message-1",
+                "role": "user",
+                "content": "hello",
+                "metadata": {},
+                "extensions": {},
+            }
+        ],
         "cache_hit": True,
     }
 
     result["messages"][0]["content"] = "mutated result"
-    await service.append_messages(
-        {**payload, "messages": {"role": "ai", "content": "world"}}
+    await service.append_message(
+        {
+            **payload,
+            "message": {
+                "message_uid": "message-2",
+                "role": "ai",
+                "content": "world",
+                "metadata": {"model": "test"},
+                "extensions": {"reasoning": "because"},
+            },
+        }
     )
     result = await service.get_recent_messages(payload)
     assert [message["content"] for message in result["messages"]] == [
@@ -56,12 +81,18 @@ async def test_append_is_a_noop_on_cache_miss_and_empty_backfill_clears(
 ):
     service = BuiltinService(tmp_path / "cache.json")
 
-    assert (await service.append_messages({**payload, "messages": {"id": 1}}))[
+    assert (
+        await service.append_message(
+            {**payload, "message": {"message_uid": "message-1"}}
+        )
+    )[
         "success"
     ]
     assert not (await service.get_recent_messages(payload))["cache_hit"]
 
-    await service.backfill_messages({**payload, "messages": [{"id": 1}]})
+    await service.backfill_messages(
+        {**payload, "messages": [{"message_uid": "message-1"}]}
+    )
     await service.backfill_messages({**payload, "messages": []})
     assert not (await service.get_recent_messages(payload))["cache_hit"]
 
@@ -72,7 +103,9 @@ async def test_ttl_expiry_is_applied_without_sleep(monkeypatch, tmp_path, payloa
     monkeypatch.setattr(builtin_module.time, "time", lambda: clock[0])
     service = BuiltinService(tmp_path / "cache.json")
 
-    await service.backfill_messages({**payload, "messages": [{"id": 1}]})
+    await service.backfill_messages(
+        {**payload, "messages": [{"message_uid": "message-1"}]}
+    )
     await service.set_expire(payload, ttl_seconds=10)
     clock[0] = 1009.9
     assert (await service.get_recent_messages(payload))["cache_hit"]
@@ -130,7 +163,9 @@ async def test_persistence_restores_only_valid_unexpired_items(
     monkeypatch.setattr(builtin_module.time, "time", lambda: clock[0])
     path = tmp_path / "nested" / "cache.json"
     first = BuiltinService(path)
-    await first.backfill_messages({**payload, "messages": [{"id": 1}]})
+    await first.backfill_messages(
+        {**payload, "messages": [{"message_uid": "message-1"}]}
+    )
     await first.cache_current_messages_branch_chain(
         {**payload, "node_id_chain": ["root"]}
     )
@@ -141,7 +176,9 @@ async def test_persistence_restores_only_valid_unexpired_items(
     assert "expired" not in stored
     restored = BuiltinService(path)
     await restored.start()
-    assert (await restored.get_recent_messages(payload))["messages"] == [{"id": 1}]
+    assert (await restored.get_recent_messages(payload))["messages"] == [
+        {"message_uid": "message-1"}
+    ]
     assert (await restored.get_current_messages_branch_chain(payload))[
         "messages"
     ] == ["root"]

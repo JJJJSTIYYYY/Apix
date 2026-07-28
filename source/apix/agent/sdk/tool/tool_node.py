@@ -914,9 +914,7 @@ class ToolNode(BaseNode):
     ) -> ApixToolMessage:
         """Overwrite runtime metadata on one tool message."""
         message.name = tool_call["tool_name"]
-        message.info = {
-            "name": tool_call["tool_name"],
-            "tool_call_id": tool_call["call_id"],
+        message.metadata = {
             "duration": duration,
         }
         message.tool_call_id = tool_call["call_id"]

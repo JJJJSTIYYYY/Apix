@@ -60,7 +60,7 @@ DROP TABLE IF EXISTS shortterm_memory;
 CREATE TABLE shortterm_memory (
     -- Identity
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal auto id',
-    memory_id VARCHAR(64) NOT NULL UNIQUE COMMENT 'Message''s id',
+    memory_id VARCHAR(64) NOT NULL UNIQUE COMMENT 'Related message_uid',
     user_uid VARCHAR(64) NOT NULL COMMENT 'External user identifier',
     conversation_uid VARCHAR(64) NOT NULL COMMENT 'External conversation uid',
 
@@ -94,6 +94,8 @@ CREATE TABLE shortterm_memory (
 DROP TABLE IF EXISTS messages;
 CREATE TABLE messages (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    message_uid VARCHAR(64) NOT NULL COMMENT 'Application-level unique message id',
+    msg_cursor BIGINT NOT NULL COMMENT 'Message cursor in one conversation',
 
     user_uid VARCHAR(64) NOT NULL COMMENT 'Owner user uid',
     conversation_id BIGINT NOT NULL COMMENT 'id in table conversations, to make table joins more efficient.',
@@ -104,17 +106,15 @@ CREATE TABLE messages (
     parent_id VARCHAR(32) NOT NULL COMMENT 'Reference to the parent node (previous message in the conversation tree).',
 
     role ENUM('user', 'ai', 'system', 'tool', 'info') NOT NULL,
+    name VARCHAR(255) DEFAULT NULL COMMENT 'Assistant, user, or tool name',
     content LONGTEXT,
-    think LONGTEXT,
-
-    extra JSON DEFAULT NULL COMMENT 'Tool args / metadata / ...',
-    info JSON DEFAULT NULL COMMENT 'model / provider / duration / tokens / id',
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    msg_cursor BIGINT NOT NULL COMMENT 'Message cursor in one conversation',
+    metadata JSON DEFAULT NULL COMMENT 'Usage, model provider, duration, and similar metadata',
+    extensions JSON DEFAULT NULL COMMENT 'Reasoning, tool calls, plans, search, files, instructions, references, and other business data',
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation time',
 
     is_deleted BOOLEAN DEFAULT FALSE,
 
+    UNIQUE KEY uk_message_uid (message_uid),
     UNIQUE KEY uk_conversation_cursor (conversation_id, msg_cursor),
 
     INDEX idx_user_conversation_cursor (
@@ -594,11 +594,12 @@ DELIMITER $$
 CREATE PROCEDURE append_message (
     IN p_user_uid VARCHAR(64),
     IN p_conversation_uid VARCHAR(64),
+    IN p_message_uid VARCHAR(64),
     IN p_role ENUM('user', 'ai', 'system', 'tool', 'info'),
+    IN p_name VARCHAR(255),
     IN p_content LONGTEXT,
-    IN p_think LONGTEXT,
-    IN p_extra JSON,
-    IN p_info JSON,
+    IN p_metadata JSON,
+    IN p_extensions JSON,
     IN p_generation_id VARCHAR(64),
     IN p_node_id VARCHAR(32),
     IN p_parent_id VARCHAR(32)
@@ -641,11 +642,12 @@ BEGIN
         user_uid,
         conversation_id,
         conversation_uid,
+        message_uid,
         role,
+        name,
         content,
-        think,
-        extra,
-        info,
+        metadata,
+        extensions,
         msg_cursor,
         generation_id,
         node_id,
@@ -655,11 +657,12 @@ BEGIN
         p_user_uid,
         v_conversation_id,
         p_conversation_uid,
+        p_message_uid,
         p_role,
+        p_name,
         p_content,
-        p_think,
-        p_extra,
-        p_info,
+        p_metadata,
+        p_extensions,
         v_next_cursor,
         p_generation_id,
         p_node_id,
@@ -680,7 +683,7 @@ BEGIN
     SELECT
         v_message_id AS msg_id,
         v_next_cursor AS msg_cursor,
-        NOW() AS created_at;
+        NOW() AS timestamp;
 
     COMMIT;
 END$$
@@ -702,14 +705,14 @@ CREATE PROCEDURE delete_messages (
 BEGIN
     START TRANSACTION;
 
-    -- Step 1: Cache target rows (only store primary key + info for efficiency)
+    -- Step 1: Cache target rows and their application message ids.
     CREATE TEMPORARY TABLE tmp_to_delete (
         id BIGINT PRIMARY KEY,
-        info JSON
+        message_uid VARCHAR(64)
     ) ENGINE=InnoDB;
 
-    INSERT INTO tmp_to_delete (id, info)
-    SELECT id, info
+    INSERT INTO tmp_to_delete (id, message_uid)
+    SELECT id, message_uid
     FROM messages
     WHERE user_uid = p_user_uid
       AND conversation_uid = p_conversation_uid
@@ -725,8 +728,8 @@ BEGIN
     JOIN tmp_to_delete t ON m.id = t.id
     SET m.is_deleted = TRUE;
 
-    -- Step 3: Return deleted infos
-    SELECT info FROM tmp_to_delete;
+    -- Step 3: Return deleted application message ids.
+    SELECT message_uid FROM tmp_to_delete;
 
     DROP TEMPORARY TABLE tmp_to_delete;
 
@@ -749,14 +752,14 @@ CREATE PROCEDURE delete_messages_node (
 BEGIN
     START TRANSACTION;
 
-    -- Step 1: Cache target rows (only store primary key + info for efficiency)
+    -- Step 1: Cache target rows and their application message ids.
     CREATE TEMPORARY TABLE tmp_to_delete (
         id BIGINT PRIMARY KEY,
-        info JSON
+        message_uid VARCHAR(64)
     ) ENGINE=InnoDB;
 
-    INSERT INTO tmp_to_delete (id, info)
-    SELECT id, info
+    INSERT INTO tmp_to_delete (id, message_uid)
+    SELECT id, message_uid
     FROM messages
     WHERE user_uid = p_user_uid
       AND conversation_uid = p_conversation_uid
@@ -768,8 +771,8 @@ BEGIN
     JOIN tmp_to_delete t ON m.id = t.id
     SET m.is_deleted = TRUE;
 
-    -- Step 3: Return deleted infos
-    SELECT info FROM tmp_to_delete;
+    -- Step 3: Return deleted application message ids.
+    SELECT message_uid FROM tmp_to_delete;
 
     DROP TEMPORARY TABLE tmp_to_delete;
 
@@ -792,13 +795,14 @@ CREATE PROCEDURE fetch_messages_after_cursor (
 )
 BEGIN
     SELECT
+        message_uid,
         role,
+        name,
         content,
-        think,
-        extra,
-        info,
+        metadata,
+        extensions,
         msg_cursor,
-        created_at,
+        timestamp,
         generation_id,
         node_id,
         parent_id,

@@ -34,7 +34,7 @@ class RedisService(CacheServerBase):
     # Memo Redis (Conversation Cache)
     # ------------------------------------------------------------------
 
-    async def append_messages(self, payload: dict) -> dict:
+    async def append_message(self, payload: dict) -> dict:
         """
         Append message ONLY IF redis key already exists.
         This method should only be called after append message to MySQL and then backfilling Redis.
@@ -43,23 +43,18 @@ class RedisService(CacheServerBase):
             payload: Dict, the format is {
                 "user_uid": user id,
                 "conversation_uid": conversation id,
-                "messages": {
+                "message": {
+                    "message_uid": "application unique message id",
                     "role": 'user', 'ai', 'system', 'tool', 'info'
+                    "name": "assistant / user / tool name",
                     "content": "message content",
-                    "think": "",
-                    "extra": {...},
-                    "info": {
-                        "model": "...",
-                        "total_duration": "...",
-                        "model_provider": "...",
-                        "total_tokens": int,
-                        "id": "",
-                    }, 
-                    "node_id": int,
-                    "parent_id": int,
+                    "metadata": {...},
+                    "extensions": {...},
+                    "node_id": str,
+                    "parent_id": str,
                     "msg_cursor": int,
-                    "timestamp": int,
-                    "created_at": str
+                    "timestamp": str,
+                    "is_deleted": bool,
                 }
             }
 
@@ -83,10 +78,10 @@ class RedisService(CacheServerBase):
                     "messages": "success",
                 }
 
-            messages = payload.get("messages", {})
+            message = payload.get("message", {})
 
             async with self._memo_redis.pipeline() as pipe:
-                pipe.rpush(key, json.dumps(messages, ensure_ascii=False))
+                pipe.rpush(key, json.dumps(message, ensure_ascii=False))
 
                 pipe.expire(key, HOT_CACHE_DEFAULT_EXPIRE_SECONDS)
                 await pipe.execute()

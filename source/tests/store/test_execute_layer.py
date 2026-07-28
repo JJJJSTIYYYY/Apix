@@ -32,8 +32,8 @@ def _row(
     role: str,
     *,
     deleted: bool = False,
-    extra=None,
-    info=None,
+    metadata=None,
+    extensions=None,
 ) -> dict:
     return {
         "node_id": node_id,
@@ -41,8 +41,8 @@ def _row(
         "msg_cursor": cursor,
         "role": role,
         "is_deleted": deleted,
-        "extra": {} if extra is None else extra,
-        "info": {} if info is None else info,
+        "metadata": {} if metadata is None else metadata,
+        "extensions": {} if extensions is None else extensions,
         "content": f"{node_id}:{cursor}",
     }
 
@@ -312,7 +312,8 @@ async def test_append_message_persists_updates_cache_and_branch_chain():
     payload = {
         "user_uid": "user-1",
         "conversation_uid": "conversation-1",
-        "messages": {
+        "message": {
+            "message_uid": "message-1",
             "role": "user",
             "node_id": "node-1",
             "parent_id": "-",
@@ -324,13 +325,13 @@ async def test_append_message_persists_updates_cache_and_branch_chain():
                 "success": True,
                 "messages": {
                     "msg_cursor": 3,
-                    "id": "message-1",
+                    "timestamp": "2026-01-01T00:00:00",
                 },
             }
         )
     )
     cache_store = SimpleNamespace(
-        append_messages=AsyncMock(),
+        append_message=AsyncMock(),
         update_current_messages_branch_chain_cache=AsyncMock(),
     )
     executor = _executor(
@@ -342,11 +343,24 @@ async def test_append_message_persists_updates_cache_and_branch_chain():
         "success": True,
         "messages": "success",
     }
-    cached_message = payload["messages"]
+    cached_message = payload["message"]
     assert cached_message["msg_cursor"] == 3
-    assert cached_message["id"] == "message-1"
+    assert cached_message["message_uid"] == "message-1"
+    assert cached_message["timestamp"] == "2026-01-01T00:00:00"
     assert cached_message["is_deleted"] is False
-    cache_store.append_messages.assert_awaited_once_with(payload)
+    data_store.append_message.assert_awaited_once_with(
+        {
+            "user_uid": "user-1",
+            "conversation_uid": "conversation-1",
+            "message": {
+                "message_uid": "message-1",
+                "role": "user",
+                "node_id": "node-1",
+                "parent_id": "-",
+            },
+        }
+    )
+    cache_store.append_message.assert_awaited_once_with(payload)
     cache_store.update_current_messages_branch_chain_cache.assert_awaited_once_with(
         {
             "user_uid": "user-1",
@@ -362,14 +376,14 @@ async def test_append_message_short_circuits_and_ignores_cache_append_error():
     payload = {
         "user_uid": "user-1",
         "conversation_uid": "conversation-1",
-        "messages": {},
+        "message": {},
     }
     failure = {"success": False, "messages": "write failed"}
     data_store = SimpleNamespace(
         append_message=AsyncMock(return_value=failure)
     )
     cache_store = SimpleNamespace(
-        append_messages=AsyncMock(),
+        append_message=AsyncMock(),
         update_current_messages_branch_chain_cache=AsyncMock(),
     )
     executor = _executor(
@@ -378,13 +392,13 @@ async def test_append_message_short_circuits_and_ignores_cache_append_error():
     )
 
     assert await executor.append_message(deepcopy(payload)) == failure
-    cache_store.append_messages.assert_not_awaited()
+    cache_store.append_message.assert_not_awaited()
 
     data_store.append_message.return_value = {
         "success": True,
         "messages": {"msg_cursor": 1},
     }
-    cache_store.append_messages.side_effect = RuntimeError("cache down")
+    cache_store.append_message.side_effect = RuntimeError("cache down")
 
     assert (await executor.append_message(payload))["success"] is True
     cache_store.update_current_messages_branch_chain_cache.assert_awaited_once()
@@ -399,7 +413,7 @@ async def test_append_message_normalizes_outer_exception():
 
     assert await executor.append_message({}) == {
         "success": False,
-        "messages": "fail: 'messages'",
+        "messages": "fail: 'message'",
     }
 
 
@@ -414,9 +428,9 @@ async def test_delete_messages_deletes_related_memory_ids():
             return_value={
                 "success": True,
                 "messages": [
-                    {"id": ""},
+                    {"message_uid": ""},
                     {"other": "missing"},
-                    {"id": "memory-1"},
+                    {"message_uid": "memory-1"},
                 ],
             }
         ),
@@ -472,7 +486,7 @@ async def test_delete_messages_handles_cache_store_and_memory_failures():
 
     delete_messages.return_value = {
         "success": True,
-        "messages": [{"id": "memory-1"}],
+        "messages": [{"message_uid": "memory-1"}],
     }
     memory_failure = {"success": False, "messages": "memory failed"}
     delete_memory.return_value = memory_failure
@@ -499,7 +513,7 @@ def test_build_visible_messages_handles_empty_input():
         [],
         None,
         ("user",),
-    ) == ([], {})
+    ) == ([], {}, [])
 
 
 def test_build_visible_messages_parses_filters_and_reports_branches():
@@ -509,20 +523,20 @@ def test_build_visible_messages_parses_filters_and_reports_branches():
             "-",
             1,
             "user",
-            extra='{"source": "json"}',
-            info="invalid-json",
+            extensions='{"source": "json"}',
+            metadata="invalid-json",
         ),
         _row(
             "node-a",
             "-",
             2,
             "ai",
-            extra="invalid-json",
-            info='{"score": 1}',
+            extensions="invalid-json",
+            metadata='{"score": 1}',
         ),
         _row("node-a", "-", 3, "internal"),
         _row("node-b", "-", 4, "user"),
-        _row("node-c", "node-a", 5, "tool", extra="", info=""),
+        _row("node-c", "node-a", 5, "tool", extensions="", metadata=""),
         _row("node-c", "node-a", 6, "tool", deleted=True),
     ]
     executor = _executor()
@@ -534,12 +548,12 @@ def test_build_visible_messages_parses_filters_and_reports_branches():
     )
 
     assert [message["msg_cursor"] for message in parsed] == [1, 2, 5]
-    assert parsed[0]["extra"] == {"source": "json"}
-    assert parsed[0]["info"] == {}
-    assert parsed[1]["extra"] == {}
-    assert parsed[1]["info"] == {"score": 1}
-    assert parsed[2]["extra"] == ""
-    assert parsed[2]["info"] == ""
+    assert parsed[0]["extensions"] == {"source": "json"}
+    assert parsed[0]["metadata"] == {}
+    assert parsed[1]["extensions"] == {}
+    assert parsed[1]["metadata"] == {"score": 1}
+    assert parsed[2]["extensions"] == {}
+    assert parsed[2]["metadata"] == {}
     assert node_chain == ["node-a", "node-c"]
     assert branches == {
         "-": [

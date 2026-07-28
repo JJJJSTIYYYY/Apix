@@ -303,9 +303,8 @@ async def test_string_result_creates_tool_message_with_runtime_metadata():
     assert message.content == "finished"
     assert message.name == "text"
     assert message.tool_call_id == "call-text"
-    assert message.info["name"] == "text"
-    assert message.info["tool_call_id"] == "call-text"
-    assert message.info["duration"] >= 0
+    assert message.metadata["duration"] >= 0
+    assert message.extensions["tool_call_id"] == "call-text"
 
 
 @pytest.mark.asyncio
@@ -314,7 +313,7 @@ async def test_tool_message_result_has_runtime_metadata_overwritten():
     returned_message = ApixToolMessage(
         content="finished",
         name="stale-name",
-        info={"stale": True},
+        metadata={"stale": True},
         tool_call_id="stale-call",
     )
 
@@ -332,10 +331,8 @@ async def test_tool_message_result_has_runtime_metadata_overwritten():
     assert normalised_message is returned_message
     assert normalised_message.name == "message"
     assert normalised_message.tool_call_id == "call-message"
-    assert normalised_message.info["name"] == "message"
-    assert normalised_message.info["tool_call_id"] == "call-message"
-    assert normalised_message.info["duration"] >= 0
-    assert "stale" not in normalised_message.info
+    assert normalised_message.metadata["duration"] >= 0
+    assert "stale" not in normalised_message.metadata
 
 
 @pytest.mark.asyncio
@@ -366,7 +363,7 @@ async def test_command_result_is_preserved_and_message_metadata_is_overwritten()
     returned_message = ApixToolMessage(
         content="finished",
         name="stale-name",
-        info={"stale": True},
+        metadata={"stale": True},
         tool_call_id="stale-call",
     )
 
@@ -395,10 +392,8 @@ async def test_command_result_is_preserved_and_message_metadata_is_overwritten()
     assert message.content == "finished"
     assert message.name == "update_state"
     assert message.tool_call_id == "call-update"
-    assert message.info["name"] == "update_state"
-    assert message.info["tool_call_id"] == "call-update"
-    assert message.info["duration"] >= 0
-    assert "stale" not in message.info
+    assert message.metadata["duration"] >= 0
+    assert "stale" not in message.metadata
 
 
 @pytest.mark.asyncio
@@ -948,7 +943,7 @@ def test_normalise_valid_command_preserves_updates_and_goto():
     existing_message = ApixToolMessage(
         content="existing",
         name="old-name",
-        info={"old": True},
+        metadata={"old": True},
         tool_call_id="existing-call",
     )
 
@@ -966,9 +961,7 @@ def test_normalise_valid_command_preserves_updates_and_goto():
     )
     assert existing_message.name == "<lambda>"
     assert existing_message.tool_call_id == "call-normalise"
-    assert existing_message.info == {
-        "name": "<lambda>",
-        "tool_call_id": "call-normalise",
+    assert existing_message.metadata == {
         "duration": 123,
     }
 
