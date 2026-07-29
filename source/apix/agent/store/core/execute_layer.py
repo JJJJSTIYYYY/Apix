@@ -644,7 +644,7 @@ class DataExecutors:
         return await self.data_store.fetch_target_skill(payload)
 
     # --------------------------------------------------
-    # Short-term Memory
+    # Memory
     # --------------------------------------------------
     
     @data_task_handler("fetch_shortterm_memory")
