@@ -91,6 +91,38 @@ CREATE TABLE shortterm_memory (
 
 
 
+DROP TABLE IF EXISTS longterm_memory;
+CREATE TABLE longterm_memory (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal auto id',
+    memory_id VARCHAR(64) NOT NULL UNIQUE COMMENT 'Long-term memory id',
+    user_uid VARCHAR(64) NOT NULL COMMENT 'Owner user uid',
+
+    title VARCHAR(255) NOT NULL COMMENT 'Memory title',
+    memory_date DATE NOT NULL COMMENT 'Memory date',
+    content LONGTEXT NOT NULL COMMENT 'Memory content',
+    source ENUM('conversation', 'workspace') NOT NULL COMMENT 'Memory source',
+
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Soft delete flag',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL COMMENT 'Soft delete time',
+
+    INDEX idx_longterm_memory_user_date (
+        user_uid,
+        is_deleted,
+        memory_date DESC,
+        id DESC
+    ),
+
+    CONSTRAINT fk_longterm_memory_user
+        FOREIGN KEY (user_uid)
+        REFERENCES users(user_uid)
+        ON DELETE CASCADE
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
 DROP TABLE IF EXISTS messages;
 CREATE TABLE messages (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -581,6 +613,92 @@ BEGIN
       AND is_deleted = FALSE
     ORDER BY created_timestamp DESC
     LIMIT 1;
+END $$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS insert_longterm_memory;
+DELIMITER $$
+
+CREATE PROCEDURE insert_longterm_memory (
+    IN p_memory_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_title VARCHAR(255),
+    IN p_date DATE,
+    IN p_content LONGTEXT,
+    IN p_source ENUM('conversation', 'workspace')
+)
+BEGIN
+    INSERT INTO longterm_memory (
+        memory_id,
+        user_uid,
+        title,
+        memory_date,
+        content,
+        source
+    ) VALUES (
+        p_memory_id,
+        p_user_uid,
+        p_title,
+        p_date,
+        p_content,
+        p_source
+    );
+END $$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS fetch_longterm_memory;
+DELIMITER $$
+
+CREATE PROCEDURE fetch_longterm_memory (
+    IN p_user_uid VARCHAR(64)
+)
+BEGIN
+    SELECT
+        memory_id,
+        title,
+        memory_date AS `date`,
+        content,
+        source
+    FROM longterm_memory
+    WHERE user_uid = p_user_uid
+      AND is_deleted = FALSE
+    ORDER BY memory_date DESC, id DESC;
+END $$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS update_longterm_memory;
+DELIMITER $$
+
+CREATE PROCEDURE update_longterm_memory (
+    IN p_memory_id VARCHAR(64),
+    IN p_user_uid VARCHAR(64),
+    IN p_title VARCHAR(255),
+    IN p_date DATE,
+    IN p_content LONGTEXT,
+    IN p_source ENUM('conversation', 'workspace'),
+    IN p_is_deleted BOOLEAN
+)
+BEGIN
+    UPDATE longterm_memory
+    SET
+        title = COALESCE(p_title, title),
+        memory_date = COALESCE(p_date, memory_date),
+        content = COALESCE(p_content, content),
+        source = COALESCE(p_source, source),
+        is_deleted = COALESCE(p_is_deleted, is_deleted),
+        deleted_at = IF(p_is_deleted = TRUE, CURRENT_TIMESTAMP, deleted_at)
+    WHERE memory_id = p_memory_id
+      AND user_uid = p_user_uid
+      AND is_deleted = FALSE;
 END $$
 
 DELIMITER ;

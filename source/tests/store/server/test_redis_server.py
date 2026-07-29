@@ -69,9 +69,18 @@ class FakeRedis:
         self.expiries[key] = ttl
         return key in self.values
 
-    async def delete(self, key):
-        self.values.pop(key, None)
-        return 1
+    async def delete(self, *keys):
+        deleted = 0
+        for key in keys:
+            deleted += key in self.values
+            self.values.pop(key, None)
+        return deleted
+
+    async def scan_iter(self, match):
+        prefix = match.removesuffix("*")
+        for key in list(self.values):
+            if key.startswith(prefix):
+                yield key
 
     async def aclose(self):
         self.closed = True
@@ -210,6 +219,74 @@ async def test_branch_chain_validation_and_cache_miss(service, payload):
         "messages": [],
         "cache_hit": False,
     }
+
+
+@pytest.mark.asyncio
+async def test_resource_cache_handles_empty_hits_and_scoped_invalidation(service):
+    empty = {
+        "cache_group": "mcp:user-1",
+        "cache_key": "enabled",
+        "messages": [],
+    }
+    all_servers = {
+        "cache_group": "mcp:user-1",
+        "cache_key": "all",
+        "messages": [{"mcp_id": "mcp-1"}],
+    }
+    provider = {
+        "cache_group": "providers:list",
+        "cache_key": "user-1",
+        "messages": [{"provider_id": "provider-1"}],
+    }
+
+    for item in (empty, all_servers, provider):
+        assert (await service.backfill_resource(item))["success"]
+
+    assert await service.get_resource(empty) == {
+        "success": True,
+        "messages": [],
+        "cache_hit": True,
+    }
+    resource_key = service._build_resource_key(all_servers)
+    assert (
+        service._memo_redis.expiries[resource_key]
+        == redis_module.STATIC_CACHE_DEFAULT_EXPIRE_SECONDS
+    )
+
+    await service.invalidate_resource(
+        {
+            "cache_group": "mcp:user-1",
+            "cache_key": "enabled",
+        }
+    )
+    assert not (await service.get_resource(empty))["cache_hit"]
+    assert (await service.get_resource(all_servers))["cache_hit"]
+
+    await service.invalidate_resource({"cache_group": "mcp:user-1"})
+    assert not (await service.get_resource(all_servers))["cache_hit"]
+    assert (await service.get_resource(provider))["cache_hit"]
+
+
+@pytest.mark.asyncio
+async def test_resource_cache_validation_and_decode_errors(service):
+    invalid = await service.backfill_resource(
+        {
+            "cache_group": "providers:list",
+            "cache_key": "user-1",
+            "messages": {},
+        }
+    )
+    assert invalid["success"] is False
+
+    payload = {
+        "cache_group": "providers:list",
+        "cache_key": "user-1",
+    }
+    service._memo_redis.values[
+        service._build_resource_key(payload)
+    ] = '{"not": "a list"}'
+    assert not (await service.get_resource(payload))["success"]
+    assert not (await service.invalidate_resource({}))["success"]
 
 
 @pytest.mark.asyncio

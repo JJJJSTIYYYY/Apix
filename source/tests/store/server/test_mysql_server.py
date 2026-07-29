@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -15,6 +16,20 @@ def make_service():
         password="password",
         database="database",
     )
+
+
+def test_mysql_schema_declares_longterm_memory_table_and_procedures():
+    sql = Path(mysql_module.__file__).with_name("init_mysql.sql").read_text(
+        encoding="utf-8"
+    )
+
+    assert "CREATE TABLE longterm_memory" in sql
+    assert "source ENUM('conversation', 'workspace')" in sql
+    assert "CREATE PROCEDURE insert_longterm_memory" in sql
+    assert "CREATE PROCEDURE fetch_longterm_memory" in sql
+    assert "CREATE PROCEDURE update_longterm_memory" in sql
+    assert "memory_date AS `date`" in sql
+    assert "AND is_deleted = FALSE" in sql
 
 
 class AsyncContext:
@@ -304,22 +319,16 @@ async def test_message_delete_fetch_and_search(monkeypatch):
             ("u-1", "s-1"),
         ),
         (
-            "fetch_available_documents",
-            {"user_uid": "u-1", "limit": 4},
-            "fetch_rag_documents",
-            ("u-1", 4),
-        ),
-        (
-            "fetch_target_document",
-            {"user_uid": "u-1", "document_id": "d-1"},
-            "fetch_target_document",
-            ("u-1", "d-1"),
-        ),
-        (
             "fetch_shortterm_memory",
             {"user_uid": "u-1", "conversation_uid": "c-1"},
             "fetch_shortterm_memory",
             ("u-1", "c-1"),
+        ),
+        (
+            "fetch_longterm_memory",
+            {"user_uid": "u-1"},
+            "fetch_longterm_memory",
+            ("u-1",),
         ),
         ("get_llm_providers", {"user_uid": "u-1"}, "get_llm_providers", ("u-1",)),
         (
@@ -365,7 +374,7 @@ async def test_read_wrappers_forward_parameters(
 
 
 @pytest.mark.asyncio
-async def test_skill_and_document_mutations(monkeypatch):
+async def test_skill_mutations(monkeypatch):
     service = make_service()
     call = AsyncMock(return_value=[])
     monkeypatch.setattr(service, "_call_procedure", call)
@@ -400,36 +409,6 @@ async def test_skill_and_document_mutations(monkeypatch):
     )
     call.assert_awaited_with("update_agent_skill", ("s-1", "u-1", True, False))
 
-    document = {
-        "file_id": "d-1",
-        "file_name": "doc.pdf",
-        "file_type": "application/pdf",
-        "file_path": "/doc.pdf",
-        "file_size": 99,
-        "sha256": "doc-hash",
-    }
-    await service.insert_rag_document(
-        {"user_uid": "u-1", "file_info": [document]}
-    )
-    call.assert_awaited_with(
-        "insert_rag_document",
-        ("d-1", "doc.pdf", "", "application/pdf", "/doc.pdf", 99, "doc-hash", "u-1"),
-    )
-    await service.update_document_status(
-        {
-            "user_uid": "u-1",
-            "document_id": "d-1",
-            "description": "ready",
-            "embed_engine": ["embedding"],
-            "is_active": True,
-            "deleted": False,
-        }
-    )
-    call.assert_awaited_with(
-        "update_rag_document",
-        ("d-1", "u-1", True, False, "ready", '["embedding"]'),
-    )
-
 
 @pytest.mark.asyncio
 async def test_memory_provider_mcp_and_cron_mutations(monkeypatch):
@@ -454,6 +433,51 @@ async def test_memory_provider_mcp_and_cron_mutations(monkeypatch):
     )
     call.assert_awaited_with(
         "delete_shortterm_memory", ('["m-1"]', "u-1", "c-1")
+    )
+
+    assert await service.insert_longterm_memory(
+        {
+            "memory_id": "long-1",
+            "user_uid": "u-1",
+            "title": "A memory",
+            "date": "2025-06-07",
+            "content": "Long-lived content",
+            "source": "conversation",
+        }
+    ) == {
+        "success": True,
+        "messages": {"memory_id": "long-1"},
+    }
+    call.assert_awaited_with(
+        "insert_longterm_memory",
+        (
+            "long-1",
+            "u-1",
+            "A memory",
+            "2025-06-07",
+            "Long-lived content",
+            "conversation",
+        ),
+    )
+    assert (await service.update_longterm_memory(
+        {
+            "memory_id": "long-1",
+            "user_uid": "u-1",
+            "title": "Updated",
+            "is_deleted": True,
+        }
+    ))["success"]
+    call.assert_awaited_with(
+        "update_longterm_memory",
+        (
+            "long-1",
+            "u-1",
+            "Updated",
+            None,
+            None,
+            None,
+            True,
+        ),
     )
 
     provider_payload = {

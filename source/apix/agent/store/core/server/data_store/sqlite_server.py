@@ -578,122 +578,6 @@ class SqliteService(DataServerBase):
             return self._failure(exc)
 
     # --------------------------------------------------
-    # RAG documents / legacy file API
-    # --------------------------------------------------
-
-    async def insert_rag_document(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            file_info_list = payload.get("file_info", payload.get("messages", []))
-            params = []
-            for item in file_info_list:
-                is_file_payload = "file_id" in item
-                params.append(
-                    (
-                        item["file_id"] if is_file_payload else item["document_id"],
-                        item["file_name"] if is_file_payload else item["document_name"],
-                        (
-                            ""
-                            if is_file_payload
-                            else item.get("document_description", "")
-                        ),
-                        item.get("file_type", item.get("mime_type", "unknown")),
-                        item["file_path"] if is_file_payload else item["document_path"],
-                        item["file_size"] if is_file_payload else item["document_size"],
-                        item["sha256"] if is_file_payload else item.get("document_sha256"),
-                        user_uid,
-                    )
-                )
-            if params:
-                await self._executemany(
-                    """
-                    INSERT INTO rag_documents (
-                        document_id, document_name, document_description,
-                        mime_type, document_path, document_size,
-                        document_sha256, user_uid
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    params,
-                )
-            return {"success": True, "messages": "success"}
-        except Exception as exc:
-            return self._failure(exc)
-
-    async def update_document_status(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            embed_engine = payload.get("embed_engine")
-            if embed_engine is not None and not isinstance(embed_engine, str):
-                embed_engine = json.dumps(embed_engine, ensure_ascii=False)
-            deleted = payload.get("deleted")
-            await self._execute(
-                """
-                UPDATE rag_documents
-                SET is_active = COALESCE(?, is_active),
-                    deleted = COALESCE(?, deleted),
-                    document_description = COALESCE(?, document_description),
-                    embed_engine = COALESCE(?, embed_engine),
-                    deleted_at = CASE
-                        WHEN ? = 1 THEN CURRENT_TIMESTAMP
-                        WHEN ? = 0 THEN NULL
-                        ELSE deleted_at
-                    END
-                WHERE user_uid = ? AND document_id = ?
-                """,
-                (
-                    payload.get("is_active"),
-                    deleted,
-                    payload.get("description"),
-                    embed_engine,
-                    deleted,
-                    deleted,
-                    payload["user_uid"],
-                    payload["document_id"],
-                ),
-            )
-            return {"success": True, "messages": "success"}
-        except Exception as exc:
-            return self._failure(exc)
-
-    async def fetch_available_documents(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            rows = await self._fetch_all(
-                """
-                SELECT document_id, document_name, document_description,
-                       embed_engine, mime_type, document_path, document_size,
-                       document_sha256, is_active, upload_at
-                FROM rag_documents
-                WHERE user_uid = ? AND deleted = 0
-                ORDER BY upload_at DESC
-                LIMIT ?
-                """,
-                (payload["user_uid"], int(payload.get("limit", 5))),
-            )
-            return {"success": True, "messages": rows}
-        except Exception as exc:
-            return self._failure(exc)
-
-    async def fetch_target_document(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            rows = await self._fetch_all(
-                """
-                SELECT document_id, document_name, document_description,
-                       embed_engine, mime_type, document_path, document_size,
-                       document_sha256, is_active, deleted, upload_at, deleted_at
-                FROM rag_documents
-                WHERE user_uid = ? AND document_id = ?
-                LIMIT 1
-                """,
-                (payload["user_uid"], payload["document_id"]),
-            )
-            return {"success": True, "messages": rows}
-        except Exception as exc:
-            return self._failure(exc)
-
-    # --------------------------------------------------
     # Short-term memory
     # --------------------------------------------------
 
@@ -754,6 +638,83 @@ class SqliteService(DataServerBase):
                         *memory_ids,
                     ),
                 )
+            return {"success": True, "messages": "success"}
+        except Exception as exc:
+            return self._failure(exc)
+
+    # --------------------------------------------------
+    # Long-term memory
+    # --------------------------------------------------
+
+    async def fetch_longterm_memory(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            rows = await self._fetch_all(
+                """
+                SELECT memory_id, title, memory_date AS date, content, source
+                FROM longterm_memory
+                WHERE user_uid = ? AND is_deleted = 0
+                ORDER BY memory_date DESC, id DESC
+                """,
+                (payload["user_uid"],),
+            )
+            return {"success": True, "messages": rows}
+        except Exception as exc:
+            return self._failure(exc)
+
+    async def insert_longterm_memory(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            memory_id = payload["memory_id"]
+            await self._execute(
+                """
+                INSERT INTO longterm_memory (
+                    memory_id, user_uid, title, memory_date, content, source
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    memory_id,
+                    payload["user_uid"],
+                    payload["title"],
+                    payload["date"],
+                    payload["content"],
+                    payload["source"],
+                ),
+            )
+            return {"success": True, "messages": {"memory_id": memory_id}}
+        except Exception as exc:
+            return self._failure(exc)
+
+    async def update_longterm_memory(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            is_deleted = payload.get("is_deleted")
+            await self._execute(
+                """
+                UPDATE longterm_memory
+                SET title = COALESCE(?, title),
+                    memory_date = COALESCE(?, memory_date),
+                    content = COALESCE(?, content),
+                    source = COALESCE(?, source),
+                    is_deleted = COALESCE(?, is_deleted),
+                    deleted_at = CASE
+                        WHEN ? = 1 THEN CURRENT_TIMESTAMP
+                        ELSE deleted_at
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE memory_id = ? AND user_uid = ? AND is_deleted = 0
+                """,
+                (
+                    payload.get("title"),
+                    payload.get("date"),
+                    payload.get("content"),
+                    payload.get("source"),
+                    is_deleted,
+                    is_deleted,
+                    payload["memory_id"],
+                    payload["user_uid"],
+                ),
+            )
             return {"success": True, "messages": "success"}
         except Exception as exc:
             return self._failure(exc)

@@ -210,8 +210,71 @@ class BuiltinService(CacheServerBase):
         except Exception as error:
             logger.exception(f"Error: {type(error).__name__}: {error}")
             return {"success": False, "messages": f"fail: {error}"}
-        
 
+    # ------------------------------------------------------------------
+    # Read-through Resource Cache
+    # ------------------------------------------------------------------
+
+    async def backfill_resource(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            messages = payload.get("messages")
+            if not isinstance(messages, list):
+                raise ValueError("Resource messages must be a list")
+            key = self._build_resource_key(payload)
+            async with self._lock:
+                self._set_item(
+                    key,
+                    copy.deepcopy(messages),
+                    STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+                )
+            return {"success": True, "messages": "success"}
+        except Exception as error:
+            logger.exception(f"Error: {type(error).__name__}: {error}")
+            return {"success": False, "messages": f"fail: {error}"}
+
+
+    async def get_resource(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            key = self._build_resource_key(payload)
+            async with self._lock:
+                item = self._get_item(key)
+                if item is None:
+                    return {
+                        "success": True,
+                        "messages": [],
+                        "cache_hit": False,
+                    }
+                return {
+                    "success": True,
+                    "messages": copy.deepcopy(item["value"]),
+                    "cache_hit": True,
+                }
+        except Exception as error:
+            logger.exception(f"Error: {type(error).__name__}: {error}")
+            return {"success": False, "messages": f"fail: {error}"}
+
+
+    async def invalidate_resource(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            async with self._lock:
+                if payload.get("cache_key") is not None:
+                    self._cache.pop(self._build_resource_key(payload), None)
+                else:
+                    prefix = self._build_resource_prefix(payload)
+                    matching_keys = [
+                        key for key in self._cache if key.startswith(prefix)
+                    ]
+                    for key in matching_keys:
+                        self._cache.pop(key, None)
+            return {"success": True, "messages": "success"}
+        except Exception as error:
+            logger.exception(f"Error: {type(error).__name__}: {error}")
+            return {"success": False, "messages": f"fail: {error}"}
+
+        
     def _set_item(self, key: str, value: Any, ttl_seconds: int) -> None:
         self._cache[key] = {"value": value, "expires_at": time.time() + ttl_seconds}
 

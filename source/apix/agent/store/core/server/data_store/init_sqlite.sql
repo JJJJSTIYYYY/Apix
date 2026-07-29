@@ -49,6 +49,31 @@ CREATE TABLE IF NOT EXISTS shortterm_memory (
 CREATE INDEX IF NOT EXISTS idx_shortterm_memory_lookup
     ON shortterm_memory(user_uid, conversation_uid, created_timestamp DESC);
 
+CREATE TABLE IF NOT EXISTS longterm_memory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memory_id TEXT NOT NULL UNIQUE,
+    user_uid TEXT NOT NULL,
+    title TEXT NOT NULL,
+    memory_date TEXT NOT NULL
+        CHECK (
+            memory_date GLOB
+                '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+            AND date(memory_date) IS NOT NULL
+            AND memory_date = date(memory_date)
+        ),
+    content TEXT NOT NULL,
+    source TEXT NOT NULL
+        CHECK (source IN ('conversation', 'workspace')),
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TEXT,
+    FOREIGN KEY (user_uid) REFERENCES users(user_uid) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_longterm_memory_user_date
+    ON longterm_memory(user_uid, is_deleted, memory_date DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     message_uid TEXT NOT NULL UNIQUE,

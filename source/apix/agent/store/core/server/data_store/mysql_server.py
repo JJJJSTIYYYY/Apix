@@ -807,224 +807,6 @@ class MysqlService(DataServerBase):
             }
         
     # --------------------------------------------------
-    # Rag Document (meta only)
-    # --------------------------------------------------
-
-    async def insert_rag_document(self, payload: dict) -> dict:
-        """
-        Insert uploaded document metadata into MySQL.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "file_info": [
-                    {
-                        "file_id": str,
-                        "file_name": str,
-                        "file_path": str,
-                        "file_size": int,   # e.g. 123456 (bytes)
-                        "file_type": str,   # e.g. "application/pdf"
-                        "sha256": str,
-                    },
-                    ...
-                ]
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "success" or "fail: {e}",
-            }
-        """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            file_info_list = payload.get("file_info", [])
-
-            for file_info in file_info_list:
-                file_id = file_info["file_id"]
-                file_name = file_info["file_name"]
-                file_desc = ""
-                mime_type = file_info.get("file_type", "unknown")
-                file_path = file_info["file_path"]
-                file_size = file_info["file_size"]
-                sha256 = file_info["sha256"]
-
-                await self._call_procedure(
-                    "insert_rag_document", 
-                    (file_id, file_name, file_desc, mime_type, file_path, file_size, sha256, user_uid)
-                )
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-
-    async def update_document_status(self, payload: dict) -> dict:
-        """
-        Update document status (activate / deactivate / delete / embed engine / description).
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "document_id": str,
-                "description": str | None,
-                "embed_engine": list | None,
-                "is_active": bool | None,
-                "deleted": bool | None,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
-
-        logger.trace()
-
-        try:
-            user_uid = payload["user_uid"]
-            document_id = payload["document_id"]
-            description = payload.get("description")
-            embed_engine = payload.get("embed_engine")
-            is_active = payload.get("is_active")
-            deleted = payload.get("deleted")
-
-            if embed_engine is not None and not isinstance(embed_engine, str):
-                embed_engine = json.dumps(embed_engine, ensure_ascii=False)
-
-            await self._call_procedure(
-                "update_rag_document",
-                (document_id, user_uid, is_active, deleted, description, embed_engine),
-            )
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-
-    async def fetch_available_documents(self, payload: dict) -> dict:
-        """
-        Fetch uploaded document metadata in MySQL.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "limit": int
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": [
-                    {
-                        "document_id": str,
-                        "document_name": str,
-                        "document_description": str,
-                        "embed_engine": list,
-                        "mime_type": str,
-                        "document_path": str,
-                        "document_size": int,
-                        "document_sha256": str,
-                        "is_active": bool,
-                        "upload_at": str
-                    },
-                    ...
-                ]
-            }
-        """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            limit = payload.get("limit", 5)
-
-            rows = await self._call_procedure("fetch_rag_documents", (user_uid, limit))
-
-            return {
-                "success": True,
-                "messages": rows,
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-
-
-    async def fetch_target_document(self, payload: dict) -> dict:
-        """
-        Fetch uploaded document metadata in MySQL.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "document_id": str
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": [
-                    {
-                        "document_id": str,
-                        "document_name": str,
-                        "document_description": str,
-                        "embed_engine": list,
-                        "mime_type": str,
-                        "document_path": str,
-                        "document_size": int,
-                        "document_sha256": str,
-                        "is_active": bool,
-                        "deleted": bool,
-                        "upload_at": str,
-                        "deleted_at": str
-                    }
-                ]
-            }
-        """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            document_id = payload["document_id"]
-
-            rows = await self._call_procedure("fetch_target_document", (user_uid, document_id))
-
-            return {
-                "success": True,
-                "messages": rows,
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
-    # --------------------------------------------------
     # Short-term Memory 
     # --------------------------------------------------
 
@@ -1142,6 +924,65 @@ class MysqlService(DataServerBase):
                 "success": False,
                 "messages": f"fail: {e}",
             }
+
+    # --------------------------------------------------
+    # Long-term Memory
+    # --------------------------------------------------
+
+    async def fetch_longterm_memory(self, payload: dict) -> dict:
+        """Fetch all active long-term memories owned by a user."""
+        logger.trace()
+        try:
+            rows = await self._call_procedure(
+                "fetch_longterm_memory",
+                (payload["user_uid"],),
+            )
+            return {"success": True, "messages": rows}
+        except Exception as e:
+            logger.exception(f"Error: {type(e).__name__}: {e}")
+            return {"success": False, "messages": f"fail: {e}"}
+
+    async def insert_longterm_memory(self, payload: dict) -> dict:
+        """Insert one long-term memory."""
+        logger.trace()
+        try:
+            memory_id = payload["memory_id"]
+            await self._call_procedure(
+                "insert_longterm_memory",
+                (
+                    memory_id,
+                    payload["user_uid"],
+                    payload["title"],
+                    payload["date"],
+                    payload["content"],
+                    payload["source"],
+                ),
+            )
+            return {"success": True, "messages": {"memory_id": memory_id}}
+        except Exception as e:
+            logger.exception(f"Error: {type(e).__name__}: {e}")
+            return {"success": False, "messages": f"fail: {e}"}
+
+    async def update_longterm_memory(self, payload: dict) -> dict:
+        """Partially update or soft-delete one long-term memory."""
+        logger.trace()
+        try:
+            await self._call_procedure(
+                "update_longterm_memory",
+                (
+                    payload["memory_id"],
+                    payload["user_uid"],
+                    payload.get("title"),
+                    payload.get("date"),
+                    payload.get("content"),
+                    payload.get("source"),
+                    payload.get("is_deleted"),
+                ),
+            )
+            return {"success": True, "messages": "success"}
+        except Exception as e:
+            logger.exception(f"Error: {type(e).__name__}: {e}")
+            return {"success": False, "messages": f"fail: {e}"}
         
     # --------------------------------------------------
     # Custom Provider 

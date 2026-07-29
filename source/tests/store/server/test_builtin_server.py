@@ -156,6 +156,74 @@ async def test_branch_chain_update_handles_cache_miss(tmp_path, payload):
 
 
 @pytest.mark.asyncio
+async def test_resource_cache_preserves_empty_hits_and_supports_invalidation(
+    tmp_path,
+):
+    service = BuiltinService(tmp_path / "cache.json")
+    first = {
+        "cache_group": "skills:user-1",
+        "cache_key": "list:5",
+        "messages": [],
+    }
+    second = {
+        "cache_group": "skills:user-1",
+        "cache_key": "item:skill-1",
+        "messages": [{"skill_id": "skill-1"}],
+    }
+    other_user = {
+        "cache_group": "skills:user-2",
+        "cache_key": "list:5",
+        "messages": [{"skill_id": "skill-2"}],
+    }
+
+    for item in (first, second, other_user):
+        assert (await service.backfill_resource(item))["success"]
+
+    empty_hit = await service.get_resource(first)
+    assert empty_hit == {
+        "success": True,
+        "messages": [],
+        "cache_hit": True,
+    }
+
+    item_hit = await service.get_resource(second)
+    item_hit["messages"][0]["skill_id"] = "mutated"
+    assert (await service.get_resource(second))["messages"] == [
+        {"skill_id": "skill-1"}
+    ]
+
+    await service.invalidate_resource(
+        {
+            "cache_group": "skills:user-1",
+            "cache_key": "item:skill-1",
+        }
+    )
+    assert not (await service.get_resource(second))["cache_hit"]
+    assert (await service.get_resource(first))["cache_hit"]
+
+    await service.invalidate_resource({"cache_group": "skills:user-1"})
+    assert not (await service.get_resource(first))["cache_hit"]
+    assert (await service.get_resource(other_user))["cache_hit"]
+
+
+@pytest.mark.asyncio
+async def test_resource_cache_validation_errors_are_failures(tmp_path):
+    service = BuiltinService(tmp_path / "cache.json")
+
+    assert not (
+        await service.backfill_resource(
+            {
+                "cache_group": "providers:list",
+                "cache_key": "user-1",
+                "messages": {},
+            }
+        )
+    )["success"]
+    assert not (await service.get_resource({}))["success"]
+    assert not (await service.invalidate_resource({}))["success"]
+
+
+@pytest.mark.asyncio
 async def test_persistence_restores_only_valid_unexpired_items(
     monkeypatch, tmp_path, payload
 ):

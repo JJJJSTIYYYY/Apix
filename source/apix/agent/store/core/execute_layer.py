@@ -57,7 +57,7 @@ class DataExecutors:
 
     Responsibilities:
     - Translate high-level business actions into ordered service calls
-    - Coordinate RedisService and MysqlService handlers
+    - Coordinate cache-store and data-store handlers
     - Normalize return format
     """
 
@@ -73,6 +73,105 @@ class DataExecutors:
         self.data_store = data_store
         self.file_server = file_server
         self.rag_server = rag_server
+
+    async def _read_through_resource(
+        self,
+        payload: dict,
+        *,
+        cache_group: str,
+        cache_key: str,
+        reader: Callable[[dict], Awaitable[dict]],
+        parse_messages: Callable[[list], list] | None = None,
+    ) -> dict:
+        """Read a disposable cache copy, then fall back to the data store.
+
+        Cache reads and backfills are deliberately best effort.  Only a
+        successful data-store response is eligible for backfill.
+        """
+        cache_payload = {
+            "cache_group": cache_group,
+            "cache_key": cache_key,
+        }
+        try:
+            cached = await self.cache_store.get_resource(cache_payload)
+            cached_messages = cached.get("messages")
+            if (
+                cached.get("success")
+                and cached.get("cache_hit")
+                and isinstance(cached_messages, list)
+            ):
+                return {
+                    "success": True,
+                    "messages": cached_messages,
+                }
+        except Exception as exc:
+            logger.warning(f"Resource cache read failed: {exc}")
+
+        result = await reader(payload)
+        if not result.get("success"):
+            return result
+
+        messages = result.get("messages", []) or []
+        if not isinstance(messages, list):
+            raise ValueError("Data-store resource messages must be a list")
+        if parse_messages is not None:
+            messages = parse_messages(messages)
+        result["messages"] = messages
+
+        try:
+            cache_result = await self.cache_store.backfill_resource(
+                {
+                    **cache_payload,
+                    "messages": messages,
+                }
+            )
+            if not cache_result.get("success"):
+                logger.warning(
+                    f"Resource cache backfill failed: "
+                    f"{cache_result.get('messages')}"
+                )
+        except Exception as exc:
+            logger.warning(f"Resource cache backfill failed: {exc}")
+        return result
+
+
+    async def _invalidate_resources(self, *targets: dict) -> None:
+        """Best-effort invalidation after a successful data-store mutation."""
+        for target in targets:
+            try:
+                result = await self.cache_store.invalidate_resource(target)
+                if not result.get("success"):
+                    logger.warning(
+                        f"Resource cache invalidation failed: "
+                        f"{result.get('messages')}"
+                    )
+            except Exception as exc:
+                logger.warning(f"Resource cache invalidation failed: {exc}")
+
+
+    @staticmethod
+    def _parse_provider_messages(messages: list) -> list:
+        parsed = []
+        for provider in messages:
+            model_list = provider.get("model_list", []) or []
+            if not isinstance(model_list, list):
+                provider["model_list"] = json.loads(model_list)
+            parsed.append(provider)
+        return parsed
+
+
+    @staticmethod
+    def _parse_mcp_messages(messages: list) -> list:
+        parsed = []
+        for server in messages:
+            config = server.get("config")
+            if config and not isinstance(config, (dict, list)):
+                try:
+                    server["config"] = json.loads(config)
+                except (TypeError, ValueError):
+                    server["config"] = {}
+            parsed.append(server)
+        return parsed
 
     # ------------------------------------------------------------------
     # Handler Export
@@ -292,6 +391,15 @@ class DataExecutors:
             res = await self.data_store.delete_shortterm_memory(sm_payload)
             if not res.get("success"):
                 return res
+            await self._invalidate_resources(
+                {
+                    "cache_group": (
+                        f"shortterm-memory:"
+                        f"{payload.get('user_uid') or '-'}"
+                    ),
+                    "cache_key": payload.get("conversation_uid") or "-",
+                }
+            )
 
         return {
             "success": True,
@@ -596,6 +704,10 @@ class DataExecutors:
         mysql_res = await self.data_store.insert_skill_info(skill_payload)
         if not mysql_res.get("success"):
             return mysql_res
+
+        await self._invalidate_resources(
+            {"cache_group": f"skills:{payload.get('user_uid') or '-'}"}
+        )
             
         skill_info_list = file_res.get("messages", [])
         visible_skill_info_list = []
@@ -620,10 +732,15 @@ class DataExecutors:
     @data_task_handler("update_skill")
     async def update_skill(self, payload: dict) -> dict:
         """
-        Update skill info in MySQL.
+        Update skill info in the persistent data store.
         Typically used to mark a file as deleted or active.
         """
-        return await self.data_store.update_skill_status(payload)
+        result = await self.data_store.update_skill_status(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {"cache_group": f"skills:{payload.get('user_uid') or '-'}"}
+            )
+        return result
 
     @data_task_handler("fetch_skills")
     async def fetch_skills(self, payload: dict) -> dict:
@@ -632,7 +749,13 @@ class DataExecutors:
 
         Mention: This method does not fetch binary.
         """
-        return await self.data_store.fetch_available_skills(payload)
+        limit = int(payload.get("limit", 5))
+        return await self._read_through_resource(
+            payload,
+            cache_group=f"skills:{payload.get('user_uid') or '-'}",
+            cache_key=f"list:{limit}",
+            reader=self.data_store.fetch_available_skills,
+        )
 
     @data_task_handler("fetch_target_skill")
     async def fetch_target_skill(self, payload: dict) -> dict:
@@ -641,7 +764,12 @@ class DataExecutors:
 
         Mention: This method does not fetch binary.
         """
-        return await self.data_store.fetch_target_skill(payload)
+        return await self._read_through_resource(
+            payload,
+            cache_group=f"skills:{payload.get('user_uid') or '-'}",
+            cache_key=f"item:{payload.get('skill_id') or '-'}",
+            reader=self.data_store.fetch_target_skill,
+        )
 
     # --------------------------------------------------
     # Memory
@@ -652,18 +780,69 @@ class DataExecutors:
         """
         Fetch shortterm memory.
         """
-        mysql_res = await self.data_store.fetch_shortterm_memory(payload)
-
-        return mysql_res
+        return await self._read_through_resource(
+            payload,
+            cache_group=(
+                f"shortterm-memory:{payload.get('user_uid') or '-'}"
+            ),
+            cache_key=payload.get("conversation_uid") or "-",
+            reader=self.data_store.fetch_shortterm_memory,
+        )
         
     @data_task_handler("insert_shortterm_memory")
     async def insert_shortterm_memory(self, payload: dict) -> dict:
         """
         Insert shortterm memory.
         """
-        mysql_res = await self.data_store.insert_shortterm_memory(payload)
+        result = await self.data_store.insert_shortterm_memory(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {
+                    "cache_group": (
+                        f"shortterm-memory:"
+                        f"{payload.get('user_uid') or '-'}"
+                    ),
+                    "cache_key": payload.get("conversation_uid") or "-",
+                }
+            )
+        return result
 
-        return mysql_res
+    @data_task_handler("fetch_longterm_memory")
+    async def fetch_longterm_memory(self, payload: dict) -> dict:
+        """Fetch active long-term memories for a user."""
+        return await self._read_through_resource(
+            payload,
+            cache_group="longterm-memory",
+            cache_key=payload.get("user_uid") or "-",
+            reader=self.data_store.fetch_longterm_memory,
+        )
+
+    @data_task_handler("insert_longterm_memory")
+    async def insert_longterm_memory(self, payload: dict) -> dict:
+        """Create a long-term memory with an application-level id."""
+        payload["memory_id"] = uuid4().hex
+        result = await self.data_store.insert_longterm_memory(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {
+                    "cache_group": "longterm-memory",
+                    "cache_key": payload.get("user_uid") or "-",
+                }
+            )
+        return result
+
+    @data_task_handler("update_longterm_memory")
+    async def update_longterm_memory(self, payload: dict) -> dict:
+        """Partially update or soft-delete a long-term memory."""
+        result = await self.data_store.update_longterm_memory(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {
+                    "cache_group": "longterm-memory",
+                    "cache_key": payload.get("user_uid") or "-",
+                }
+            )
+        return result
 
     # --------------------------------------------------
     # LLM Provider
@@ -677,54 +856,64 @@ class DataExecutors:
         provider_id = str(uuid4().hex)
         payload["provider_id"] = provider_id
 
-        return await self.data_store.create_llm_provider(payload)
+        result = await self.data_store.create_llm_provider(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {
+                    "cache_group": "providers:list",
+                    "cache_key": payload.get("user_uid") or "-",
+                },
+                {
+                    "cache_group": "providers:item",
+                    "cache_key": provider_id,
+                },
+            )
+        return result
         
     @data_task_handler("get_llm_providers")
     async def get_llm_providers(self, payload: dict) -> dict:
         """
         Get all llm provider meta in database.
         """
-        mysql_res = await self.data_store.get_llm_providers(payload)
-        if not mysql_res.get("success"):
-            return mysql_res
-            
-        parsed = []
-        providers = mysql_res.get("messages", []) or []
-        for p in providers:
-            model_list = p.get("model_list", []) or []
-            if not isinstance(model_list, list):
-                p["model_list"] = json.loads(model_list)
-            parsed.append(p)
-            
-        mysql_res["messages"] = parsed
-        return mysql_res
+        return await self._read_through_resource(
+            payload,
+            cache_group="providers:list",
+            cache_key=payload.get("user_uid") or "-",
+            reader=self.data_store.get_llm_providers,
+            parse_messages=self._parse_provider_messages,
+        )
         
     @data_task_handler("get_llm_provider_by_id")
     async def get_llm_provider_by_id(self, payload: dict) -> dict:
         """
         Get a llm provider meta in database.
         """
-        mysql_res = await self.data_store.get_llm_provider_by_id(payload)
-        if not mysql_res.get("success"):
-            return mysql_res
-            
-        parsed = []
-        providers = mysql_res.get("messages", []) or []
-        for p in providers:
-            model_list = p.get("model_list", []) or []
-            if not isinstance(model_list, list):
-                p["model_list"] = json.loads(model_list)
-            parsed.append(p)
-            
-        mysql_res["messages"] = parsed
-        return mysql_res
+        return await self._read_through_resource(
+            payload,
+            cache_group="providers:item",
+            cache_key=payload.get("provider_id") or "-",
+            reader=self.data_store.get_llm_provider_by_id,
+            parse_messages=self._parse_provider_messages,
+        )
         
     @data_task_handler("update_llm_provider")
     async def update_llm_provider(self, payload: dict) -> dict:
         """
         Update a llm provider meta in database, include is_deleted status.
         """
-        return await self.data_store.update_llm_provider(payload)
+        result = await self.data_store.update_llm_provider(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {
+                    "cache_group": "providers:list",
+                    "cache_key": payload.get("user_uid") or "-",
+                },
+                {
+                    "cache_group": "providers:item",
+                    "cache_key": payload.get("provider_id") or "-",
+                },
+            )
+        return result
         
     # --------------------------------------------------
     # MCP Server
@@ -738,7 +927,12 @@ class DataExecutors:
         mcp_id = str(uuid4().hex)
         payload["mcp_id"] = mcp_id
 
-        return await self.data_store.create_mcp_server(payload)
+        result = await self.data_store.create_mcp_server(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {"cache_group": f"mcp:{payload.get('user_uid') or '-'}"}
+            )
+        return result
 
 
     @data_task_handler("get_mcp_servers")
@@ -746,30 +940,13 @@ class DataExecutors:
         """
         Get all mcp server meta in database.
         """
-        mysql_res = await self.data_store.get_mcp_servers(payload)
-
-        if not mysql_res.get("success"):
-            return mysql_res
-
-        parsed = []
-
-        servers = mysql_res.get("messages", []) or []
-
-        for server in servers:
-
-            config = server.get("config")
-
-            if config and not isinstance(config, (dict, list)):
-                try:
-                    server["config"] = json.loads(config)
-                except Exception:
-                    server["config"] = {}
-
-            parsed.append(server)
-
-        mysql_res["messages"] = parsed
-
-        return mysql_res
+        return await self._read_through_resource(
+            payload,
+            cache_group=f"mcp:{payload.get('user_uid') or '-'}",
+            cache_key="all",
+            reader=self.data_store.get_mcp_servers,
+            parse_messages=self._parse_mcp_messages,
+        )
 
 
     @data_task_handler("get_enabled_mcp_servers")
@@ -777,30 +954,13 @@ class DataExecutors:
         """
         Get enabled mcp server meta in database.
         """
-        mysql_res = await self.data_store.get_enabled_mcp_servers(payload)
-
-        if not mysql_res.get("success"):
-            return mysql_res
-
-        parsed = []
-
-        servers = mysql_res.get("messages", []) or []
-
-        for server in servers:
-
-            config = server.get("config")
-
-            if config and not isinstance(config, (dict, list)):
-                try:
-                    server["config"] = json.loads(config)
-                except Exception:
-                    server["config"] = {}
-
-            parsed.append(server)
-
-        mysql_res["messages"] = parsed
-
-        return mysql_res
+        return await self._read_through_resource(
+            payload,
+            cache_group=f"mcp:{payload.get('user_uid') or '-'}",
+            cache_key="enabled",
+            reader=self.data_store.get_enabled_mcp_servers,
+            parse_messages=self._parse_mcp_messages,
+        )
 
 
     @data_task_handler("update_mcp_server")
@@ -809,7 +969,12 @@ class DataExecutors:
         Update a mcp server meta in database,
         include enabled/tool_count/is_deleted status.
         """
-        return await self.data_store.update_mcp_server(payload)
+        result = await self.data_store.update_mcp_server(payload)
+        if result.get("success"):
+            await self._invalidate_resources(
+                {"cache_group": f"mcp:{payload.get('user_uid') or '-'}"}
+            )
+        return result
         
 
     @data_task_handler("create_cron_task")

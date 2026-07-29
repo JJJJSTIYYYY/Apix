@@ -22,6 +22,7 @@ class Skill(TypedDict):
 
 
 class LongtermMemory(TypedDict):
+    memory_id: str # Longterm memory id, uuid4 hex.
     title: str
     date: str # 2025-06-07
     content: str

@@ -94,22 +94,6 @@ class DataServerBase(ABC):
         pass
         
     # --------------------------------------------------
-    # Rag Document (meta only)
-    # --------------------------------------------------
-
-    async def insert_rag_document(self, payload: dict) -> dict:
-        pass
-
-    async def update_document_status(self, payload: dict) -> dict:
-        pass
-
-    async def fetch_available_documents(self, payload: dict) -> dict:
-        pass
-
-    async def fetch_target_document(self, payload: dict) -> dict:
-        pass
-        
-    # --------------------------------------------------
     # Short-term Memory 
     # --------------------------------------------------
 
@@ -123,6 +107,22 @@ class DataServerBase(ABC):
 
     @abstractmethod
     async def delete_shortterm_memory(self, payload: dict) -> dict:
+        pass
+
+    # --------------------------------------------------
+    # Long-term Memory
+    # --------------------------------------------------
+
+    @abstractmethod
+    async def fetch_longterm_memory(self, payload: dict) -> dict:
+        pass
+
+    @abstractmethod
+    async def insert_longterm_memory(self, payload: dict) -> dict:
+        pass
+
+    @abstractmethod
+    async def update_longterm_memory(self, payload: dict) -> dict:
         pass
         
     # --------------------------------------------------

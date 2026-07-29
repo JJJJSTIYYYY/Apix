@@ -380,6 +380,71 @@ class RedisService(CacheServerBase):
                 "messages": f"fail: {e}",
             }
 
+    # ------------------------------------------------------------------
+    # Read-through Resource Cache
+    # ------------------------------------------------------------------
+
+    async def backfill_resource(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            messages = payload.get("messages")
+            if not isinstance(messages, list):
+                raise ValueError("Resource messages must be a list")
+            await self._memo_redis.set(
+                self._build_resource_key(payload),
+                json.dumps(messages, ensure_ascii=False),
+                ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+            )
+            return {"success": True, "messages": "success"}
+        except Exception as e:
+            logger.exception(f"Error: {type(e).__name__}: {e}")
+            return {"success": False, "messages": f"fail: {e}"}
+
+
+    async def get_resource(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            raw = await self._memo_redis.get(
+                self._build_resource_key(payload)
+            )
+            if raw is None:
+                return {
+                    "success": True,
+                    "messages": [],
+                    "cache_hit": False,
+                }
+            messages = json.loads(raw)
+            if not isinstance(messages, list):
+                raise ValueError("Cached resource messages must be a list")
+            return {
+                "success": True,
+                "messages": messages,
+                "cache_hit": True,
+            }
+        except Exception as e:
+            logger.exception(f"Error: {type(e).__name__}: {e}")
+            return {"success": False, "messages": f"fail: {e}"}
+
+
+    async def invalidate_resource(self, payload: dict) -> dict:
+        logger.trace()
+        try:
+            if payload.get("cache_key") is not None:
+                keys = [self._build_resource_key(payload)]
+            else:
+                keys = [
+                    key
+                    async for key in self._memo_redis.scan_iter(
+                        match=f"{self._build_resource_prefix(payload)}*"
+                    )
+                ]
+            if keys:
+                await self._memo_redis.delete(*keys)
+            return {"success": True, "messages": "success"}
+        except Exception as e:
+            logger.exception(f"Error: {type(e).__name__}: {e}")
+            return {"success": False, "messages": f"fail: {e}"}
+
 
     # ------------------------------------------------------------------
     # TTL

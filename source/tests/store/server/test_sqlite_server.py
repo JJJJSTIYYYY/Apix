@@ -58,6 +58,7 @@ async def test_lifecycle_helpers_and_transaction_rollback(tmp_path):
         "agent_skills",
         "rag_documents",
         "shortterm_memory",
+        "longterm_memory",
         "llm_provider",
         "mcp_server",
         "cron_task",
@@ -278,7 +279,7 @@ async def test_users_conversations_and_messages(db, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_skills_documents_and_shortterm_memory(db, monkeypatch):
+async def test_skills_and_shortterm_memory(db, monkeypatch):
     await create_user_and_conversation(db, monkeypatch)
 
     skills = [
@@ -326,66 +327,6 @@ async def test_skills_documents_and_shortterm_memory(db, monkeypatch):
         {"user_uid": "user-1", "skill_id": "skill-1"}
     ))["messages"] == []
 
-    assert (await db.insert_rag_document(
-        {
-            "user_uid": "user-1",
-            "file_info": [
-                {
-                    "file_id": "doc-1",
-                    "file_name": "one.pdf",
-                    "file_type": "application/pdf",
-                    "file_path": "/docs/one.pdf",
-                    "file_size": 100,
-                    "sha256": "hash-1",
-                }
-            ],
-        }
-    ))["success"]
-    assert (await db.insert_rag_document(
-        {
-            "user_uid": "user-1",
-            "messages": [
-                {
-                    "document_id": "doc-2",
-                    "document_name": "two.txt",
-                    "document_description": "second",
-                    "mime_type": "text/plain",
-                    "document_path": "/docs/two.txt",
-                    "document_size": 20,
-                    "document_sha256": "hash-2",
-                }
-            ],
-        }
-    ))["success"]
-    assert await db.update_document_status(
-        {
-            "user_uid": "user-1",
-            "document_id": "doc-1",
-            "description": "indexed",
-            "embed_engine": ["text-embedding"],
-            "is_active": True,
-            "deleted": False,
-        }
-    ) == {"success": True, "messages": "success"}
-    document = (await db.fetch_target_document(
-        {"user_uid": "user-1", "document_id": "doc-1"}
-    ))["messages"][0]
-    assert document["document_description"] == "indexed"
-    assert json.loads(document["embed_engine"]) == ["text-embedding"]
-    assert document["is_active"] == 1
-    assert document["deleted_at"] is None
-    assert len((await db.fetch_available_documents(
-        {"user_uid": "user-1", "limit": 1}
-    ))["messages"]) == 1
-    await db.update_document_status(
-        {"user_uid": "user-1", "document_id": "doc-1", "deleted": True}
-    )
-    document = (await db.fetch_target_document(
-        {"user_uid": "user-1", "document_id": "doc-1"}
-    ))["messages"][0]
-    assert document["deleted"] == 1
-    assert "T" in document["deleted_at"]
-
     assert await db.insert_shortterm_memory(
         {
             "memory_id": "memory-1",
@@ -410,6 +351,133 @@ async def test_skills_documents_and_shortterm_memory(db, monkeypatch):
     ))["messages"] == []
     assert (await db.delete_shortterm_memory(
         {"memory_ids": [], "user_uid": "user-1", "conversation_uid": "conv-1"}
+    ))["success"]
+
+
+@pytest.mark.asyncio
+async def test_longterm_memory_crud_and_constraints(db):
+    assert (await db.create_a_user(
+        {
+            "user_uid": "user-1",
+            "username": "alice",
+            "password": "secret",
+        }
+    ))["success"]
+
+    assert await db.insert_longterm_memory(
+        {
+            "memory_id": "memory-1",
+            "user_uid": "user-1",
+            "title": "First memory",
+            "date": "2025-06-07",
+            "content": "Remember this",
+            "source": "conversation",
+        }
+    ) == {
+        "success": True,
+        "messages": {"memory_id": "memory-1"},
+    }
+    assert (await db.insert_longterm_memory(
+        {
+            "memory_id": "memory-2",
+            "user_uid": "user-1",
+            "title": "Second memory",
+            "date": "2026-07-30",
+            "content": "Workspace preference",
+            "source": "workspace",
+        }
+    ))["success"]
+
+    fetched = await db.fetch_longterm_memory({"user_uid": "user-1"})
+    assert fetched == {
+        "success": True,
+        "messages": [
+            {
+                "memory_id": "memory-2",
+                "title": "Second memory",
+                "date": "2026-07-30",
+                "content": "Workspace preference",
+                "source": "workspace",
+            },
+            {
+                "memory_id": "memory-1",
+                "title": "First memory",
+                "date": "2025-06-07",
+                "content": "Remember this",
+                "source": "conversation",
+            },
+        ],
+    }
+
+    assert await db.update_longterm_memory(
+        {
+            "memory_id": "memory-1",
+            "user_uid": "user-1",
+            "title": "Updated memory",
+            "date": "2027-01-02",
+            "content": "Updated content",
+            "source": "workspace",
+        }
+    ) == {"success": True, "messages": "success"}
+    updated = (await db.fetch_longterm_memory(
+        {"user_uid": "user-1"}
+    ))["messages"][0]
+    assert updated == {
+        "memory_id": "memory-1",
+        "title": "Updated memory",
+        "date": "2027-01-02",
+        "content": "Updated content",
+        "source": "workspace",
+    }
+
+    assert await db.update_longterm_memory(
+        {
+            "memory_id": "memory-1",
+            "user_uid": "user-1",
+            "is_deleted": True,
+        }
+    ) == {"success": True, "messages": "success"}
+    assert (await db.fetch_longterm_memory(
+        {"user_uid": "user-1"}
+    ))["messages"] == [
+        {
+            "memory_id": "memory-2",
+            "title": "Second memory",
+            "date": "2026-07-30",
+            "content": "Workspace preference",
+            "source": "workspace",
+        }
+    ]
+    deleted_row = (await db._fetch_all(
+        """
+        SELECT is_deleted, deleted_at
+        FROM longterm_memory
+        WHERE memory_id = ?
+        """,
+        ("memory-1",),
+    ))[0]
+    assert deleted_row["is_deleted"] == 1
+    assert "T" in deleted_row["deleted_at"]
+
+    assert not (await db.insert_longterm_memory(
+        {
+            "memory_id": "invalid-source",
+            "user_uid": "user-1",
+            "title": "Invalid",
+            "date": "2025-06-07",
+            "content": "Invalid",
+            "source": "external",
+        }
+    ))["success"]
+    assert not (await db.insert_longterm_memory(
+        {
+            "memory_id": "invalid-date",
+            "user_uid": "user-1",
+            "title": "Invalid",
+            "date": "not-a-date",
+            "content": "Invalid",
+            "source": "conversation",
+        }
     ))["success"]
 
 

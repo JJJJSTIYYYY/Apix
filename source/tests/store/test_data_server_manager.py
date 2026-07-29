@@ -74,6 +74,9 @@ def test_constructor_registers_executor_handlers_and_validates_worker_count():
         "update_skill",
         "fetch_skills",
         "fetch_target_skill",
+        "fetch_longterm_memory",
+        "insert_longterm_memory",
+        "update_longterm_memory",
     }.issubset(manager._handle)
 
     with pytest.raises(ValueError, match="greater than zero"):
