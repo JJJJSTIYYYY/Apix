@@ -2,6 +2,8 @@ import asyncio
 import re
 import json
 import time
+from functools import wraps
+from typing import Awaitable, Callable, TypeVar, cast
 
 import aiomysql
 from aiomysql.cursors import DictCursor
@@ -11,6 +13,54 @@ from apix.agent.store.core.server.data_store.data_server_base import DataServerB
 from apix.common.lifespan.auto_init import auto_init
 from apix.config.base_config import MYSQL_BASE_URL, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, MYSQL_CHARSET, AUTO_COMMIT
 from apix.common.utils.logger import logger
+
+
+TaskHandler = TypeVar(
+    "TaskHandler",
+    bound=Callable[..., Awaitable[dict]],
+)
+FailureFactory = Callable[[Exception], dict]
+
+
+def _identity_failure(exc: Exception) -> dict:
+    return {
+        "success": False,
+        "messages": {
+            "msg": f"{type(exc).__name__}: {exc}",
+            "uid": None,
+        },
+    }
+
+
+def data_store_handler(
+    func: TaskHandler | None = None,
+    *,
+    failure_factory: FailureFactory | None = None,
+) -> TaskHandler | Callable[[TaskHandler], TaskHandler]:
+    """Normalize unhandled failures from public data-store methods."""
+
+    def decorator(handler: TaskHandler) -> TaskHandler:
+        @wraps(handler)
+        async def wrapper(*args, **kwargs) -> dict:
+            logger.trace()
+            try:
+                return await handler(*args, **kwargs)
+            except Exception as exc:
+                logger.exception(
+                    f"Data-store handler `{handler.__name__}` failed: {exc}"
+                )
+                if failure_factory is not None:
+                    return failure_factory(exc)
+                return {
+                    "success": False,
+                    "messages": f"fail: {exc}",
+                }
+
+        return cast(TaskHandler, wrapper)
+
+    if func is None:
+        return decorator
+    return decorator(func)
 
 
 class MysqlService(DataServerBase):
@@ -84,6 +134,7 @@ class MysqlService(DataServerBase):
     # Action of Memo Mysql (Dialog Memory)
     # --------------------------------------------------
 
+    @data_store_handler(failure_factory=_identity_failure)
     async def create_a_user(self, payload: dict) -> dict:
         """
         Ensure user account exists. Call procedure create_a_user.
@@ -102,30 +153,20 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success",
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            username = payload["username"]
-            password = payload["password"]
-            await self._call_procedure("create_user", (user_uid, username, password))
-            return {
-                "success": True,
-                "messages": {
-                    "msg": "success",
-                    "uid": user_uid
-                },
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": {
-                    "msg": f"{type(e).__name__}: {e}",
-                    "uid": None
-                },
-            }
+        user_uid = payload["user_uid"]
+        username = payload["username"]
+        password = payload["password"]
+        await self._call_procedure("create_user", (user_uid, username, password))
+        return {
+            "success": True,
+            "messages": {
+                "msg": "success",
+                "uid": user_uid
+            },
+        }
         
 
+    @data_store_handler(failure_factory=_identity_failure)
     async def verify_user(self, payload: dict) -> dict:
         """
         Ensure user account exists. Call procedure verify_user.
@@ -143,30 +184,20 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success",
             }
         """
-        logger.trace()
-        try:
-            username = payload["username"]
-            password = payload["password"]
-            res = await self._call_procedure("verify_user", (username, password))
-            if(len(res) != 1): raise Exception("User do not exist or wrong password.")
-            return {
-                "success": True,
-                "messages": {
-                    "msg": "success",
-                    "uid": res[0].get("user_uid")
-                },
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": {
-                    "msg": f"{type(e).__name__}: {e}",
-                    "uid": None
-                },
-            }
+        username = payload["username"]
+        password = payload["password"]
+        res = await self._call_procedure("verify_user", (username, password))
+        if(len(res) != 1): raise Exception("User do not exist or wrong password.")
+        return {
+            "success": True,
+            "messages": {
+                "msg": "success",
+                "uid": res[0].get("user_uid")
+            },
+        }
         
 
+    @data_store_handler
     async def ensure_user_exists(self, payload: dict, exist: bool = True) -> dict:
         """
         Ensure user account exists. Call procedure ensure_user_exists.
@@ -184,28 +215,21 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success",
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            user_name = payload.get("username")
-            res = await self._call_procedure("ensure_user_exists", (user_uid, user_name))
-            if exist and len(res) == 0: raise Exception("User do not exist.")
-            elif not exist and len(res) > 0: raise Exception("User has already exist.")
-            return {
-                "success": True,
-                "messages": "success",
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        user_name = payload.get("username")
+        res = await self._call_procedure("ensure_user_exists", (user_uid, user_name))
+        if exist and len(res) == 0: raise Exception("User do not exist.")
+        elif not exist and len(res) > 0: raise Exception("User has already exist.")
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
     # --------------------------------------------------
     # Conversation
     # --------------------------------------------------
 
+    @data_store_handler
     async def fetch_conversation_list(self, payload: dict) -> dict:
         """
         Get conversation history list for a user. Call procedure fetch_conversation_list.
@@ -221,22 +245,15 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or [...] (list of conversation histories dicts),
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            rows = await self._call_procedure("fetch_conversation_list", (str(user_uid),))
-            return {
-                "success": True,
-                "messages": rows,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        rows = await self._call_procedure("fetch_conversation_list", (str(user_uid),))
+        return {
+            "success": True,
+            "messages": rows,
+        }
         
 
+    @data_store_handler
     async def get_conversation_meta_by_id(self, payload: dict) -> dict:
         """
         Get a conversation metadata. Call procedure get_conversation_meta_by_id.
@@ -252,22 +269,15 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or [...] (list of conversation meta dicts),
             }
         """
-        logger.trace()
-        try:
-            conversation_uid = payload["conversation_uid"]
-            rows = await self._call_procedure("get_conversation_meta_by_id", (conversation_uid,))
-            return {
-                "success": True,
-                "messages": rows,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        conversation_uid = payload["conversation_uid"]
+        rows = await self._call_procedure("get_conversation_meta_by_id", (conversation_uid,))
+        return {
+            "success": True,
+            "messages": rows,
+        }
         
 
+    @data_store_handler
     async def create_conversation(self, payload: dict) -> dict:
         """
         Create a new conversation record. Call procedure create_conversation.
@@ -286,28 +296,21 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "conversation_uid",
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            platform = payload.get("platform", "default")
-            conversation_uid = self._conversation_id_generator()
-            title = payload.get("title", "New Conversation...")
-            workspace = payload.get("workspace", None)
-            is_cron = payload.get("is_cron", False)
+        user_uid = payload["user_uid"]
+        platform = payload.get("platform", "default")
+        conversation_uid = self._conversation_id_generator()
+        title = payload.get("title", "New Conversation...")
+        workspace = payload.get("workspace", None)
+        is_cron = payload.get("is_cron", False)
 
-            await self._call_procedure("create_conversation", (user_uid, platform, conversation_uid, title, workspace, is_cron))
-            return {
-                "success": True,
-                "messages": f"{conversation_uid}",
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        await self._call_procedure("create_conversation", (user_uid, platform, conversation_uid, title, workspace, is_cron))
+        return {
+            "success": True,
+            "messages": f"{conversation_uid}",
+        }
         
 
+    @data_store_handler
     async def update_conversation(self, payload: dict) -> dict:
         """
         Update a conversation record. Call procedure update_conversation.
@@ -329,34 +332,27 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "conversation_uid",
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            workspace = payload.get("workspace", None)
-            title = payload.get("title", None)
-            pinned = payload.get("is_pinned", None)
-            is_deleted = payload.get("is_deleted", None)
-            has_new_message = payload.get("has_new_message", None)
-            await self._call_procedure(
-                "update_conversation", 
-                (user_uid, conversation_uid, title, workspace, pinned, is_deleted, has_new_message)
-            )
-            return {
-                "success": True,
-                "messages": f"{conversation_uid}",
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        workspace = payload.get("workspace", None)
+        title = payload.get("title", None)
+        pinned = payload.get("is_pinned", None)
+        is_deleted = payload.get("is_deleted", None)
+        has_new_message = payload.get("has_new_message", None)
+        await self._call_procedure(
+            "update_conversation", 
+            (user_uid, conversation_uid, title, workspace, pinned, is_deleted, has_new_message)
+        )
+        return {
+            "success": True,
+            "messages": f"{conversation_uid}",
+        }
 
     # --------------------------------------------------
     # Messages
     # --------------------------------------------------
 
+    @data_store_handler
     async def append_message(self, payload: dict) -> dict:
         """
         Persist a message. Call procedure append_message.
@@ -384,69 +380,62 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or dict,
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            message = payload["message"]
-            
-            if not message:
-                raise ValueError("Messages is empty")
-            
-            message_uid = message["message_uid"]
-            role = message["role"]
-            name = message.get("name")
-            content = message["content"]
-            metadata = message.get("metadata", {})
-            extensions = message.get("extensions", {})
-            generation_id = message.get("generation_id", "")
-            node_id = message.get("node_id", "")
-            parent_id = message.get("parent_id", "")
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        message = payload["message"]
+        
+        if not message:
+            raise ValueError("Messages is empty")
+        
+        message_uid = message["message_uid"]
+        role = message["role"]
+        name = message.get("name")
+        content = message["content"]
+        metadata = message.get("metadata", {})
+        extensions = message.get("extensions", {})
+        generation_id = message.get("generation_id", "")
+        node_id = message.get("node_id", "")
+        parent_id = message.get("parent_id", "")
 
-            if metadata is None:
-                metadata = {}
-            if not isinstance(metadata, str):
-                metadata = json.dumps(metadata, ensure_ascii=False)
+        if metadata is None:
+            metadata = {}
+        if not isinstance(metadata, str):
+            metadata = json.dumps(metadata, ensure_ascii=False)
 
-            if extensions is None:
-                extensions = {}
-            if not isinstance(extensions, str):
-                extensions = json.dumps(extensions, ensure_ascii=False)
+        if extensions is None:
+            extensions = {}
+        if not isinstance(extensions, str):
+            extensions = json.dumps(extensions, ensure_ascii=False)
 
-            result = await self._call_procedure(
-                "append_message", 
-                (
-                    user_uid,
-                    conversation_uid,
-                    message_uid,
-                    role,
-                    name,
-                    content,
-                    metadata,
-                    extensions,
-                    generation_id,
-                    node_id,
-                    parent_id,
-                )
+        result = await self._call_procedure(
+            "append_message", 
+            (
+                user_uid,
+                conversation_uid,
+                message_uid,
+                role,
+                name,
+                content,
+                metadata,
+                extensions,
+                generation_id,
+                node_id,
+                parent_id,
             )
-            cursor =  result[0].get("msg_cursor", -1)
-            timestamp = result[0].get("timestamp")
-            if cursor == -1: raise ValueError("Invalid cursor the database returned.")
-            return {
-                "success": True,
-                "messages": {
-                    "msg_cursor": cursor,
-                    "timestamp": timestamp,
-                }
+        )
+        cursor =  result[0].get("msg_cursor", -1)
+        timestamp = result[0].get("timestamp")
+        if cursor == -1: raise ValueError("Invalid cursor the database returned.")
+        return {
+            "success": True,
+            "messages": {
+                "msg_cursor": cursor,
+                "timestamp": timestamp,
             }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        }
         
 
+    @data_store_handler
     async def delete_messages(self, payload: dict) -> dict:
         """
         Persist a peice of message. Call procedure delete_messages.
@@ -468,37 +457,30 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or list[dict],
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            messages = payload["messages"]
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        messages = payload["messages"]
+        
+        if not messages:
+            raise ValueError("Messages list is empty")
             
-            if not messages:
-                raise ValueError("Messages list is empty")
-                
-            message_uids = []
-            for node_id in messages:
-                res = await self._call_procedure("delete_messages_node", (user_uid, conversation_uid, node_id))
-                for row in res:
-                    if not isinstance(row, dict):
-                        continue
-                    message_uid = row.get("message_uid")
-                    if message_uid:
-                        message_uids.append({"message_uid": message_uid})
-            
-            return {
-                "success": True,
-                "messages": message_uids,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        message_uids = []
+        for node_id in messages:
+            res = await self._call_procedure("delete_messages_node", (user_uid, conversation_uid, node_id))
+            for row in res:
+                if not isinstance(row, dict):
+                    continue
+                message_uid = row.get("message_uid")
+                if message_uid:
+                    message_uids.append({"message_uid": message_uid})
+        
+        return {
+            "success": True,
+            "messages": message_uids,
+        }
         
 
+    @data_store_handler
     async def fetch_messages_after_cursor(self, payload: dict) -> dict:
         """
         Get a batch of messages after cursor (include this cursor). Call procedure fetch_messages_after_cursor.
@@ -518,28 +500,21 @@ class MysqlService(DataServerBase):
                 "next_cursor": new cursor = latest_msg_cursor + 1.
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            after_cursor = payload.get("cursor", 0)
-            after_cursor = max(int(after_cursor), 0)
-            limit = payload.get("limit", 65535)
-            rows = await self._call_procedure("fetch_messages_after_cursor", (user_uid, conversation_uid, after_cursor, limit))
-            next_cursor = rows[-1].get('msg_cursor') + 1 if rows else after_cursor
-            return {
-                "success": True,
-                "messages": rows,
-                "next_cursor": next_cursor
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        after_cursor = payload.get("cursor", 0)
+        after_cursor = max(int(after_cursor), 0)
+        limit = payload.get("limit", 65535)
+        rows = await self._call_procedure("fetch_messages_after_cursor", (user_uid, conversation_uid, after_cursor, limit))
+        next_cursor = rows[-1].get('msg_cursor') + 1 if rows else after_cursor
+        return {
+            "success": True,
+            "messages": rows,
+            "next_cursor": next_cursor
+        }
         
         
+    @data_store_handler
     async def search_messages_by_keyword(self, payload: dict) -> dict:
         """
         Search messages in all conversations. Call procedure search_messages_by_keyword.
@@ -565,40 +540,33 @@ class MysqlService(DataServerBase):
                 "last_active_at": str
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            keyword: str = payload["keyword"]
+        user_uid = payload["user_uid"]
+        keyword: str = payload["keyword"]
 
-            # Ignore keywords that contain only %, _, \ and whitespace
-            if not re.sub(r"[%_\\\s]+", "", keyword):
-                return {
-                    "success": True,
-                    "messages": [],
-                }
-
-            # Normalize separators for SQL LIKE search
-            keyword = re.sub(r"[_\\\s]+", "%", keyword)
-            keyword = re.sub(r"%+", "%", keyword).strip("%")
-
-            rows = await self._call_procedure("search_messages_by_keyword", (user_uid, keyword))
-
+        # Ignore keywords that contain only %, _, \ and whitespace
+        if not re.sub(r"[%_\\\s]+", "", keyword):
             return {
                 "success": True,
-                "messages": rows,
+                "messages": [],
             }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        # Normalize separators for SQL LIKE search
+        keyword = re.sub(r"[_\\\s]+", "%", keyword)
+        keyword = re.sub(r"%+", "%", keyword).strip("%")
+
+        rows = await self._call_procedure("search_messages_by_keyword", (user_uid, keyword))
+
+        return {
+            "success": True,
+            "messages": rows,
+        }
+
         
     # --------------------------------------------------
     # Skills (meta only)
     # --------------------------------------------------
 
+    @data_store_handler
     async def insert_skill_info(self, payload: dict) -> dict:
         """
         Insert uploaded skill metadata into MySQL.
@@ -628,38 +596,31 @@ class MysqlService(DataServerBase):
             }
         """
 
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            skill_info_list = payload.get("skills", [])
+        user_uid = payload["user_uid"]
+        skill_info_list = payload.get("skills", [])
 
-            for skill in skill_info_list:
-                skill_id = skill["skill_id"]
-                skill_name = skill["skill_name"]
-                skill_description = skill["skill_description"]
-                skill_version = skill.get("skill_version", "v1.0")
-                package_path = skill["package_path"]
-                package_size = skill["package_size"]
-                package_sha256 = skill.get("package_sha256")
+        for skill in skill_info_list:
+            skill_id = skill["skill_id"]
+            skill_name = skill["skill_name"]
+            skill_description = skill["skill_description"]
+            skill_version = skill.get("skill_version", "v1.0")
+            package_path = skill["package_path"]
+            package_size = skill["package_size"]
+            package_sha256 = skill.get("package_sha256")
 
-                await self._call_procedure(
-                    "insert_agent_skill",
-                    (skill_id, skill_name, skill_description, skill_version, package_path, package_size, package_sha256, user_uid)
-                )
+            await self._call_procedure(
+                "insert_agent_skill",
+                (skill_id, skill_name, skill_description, skill_version, package_path, package_size, package_sha256, user_uid)
+            )
 
-            return {
-                "success": True,
-                "messages": "success",
-            }
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
 
+    @data_store_handler
     async def update_skill_status(self, payload: dict) -> dict:
         """
         Update skill status (activate / deactivate / delete).
@@ -680,32 +641,25 @@ class MysqlService(DataServerBase):
             }
         """
 
-        logger.trace()
 
-        try:
-            user_uid = payload["user_uid"]
-            skill_id = payload["skill_id"]
-            is_active = payload.get("is_active")
-            deleted = payload.get("deleted")
+        user_uid = payload["user_uid"]
+        skill_id = payload["skill_id"]
+        is_active = payload.get("is_active")
+        deleted = payload.get("deleted")
 
-            await self._call_procedure(
-                "update_agent_skill",
-                ( skill_id, user_uid, is_active, deleted),
-            )
+        await self._call_procedure(
+            "update_agent_skill",
+            ( skill_id, user_uid, is_active, deleted),
+        )
 
-            return {
-                "success": True,
-                "messages": "success",
-            }
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
         
+    @data_store_handler
     async def fetch_available_skills(self, payload: dict) -> dict:
         """
         Fetch available skills for user.
@@ -736,27 +690,20 @@ class MysqlService(DataServerBase):
             }
         """
 
-        logger.trace()
 
-        try:
-            user_uid = payload["user_uid"]
-            limit = payload.get("limit", 5)
+        user_uid = payload["user_uid"]
+        limit = payload.get("limit", 5)
 
-            rows = await self._call_procedure("fetch_agent_skills", (user_uid, limit,))
+        rows = await self._call_procedure("fetch_agent_skills", (user_uid, limit,))
 
-            return {
-                "success": True,
-                "messages": rows,
-            }
+        return {
+            "success": True,
+            "messages": rows,
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
 
+    @data_store_handler
     async def fetch_target_skill(self, payload: dict) -> dict:
         """
         Fetch target skill for user.
@@ -788,28 +735,22 @@ class MysqlService(DataServerBase):
 
         logger.info("[MysqlService][fetch_target_skill] enter.")
 
-        try:
-            user_uid = payload["user_uid"]
-            skill_id = payload["skill_id"]
-
-            rows = await self._call_procedure("fetch_target_skill", (user_uid, skill_id,))
-
-            return {
-                "success": True,
-                "messages": rows,
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        skill_id = payload["skill_id"]
+        rows = await self._call_procedure(
+            "fetch_target_skill",
+            (user_uid, skill_id,),
+        )
+        return {
+            "success": True,
+            "messages": rows,
+        }
         
     # --------------------------------------------------
     # Short-term Memory 
     # --------------------------------------------------
 
+    @data_store_handler
     async def fetch_shortterm_memory(self, payload: dict) -> dict:
         """
         Get a batch of memories. Call procedure fetch_shortterm_memory.
@@ -836,23 +777,16 @@ class MysqlService(DataServerBase):
                 }
             ]
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            rows = await self._call_procedure("fetch_shortterm_memory", (user_uid, conversation_uid))
-            return {
-                "success": True,
-                "messages": rows,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        rows = await self._call_procedure("fetch_shortterm_memory", (user_uid, conversation_uid))
+        return {
+            "success": True,
+            "messages": rows,
+        }
         
 
+    @data_store_handler
     async def insert_shortterm_memory(self, payload: dict) -> dict:
         """
         Get a batch of memories. Call procedure insert_shortterm_memory.
@@ -871,26 +805,19 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success",
             }
         """
-        logger.trace()
-        try:
-            memory_id = payload["memory_id"]
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            content = payload["content"]
-            created_timestamp = int(time.time() * 1_000_000)
-            await self._call_procedure("insert_shortterm_memory", (memory_id, user_uid, conversation_uid, content, created_timestamp))
-            return {
-                "success": True,
-                "messages": "success",
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        memory_id = payload["memory_id"]
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        content = payload["content"]
+        created_timestamp = int(time.time() * 1_000_000)
+        await self._call_procedure("insert_shortterm_memory", (memory_id, user_uid, conversation_uid, content, created_timestamp))
+        return {
+            "success": True,
+            "messages": "success",
+        }
         
 
+    @data_store_handler
     async def delete_shortterm_memory(self, payload: dict) -> dict:
         """
         Get a batch of memories. Call procedure delete_shortterm_memory.
@@ -908,86 +835,67 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success",
             }
         """
-        logger.trace()
-        try:
-            memory_ids = payload["memory_ids"]
-            user_uid = payload["user_uid"]
-            conversation_uid = payload["conversation_uid"]
-            await self._call_procedure("delete_shortterm_memory", (json.dumps(memory_ids), user_uid, conversation_uid))
-            return {
-                "success": True,
-                "messages": "success",
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        memory_ids = payload["memory_ids"]
+        user_uid = payload["user_uid"]
+        conversation_uid = payload["conversation_uid"]
+        await self._call_procedure("delete_shortterm_memory", (json.dumps(memory_ids), user_uid, conversation_uid))
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
     # --------------------------------------------------
     # Long-term Memory
     # --------------------------------------------------
 
+    @data_store_handler
     async def fetch_longterm_memory(self, payload: dict) -> dict:
         """Fetch all active long-term memories owned by a user."""
-        logger.trace()
-        try:
-            rows = await self._call_procedure(
-                "fetch_longterm_memory",
-                (payload["user_uid"],),
-            )
-            return {"success": True, "messages": rows}
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+        rows = await self._call_procedure(
+            "fetch_longterm_memory",
+            (payload["user_uid"],),
+        )
+        return {"success": True, "messages": rows}
 
+    @data_store_handler
     async def insert_longterm_memory(self, payload: dict) -> dict:
         """Insert one long-term memory."""
-        logger.trace()
-        try:
-            memory_id = payload["memory_id"]
-            await self._call_procedure(
-                "insert_longterm_memory",
-                (
-                    memory_id,
-                    payload["user_uid"],
-                    payload["title"],
-                    payload["date"],
-                    payload["content"],
-                    payload["source"],
-                ),
-            )
-            return {"success": True, "messages": {"memory_id": memory_id}}
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+        memory_id = payload["memory_id"]
+        await self._call_procedure(
+            "insert_longterm_memory",
+            (
+                memory_id,
+                payload["user_uid"],
+                payload["title"],
+                payload["date"],
+                payload["content"],
+                payload["source"],
+            ),
+        )
+        return {"success": True, "messages": {"memory_id": memory_id}}
 
+    @data_store_handler
     async def update_longterm_memory(self, payload: dict) -> dict:
         """Partially update or soft-delete one long-term memory."""
-        logger.trace()
-        try:
-            await self._call_procedure(
-                "update_longterm_memory",
-                (
-                    payload["memory_id"],
-                    payload["user_uid"],
-                    payload.get("title"),
-                    payload.get("date"),
-                    payload.get("content"),
-                    payload.get("source"),
-                    payload.get("is_deleted"),
-                ),
-            )
-            return {"success": True, "messages": "success"}
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+        await self._call_procedure(
+            "update_longterm_memory",
+            (
+                payload["memory_id"],
+                payload["user_uid"],
+                payload.get("title"),
+                payload.get("date"),
+                payload.get("content"),
+                payload.get("source"),
+                payload.get("is_deleted"),
+            ),
+        )
+        return {"success": True, "messages": "success"}
         
     # --------------------------------------------------
     # Custom Provider 
     # --------------------------------------------------
 
+    @data_store_handler
     async def create_llm_provider(self, payload: dict) -> dict:
         """
         Insert a llm provider meta in database. Call procedure create_llm_provider.
@@ -1009,33 +917,26 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or dict {"provider_id": str},
             }
         """
-        logger.trace()
-        try:
-            provider_id = payload["provider_id"]
-            user_uid = payload["user_uid"]
-            provider_name = payload["provider_name"]
-            provider_type = (payload.get("type", "openai") or "openai").lower()
-            endpoint = payload["endpoint"]
-            model_list = payload["model_list"]
-            description = payload.get("description")
-            await self._call_procedure(
-                "create_llm_provider", 
-                (provider_id, user_uid, provider_name, provider_type, endpoint, json.dumps(model_list), description)
-            )
-            return {
-                "success": True,
-                "messages": {
-                    "provider_id": provider_id
-                },
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        provider_id = payload["provider_id"]
+        user_uid = payload["user_uid"]
+        provider_name = payload["provider_name"]
+        provider_type = (payload.get("type", "openai") or "openai").lower()
+        endpoint = payload["endpoint"]
+        model_list = payload["model_list"]
+        description = payload.get("description")
+        await self._call_procedure(
+            "create_llm_provider", 
+            (provider_id, user_uid, provider_name, provider_type, endpoint, json.dumps(model_list), description)
+        )
+        return {
+            "success": True,
+            "messages": {
+                "provider_id": provider_id
+            },
+        }
         
 
+    @data_store_handler
     async def get_llm_providers(self, payload: dict) -> dict:
         """
         Get all llm provider meta in database. Call procedure get_llm_providers.
@@ -1062,22 +963,15 @@ class MysqlService(DataServerBase):
                 ],
             }
         """
-        logger.trace()
-        try:
-            user_uid = payload["user_uid"]
-            rows = await self._call_procedure("get_llm_providers", (user_uid, ))
-            return {
-                "success": True,
-                "messages": rows,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        user_uid = payload["user_uid"]
+        rows = await self._call_procedure("get_llm_providers", (user_uid, ))
+        return {
+            "success": True,
+            "messages": rows,
+        }
         
 
+    @data_store_handler
     async def get_llm_provider_by_id(self, payload: dict) -> dict:
         """
         Get a llm provider meta in database. Call procedure get_llm_provider_by_id.
@@ -1103,22 +997,15 @@ class MysqlService(DataServerBase):
                 ],
             }
         """
-        logger.trace()
-        try:
-            provider_id = payload["provider_id"]
-            rows = await self._call_procedure("get_llm_provider_by_id", (provider_id, ))
-            return {
-                "success": True,
-                "messages": rows,
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        provider_id = payload["provider_id"]
+        rows = await self._call_procedure("get_llm_provider_by_id", (provider_id, ))
+        return {
+            "success": True,
+            "messages": rows,
+        }
         
 
+    @data_store_handler
     async def update_llm_provider(self, payload: dict) -> dict:
         """
         Update a llm provider meta in database, include is_deleted status. Call procedure update_llm_provider.
@@ -1141,39 +1028,32 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success",
             }
         """
-        logger.trace()
-        try:
-            provider_id = payload["provider_id"]
-            user_uid = payload["user_uid"]
-            provider_name = payload.get("provider_name")
-            provider_type = payload.get("type")
-            if isinstance(provider_type, str):
-                provider_type = provider_type.lower()
-            endpoint = payload.get("endpoint")
-            model_list = payload.get("model_list")
-            if isinstance(model_list, list):
-                model_list = json.dumps(model_list)
-            description = payload.get("description")
-            is_deleted = payload.get("is_deleted")
-            await self._call_procedure(
-                "update_llm_provider", 
-                (provider_id, user_uid, provider_name, provider_type, endpoint, model_list, description, is_deleted)
-            )
-            return {
-                "success": True,
-                "messages": 'success',
-            }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        provider_id = payload["provider_id"]
+        user_uid = payload["user_uid"]
+        provider_name = payload.get("provider_name")
+        provider_type = payload.get("type")
+        if isinstance(provider_type, str):
+            provider_type = provider_type.lower()
+        endpoint = payload.get("endpoint")
+        model_list = payload.get("model_list")
+        if isinstance(model_list, list):
+            model_list = json.dumps(model_list)
+        description = payload.get("description")
+        is_deleted = payload.get("is_deleted")
+        await self._call_procedure(
+            "update_llm_provider", 
+            (provider_id, user_uid, provider_name, provider_type, endpoint, model_list, description, is_deleted)
+        )
+        return {
+            "success": True,
+            "messages": 'success',
+        }
         
     # --------------------------------------------------
     # MCP Server
     # --------------------------------------------------
 
+    @data_store_handler
     async def create_mcp_server(self, payload: dict) -> dict:
         """
         Insert a mcp server meta in database. Call procedure create_mcp_server.
@@ -1197,38 +1077,30 @@ class MysqlService(DataServerBase):
                 },
             }
         """
-        logger.trace()
 
-        try:
-            mcp_id = payload["mcp_id"]
-            user_uid = payload["user_uid"]
-            mcp_name = payload["mcp_name"]
-            transport = payload["transport"]
-            endpoint = payload["endpoint"]
-            config = payload.get("config", {})
-            description = payload.get("description")
+        mcp_id = payload["mcp_id"]
+        user_uid = payload["user_uid"]
+        mcp_name = payload["mcp_name"]
+        transport = payload["transport"]
+        endpoint = payload["endpoint"]
+        config = payload.get("config", {})
+        description = payload.get("description")
 
-            await self._call_procedure(
-                "create_mcp_server",
-                (mcp_id, user_uid, mcp_name, transport, endpoint, json.dumps(config), description,),
-            )
+        await self._call_procedure(
+            "create_mcp_server",
+            (mcp_id, user_uid, mcp_name, transport, endpoint, json.dumps(config), description,),
+        )
 
-            return {
-                "success": True,
-                "messages": {
-                    "mcp_id": mcp_id,
-                },
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return {
+            "success": True,
+            "messages": {
+                "mcp_id": mcp_id,
+            },
+        }
 
 
+
+    @data_store_handler
     async def get_mcp_servers(self, payload: dict) -> dict:
         """
         Get all mcp servers in database. Call procedure get_mcp_servers.
@@ -1244,27 +1116,19 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or list
             }
         """
-        logger.trace()
 
-        try:
-            user_uid = payload["user_uid"]
+        user_uid = payload["user_uid"]
 
-            rows = await self._call_procedure("get_mcp_servers", (user_uid,),)
+        rows = await self._call_procedure("get_mcp_servers", (user_uid,),)
 
-            return {
-                "success": True,
-                "messages": rows,
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return {
+            "success": True,
+            "messages": rows,
+        }
 
 
+
+    @data_store_handler
     async def get_enabled_mcp_servers(self, payload: dict) -> dict:
         """
         Get enabled mcp servers in database. Call procedure get_enabled_mcp_servers.
@@ -1280,27 +1144,19 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or list
             }
         """
-        logger.trace()
 
-        try:
-            user_uid = payload["user_uid"]
+        user_uid = payload["user_uid"]
 
-            rows = await self._call_procedure("get_enabled_mcp_servers", (user_uid,),)
+        rows = await self._call_procedure("get_enabled_mcp_servers", (user_uid,),)
 
-            return {
-                "success": True,
-                "messages": rows,
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        return {
+            "success": True,
+            "messages": rows,
+        }
 
 
+
+    @data_store_handler
     async def update_mcp_server(self, payload: dict) -> dict:
         """
         Update a mcp server meta in database. Call procedure update_mcp_server.
@@ -1328,49 +1184,41 @@ class MysqlService(DataServerBase):
                 "messages": "success" or "fail: {e}"
             }
         """
-        logger.trace()
 
-        try:
-            mcp_id = payload["mcp_id"]
-            user_uid = payload["user_uid"]
+        mcp_id = payload["mcp_id"]
+        user_uid = payload["user_uid"]
 
-            mcp_name = payload.get("mcp_name")
-            transport = payload.get("transport")
-            endpoint = payload.get("endpoint")
+        mcp_name = payload.get("mcp_name")
+        transport = payload.get("transport")
+        endpoint = payload.get("endpoint")
 
-            config = payload.get("config")
-            if isinstance(config, (dict, list)):
-                config = json.dumps(config)
+        config = payload.get("config")
+        if isinstance(config, (dict, list)):
+            config = json.dumps(config)
 
-            description = payload.get("description")
+        description = payload.get("description")
 
-            enabled = payload.get("enabled")
-            tool_count = payload.get("tool_count")
+        enabled = payload.get("enabled")
+        tool_count = payload.get("tool_count")
 
-            is_deleted = payload.get("is_deleted")
+        is_deleted = payload.get("is_deleted")
 
-            await self._call_procedure(
-                "update_mcp_server",
-                ( mcp_id, user_uid, mcp_name, transport, endpoint, config, description, enabled, tool_count, is_deleted,),
-            )
+        await self._call_procedure(
+            "update_mcp_server",
+            ( mcp_id, user_uid, mcp_name, transport, endpoint, config, description, enabled, tool_count, is_deleted,),
+        )
 
-            return {
-                "success": True,
-                "messages": "success",
-            }
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
     # --------------------------------------------------
     # Cron task
     # --------------------------------------------------
 
+    @data_store_handler
     async def create_cron_task(self, payload: dict) -> dict:
         """
         Create a cron task in database. Call procedure create_cron_task.
@@ -1398,47 +1246,39 @@ class MysqlService(DataServerBase):
                 }
             }
         """
-        logger.trace()
 
-        try:
-            task_id = payload["task_id"]
-            user_uid = payload["user_uid"]
-            conversation_uid = payload.get("conversation_uid")
-            platform = payload.get("platform")
-            task_name = payload.get("task_name")
-            task_prompt = payload.get("prompt")
-            execute_code = payload.get("execute")
-            execute_time = payload.get("exec_time")
-            repeat = payload.get("repeat")
-            extra_config = payload.get("extra_config", {})
-            description = payload.get("description", "")
-            
-            if extra_config is None:
-                extra_config = {}
-            if not isinstance(extra_config, str):
-                extra_config = json.dumps(extra_config, ensure_ascii=False)
+        task_id = payload["task_id"]
+        user_uid = payload["user_uid"]
+        conversation_uid = payload.get("conversation_uid")
+        platform = payload.get("platform")
+        task_name = payload.get("task_name")
+        task_prompt = payload.get("prompt")
+        execute_code = payload.get("execute")
+        execute_time = payload.get("exec_time")
+        repeat = payload.get("repeat")
+        extra_config = payload.get("extra_config", {})
+        description = payload.get("description", "")
+        
+        if extra_config is None:
+            extra_config = {}
+        if not isinstance(extra_config, str):
+            extra_config = json.dumps(extra_config, ensure_ascii=False)
 
-            await self._call_procedure(
-                "create_cron_task",
-                (task_id, user_uid, conversation_uid, platform, task_name, task_prompt, execute_code, execute_time, repeat, extra_config, description,),
-            )
+        await self._call_procedure(
+            "create_cron_task",
+            (task_id, user_uid, conversation_uid, platform, task_name, task_prompt, execute_code, execute_time, repeat, extra_config, description,),
+        )
 
-            return {
-                "success": True,
-                "messages": {
-                    "task_id": task_id
-                },
-            }
+        return {
+            "success": True,
+            "messages": {
+                "task_id": task_id
+            },
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
 
+    @data_store_handler
     async def get_all_enabled_cron_tasks(self, payload: dict) -> dict:
         """
         Get all cron tasks in database. Call procedure get_all_enabled_cron_tasks.
@@ -1452,25 +1292,17 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or list
             }
         """
-        logger.trace()
 
-        try:
-            rows = await self._call_procedure("get_all_enabled_cron_tasks", (),)
+        rows = await self._call_procedure("get_all_enabled_cron_tasks", (),)
 
-            return {
-                "success": True,
-                "messages": rows,
-            }
+        return {
+            "success": True,
+            "messages": rows,
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
 
+    @data_store_handler
     async def get_cron_tasks(self, payload: dict) -> dict:
         """
         Get all cron tasks in database. Call procedure get_cron_tasks.
@@ -1486,27 +1318,19 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or list
             }
         """
-        logger.trace()
 
-        try:
-            user_uid = payload["user_uid"]
+        user_uid = payload["user_uid"]
 
-            rows = await self._call_procedure("get_cron_tasks", (user_uid,),)
+        rows = await self._call_procedure("get_cron_tasks", (user_uid,),)
 
-            return {
-                "success": True,
-                "messages": rows,
-            }
+        return {
+            "success": True,
+            "messages": rows,
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
 
+    @data_store_handler
     async def get_cron_task_by_id(self, payload: dict) -> dict:
         """
         Get a cron task in database. Call procedure get_cron_task_by_id.
@@ -1522,27 +1346,19 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or list
             }
         """
-        logger.trace()
 
-        try:
-            task_id = payload["task_id"]
+        task_id = payload["task_id"]
 
-            rows = await self._call_procedure("get_cron_task_by_id", (task_id,),)
+        rows = await self._call_procedure("get_cron_task_by_id", (task_id,),)
 
-            return {
-                "success": True,
-                "messages": rows,
-            }
+        return {
+            "success": True,
+            "messages": rows,
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
         
         
+    @data_store_handler
     async def update_cron_task(self, payload: dict) -> dict:
         """
         Update a cron task in database. Call procedure update_cron_task.
@@ -1568,42 +1384,33 @@ class MysqlService(DataServerBase):
                 "messages": "fail: {e}" or "success"
             }
         """
-        logger.trace()
 
-        try:
-            task_id = payload["task_id"]
-            conversation_uid = payload.get("conversation_uid")
-            platform = payload.get("platform")
-            task_name = payload.get("task_name")
-            task_prompt = payload.get("prompt")
-            execute_code = payload.get("execute")
-            execute_time = payload.get("exec_time")
-            repeat = payload.get("repeat")
-            extra_config = payload.get("extra_config")
-            description = payload.get("description")
-            enabled = payload.get("enabled")
-            is_deleted = payload.get("is_deleted")
+        task_id = payload["task_id"]
+        conversation_uid = payload.get("conversation_uid")
+        platform = payload.get("platform")
+        task_name = payload.get("task_name")
+        task_prompt = payload.get("prompt")
+        execute_code = payload.get("execute")
+        execute_time = payload.get("exec_time")
+        repeat = payload.get("repeat")
+        extra_config = payload.get("extra_config")
+        description = payload.get("description")
+        enabled = payload.get("enabled")
+        is_deleted = payload.get("is_deleted")
 
-            if isinstance(extra_config, (dict, list)):
-                extra_config = json.dumps(extra_config)
+        if isinstance(extra_config, (dict, list)):
+            extra_config = json.dumps(extra_config)
 
-            await self._call_procedure(
-                "update_cron_task",
-                (task_id, conversation_uid, platform, task_name, task_prompt, execute_code, execute_time, repeat, extra_config, description, enabled, is_deleted,),
-            )
+        await self._call_procedure(
+            "update_cron_task",
+            (task_id, conversation_uid, platform, task_name, task_prompt, execute_code, execute_time, repeat, extra_config, description, enabled, is_deleted,),
+        )
 
-            return {
-                "success": True,
-                "messages": "success",
-            }
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
 
 
 
