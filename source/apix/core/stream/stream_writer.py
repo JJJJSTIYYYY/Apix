@@ -1,7 +1,7 @@
 """Invocation-local message queue and writer for graph streaming."""
 
 import asyncio
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
@@ -76,7 +76,7 @@ def get_stream_writer() -> StreamWriter:
 
 
 @contextmanager
-def stream_writer_context(writer: StreamWriter) -> Iterator[None]:
+def stream_writer_context(writer: StreamWriter) -> Generator[None]:
     """Bind a writer for the duration of one node execution."""
     token = _current_stream_writer.set(writer)
     try:

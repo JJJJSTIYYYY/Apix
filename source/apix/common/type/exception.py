@@ -100,6 +100,23 @@ class EventHandlerAlreadyRegistered(Exception):
         return f"{self.message}{error_details}"
     
 
+class GraphNodeError(Exception):
+    
+    def __init__(self, message="Graph node error", errors=None):
+        """        
+        Args:
+            message: error message
+            errors: error object
+        """
+        self.message = message
+        self.errors = errors if errors else []
+        super().__init__(self.message)
+    
+    def __str__(self):
+        error_details = f"Errors: {self.errors}" if self.errors else ""
+        return f"{self.message}{error_details}"
+    
+
 class InvalidNodeReturns(Exception):
     
     def __init__(self, message="Invalid node returns", errors=None):
@@ -131,3 +148,4 @@ class IncompleteToolCallError(ValueError):
 
 class IdentityError(ValueError):
     """Ambiguous apix identity. Unknow user_uid, platform or conversation_uid"""
+

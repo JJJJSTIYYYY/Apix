@@ -15,6 +15,15 @@ class GraphManager:
     carried from node to node in the event context instead. Every graph must
     define a transition from :data:`START`; nodes without a transition finish
     by routing to :data:`END`.
+
+    Examples:
+        ```python
+        class AccumulatingState(TypedDict):
+            messages: Annotated[list[str], AutoMerge()]
+            status: str
+
+        manager = GraphManager(AccumulatingState)
+        ```
     """
 
     def __init__(
@@ -25,14 +34,20 @@ class GraphManager:
 
         Args:
             state_schema:
-                Optional annotated state schema. ``NodeGraph`` uses it to
-                discover fields marked with ``AutoMerge``. Omitting it
+                Optional annotated state schema. :class:`NodeGraph` uses it to
+                discover fields marked with :class:`AutoMerge`. Omitting it
                 preserves normal dictionary overwrite behaviour.
         """
         self._state_schema = state_schema
         self._nodes: dict[str, BaseNode] = {}
         self._default_gotos: dict[str, str] = {}
         self._generated_names: set[str] = set()
+
+
+    def has_node(self, node_name: str) -> bool:
+        """Returns whether this graph manager has a node named `node_name`.
+        """
+        return node_name in self._nodes
 
 
     def add_node(

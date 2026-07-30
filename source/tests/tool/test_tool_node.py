@@ -893,10 +893,10 @@ def test_tool_node_rejects_invalid_name(name):
         ToolNode(lambda: None, name=name)
 
 
-@pytest.mark.parametrize("message_key", ["", None, 1])
-def test_tool_node_rejects_invalid_message_key(message_key):
+@pytest.mark.parametrize("messages_key", ["", None, 1])
+def test_tool_node_rejects_invalid_messages_key(messages_key):
     with pytest.raises(ValueError, match="message key"):
-        ToolNode(lambda: None, message_key=message_key)
+        ToolNode(lambda: None, messages_key=messages_key)
 
 
 def test_tool_node_rejects_invalid_and_duplicate_tools():
@@ -983,8 +983,8 @@ def test_normalise_valid_command_preserves_updates_and_goto():
     assert goto_command.has_goto is True
 
 
-def test_normalise_tool_result_uses_configured_message_key():
-    node = ToolNode(lambda: None, message_key="history")
+def test_normalise_tool_result_uses_configured_messages_key():
+    node = ToolNode(lambda: None, messages_key="history")
     call = _tool_call("<lambda>", "call-history")
 
     command = node._normalise_tool_result("finished", call)

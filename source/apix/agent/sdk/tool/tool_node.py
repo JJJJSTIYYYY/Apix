@@ -796,19 +796,20 @@ class ToolNode(BaseNode):
 
     name: str
     tool_set: list[Tool]
-    message_key: str
+    messages_key: str
     
     def __init__(
         self, 
         tool_set: Tool | list[Tool] | ToolFunction | list[ToolFunction],
         name: str = "tools",
-        message_key: str = "messages",
+        messages_key: str = "messages",
     ) -> None:
         """Create a node.
 
         Args:
             tool_set: A ToolFunction instance or a list of ToolFunction instances.
             name: The name of the tool node. Must be a non-empty string.
+            messages_key: The key in the state dictionary that contains the message list.
 
         Raises:
             ValueError: If `tool_set` is not a ToolFunction or a list of ToolFunctions, 
@@ -816,7 +817,7 @@ class ToolNode(BaseNode):
         """
         if not isinstance(name, str) or not name:
             raise ValueError("A tool node requires a name.")
-        if not isinstance(message_key, str) or not message_key:
+        if not isinstance(messages_key, str) or not messages_key:
             raise ValueError("A tool node requires a message key.")
 
         candidates = (
@@ -827,7 +828,7 @@ class ToolNode(BaseNode):
 
         self.name = name
         self.tool_set = []
-        self.message_key = message_key
+        self.messages_key = messages_key
         self._tools_by_name: dict[str, Tool] = {}
 
         for candidate in candidates:
@@ -958,27 +959,27 @@ class ToolNode(BaseNode):
                 raise TypeError("Command.goto must be a string or None.")
 
             update = dict(result.update)
-            message_update = update.get(self.message_key)
+            message_update = update.get(self.messages_key)
 
             if not isinstance(message_update, list):
                 raise TypeError(
-                    f"Command.update[{self.message_key!r}] must be "
+                    f"Command.update[{self.messages_key!r}] must be "
                     "a list of ApixToolMessage."
                 )
             if len(message_update) != 1:
                 raise ValueError(
-                    f"Command.update[{self.message_key!r}] must contain "
+                    f"Command.update[{self.messages_key!r}] must contain "
                     "exactly one ApixToolMessage."
                 )
 
             message = message_update[0]
             if not isinstance(message, ApixToolMessage):
                 raise TypeError(
-                    f"Command.update[{self.message_key!r}] must be "
+                    f"Command.update[{self.messages_key!r}] must be "
                     "a list[ApixToolMessage]."
                 )
 
-            update[self.message_key] = [
+            update[self.messages_key] = [
                 self._apply_tool_message_metadata(
                     message,
                     tool_call,
@@ -1011,7 +1012,7 @@ class ToolNode(BaseNode):
 
         return Command(
             update={
-                self.message_key: [message],
+                self.messages_key: [message],
             }
         )
 
@@ -1049,14 +1050,14 @@ class ToolNode(BaseNode):
         if not isinstance(state, dict):
             raise TypeError("state must be a dictionary.")
 
-        messages = state.get(self.message_key)
+        messages = state.get(self.messages_key)
 
         if messages is None:
             return []
 
         if not isinstance(messages, list):
             raise ValueError(
-                f"`{self.message_key}` must be a message list, "
+                f"`{self.messages_key}` must be a message list, "
                 f"got {type(messages).__name__}."
             )
 
