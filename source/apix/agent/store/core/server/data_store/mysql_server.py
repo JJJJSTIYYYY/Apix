@@ -6,8 +6,13 @@ from functools import wraps
 from pathlib import Path
 from typing import Awaitable, Callable, TypeVar, cast
 
-import aiomysql
-from aiomysql.cursors import DictCursor
+try:
+    import aiomysql
+    from aiomysql.cursors import DictCursor
+except ImportError as exc:
+    raise ImportError(
+        "MySQl store requires the `aiomysql` package. Run `uv add aiomysql` to install."
+    ) from exc
 from fastapi.encoders import jsonable_encoder
 
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase

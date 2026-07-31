@@ -1,6 +1,11 @@
 import json
 
-import redis.asyncio as redis
+try:
+    import redis.asyncio as redis
+except ImportError as exc:
+    raise ImportError(
+        "Redis cache requires the `redis` package. Run `uv add redis` to install."
+    ) from exc
 
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
 from apix.common.lifespan.auto_init import auto_init

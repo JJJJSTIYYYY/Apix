@@ -98,12 +98,16 @@ class ApixEventLoop:
 
         try:
             while True:
-                event = await event_pipe_writer.get_event()
-
                 await self._dispatch_semaphore.acquire()
 
+                try:
+                    event = await event_pipe_writer.get_event()
+                except BaseException:
+                    self._dispatch_semaphore.release()
+                    raise
+
                 task = asyncio.create_task(
-                    self._dispatch_event(event),
+                    self._dispatch_event_and_ack(event),
                 )
 
                 self._dispatch_tasks.add(task)
@@ -114,6 +118,13 @@ class ApixEventLoop:
 
         except asyncio.CancelledError:
             logger.info("Event loop cancelled.")
+
+    async def _dispatch_event_and_ack(self, event: ApixEvent) -> ApixEvent | None:
+        """Dispatch one event and complete the builtin queue task."""
+        try:
+            return await self._dispatch_event(event)
+        finally:
+            event_pipe_writer.task_done()
 
     def _create_background_handler_task(
         self,

@@ -6,11 +6,15 @@
 #   base_url: "http://localhost:8080"
 #   config_endpoint: "/api/config"
 #   pipe_endpoint: "/api/pipe"
+#   max_retry: 5
+#   retry_initial_delay: 1.0
+#   timeout: 10.0
 
 SERVER:
   base_url: "http://localhost:2712"
   base_dir: "./.apix_data/"
   worker_count: 4
+  node_name: "apix_service"
 
 PROXY:
   original_proxy_env:
@@ -27,6 +31,23 @@ PIPELINE:
   event_pipe_max_len: 1024
   event_handler_default_time_out: 300
   message_pipe_max_len: 4096
+
+# A remote node consumes exactly one external mailbox implementation. This
+# section is ignored while REMOTE_GATEWAY is disabled.
+EVENT_CHANNEL:
+  type: "kafka"  # kafka | rabbitmq
+
+  kafka:
+    bootstrap_servers:
+      - "localhost:9092"
+    topic_prefix: "apix.mailbox"
+    group_id_prefix: "apix.node"
+
+  rabbitmq:
+    url: "amqp://guest:guest@localhost/"
+    exchange: "apix.events"
+    queue_prefix: "apix.mailbox"
+    prefetch_count: 100
 
 RUNTIME:
   tools_max_output_length: 32000

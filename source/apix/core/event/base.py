@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Tuple, TypedDict
+from typing import Any, Awaitable, Callable, Literal, Tuple, TypedDict
 from datetime import datetime
 
 from apix.config.base_config import EVENT_HANDLER_DEFAULT_TIME_OUT
@@ -64,3 +64,6 @@ class HandlerEntry:
     stop_when_error: bool = field(default=True)
     time_out: float = field(default=EVENT_HANDLER_DEFAULT_TIME_OUT)
     background: bool = field(default=False)
+
+
+ChannelName = Literal["builtin", "mailbox", "mailtruck"]

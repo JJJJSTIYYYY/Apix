@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from apix.config.base_config import BASE_URL, NODE_ID
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
-from apix.core.event import apix_event_loop
+from apix.core.event import EVENT_PIPE, apix_event_loop
 from apix.common.utils.logger import Logger, logger
 
 
@@ -30,22 +30,36 @@ def auto_load_router(app: FastAPI):
 
 async def lifespan(app: FastAPI):
     await Logger.start()
+    try:
+        auto_load_router(app)
 
-    auto_load_router(app)
+        await EVENT_PIPE.start()
+        await apix_event_loop.start()
+        await auto_init.start()
 
-    await apix_event_loop.start()
-    await auto_init.start()
-    
-    yield
-
-    await auto_init.stop()
-    await apix_event_loop.stop()
-
-    await Logger.stop()
+        yield
+    finally:
+        # The gateway must learn that this node is unavailable before the
+        # remaining services and event dispatcher are torn down.
+        try:
+            await EVENT_PIPE.stop()
+        finally:
+            try:
+                await auto_init.stop()
+            finally:
+                try:
+                    await apix_event_loop.stop()
+                finally:
+                    await Logger.stop()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="APIX AGENT", version="1.0.0", lifespan=lifespan)
+
+    @app.get("/health")
+    def health_check():
+        return JSONResponse({"status": "ok", "service": str(NODE_ID)})
+
     return app
 
 
@@ -71,10 +85,6 @@ def print_logo():
 
 if __name__ == "__main__":
     app = create_app()
-
-    @app.get("/health")
-    def health_check():
-        return JSONResponse({"status": "ok", "service": str(NODE_ID)})
 
     parsed = urlparse(BASE_URL)
 

@@ -589,6 +589,28 @@ class TestEventConsumerLoop:
         assert result.accepted
         mock_callback.assert_awaited_once_with(event)
 
+    @pytest.mark.asyncio
+    async def test_dispatch_acknowledges_event_even_when_dispatch_fails(self):
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+        handler = ApixEventLoop(registry)
+        event = _make_event()
+
+        with (
+            patch.object(
+                handler,
+                "_dispatch_event",
+                AsyncMock(side_effect=RuntimeError("dispatch failed")),
+            ),
+            patch(
+                "apix.core.event.event_loop.event_pipe_writer.task_done"
+            ) as task_done,
+        ):
+            with pytest.raises(RuntimeError, match="dispatch failed"):
+                await handler._dispatch_event_and_ack(event)
+
+        task_done.assert_called_once_with()
+
 
 # ============================
 # Tests: Constructor

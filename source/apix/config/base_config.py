@@ -1,6 +1,6 @@
 import os
 import platform
-import uuid
+from uuid import uuid4
 from collections.abc import Mapping
 from typing import Any, Literal
 
@@ -97,12 +97,18 @@ def _load_config(path: str) -> dict[str, Any]:
     if not isinstance(remote_center, Mapping):
         raise ValueError("REMOTE_GATEWAY must be a mapping.")
 
-    center_base_url = remote_center.get("center_base_url")
+    enable = remote_center.get("enable", False)
+    if not isinstance(enable, bool):
+        raise ValueError("REMOTE_GATEWAY.enable must be a boolean.")
+    if enable is not True:
+        return local_config
+
+    center_base_url = remote_center.get("base_url")
     config_endpoint = remote_center.get("config_endpoint")
 
     if not isinstance(center_base_url, str) or not center_base_url.strip():
         raise ValueError(
-            "REMOTE_GATEWAY.center_base_url must be a non-empty string."
+            "REMOTE_GATEWAY.base_url must be a non-empty string."
         )
 
     if not isinstance(config_endpoint, str) or not config_endpoint.strip():
@@ -137,7 +143,6 @@ def _get_config(path: str, default=None):
 
 
 OPERATION_SYSTEM = platform.system().lower()
-NODE_ID = "apix_service-" + uuid.uuid4().hex[:8]
 
 _DEFAULT_PROXY_ENV = {
     "HTTP_PROXY": os.environ.get("HTTP_PROXY"),
@@ -160,10 +165,71 @@ _PROVIDER_BASE_URL = {
 _config = _load_config("./config.yaml")
 
 
+def _validate_config_compatibility(config: Mapping[str, Any]) -> None:
+    """Reject storage backends that cannot be shared by remote nodes."""
+    remote = config.get("REMOTE_GATEWAY")
+    if not isinstance(remote, Mapping) or remote.get("enable") is not True:
+        return
+
+    data_store = config.get("DATA_STORE", {})
+    cache = config.get("CACHE", {})
+    data_store_type = (
+        data_store.get("type", "sqlite")
+        if isinstance(data_store, Mapping)
+        else "sqlite"
+    )
+    cache_store_type = (
+        cache.get("store_type", "builtin")
+        if isinstance(cache, Mapping)
+        else "builtin"
+    )
+    conflicts: list[str] = []
+    if data_store_type == "sqlite":
+        conflicts.append("DATA_STORE.type=sqlite")
+    if cache_store_type == "builtin":
+        conflicts.append("CACHE.store_type=builtin")
+    if conflicts:
+        raise ValueError(
+            "REMOTE_GATEWAY requires distributed storage backends; "
+            + ", ".join(conflicts)
+            + " cannot be used in remote node mode."
+        )
+
+
+_validate_config_compatibility(_config)
+
+
+# Remote gateway and node identity
+REMOTE_GATEWAY_ENABLE = _get_config("REMOTE_GATEWAY.enable", False) is True
+REMOTE_GATEWAY_BASE_URL = _get_config(
+    "REMOTE_GATEWAY.base_url", "http://localhost:8080"
+)
+REMOTE_GATEWAY_CONFIG_ENDPOINT = _get_config(
+    "REMOTE_GATEWAY.config_endpoint", "/api/config"
+)
+REMOTE_GATEWAY_PIPE_ENDPOINT = _get_config(
+    "REMOTE_GATEWAY.pipe_endpoint", "/api/pipe"
+)
+GATEWAY_MAX_RETRY = _get_config("REMOTE_GATEWAY.max_retry", 5)
+GATEWAY_RETRY_INITIAL_DELAY = _get_config(
+    "REMOTE_GATEWAY.retry_initial_delay", 1.0
+)
+GATEWAY_TIMEOUT = _get_config("REMOTE_GATEWAY.timeout", 10.0)
+
+
+def _create_node_id(remote_enabled: bool) -> str:
+    """Create a globally unique MQ id only for remote node mode."""
+    return uuid4().hex if remote_enabled else "apix_service"
+
+
+NODE_ID = _create_node_id(REMOTE_GATEWAY_ENABLE)
+
+
 # Server
 BASE_URL = _get_config("SERVER.base_url", "http://localhost:2712")
 BASE_DIR = _get_config("SERVER.base_dir", "./.apix_data/")
 WORKER_COUNT = _get_config("SERVER.worker_count", 4)
+NODE_NAME = _get_config("SERVER.node_name", "apix_service")
 
 
 # Proxy
@@ -172,7 +238,6 @@ _proxy_env_config = _get_config("PROXY.original_proxy_env", {})
 if not isinstance(_proxy_env_config, Mapping):
     raise ValueError("PROXY.original_proxy_env must be a mapping.")
 
-# 对外仍保留真正的环境变量名，避免影响现有调用代码。
 ORIGINAL_PROXY_ENV = {
     "HTTP_PROXY": _proxy_env_config.get(
         "http_proxy",
@@ -206,6 +271,33 @@ EVENT_HANDLER_DEFAULT_TIME_OUT = _get_config(
     300,
 )
 MESSAGE_PIPE_MAX_LEN = _get_config("PIPELINE.message_pipe_max_len", 4096)
+
+
+# External event mailbox
+EVENT_CHANNEL_TYPE: Literal["kafka", "rabbitmq"] = _get_config(
+    "EVENT_CHANNEL.type", "kafka"
+)
+KAFKA_BOOTSTRAP_SERVERS = _get_config(
+    "EVENT_CHANNEL.kafka.bootstrap_servers", ["localhost:9092"]
+)
+KAFKA_TOPIC_PREFIX = _get_config(
+    "EVENT_CHANNEL.kafka.topic_prefix", "apix.mailbox"
+)
+KAFKA_GROUP_ID_PREFIX = _get_config(
+    "EVENT_CHANNEL.kafka.group_id_prefix", "apix.node"
+)
+RABBITMQ_URL = _get_config(
+    "EVENT_CHANNEL.rabbitmq.url", "amqp://guest:guest@localhost/"
+)
+RABBITMQ_EXCHANGE = _get_config(
+    "EVENT_CHANNEL.rabbitmq.exchange", "apix.events"
+)
+RABBITMQ_QUEUE_PREFIX = _get_config(
+    "EVENT_CHANNEL.rabbitmq.queue_prefix", "apix.mailbox"
+)
+RABBITMQ_PREFETCH_COUNT = _get_config(
+    "EVENT_CHANNEL.rabbitmq.prefetch_count", 100
+)
 
 
 # Runtime
@@ -268,5 +360,3 @@ PROVIDER_BASE_URL = _get_config(
 )
 LLM_MAX_RETRY = _get_config("LLM.max_retry", 3)
 LLM_TIMEOUT = _get_config("LLM.timeout", 30)
-
-
