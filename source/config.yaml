@@ -1,9 +1,11 @@
 # Optional remote config center.
 # Uncomment both fields to enable remote configuration loading.
 #
-# REMOTE_ROUTER_CENTER:
-#   center_base_url: "http://localhost:8080"
+# REMOTE_GATEWAY:
+#   enable: true
+#   base_url: "http://localhost:8080"
 #   config_endpoint: "/api/config"
+#   pipe_endpoint: "/api/pipe"
 
 SERVER:
   base_url: "http://localhost:2712"

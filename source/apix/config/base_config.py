@@ -84,30 +84,30 @@ def _load_config(path: str) -> dict[str, Any]:
 
     Loading order:
         1. Read local YAML.
-        2. Discover REMOTE_ROUTER_CENTER from the local YAML.
+        2. Discover REMOTE_GATEWAY from the local YAML.
         3. Load remote configuration when configured.
         4. Merge local configuration over remote configuration.
     """
     local_config = _load_from_yaml(path)
 
-    remote_center = local_config.get("REMOTE_ROUTER_CENTER")
+    remote_center = local_config.get("REMOTE_GATEWAY")
     if remote_center is None:
         return local_config
 
     if not isinstance(remote_center, Mapping):
-        raise ValueError("REMOTE_ROUTER_CENTER must be a mapping.")
+        raise ValueError("REMOTE_GATEWAY must be a mapping.")
 
     center_base_url = remote_center.get("center_base_url")
     config_endpoint = remote_center.get("config_endpoint")
 
     if not isinstance(center_base_url, str) or not center_base_url.strip():
         raise ValueError(
-            "REMOTE_ROUTER_CENTER.center_base_url must be a non-empty string."
+            "REMOTE_GATEWAY.center_base_url must be a non-empty string."
         )
 
     if not isinstance(config_endpoint, str) or not config_endpoint.strip():
         raise ValueError(
-            "REMOTE_ROUTER_CENTER.config_endpoint must be a non-empty string."
+            "REMOTE_GATEWAY.config_endpoint must be a non-empty string."
         )
 
     remote_config = _load_from_remote(
@@ -137,7 +137,7 @@ def _get_config(path: str, default=None):
 
 
 OPERATION_SYSTEM = platform.system().lower()
-SERVER_ID = "apix_service-" + uuid.uuid4().hex
+NODE_ID = "apix_service-" + uuid.uuid4().hex[:8]
 
 _DEFAULT_PROXY_ENV = {
     "HTTP_PROXY": os.environ.get("HTTP_PROXY"),

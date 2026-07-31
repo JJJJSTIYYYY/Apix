@@ -92,6 +92,7 @@ class BaseEventChannel(ABC):
         ...
 
 
+# Mailbox
 class KafkaChannel(BaseEventChannel):
 
     pass
@@ -102,6 +103,7 @@ class RabbitMQChannel(BaseEventChannel):
     pass
 
 
+# Builtin
 class BuiltinChannel(BaseEventChannel):
 
     pass
@@ -111,5 +113,6 @@ class ApixEventPipe:
 
     def __init__(self):
         self._event_pipe: dict[str, BaseEventChannel] = {
-            "default": BuiltinChannel(maxsize=EVENT_PIPE_MAX_LEN)
+            "builtin": BuiltinChannel(maxsize=EVENT_PIPE_MAX_LEN),
+            "mailbox": BaseEventChannel()
         }
