@@ -1,9 +1,11 @@
 import pkgutil
 import importlib
+from urllib.parse import urlparse
 from fastapi import FastAPI, APIRouter
 import uvicorn
 from fastapi.responses import JSONResponse
 
+from apix.config.base_config import BASE_URL
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
 from apix.core.event import apix_event_loop
@@ -54,4 +56,9 @@ if __name__ == "__main__":
     def health_check():
         return JSONResponse({"status": "ok", "service": "agent-service"})
 
-    uvicorn.run(app, host="0.0.0.0", port=5091, reload=False)
+    parsed = urlparse(BASE_URL)
+
+    host = parsed.hostname or "0.0.0.0"
+    port = parsed.port or 2712
+
+    uvicorn.run(app, host=host, port=port, reload=False)

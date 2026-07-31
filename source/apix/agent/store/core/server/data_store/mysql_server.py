@@ -3,6 +3,7 @@ import re
 import json
 import time
 from functools import wraps
+from pathlib import Path
 from typing import Awaitable, Callable, TypeVar, cast
 
 import aiomysql
@@ -20,6 +21,39 @@ TaskHandler = TypeVar(
     bound=Callable[..., Awaitable[dict]],
 )
 FailureFactory = Callable[[Exception], dict]
+
+
+def _split_mysql_script(script: str) -> list[str]:
+    """Split a MySQL script while honoring client-side DELIMITER commands."""
+    delimiter = ";"
+    buffer: list[str] = []
+    statements: list[str] = []
+
+    for line in script.splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("DELIMITER "):
+            if any(part.strip() for part in buffer):
+                raise ValueError("DELIMITER changed before the SQL statement ended")
+            delimiter = stripped.split(maxsplit=1)[1]
+            if not delimiter:
+                raise ValueError("DELIMITER must not be empty")
+            continue
+
+        if not buffer and not stripped:
+            continue
+
+        buffer.append(line)
+        candidate = "\n".join(buffer).rstrip()
+        if candidate.endswith(delimiter):
+            statement = candidate[:-len(delimiter)].strip()
+            if statement:
+                statements.append(statement)
+            buffer.clear()
+
+    if any(part.strip() for part in buffer):
+        raise ValueError("MySQL initialization script has an incomplete statement")
+
+    return statements
 
 
 def _identity_failure(exc: Exception) -> dict:
@@ -81,13 +115,33 @@ class MysqlService(DataServerBase):
             cursorclass=DictCursor,
         )
         self._pool_lock = asyncio.Lock()
+        self._schema_path = Path(__file__).with_name("init_mysql.sql")
         
 
     async def start(self):
-        """Initialize MySQL connection pool."""
+        """Initialize the pool and create missing schema objects."""
         async with self._pool_lock:
-            if not self._pool:
-                self._pool = await aiomysql.create_pool(**self._pool_args)
+            if self._pool is not None:
+                return
+
+            pool = await aiomysql.create_pool(**self._pool_args)
+            try:
+                await self._initialize_database(pool)
+            except Exception:
+                pool.close()
+                await pool.wait_closed()
+                raise
+            self._pool = pool
+
+
+    async def _initialize_database(self, pool) -> None:
+        schema = self._schema_path.read_text(encoding="utf-8")
+        statements = _split_mysql_script(schema)
+
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                for statement in statements:
+                    await cursor.execute(statement)
 
 
     async def stop(self):

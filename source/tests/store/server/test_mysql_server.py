@@ -23,7 +23,9 @@ def test_mysql_schema_declares_longterm_memory_table_and_procedures():
         encoding="utf-8"
     )
 
-    assert "CREATE TABLE longterm_memory" in sql
+    assert "DROP TABLE" not in sql
+    assert sql.count("CREATE TABLE IF NOT EXISTS") == 10
+    assert "CREATE TABLE IF NOT EXISTS longterm_memory" in sql
     assert "source ENUM('conversation', 'workspace')" in sql
     assert "CREATE PROCEDURE insert_longterm_memory" in sql
     assert "CREATE PROCEDURE fetch_longterm_memory" in sql
@@ -87,7 +89,8 @@ class FakePool:
 @pytest.mark.asyncio
 async def test_start_and_stop_are_idempotent(monkeypatch):
     service = make_service()
-    pool = FakePool()
+    cursor = FakeCursor([])
+    pool = FakePool(cursor)
     create_pool = AsyncMock(return_value=pool)
     monkeypatch.setattr(mysql_module.aiomysql, "create_pool", create_pool)
 
@@ -95,12 +98,46 @@ async def test_start_and_stop_are_idempotent(monkeypatch):
     await service.start()
     create_pool.assert_awaited_once_with(**service._pool_args)
     assert service._pool is pool
+    statements = [sql for sql, params in cursor.executions]
+    assert statements[0] == "SET time_zone = '+08:00'"
+    assert any(
+        statement.startswith("CREATE TABLE IF NOT EXISTS users")
+        for statement in statements
+    )
+    create_user = next(
+        statement
+        for statement in statements
+        if "CREATE PROCEDURE create_user" in statement
+    )
+    assert "INSERT INTO users" in create_user
+    assert "DELIMITER" not in "\n".join(statements)
+    assert all(params is None for _, params in cursor.executions)
 
     await service.stop()
     await service.stop()
     assert pool.closed is True
     assert pool.waited is True
     assert service._pool is None
+
+
+@pytest.mark.asyncio
+async def test_start_closes_pool_when_schema_initialization_fails(monkeypatch):
+    service = make_service()
+    cursor = FakeCursor([])
+    cursor.execute = AsyncMock(side_effect=RuntimeError("invalid schema"))
+    pool = FakePool(cursor)
+    monkeypatch.setattr(
+        mysql_module.aiomysql,
+        "create_pool",
+        AsyncMock(return_value=pool),
+    )
+
+    with pytest.raises(RuntimeError, match="invalid schema"):
+        await service.start()
+
+    assert service._pool is None
+    assert pool.closed is True
+    assert pool.waited is True
 
 
 @pytest.mark.asyncio

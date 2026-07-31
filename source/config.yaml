@@ -1,0 +1,74 @@
+# Optional remote config center.
+# Uncomment both fields to enable remote configuration loading.
+#
+# REMOTE_ROUTER_CENTER:
+#   center_base_url: "http://localhost:8080"
+#   config_endpoint: "/api/config"
+
+SERVER:
+  base_url: "http://localhost:2712"
+  base_dir: "./.apix_data/"
+  worker_count: 4
+
+PROXY:
+  original_proxy_env:
+    http_proxy: null
+    https_proxy: null
+    no_proxy: null
+
+LOG:
+  debug_level: "DEBUG"
+  trace: true
+  max_log_file_size: 5242880
+
+PIPELINE:
+  event_pipe_max_len: 1024
+  event_handler_default_time_out: 300
+  message_pipe_max_len: 4096
+
+RUNTIME:
+  tools_max_output_length: 32000
+  max_retry: 8
+  generation_ttl: 600
+  container_ttl: 6000
+  graph_cache_ttl: 600
+  cache_clean_interval: 300
+
+CACHE:
+  store_type: "builtin"
+  hot_cache_default_expire_seconds: 600
+  static_cache_default_expire_seconds: 604800
+
+  redis:
+    url: "redis://localhost:6379"
+    pool_size: 3
+
+DATA_STORE:
+  type: "sqlite"
+
+  sqlite:
+    database: "./.apix_data/sqlite/apix.sqlite3"
+
+  mysql:
+    base_url: "localhost"
+    port: 3307
+    user: "apix"
+    password: "apixapix"
+    database: "apix_database"
+    charset: "utf8mb4"
+    auto_commit: true
+
+LLM:
+  provider_base_url:
+    ollama:local: "http://localhost:11434"
+    ollama: "https://ollama.com"
+    openai: "https://api.openai.com/v1"
+    google: "https://generativelanguage.googleapis.com"
+    qwen: "https://dashscope.aliyuncs.com/v1"
+    qianfan: "https://qianfan.baidubce.com/v1"
+    deepseek: "https://api.deepseek.com/v1"
+    moonshot: "https://api.moonshot.cn/v1"
+    xiaomimimo: "https://api.xiaomimimo.com/v1"
+
+  max_retry: 3
+  timeout: 30

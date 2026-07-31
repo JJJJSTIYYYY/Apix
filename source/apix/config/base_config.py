@@ -1,126 +1,272 @@
-# Global configuration settings for the Apix.
-VERSION = "3.0.0"
-
 import os
-from typing import Literal
-import uuid
 import platform
+import uuid
+from collections.abc import Mapping
+from typing import Any, Literal
 
+import httpx
 import yaml
 
-def _load_from_yaml(dir, key=None) -> dict | str:
+
+# Global configuration settings for Apix.
+VERSION = "3.0.0"
+
+
+def _load_from_yaml(path: str) -> dict[str, Any]:
+    """Load configuration from a local YAML file."""
+    if not os.path.exists(path):
+        return {}
+
+    with open(path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+
+    if data is None:
+        return {}
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Config file must contain a YAML mapping, got {type(data).__name__}."
+        )
+
+    return data
+
+
+def _load_from_remote(
+    base_url: str,
+    endpoint: str,
+) -> dict[str, Any]:
+    """Load configuration from the remote config center."""
+    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+
+    response = httpx.get(url, timeout=10)
+    response.raise_for_status()
+
+    data = response.json()
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Remote config center must return a JSON object, "
+            f"got {type(data).__name__}."
+        )
+
+    return data
+
+
+def _merge_config(
+    remote: Mapping[str, Any],
+    local: Mapping[str, Any],
+) -> dict[str, Any]:
     """
-    Load yaml file and optionally return a specific key.
+    Recursively merge configuration mappings.
 
-    Args:
-        dir (str): Path to yaml file.
-        key (str, optional): Specific key to retrieve from yaml content.
-            If provided, return config[key], otherwise return full config.
-
-    Returns:
-        dict | str:
-            - Full yaml data (dict) if key is None
-            - Value of the specified key if key is provided (may be None if key not found)
-
-    Raises:
-        Exception: If file reading or yaml parsing fails.
+    Local values always take precedence over remote values. Nested mappings
+    are merged recursively, so a local partial section does not discard other
+    remote values in that section.
     """
-    config = None
-    try:
-        if os.path.exists(dir):
-            with open(dir, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
+    merged = dict(remote)
+
+    for key, local_value in local.items():
+        remote_value = merged.get(key)
+
+        if (
+            isinstance(remote_value, Mapping)
+            and isinstance(local_value, Mapping)
+        ):
+            merged[key] = _merge_config(remote_value, local_value)
         else:
-            config = {}
-        if key is not None:
-            return config.get(key)
-    
-    except Exception as e:
-        raise
-    return config
+            merged[key] = local_value
+
+    return merged
+
+
+def _load_config(path: str) -> dict[str, Any]:
+    """
+    Load the effective configuration.
+
+    Loading order:
+        1. Read local YAML.
+        2. Discover REMOTE_ROUTER_CENTER from the local YAML.
+        3. Load remote configuration when configured.
+        4. Merge local configuration over remote configuration.
+    """
+    local_config = _load_from_yaml(path)
+
+    remote_center = local_config.get("REMOTE_ROUTER_CENTER")
+    if remote_center is None:
+        return local_config
+
+    if not isinstance(remote_center, Mapping):
+        raise ValueError("REMOTE_ROUTER_CENTER must be a mapping.")
+
+    center_base_url = remote_center.get("center_base_url")
+    config_endpoint = remote_center.get("config_endpoint")
+
+    if not isinstance(center_base_url, str) or not center_base_url.strip():
+        raise ValueError(
+            "REMOTE_ROUTER_CENTER.center_base_url must be a non-empty string."
+        )
+
+    if not isinstance(config_endpoint, str) or not config_endpoint.strip():
+        raise ValueError(
+            "REMOTE_ROUTER_CENTER.config_endpoint must be a non-empty string."
+        )
+
+    remote_config = _load_from_remote(
+        base_url=center_base_url,
+        endpoint=config_endpoint,
+    )
+
+    return _merge_config(
+        remote=remote_config,
+        local=local_config,
+    )
+
+
+def _get_config(path: str, default=None):
+    value = _config
+
+    for key in path.split("."):
+        if not isinstance(value, Mapping):
+            return default
+
+        if key not in value:
+            return default
+
+        value = value[key]
+
+    return default if value is None else value
+
 
 OPERATION_SYSTEM = platform.system().lower()
-SERVER_ID = "apix_service-"+uuid.uuid4().hex
-_ORIGINAL_PROXY_ENV = {
+SERVER_ID = "apix_service-" + uuid.uuid4().hex
+
+_DEFAULT_PROXY_ENV = {
     "HTTP_PROXY": os.environ.get("HTTP_PROXY"),
     "HTTPS_PROXY": os.environ.get("HTTPS_PROXY"),
     "NO_PROXY": os.environ.get("NO_PROXY"),
 }
+
 _PROVIDER_BASE_URL = {
-    # Ollama
-    'ollama:local': 'http://localhost:11434',  # Local
-    'ollama': 'https://ollama.com',  # Cloud
-    
-    # OpenAI
-    'openai': 'https://api.openai.com/v1',
-    
-    # Google (Gemini)
-    'google': 'https://generativelanguage.googleapis.com',
-    
-    # Qwen (通义千问)
-    'qwen': 'https://dashscope.aliyuncs.com/v1',
-    
-    # Qianfan (百度千帆)
-    'qianfan': 'https://qianfan.baidubce.com/v1',
-    
-    # DeepSeek
-    'deepseek': 'https://api.deepseek.com/v1',
+    "ollama:local": "http://localhost:11434",
+    "ollama": "https://ollama.com",
+    "openai": "https://api.openai.com/v1",
+    "google": "https://generativelanguage.googleapis.com",
+    "qwen": "https://dashscope.aliyuncs.com/v1",
+    "qianfan": "https://qianfan.baidubce.com/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "xiaomimimo": "https://api.xiaomimimo.com/v1",
+}
 
-    # Moonshot (月之暗面)
-    'moonshot': 'https://api.moonshot.cn/v1',
-
-    # XiaomiMIMO
-    'xiaomimimo': 'https://api.xiaomimimo.com/v1',
-} # Base URL for the LLM service
-
-_config = _load_from_yaml('./config.yaml') or {}
-
-BASE_URL = _config.get('BASE_URL', "http://localhost:2712")
-BASE_DIR = _config.get('BASE_DIR', "./.apix_data/") # Base log direction
-ORIGINAL_PROXY_ENV = _config.get('ORIGINAL_PROXY_ENV', _ORIGINAL_PROXY_ENV)
-
-DEBUG_LEVEL: Literal['DEBUG', 'INFO', 'WARN', 'ERROR'] = _config.get('DEBUG_LEVEL', 'DEBUG').upper()
-TRACE = _config.get('TRACE', True)
-
-EVENT_PIPE_MAX_LEN = _config.get('EVENT_PIPE_MAX_LEN', 1024)
-EVENT_HANDLER_DEFAULT_TIME_OUT = _config.get('EVENT_HANDLER_DEFAULT_TIME_OUT', 300)
-MESSAGE_PIPE_MAX_LEN = _config.get('MESSAGE_PIPE_MAX_LEN', 4096)
-MAX_LOG_FILE_SIZE = _config.get('MAX_LOG_FILE_SIZE', 5 * 1024 * 1024)
-TOOLS_MAX_OUTPUT_LENGTH = _config.get('TOOLS_MAX_OUTPUT_LENGTH', 32000)
-MAX_RETRY = _config.get('MAX_RETRY', 8) # Max retry when llm_call failure, make sure it > 3
-
-GENERATION_TTL = _config.get('GENERATION_TTL', 600) # Clear finished/aborted generation ctx (seconds)
-CONTIANER_TTL = _config.get('CONTIANER_TTL', 6000)
-GRAPH_CACHE_TTL = _config.get('GRAPH_CACHE_TTL', 600)
-CACHE_CLEAN_INTERVAL = _config.get('CACHE_CLEAN_INTERVAL', 300)
-
-WORKER_COUNT = _config.get('WORKER_COUNT', 4) # Number of worker tasks in DataServerManager
-
-USE_REDIS_CACHE = _config.get('USE_REDIS_CACHE', True)
-DATABASE_TYPE = _config.get('DATABASE_TYPE', 'mysql')
+_config = _load_config("./config.yaml")
 
 
-# Config for cache
-CACHE_STORE_TYPE: Literal['builtin', 'redis'] = _config.get('CACHE_STORE_TYPE', "builtin")
-HOT_CACHE_DEFAULT_EXPIRE_SECONDS = _config.get('HOT_CACHE_DEFAULT_EXPIRE_SECONDS', 600) # For frequently changed data, such as messages.
-STATIC_CACHE_DEFAULT_EXPIRE_SECONDS = _config.get('STATIC_CACHE_DEFAULT_EXPIRE_SECONDS', 604800) # For frequently changed data, such as some ui cache.
-# Redis
-MEMO_REDIS_URL = _config.get('MEMO_REDIS_URL', "redis://localhost:6379")
-REDIS_POOL_SIZE = _config.get('REDIS_POOL_SIZE', 3)
+# Server
+BASE_URL = _get_config("SERVER.base_url", "http://localhost:2712")
+BASE_DIR = _get_config("SERVER.base_dir", "./.apix_data/")
+WORKER_COUNT = _get_config("SERVER.worker_count", 4)
 
-# Config for database
-DATA_STORE_TYPE: Literal['sqlite', 'mysql'] = _config.get('DATA_STORE_TYPE', "sqlite")
-# Sqlite
-SQLITE_DATABASE = _config.get('SQLITE_DATABASE', os.path.join(BASE_DIR, "sqlite", "apix.sqlite3"))
-# Mysql
-MYSQL_BASE_URL = _config.get('MYSQL_BASE_URL', "localhost")
-MYSQL_PORT = _config.get('MYSQL_PORT', 3307)
-MYSQL_USER = _config.get('MYSQL_USER', "apix")
-MYSQL_PASSWORD = _config.get('MYSQL_PASSWORD', "apixapix")
-MYSQL_DATABASE = _config.get('MYSQL_DATABASE', "apix_database")
-MYSQL_CHARSET = _config.get('MYSQL_CHARSET', "utf8mb4")
-AUTO_COMMIT = _config.get('AUTO_COMMIT', True)
 
-PROVIDER_BASE_URL = _config.get('PROVIDER_BASE_URL', _PROVIDER_BASE_URL)
-LLM_MAX_RETRY = _config.get('LLM_MAX_RETRY', 3)
-LLM_TIMEOUT = _config.get('LLM_TIMEOUT', 30)
+# Proxy
+_proxy_env_config = _get_config("PROXY.original_proxy_env", {})
+
+if not isinstance(_proxy_env_config, Mapping):
+    raise ValueError("PROXY.original_proxy_env must be a mapping.")
+
+# 对外仍保留真正的环境变量名，避免影响现有调用代码。
+ORIGINAL_PROXY_ENV = {
+    "HTTP_PROXY": _proxy_env_config.get(
+        "http_proxy",
+        _DEFAULT_PROXY_ENV["HTTP_PROXY"],
+    ),
+    "HTTPS_PROXY": _proxy_env_config.get(
+        "https_proxy",
+        _DEFAULT_PROXY_ENV["HTTPS_PROXY"],
+    ),
+    "NO_PROXY": _proxy_env_config.get(
+        "no_proxy",
+        _DEFAULT_PROXY_ENV["NO_PROXY"],
+    ),
+}
+
+
+# Log
+DEBUG_LEVEL: Literal["DEBUG", "INFO", "WARN", "ERROR"] = _get_config(
+    "LOG.debug_level",
+    "DEBUG",
+).upper()
+
+TRACE = _get_config("LOG.trace", True)
+MAX_LOG_FILE_SIZE = _get_config("LOG.max_log_file_size", 5 * 1024 * 1024)
+
+
+# Pipeline
+EVENT_PIPE_MAX_LEN = _get_config("PIPELINE.event_pipe_max_len", 1024)
+EVENT_HANDLER_DEFAULT_TIME_OUT = _get_config(
+    "PIPELINE.event_handler_default_time_out",
+    300,
+)
+MESSAGE_PIPE_MAX_LEN = _get_config("PIPELINE.message_pipe_max_len", 4096)
+
+
+# Runtime
+TOOLS_MAX_OUTPUT_LENGTH = _get_config(
+    "RUNTIME.tools_max_output_length",
+    32000,
+)
+MAX_RETRY = _get_config("RUNTIME.max_retry", 8)
+GENERATION_TTL = _get_config("RUNTIME.generation_ttl", 600)
+CONTAINER_TTL = _get_config("RUNTIME.container_ttl", 6000)
+GRAPH_CACHE_TTL = _get_config("RUNTIME.graph_cache_ttl", 600)
+CACHE_CLEAN_INTERVAL = _get_config("RUNTIME.cache_clean_interval", 300)
+
+
+# Cache
+CACHE_STORE_TYPE: Literal["builtin", "redis"] = _get_config(
+    "CACHE.store_type",
+    "builtin",
+)
+HOT_CACHE_DEFAULT_EXPIRE_SECONDS = _get_config(
+    "CACHE.hot_cache_default_expire_seconds",
+    600,
+)
+STATIC_CACHE_DEFAULT_EXPIRE_SECONDS = _get_config(
+    "CACHE.static_cache_default_expire_seconds",
+    604800,
+)
+
+MEMO_REDIS_URL = _get_config(
+    "CACHE.redis.url",
+    "redis://localhost:6379",
+)
+REDIS_POOL_SIZE = _get_config("CACHE.redis.pool_size", 3)
+
+
+# Data store
+DATA_STORE_TYPE: Literal["sqlite", "mysql"] = _get_config(
+    "DATA_STORE.type",
+    "sqlite",
+)
+
+SQLITE_DATABASE = _get_config(
+    "DATA_STORE.sqlite.database",
+    os.path.join(BASE_DIR, "sqlite", "apix.sqlite3"),
+)
+
+MYSQL_BASE_URL = _get_config("DATA_STORE.mysql.base_url", "localhost")
+MYSQL_PORT = _get_config("DATA_STORE.mysql.port", 3307)
+MYSQL_USER = _get_config("DATA_STORE.mysql.user", "apix")
+MYSQL_PASSWORD = _get_config("DATA_STORE.mysql.password", "apixapix")
+MYSQL_DATABASE = _get_config("DATA_STORE.mysql.database", "apix_database")
+MYSQL_CHARSET = _get_config("DATA_STORE.mysql.charset", "utf8mb4")
+AUTO_COMMIT = _get_config("DATA_STORE.mysql.auto_commit", True)
+
+
+# LLM
+PROVIDER_BASE_URL = _get_config(
+    "LLM.provider_base_url",
+    _PROVIDER_BASE_URL,
+)
+LLM_MAX_RETRY = _get_config("LLM.max_retry", 3)
+LLM_TIMEOUT = _get_config("LLM.timeout", 30)
+
+
