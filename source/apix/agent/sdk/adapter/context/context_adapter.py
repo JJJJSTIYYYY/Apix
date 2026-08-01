@@ -19,37 +19,6 @@ class AIContextAdapter:
         "[The outputs of this tool have been lost, or the tool's execution was interrupted by the user.]"
     )
 
-    def build_runtime_context(
-            self, 
-            agent_messages: list[AnyMessage], 
-            *,
-            todo: list[Todo] | None = None,
-            skill: list[Skill] | None = None,
-            memory: list[LongtermMemory] | None = None,
-            workspace: str | None = None
-        ) -> list[AnyMessage]:
-        """Build a frequently updated prompt and inject it into the last message object.
-        The last object in `agent_messages` should be a :class:`ApixUserMessage`.
-
-        Args:
-            agent_messages: A list of :class:`ApixMessageBase` instances.
-            todo: Optional, the current todo list.
-            skill: Optional, the current skill list.
-            memory: Optional, the current memory list.
-            workspace: Optional, the current workspace directory in the sandbox.
-
-        Returns:
-            list[AnyMessage]: The message list after injection.
-
-        Raises:
-            ValueError: If the last message in the list is not a :class:`ApixUserMessage`.
-        """
-        if not isinstance(agent_messages, list) or not agent_messages:
-            raise ValueError(f"`agent_message` should be a no-empty list, got {type(agent_messages).__name__}")
-
-        if not isinstance(agent_messages[-1], ApixUserMessage):
-            raise ValueError(f"The last message in agent_message list should be `ApixUserMessage`, got {type(agent_messages[-1]).__name__}")
-
     def _build_user_context(
         self,
         extensions: dict[str, Any],
@@ -302,10 +271,10 @@ class AIContextAdapter:
 
             if role == "user":
                 name = name or "user"
-                should_inject_todo = bool(todo) and index == messages_len
+                should_inject_context = bool(todo) and index == messages_len
                 content = self._build_user_context(
                     extensions,
-                    todo=(todo if should_inject_todo else None),
+                    todo=(todo if should_inject_context else None),
                 ) + (content or "")
 
                 if not content:

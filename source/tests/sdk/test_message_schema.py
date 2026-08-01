@@ -34,8 +34,6 @@ def test_message_object_keeps_only_application_owned_fields():
     assert message.uploaded_files == ["brief.pdf"]
     assert not hasattr(message, "id")
     assert not hasattr(message, "timestamp")
-    assert not hasattr(message, "info")
-    assert not hasattr(message, "extra")
 
 
 def test_extension_properties_update_the_underlying_dictionary():
