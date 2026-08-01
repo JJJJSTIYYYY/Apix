@@ -36,6 +36,16 @@ following application-owned values::
 ``extensions`` carries business payloads.  Frequently used extension values
 are exposed as properties below so callers do not need to manipulate the
 dictionary directly.
+
+For role `info`
+- What is it?
+> It is a branch of ai message which contains no think and no content.
+> It just defines a dictionary struct, not a subclass of ApixMessageBase.
+- When to use it?
+> Use when you want to append some message information in append-only-database, but you can not modify an existing ai message.
+> An ai message without think and content is not recommanded.
+> Such as: use when a todo list is written, a web search tool is called by assistant and some website is visited.
+info message does not provided a class, use ai_context_adapter.append_to_store(...) to store.
 """
 
 
@@ -59,7 +69,6 @@ MessageRole = Literal[
     "user",
     "ai",
     "tool",
-    "info",
 ]
 
 FinishReason = Literal[

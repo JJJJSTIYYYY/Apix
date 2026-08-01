@@ -149,3 +149,14 @@ class IncompleteToolCallError(ValueError):
 class IdentityError(ValueError):
     """Ambiguous apix identity. Unknow user_uid, platform or conversation_uid"""
 
+
+class EventChannelError(RuntimeError):
+    """Base exception raised by event channels."""
+
+
+class EventChannelPermissionError(PermissionError, EventChannelError):
+    """Raised when a channel is accessed in an unsupported direction."""
+
+
+class EventChannelUnavailableError(EventChannelError):
+    """Raised when a configured channel is not available."""

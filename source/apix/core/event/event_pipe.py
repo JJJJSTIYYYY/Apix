@@ -22,7 +22,9 @@ from uuid import uuid4
 
 import httpx
 
+from apix.common.type.exception import EventChannelPermissionError, EventChannelUnavailableError
 from apix.config.base_config import (
+    EVENT_CHANNEL_CONFIG,
     EVENT_CHANNEL_TYPE,
     EVENT_PIPE_MAX_LEN,
     GATEWAY_MAX_RETRY,
@@ -42,18 +44,6 @@ from apix.config.base_config import (
     REMOTE_GATEWAY_PIPE_ENDPOINT,
 )
 from apix.core.event.base import ApixEvent, ChannelName, EventType
-
-
-class EventChannelError(RuntimeError):
-    """Base exception raised by event channels."""
-
-
-class EventChannelPermissionError(PermissionError, EventChannelError):
-    """Raised when a channel is accessed in an unsupported direction."""
-
-
-class EventChannelUnavailableError(EventChannelError):
-    """Raised when a configured channel is not available."""
 
 
 def event_to_payload(event: ApixEvent) -> dict[str, Any]:
@@ -735,13 +725,12 @@ class ApixEventPipe:
         status = "ok" if online else "unavailable"
         return ApixEvent(
             event_id="event-" + uuid4().hex,
-            event_type=EventType.INFO,
+            event_type=EventType.LIFECYCLE,
             event_name="apix.node.online" if online else "apix.node.offline",
             context={
                 "tag": self.node_name,
                 "node_id": self.mq_id,
-                "status": status,
-                "channel_type": self.channel_type,
+                "channel_config": EVENT_CHANNEL_CONFIG,
             },
             timestamp=time.time(),
             accepted=False,

@@ -11,6 +11,11 @@ import yaml
 # Global configuration settings for Apix.
 VERSION = "3.0.0"
 
+# These sections describe resources owned by one concrete node.  They must
+# never be inherited from the gateway, otherwise several nodes may consume the
+# same mailbox configuration and lose destination isolation.
+_NODE_LOCAL_CONFIG_SECTIONS = frozenset({"EVENT_CHANNEL"})
+
 
 def _load_from_yaml(path: str) -> dict[str, Any]:
     """Load configuration from a local YAML file."""
@@ -78,6 +83,20 @@ def _merge_config(
     return merged
 
 
+def _filter_remote_config(remote: Mapping[str, Any]) -> dict[str, Any]:
+    """Remove node-local sections from gateway-provided configuration.
+
+    The returned mapping is a new shallow copy; the gateway response itself is
+    left untouched.  A local section is subsequently merged as usual, but no
+    missing nested value can be backfilled by the remote configuration.
+    """
+    return {
+        key: value
+        for key, value in remote.items()
+        if key not in _NODE_LOCAL_CONFIG_SECTIONS
+    }
+
+
 def _load_config(path: str) -> dict[str, Any]:
     """
     Load the effective configuration.
@@ -86,7 +105,8 @@ def _load_config(path: str) -> dict[str, Any]:
         1. Read local YAML.
         2. Discover REMOTE_GATEWAY from the local YAML.
         3. Load remote configuration when configured.
-        4. Merge local configuration over remote configuration.
+        4. Remove node-local sections such as EVENT_CHANNEL from remote data.
+        5. Merge local configuration over the filtered remote configuration.
     """
     local_config = _load_from_yaml(path)
 
@@ -122,7 +142,7 @@ def _load_config(path: str) -> dict[str, Any]:
     )
 
     return _merge_config(
-        remote=remote_config,
+        remote=_filter_remote_config(remote_config),
         local=local_config,
     )
 
@@ -154,12 +174,11 @@ _PROVIDER_BASE_URL = {
     "ollama:local": "http://localhost:11434",
     "ollama": "https://ollama.com",
     "openai": "https://api.openai.com/v1",
-    "google": "https://generativelanguage.googleapis.com",
     "qwen": "https://dashscope.aliyuncs.com/v1",
-    "qianfan": "https://qianfan.baidubce.com/v1",
     "deepseek": "https://api.deepseek.com/v1",
     "moonshot": "https://api.moonshot.cn/v1",
     "xiaomimimo": "https://api.xiaomimimo.com/v1",
+    "minimax": "https://api.minimaxi.com/v1"
 }
 
 _config = _load_config("./config.yaml")
@@ -274,6 +293,9 @@ MESSAGE_PIPE_MAX_LEN = _get_config("PIPELINE.message_pipe_max_len", 4096)
 
 
 # External event mailbox
+EVENT_CHANNEL_CONFIG = _get_config(
+    "EVENT_CHANNEL", {}
+)
 EVENT_CHANNEL_TYPE: Literal["kafka", "rabbitmq"] = _get_config(
     "EVENT_CHANNEL.type", "kafka"
 )

@@ -39,6 +39,70 @@ def test_enabled_remote_config_is_loaded_and_local_wins(monkeypatch):
     assert result["SERVER"] == {"worker_count": 4, "base_dir": "/remote"}
 
 
+def test_remote_event_channel_is_ignored_when_local_section_is_missing(
+    monkeypatch,
+):
+    local = {
+        "REMOTE_GATEWAY": {
+            "enable": True,
+            "base_url": "http://gateway",
+            "config_endpoint": "/config",
+        }
+    }
+    remote = {
+        "EVENT_CHANNEL": {
+            "type": "rabbitmq",
+            "rabbitmq": {"url": "amqp://shared-gateway-mailbox/"},
+        },
+        "SERVER": {"worker_count": 2},
+    }
+    monkeypatch.setattr(base_config, "_load_from_yaml", lambda path: local)
+    monkeypatch.setattr(
+        base_config,
+        "_load_from_remote",
+        lambda **kwargs: remote,
+    )
+
+    result = base_config._load_config("config.yaml")
+
+    assert "EVENT_CHANNEL" not in result
+    assert result["SERVER"] == {"worker_count": 2}
+    assert remote["EVENT_CHANNEL"]["type"] == "rabbitmq"
+
+
+def test_remote_event_channel_cannot_fill_partial_local_section(monkeypatch):
+    local_event_channel = {
+        "type": "kafka",
+        "kafka": {"bootstrap_servers": ["node-a-broker:9092"]},
+    }
+    local = {
+        "REMOTE_GATEWAY": {
+            "enable": True,
+            "base_url": "http://gateway",
+            "config_endpoint": "/config",
+        },
+        "EVENT_CHANNEL": local_event_channel,
+    }
+    monkeypatch.setattr(base_config, "_load_from_yaml", lambda path: local)
+    monkeypatch.setattr(
+        base_config,
+        "_load_from_remote",
+        lambda **kwargs: {
+            "EVENT_CHANNEL": {
+                "type": "rabbitmq",
+                "kafka": {"topic_prefix": "shared-mailbox"},
+                "rabbitmq": {"url": "amqp://shared/"},
+            }
+        },
+    )
+
+    result = base_config._load_config("config.yaml")
+
+    assert result["EVENT_CHANNEL"] == local_event_channel
+    assert "topic_prefix" not in result["EVENT_CHANNEL"]["kafka"]
+    assert "rabbitmq" not in result["EVENT_CHANNEL"]
+
+
 @pytest.mark.parametrize("enable", [1, "true", None])
 def test_remote_enable_must_be_boolean(monkeypatch, enable):
     monkeypatch.setattr(

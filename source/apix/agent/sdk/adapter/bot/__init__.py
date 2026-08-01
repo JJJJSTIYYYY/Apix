@@ -1,2 +1,2 @@
-"""Public chat bot API."""
+"""Public llm bot API."""
 

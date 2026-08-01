@@ -27,3 +27,23 @@ def compare_version(v: str) -> int:
         return -1
     else:
         return 1
+
+
+def print_logo():
+    ap_color = "\033[38;2;0;200;170m"      # APIX teal
+    ix_color = "\033[38;2;255;120;40m"     # APIX orange
+    gray = "\033[38;2;140;140;140m"        # Light gray
+    reset = "\033[0m"
+
+    print(f"""{gray}
+======================================
+{reset}{ap_color}     ___      .______{reset}    {ix_color}__  ___   ___{reset}
+{ap_color}    /   \\     |   _  \\{reset}  {ix_color}|  | \\  \\ /  /{reset}
+{ap_color}   /  ^  \\    |  |_)  |{reset} {ix_color}|  |  \\  V  /{reset}
+{ap_color}  /  /_\\  \\   |   ___/{reset}  {ix_color}|  |   >   <{reset}
+{ap_color} /  _____  \\  |  |{reset}      {ix_color}|  |  /  ^  \\{reset}
+{ap_color}/__/     \\__\\ | _|{reset}      {ix_color}|__| /__/ \\__\\{reset}
+
+{gray}              NEXT {VERSION}
+======================================
+{reset}""")

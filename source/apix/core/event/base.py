@@ -8,6 +8,7 @@ from apix.config.base_config import EVENT_HANDLER_DEFAULT_TIME_OUT
 
 class EventType(str, Enum):
     WORKFLOW = 'workflow'
+    LIFECYCLE = ' lifecycle'
     INFO = 'info'
     WARNING = 'warning'
     ERROR = 'error'
