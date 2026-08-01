@@ -5,12 +5,14 @@ from apix.core.event.event_pipe import (
     ApixEventPipe,
     BaseEventChannel,
     BuiltinChannel,
-    EventChannelError,
-    EventChannelPermissionError,
-    EventChannelUnavailableError,
     GatewayChannel,
     KafkaChannel,
     RabbitMQChannel,
+)
+from apix.common.type.exception import (
+    EventChannelError,
+    EventChannelPermissionError,
+    EventChannelUnavailableError,
 )
 from apix.core.event.event_registry import ApixEventRegistry, apix_event_registry
 from apix.core.event.event_writer import EventPipeWriter, event_pipe_writer

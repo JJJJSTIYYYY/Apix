@@ -461,6 +461,9 @@ class AIContextAdapter:
         if not input_messages:
             return input_messages
 
+        if min_keep < 0:
+            raise ValueError("min_keep must be greater than or equal to zero")
+
         n = len(input_messages)
 
         # Tail protected region start index
@@ -472,16 +475,18 @@ class AIContextAdapter:
         if split_by_todos:
             for i, msg in enumerate(input_messages):
                 # Only check ApixAiMessage with tool_calls
-                if isinstance(msg, (ApixAiMessage, ApixAiMessageChunk)):
-                    tool_calls = msg.tool_calls
-                    if not tool_calls:
-                        continue
-
-                    # Check if any tool_call is write_todos
-                    for tc in tool_calls:
-                        if tc.get("name") == "write_todos":
-                            last_todo_idx = i
-                            break
+                if isinstance(msg, ApixAiMessage):
+                    if any(
+                        call.get("tool_name") == "write_todos"
+                        for call in msg.tool_calls
+                    ):
+                        last_todo_idx = i
+                elif isinstance(msg, ApixAiMessageChunk):
+                    if any(
+                        delta.tool_name_delta == "write_todos"
+                        for delta in msg.tool_call_deltas
+                    ):
+                        last_todo_idx = i
 
         # Step2: process messages
         messages_after_drop = []
@@ -518,7 +523,7 @@ class AIContextAdapter:
         self,
         input_messages: list[AnyMessage],
         keep_recent: int = 14,
-    ) -> Tuple[list[AnyMessage], list[AnyMessage], list[ApixSystemMessage]]:
+    ) -> Tuple[list[AnyMessage], list[AnyMessage]]:
         """
         Split messages into:
             - messages to summarize
@@ -606,25 +611,39 @@ class AIContextAdapter:
         index = ""
 
         for input_msg in input_messages:
-            content = input_msg.content
-            if content is None:
-                content = ""
-
             if isinstance(input_msg, ApixUserMessage):
+                content = input_msg.content or ""
                 name = input_msg.name
                 messages.append(ApixUserMessage(content=content, name=name))
 
-            elif isinstance(input_msg, ApixAiMessage) or isinstance(input_msg, ApixAiMessageChunk):
-                think_content = (
-                    input_msg.reasoning
-                    if isinstance(input_msg, ApixAiMessage)
-                    else input_msg.reasoning_delta
-                ) or ""
-                content = think_content + '\n\n' + content
-                msg = ApixAiMessage(content=content)
+            elif isinstance(input_msg, ApixAiMessage):
+                parts = [
+                    part
+                    for part in (
+                        input_msg.reasoning,
+                        input_msg.content,
+                    )
+                    if isinstance(part, str) and part
+                ]
+                content = "\n\n".join(parts)
+                name = input_msg.name
                 index = input_msg.message_uid
-                if not content: continue
-                messages.append(msg)
+                if content:
+                    messages.append(ApixAiMessage(content=content, name=name))
+
+            elif isinstance(input_msg, ApixAiMessageChunk):
+                content = "\n\n".join(
+                    part
+                    for part in (
+                        input_msg.reasoning_delta,
+                        input_msg.content_delta,
+                    )
+                    if part
+                )
+                name = input_msg.name
+                index = input_msg.message_uid
+                if content:
+                    messages.append(ApixAiMessage(content=content, name=name))
 
             elif isinstance(input_msg, ApixSystemMessage):
                 system_msgs.append(copy.copy(input_msg))

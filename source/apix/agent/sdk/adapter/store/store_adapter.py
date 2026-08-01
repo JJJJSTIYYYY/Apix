@@ -263,7 +263,7 @@ class AIStoreAdapter:
                 "user_uid": user_uid,
                 "limit": 999
             }
-            result = await query_store(action="get_messages", payload=payload)
+            result = await query_store(action="fetch_skills", payload=payload)
             skills = result.get("messages", []) or []
             visible_skills = []
             for skill in skills:
