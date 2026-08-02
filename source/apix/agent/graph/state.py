@@ -1,38 +1,9 @@
 from typing import Annotated, Literal, NotRequired, TypedDict
 
-from apix.agent.sdk.utils.message import AnyMessage
+from apix.agent.sdk.utils.message import AnyMessage, ToolCall
 from apix.common.type import ApixIdentity
 from apix.core.graph.base import AutoMerge
-
-
-class RoleSchema(TypedDict):
-    name: str
-    definition: str
-
-
-class Todo(TypedDict):
-    content: str
-    status: Literal["pending", "in_progress", "completed"]
-
-
-class Skill(TypedDict):
-    skill_id: str
-    skill_name: str
-    description: Literal["pending", "in_progress", "completed"]
-
-
-class LongtermMemory(TypedDict):
-    memory_id: str # Longterm memory id, uuid4 hex.
-    title: str
-    date: str # 2025-06-07
-    content: str
-    source: Literal["conversation", "workspace"]
-
-
-class ShorttermMemory(TypedDict):
-    memory_id: str # The related message's ``message_uid``.
-    content: str
-    created_timestamp: int # Linux timestamp
+from apix.agent.sdk.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo, RoleSchema
 
 
 class AgentConfigSchema(TypedDict):
@@ -40,13 +11,8 @@ class AgentConfigSchema(TypedDict):
     Config for a single AI agent.
     """
 
-    # User Info
-    user_uid: str
-    conversation_uid: str
-    platform: str
-
     # LLM Runtime
-    models_provider: str
+    model_provider: str
     model_name: str
     api_key: str
     model_temperature: float
@@ -72,7 +38,6 @@ class AgentConfigSchema(TypedDict):
     enable_knowledge_retrieval: bool
     enable_command_opration: bool
     enable_skill_load: bool
-    enable_task_flow: bool
     enable_agent_assign: bool
     enable_agent_swarm: bool
 
@@ -81,8 +46,9 @@ class AgentConfigSchema(TypedDict):
     link_api_key: str
     content_provider: str
     content_api_key: str
-    embed_model: str  # The embed model for knowledge retrieval.
     web_cleaner_mode: Literal["rule", "llm"]
+
+    embed_model: str  # The embed model for knowledge retrieval.
 
     # Agent Identity / Prompt
     role_prompt: RoleSchema
@@ -91,11 +57,11 @@ class AgentConfigSchema(TypedDict):
 
 class GraphRuntimeContext(TypedDict):
     agent_name: str
-    agent_role: Literal["team_leader", "team_worker", "main_agent", "sub_agent", "agent"]
+    agent_role: Literal["leader", "worker", "agent"]
     target: ApixIdentity
     generation_id: str
-    node_id: NotRequired[str]
-    parent_node_id: NotRequired[str]
+    node_id: str
+    parent_node_id: str
     config: AgentConfigSchema
     timestamp: int
 
@@ -104,11 +70,11 @@ class MainAgentState(GraphRuntimeContext):
     input: dict
     re_generate: bool
     messages: Annotated[list[AnyMessage], AutoMerge]
-    current_tool_calls: list
-    longterm_memory: str # Cross-conversation longterm memory
-    shortterm_memory: str # Recent summary
-    rule_prompt: str
-    runtime_prompt: str # Include todos prompt, workspace prompt, memorandum prompt and so on
+    current_tool_calls: list[ToolCall]
+    todos: NotRequired[list[Todo]]
+    shortterm_memory: NotRequired[ShorttermMemory] # Recent summary
+    longterm_memory: NotRequired[list[LongtermMemory]]
+    skills: NotRequired[list[Skill]] # Include available skills name and description
     llm_calls: Annotated[int, AutoMerge] # Total LLM call count across the graph
     llm_retry_count: int
     error: NotRequired[str] # Error type
@@ -116,9 +82,6 @@ class MainAgentState(GraphRuntimeContext):
     context_compress_level: int # Level 0: Not compress; Level 1: Drop tool message content; Level 2: Context sumary to summary_exempt_tail_length; 
     context_fold_split_mark: NotRequired[str] # Split by completed | in_progress & pending todos, store with message id
     sandbox: str # Docker container id
-    todos: NotRequired[list[Todo]]
-    memorandum: NotRequired[list[LongtermMemory]]
-    skills: list # Include available skills name and description
     loaded_skills_cache: list[tuple[str, bool, str]] # (name, injected, content): Skill name, injection status, and SKILL.md content
 
 

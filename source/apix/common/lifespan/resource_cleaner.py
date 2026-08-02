@@ -1,6 +1,5 @@
 import asyncio
-import time
-from typing import Callable, List, Awaitable, Union, Optional
+from typing import Callable, Awaitable, Union, Optional
 from functools import wraps
 
 
@@ -30,7 +29,7 @@ class ResourceCleaner:
 
     def __init__(self):
         # Registered cleanup functions
-        self._cleaners: List[Callable[[], Union[int, Awaitable[int]]]] = []
+        self._cleaners: list[Callable[[], Union[int, Awaitable[int]]]] = []
 
         # Background task
         self._task: Optional[asyncio.Task] = None

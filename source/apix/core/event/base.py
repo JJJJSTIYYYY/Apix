@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Literal, Tuple, TypedDict
+from typing import Any, Awaitable, Callable, Literal, TypedDict
 from datetime import datetime
 
 from apix.config.base_config import EVENT_HANDLER_DEFAULT_TIME_OUT
@@ -48,7 +48,7 @@ class HandlerMeta(TypedDict):
     name: str
     subscribe: list[str]
     priority: float | None
-    between: Tuple[str, str] | None
+    between: tuple[str, str] | None
     register_order: int
     stop_when_error: bool
     time_out: float

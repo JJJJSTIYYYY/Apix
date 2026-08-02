@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 from apix.common.utils.logger import logger
 
@@ -24,7 +24,7 @@ class AutoInit:
         if getattr(self, "_initialized", False):
             return
 
-        self._services: List[Any] = []
+        self._services: list[Any] = []
         self._started = False
         self._initialized = True
 

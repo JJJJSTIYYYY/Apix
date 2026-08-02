@@ -1,13 +1,11 @@
 import copy
-from typing import List, Tuple
 import json
-import os
 from typing import Any
 from xml.sax.saxutils import escape
 
-from apix.agent.sdk.utils.message import ApixMessageBase, ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
+from apix.agent.sdk.utils.message import ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
 from apix.agent.sdk.utils.funcs import convert_generation_id_to_message_node_id
-from apix.agent.sdk.graph.state import MainAgentState, LongtermMemory, Skill, Todo
+from apix.agent.sdk.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo
 from apix.common.utils.logger import logger
 
 
@@ -22,7 +20,6 @@ class AIContextAdapter:
     def _build_user_context(
         self,
         extensions: dict[str, Any],
-        todo: list[Todo] = None,
     ) -> str:
         context_parts: list[str] = []
 
@@ -60,17 +57,6 @@ class AIContextAdapter:
                 "<uploaded_files>\n"
                 f"{files_xml}\n"
                 "</uploaded_files>"
-            )
-
-        if todo:
-            todo_list = []
-            for index, item in enumerate(todo, start=1):
-                todo_list.append(f"{index}. {item['content']}--{item['status']};")
-            todo_list = "\n".join(todo_list)
-            context_parts.append(
-                "<todo_list>\n"
-                f"{todo_list}\n"
-                "</todo_list>"
             )
 
         task = extensions.get("task") or {}
@@ -113,7 +99,7 @@ class AIContextAdapter:
         )
 
 
-    def _ensure_tool_message(self, agent_messages: list[AnyMessage]) -> None:
+    def ensure_tool_message(self, agent_messages: list[AnyMessage]) -> None:
         """
         Make sure tool messages match tool calls in terms of ID, quantity, and order.
 
@@ -217,7 +203,7 @@ class AIContextAdapter:
         dict_messages: list[dict],
         *,
         strict: bool = True
-    ) -> Tuple[list[AnyMessage], list[Todo]]:
+    ) -> tuple[list[AnyMessage], list[Todo]]:
         """
         Create apix messages list (dict list -> apix message objects list).
 
@@ -253,7 +239,6 @@ class AIContextAdapter:
         todo: list[Todo] = None
 
         index = 0
-        messages_len = len(dict_messages)
         for msg_dict in dict_messages:
             index = index + 1
             role = msg_dict.get("role")
@@ -271,10 +256,8 @@ class AIContextAdapter:
 
             if role == "user":
                 name = name or "user"
-                should_inject_context = bool(todo) and index == messages_len
                 content = self._build_user_context(
                     extensions,
-                    todo=(todo if should_inject_context else None),
                 ) + (content or "")
 
                 if not content:
@@ -344,7 +327,7 @@ class AIContextAdapter:
             else:
                 logger.warning(f"Unknown role or empty content ignored: {role}")
 
-        if strict: self._ensure_tool_message(messages)
+        if strict: self.ensure_tool_message(messages)
         return messages, todo
     
     
@@ -522,27 +505,47 @@ class AIContextAdapter:
     def split_messages(
         self,
         input_messages: list[AnyMessage],
-        keep_recent: int = 14,
-    ) -> Tuple[list[AnyMessage], list[AnyMessage]]:
+        keep_recent: int | None = None,
+    ) -> tuple[list[AnyMessage], list[AnyMessage]]:
         """
         Split messages into:
-            - messages to summarize
-            - recent messages to keep
+            - messages that can be summarized or dropped safely
+            - recent messages length to keep
 
         The split point will be adjusted to avoid breaking an
         ApixAiMessage(tool_calls) <-> ApixToolMessage chain.
 
+        Args:
+            input_messages: Messages to split.
+            keep_recent: Optional, if None, split automatically.
+
         Returns:
-            (to_summarize, recent_messages)
+            tuple:
+                - list[AnyMessage]: drop-safe or summary-safe messages.
+                - list[AnyMessage]: invoke-safe messages.
+
+        !!! This method does not ensure that the number of tool calls in an ApixAiMessage 
+        equals the number of following ApixToolMessages.
         """
         logger.trace()
-        logger.info(
-            f"Input messages length: {len(input_messages)}, "
-            f"Base keep recent={keep_recent}"
-        )
 
         if not input_messages:
             return [], []
+
+        if keep_recent is None:
+            for idx in range(len(input_messages) - 1, -1, -1):
+                if isinstance(input_messages[idx], ApixUserMessage):
+                    to_summarize = input_messages[:idx]
+                    recent_messages = input_messages[idx:]
+
+                    logger.info(
+                        f"Result: to_summarize={len(to_summarize)}, "
+                        f"recent_messages={len(recent_messages)}"
+                    )
+
+                    return to_summarize, recent_messages
+
+            return [], input_messages[:]
 
         if keep_recent <= 0:
             return input_messages[:], []
@@ -586,21 +589,24 @@ class AIContextAdapter:
         return to_summarize, recent_messages
     
 
-    def filter_agent_messages(
+    def filter_apix_messages(
         self,
-        input_messages: list[AnyMessage]
+        input_messages: list[AnyMessage],
+        keep_reasoning: bool = True
     ) -> tuple[list[AnyMessage], list[AnyMessage], str]:
         """
-        Keep only summary-safe messages:
-        - ApixUserMessage
-        - ApixAiMessage(content only)
+        Keep only summary-safe messages and preserve system messages.
+
+        Summary-safe messages:
+            - ApixUserMessage
+            - ApixAiMessage(content only), reasoning content will be added in content if `keep_reasoning` is True.
 
         ApixToolMessage and ApixAiMessage.tool_calls are dropped.
         ApixSystemMessage will return by a independent message list.
 
         Return:
             list[AnyMessage]: System message list.
-            list[AnyMessage]: AI and human messages after filtered.
+            list[AnyMessage]: AI and user messages after filtered.
             str: message's id
         """
         logger.trace()
@@ -617,15 +623,18 @@ class AIContextAdapter:
                 messages.append(ApixUserMessage(content=content, name=name))
 
             elif isinstance(input_msg, ApixAiMessage):
-                parts = [
-                    part
-                    for part in (
-                        input_msg.reasoning,
-                        input_msg.content,
-                    )
-                    if isinstance(part, str) and part
-                ]
-                content = "\n\n".join(parts)
+                if keep_reasoning:
+                    parts = [
+                        part
+                        for part in (
+                            input_msg.reasoning,
+                            input_msg.content,
+                        )
+                        if isinstance(part, str) and part
+                    ]
+                    content = "\n\n".join(parts)
+                else:
+                    content = input_msg.content
                 name = input_msg.name
                 index = input_msg.message_uid
                 if content:

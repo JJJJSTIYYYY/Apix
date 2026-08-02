@@ -30,5 +30,6 @@ class ToolInjectionContext:
         return self.tool_call["call_id"]
     
 
+# Examples:
 # injection: Annotated[ToolInjectionContext, AutoInjection()]
 # injection: Annotated[ToolInjectionContext, AutoInjection]

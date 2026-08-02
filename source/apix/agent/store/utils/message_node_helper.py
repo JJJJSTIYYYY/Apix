@@ -1,9 +1,9 @@
 from collections import defaultdict, OrderedDict
-from typing import List, Dict, Any
+from typing import Any
 
 
 class MessageNodeHelper:
-    def __init__(self, rows: List[Dict[str, Any]]):
+    def __init__(self, rows: list[dict[str, Any]]):
         self.rows = rows
 
         self.nodes = []
@@ -26,7 +26,7 @@ class MessageNodeHelper:
 
         return list(groups.values())
 
-    def _build_node(self, rows: List[Dict[str, Any]]):
+    def _build_node(self, rows: list[dict[str, Any]]):
         rows.sort(key=lambda x: x["msg_cursor"])
 
         first = rows[0]
@@ -99,7 +99,7 @@ class MessageNodeHelper:
 
         return list(reversed(path))
 
-    def extend_path(self, path: List[Dict[str, Any]]):
+    def extend_path(self, path: list[dict[str, Any]]):
         if not path:
             return path
 
@@ -127,7 +127,7 @@ class MessageNodeHelper:
         path = self.get_path(current_node_id)
         return self.extend_path(path)
 
-    def flatten_branch(self, branch: List[Dict[str, Any]]):
+    def flatten_branch(self, branch: list[dict[str, Any]]):
         rows = []
 
         for node in branch:

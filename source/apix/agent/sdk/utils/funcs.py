@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import json
 import time
-from typing import Callable, Generator, Literal, Tuple
+from typing import Callable, Generator, Literal
 
 from apix.common.type import IdentityError, ApixIdentity
 from apix.common.utils.logger import logger
@@ -52,11 +52,11 @@ def convert_generation_id_to_message_node_id(
     )
 
 
-def check_identity(identity: ApixIdentity | None) -> Tuple[str, str, str, dict | None]:
+def check_identity(identity: ApixIdentity | None) -> tuple[str, str, str, dict | None]:
     '''Check if the identity is available.
 
     Returns:
-        Tuple:
+        tuple:
             - user_uid
             - platform
             - conversation_uid

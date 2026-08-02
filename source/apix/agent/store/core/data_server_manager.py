@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Any, Dict, Callable
+from typing import Any,  Callable
 
 from apix.agent.store.core.execute_layer import DataExecutors
 from apix.common.lifespan.auto_init import auto_init
@@ -46,7 +46,7 @@ class DataServerManager:
         )
 
         # Action -> executor handler
-        self._handle: Dict[str, Callable] = {}
+        self._handle: dict[str, Callable] = {}
 
         # Register handler
         handler_dict = self.executor.export_handlers()
@@ -55,7 +55,7 @@ class DataServerManager:
 
         # Task queue & result futures
         self._queue: asyncio.Queue = asyncio.Queue()
-        self._results: Dict[str, asyncio.Future] = {}
+        self._results: dict[str, asyncio.Future] = {}
 
         if worker_count < 1:
             raise ValueError("worker_count must be greater than zero")

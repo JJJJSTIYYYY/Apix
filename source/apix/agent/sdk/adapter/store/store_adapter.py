@@ -6,7 +6,7 @@ from apix.agent.store import query_store
 from apix.agent.sdk.utils.message import AnyMessage
 from apix.agent.sdk.adapter.context.context_adapter import ai_context_adapter
 from apix.agent.sdk.utils.funcs import check_identity, convert_generation_id_to_message_node_id
-from apix.agent.sdk.graph.state import MainAgentState, LongtermMemory, ShorttermMemory, Skill, Todo
+from apix.agent.sdk.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo
 from apix.common.type import ApixIdentity
 from apix.common.utils.logger import logger
 from apix.common.utils.yaml import load_from_yaml

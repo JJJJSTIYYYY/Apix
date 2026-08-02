@@ -2,7 +2,7 @@ import copy
 import inspect
 import json
 from functools import wraps
-from typing import Any, Awaitable, Callable, Dict, TypeVar, cast
+from typing import Any, Awaitable, Callable, TypeVar, cast
 from uuid import uuid4
 from datetime import datetime
 
@@ -177,8 +177,8 @@ class DataExecutors:
     # Handler Export
     # ------------------------------------------------------------------
 
-    def export_handlers(self) -> Dict[str, Callable]:
-        handlers: Dict[str, Callable] = {}
+    def export_handlers(self) -> dict[str, Callable]:
+        handlers: dict[str, Callable] = {}
 
         for attr_name in dir(self):
             if attr_name.startswith("_"):

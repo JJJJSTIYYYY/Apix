@@ -1,6 +1,5 @@
 import copy
 import uuid
-from typing import Tuple
 
 from apix.core.event.base import (
     EventHandlerFunc,
@@ -65,7 +64,7 @@ class ApixEventRegistry:
         event_name: str,
         handlers: list[HandlerEntry],
         priority: float | None,
-        between_handlers: Tuple[str | None, str | None] | None = None,
+        between_handlers: tuple[str | None, str | None] | None = None,
     ) -> int:
         """
         Find the insertion index without sorting.
@@ -161,7 +160,7 @@ class ApixEventRegistry:
         self,
         *event_names: str,
         priority: float | None = None,
-        between_handlers: Tuple[str | None, str | None] | None = None,
+        between_handlers: tuple[str | None, str | None] | None = None,
         stop_when_error: bool = True,
         time_out: float = 30,
         background: bool = False,

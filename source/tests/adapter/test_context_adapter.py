@@ -38,7 +38,6 @@ def test_build_user_context_formats_and_escapes_every_supported_section():
                 "prompt": "summarize & cite",
             },
         },
-        todo=[{"content": "read", "status": "in_progress"}],
     )
 
     assert context.startswith("<context>\n")
@@ -46,13 +45,12 @@ def test_build_user_context_formats_and_escapes_every_supported_section():
     assert "<content>&lt;hello&gt;</content>" in context
     assert "<active_file>a&lt;b.py</active_file>" in context
     assert "./upload_files/x&amp;y.txt" in context
-    assert "1. read--in_progress;" in context
     assert "<name>daily &lt;brief&gt;</name>" in context
     assert "<prompt>summarize &amp; cite</prompt>" in context
     assert adapter._build_user_context({}) == ""
 
 
-def test_ensure_tool_messages_reorders_deduplicates_and_fills_missing():
+def testensure_tool_messages_reorders_deduplicates_and_fills_missing():
     adapter = AIContextAdapter()
     ai = ApixAiMessage(
         tool_calls=[
@@ -67,7 +65,7 @@ def test_ensure_tool_messages_reorders_deduplicates_and_fills_missing():
     messages = [ai, first_b, duplicate_b, unmatched, following]
     identity = id(messages)
 
-    adapter._ensure_tool_message(messages)
+    adapter.ensure_tool_message(messages)
 
     assert id(messages) == identity
     assert messages[0] is ai
@@ -89,9 +87,9 @@ def test_ensure_tool_messages_reorders_deduplicates_and_fills_missing():
         ],
     ],
 )
-def test_ensure_tool_messages_rejects_ambiguous_calls(tool_calls):
+def testensure_tool_messages_rejects_ambiguous_calls(tool_calls):
     with pytest.raises(ValueError):
-        AIContextAdapter()._ensure_tool_message(
+        AIContextAdapter().ensure_tool_message(
             [ApixAiMessage(tool_calls=tool_calls)]
         )
 
@@ -133,7 +131,6 @@ def test_convert_persisted_messages_handles_todo_context_abort_and_json():
     assert messages[0].reasoning == "why"
     assert messages[0].metadata == {"provider": "test"}
     assert "<active_file>main.py</active_file>" in messages[1].content
-    assert "<todo_list>" in messages[1].content
 
 
 def test_convert_to_dict_message_filter_and_decode_helpers():
@@ -224,7 +221,7 @@ def test_split_messages_keeps_ai_tool_chain_together():
     assert adapter.split_messages(messages, keep_recent=10) == ([], messages)
 
 
-def test_filter_agent_messages_handles_chunks_and_ignores_empty_ai_messages():
+def test_filter_apix_messages_handles_chunks_and_ignores_empty_ai_messages():
     adapter = AIContextAdapter()
     system = ApixSystemMessage(content="system")
     chunk = ApixAiMessageChunk(
@@ -232,7 +229,7 @@ def test_filter_agent_messages_handles_chunks_and_ignores_empty_ai_messages():
         reasoning_delta="why",
         content_delta="answer",
     )
-    systems, messages, index = adapter.filter_agent_messages(
+    systems, messages, index = adapter.filter_apix_messages(
         [
             system,
             ApixUserMessage(content="question", name="user"),
