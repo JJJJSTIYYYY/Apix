@@ -285,6 +285,8 @@ MAX_LOG_FILE_SIZE = _get_config("LOG.max_log_file_size", 5 * 1024 * 1024)
 
 # Pipeline
 EVENT_PIPE_MAX_LEN = _get_config("PIPELINE.event_pipe_max_len", 1024)
+# Deprecated compatibility setting. Event handlers now wait indefinitely
+# unless ``time_out`` is passed explicitly to the registry subscription.
 EVENT_HANDLER_DEFAULT_TIME_OUT = _get_config(
     "PIPELINE.event_handler_default_time_out",
     300,

@@ -207,8 +207,8 @@ class Command:
         return self.goto is not _UNSET_GOTO
 
 
-NodeResult: TypeAlias = dict[str, Any] | Command | list[Command]
-"""A state update, one command, or an ordered list of commands."""
+NodeResult: TypeAlias = dict[str, Any] | Command
+"""A state update or one command returned by a regular graph node."""
 
 NodeFunction: TypeAlias = (
     Callable[[dict[str, Any]], NodeResult]

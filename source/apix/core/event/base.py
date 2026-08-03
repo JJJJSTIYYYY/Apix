@@ -3,12 +3,10 @@ from enum import Enum
 from typing import Any, Awaitable, Callable, Literal, TypedDict
 from datetime import datetime
 
-from apix.config.base_config import EVENT_HANDLER_DEFAULT_TIME_OUT
-
 
 class EventType(str, Enum):
     WORKFLOW = 'workflow'
-    LIFECYCLE = ' lifecycle'
+    LIFECYCLE = 'lifecycle'
     INFO = 'info'
     WARNING = 'warning'
     ERROR = 'error'
@@ -63,7 +61,7 @@ class HandlerEntry:
     priority: float | None
     register_order: int
     stop_when_error: bool = field(default=True)
-    time_out: float = field(default=EVENT_HANDLER_DEFAULT_TIME_OUT)
+    time_out: float = field(default=-1)
     background: bool = field(default=False)
 
 

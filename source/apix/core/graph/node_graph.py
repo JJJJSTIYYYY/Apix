@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+import math
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
@@ -39,6 +40,7 @@ class NodeGraph:
         nodes: dict[str, BaseNode],
         default_gotos: dict[str, str],
         *,
+        node_timeouts: dict[str, float | None] | None = None,
         max_steps: int = 1024,
         state_schema: type | None = None,
     ):
@@ -47,6 +49,8 @@ class NodeGraph:
         Args:
             nodes: Nodes keyed by their graph names.
             default_gotos: Manager-defined transitions.
+            node_timeouts: Optional per-node execution limits in seconds.
+                ``None`` and non-positive values wait indefinitely.
             max_steps: Maximum number of user-node executions in one run.
             state_schema: Optional annotated state schema. Fields marked with
                 ``Annotated[..., AutoMerge()]`` are combined through their
@@ -54,6 +58,20 @@ class NodeGraph:
         """
         self._nodes = dict(nodes)
         self._default_gotos = dict(default_gotos)
+        supplied_timeouts = dict(node_timeouts or {})
+        unknown_timeout_nodes = supplied_timeouts.keys() - self._nodes.keys()
+        if unknown_timeout_nodes:
+            unknown_names = ", ".join(sorted(unknown_timeout_nodes))
+            raise ValueError(
+                "Node timeouts reference unknown nodes: "
+                f"{unknown_names}."
+            )
+        self._node_timeouts = {
+            node_name: self.normalise_timeout(
+                supplied_timeouts.get(node_name)
+            )
+            for node_name in self._nodes
+        }
         self._max_steps = max_steps
         self._state_schema = state_schema
         self._auto_increase_keys = get_auto_increase_keys(
@@ -65,6 +83,24 @@ class NodeGraph:
         self._active_runs: set[str] = set()
         self._listener_namespace = uuid.uuid4().hex
         self._register_node_listeners()
+
+
+    @staticmethod
+    def normalise_timeout(
+        timeout: float | None,
+    ) -> float | None:
+        """Return a validated node timeout or ``None`` for no timeout."""
+        if timeout is None:
+            return None
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+            raise TypeError("Node timeout must be a number or None.")
+
+        normalised = float(timeout)
+        if not math.isfinite(normalised):
+            raise ValueError("Node timeout must be finite.")
+        if normalised <= 0:
+            return None
+        return normalised
 
 
     def _copy_state(self, state: dict) -> dict:
@@ -216,9 +252,24 @@ class NodeGraph:
         try:
             writer = context.get("stream_writer", noop_stream_writer())
             with stream_writer_context(writer):
-                result = await self._nodes[node_name].execute(
+                execution = self._nodes[node_name].execute(
                     self._copy_state(context["state"])
                 )
+                timeout = self._node_timeouts[node_name]
+                if timeout is None:
+                    result = await execution
+                else:
+                    timeout_scope = asyncio.timeout(timeout)
+                    try:
+                        async with timeout_scope:
+                            result = await execution
+                    except TimeoutError as exc:
+                        if not timeout_scope.expired():
+                            raise
+                        raise TimeoutError(
+                            f"Graph node `{node_name}` timed out after "
+                            f"{timeout:g} seconds."
+                        ) from exc
             commands = result if isinstance(result, list) else [result]
             if not commands:
                 commands = [Command()]
@@ -229,6 +280,9 @@ class NodeGraph:
 
             for command in commands:
                 command_context["state"] = state
+                # Every command resolves a route independently. Later
+                # commands overwrite the route selected by earlier commands;
+                # an omitted goto resolves to this node's default route.
                 state, next_node = self.apply_command(
                     command,
                     node_name,
@@ -256,7 +310,10 @@ class NodeGraph:
             raise RecursionError(f"Graph exceeded its maximum of {self._max_steps} steps.")
 
         state = self._copy_state(context["state"])
-        update = self._copy_state(update) # Keep ref too
+        # Command updates are state transfers too. Preserve a KeepRef value
+        # when a node returns the marked field explicitly (including when it
+        # returns its complete state snapshot).
+        update = self._copy_state(update)
 
         for key, value in update.items():
             if isinstance(value, Reset):

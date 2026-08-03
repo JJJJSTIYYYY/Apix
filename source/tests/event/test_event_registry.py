@@ -48,6 +48,26 @@ class TestEventRegistrySingleton:
         """Module-level apix_event_registry should be an ApixEventRegistry instance."""
         assert isinstance(apix_event_registry, ApixEventRegistry)
 
+    def test_reinitializing_singleton_preserves_registered_handlers(self):
+        """Calling the constructor again must not reset singleton state."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def preserved_handler(event: ApixEvent):
+            pass
+
+        registry.subscribe("test.event")(preserved_handler)
+
+        same_registry = ApixEventRegistry()
+
+        assert same_registry is registry
+        assert [
+            handler.name
+            for handler in same_registry.get_handlers("test.event")
+        ] == ["preserved_handler"]
+
+        _reset_registry(registry)
+
 
 # ============================
 # Tests: _find_insert_index
@@ -985,6 +1005,18 @@ class TestOnEventDecorator:
         registry.subscribe("test.event", time_out=0)(h)
         meta = registry.get_handler_meta("h")
         assert meta["time_out"] == -1
+
+    def test_on_event_timeout_defaults_to_infinite_wait(self):
+        """Omitting time_out should store the no-timeout sentinel."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def h(event: ApixEvent):
+            pass
+
+        registry.subscribe("test.event")(h)
+
+        assert registry.get_handler_meta("h")["time_out"] == -1
 
     def test_on_event_timeout_negative_becomes_negative_one(self):
         """time_out < 0 should be converted to -1."""

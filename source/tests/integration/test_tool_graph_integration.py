@@ -326,3 +326,41 @@ async def test_tool_exception_propagates_and_stops_downstream_node():
         await graph.invoke({"messages": []})
 
     assert downstream_calls == []
+
+
+async def test_graph_timeout_cancels_running_tool_node():
+    """GraphManager timeout applies to specialised ToolNode execution."""
+    cancelled = asyncio.Event()
+
+    @tool
+    async def slow_tool() -> str:
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    tool_node = ToolNode(slow_tool)
+    graph = (
+        GraphManager(AgentState)
+        .add_node(tool_node, timeout=0.02)
+        .add_edge(START, tool_node.name)
+        .compile_graph()
+    )
+    state = {
+        "messages": [
+            ApixAiMessage(
+                tool_calls=[
+                    _tool_call("slow_tool", "call-slow")
+                ]
+            )
+        ]
+    }
+
+    with pytest.raises(
+        TimeoutError,
+        match=r"Graph node `tools` timed out after 0.02 seconds",
+    ):
+        await graph.invoke(state)
+
+    assert cancelled.is_set()

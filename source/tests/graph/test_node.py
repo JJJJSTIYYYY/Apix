@@ -5,7 +5,7 @@ from dataclasses import is_dataclass
 import pytest
 
 from apix.common.type import InvalidNodeReturns
-from apix.core.graph import Command, Node
+from apix.core.graph import BaseNode, Command, Node
 
 
 def test_node_requires_a_function():
@@ -45,15 +45,32 @@ async def test_async_node_is_awaited_and_normalised():
 
 
 @pytest.mark.asyncio
-async def test_node_preserves_an_ordered_command_list():
-    """A node may return several commands for sequential graph application."""
+async def test_regular_node_rejects_an_ordered_command_list():
+    """Only specialised BaseNode implementations may return command lists."""
     commands = [
         Command(update={"value": 1}),
         Command(update={"value": 2}, goto="next"),
     ]
     node = Node(lambda state: commands, "multi_command")
 
-    assert await node.execute({}) == commands
+    with pytest.raises(InvalidNodeReturns, match="not list\\[Command\\]"):
+        await node.execute({})
+
+
+def test_base_node_helper_preserves_specialised_command_lists():
+    """Specialised BaseNode implementations may reuse the list normaliser."""
+    assert BaseNode._normalise_result(
+        [
+            {"value": 1},
+            Command(update={"value": 2}),
+        ]
+    ) == [
+        Command(update={"value": 1}),
+        Command(update={"value": 2}),
+    ]
+    assert BaseNode._normalise_result(
+        {"value": 3}
+    ) == Command(update={"value": 3})
 
 
 def test_command_is_a_dataclass_with_independent_update_defaults():

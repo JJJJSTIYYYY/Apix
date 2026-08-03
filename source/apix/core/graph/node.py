@@ -14,14 +14,14 @@ class BaseNode(ABC):
     func: Any
 
     def __init__(self, *args, **kwargs):
-        pass
+        pass  # pragma: no cover - abstract compatibility hook
 
     @abstractmethod
     async def execute(
         self,
         state: dict,
     ) -> Command | list[Command]:
-        pass
+        pass  # pragma: no cover - implemented by concrete nodes
 
     @staticmethod
     def _is_command(value: Any) -> TypeGuard[Command]:
@@ -130,16 +130,35 @@ class Node(BaseNode):
         self.func = self._wrap_func(func)
 
 
+    @staticmethod
+    def _normalise_result(
+        result: object,
+    ) -> Command:
+        """Normalise one regular node result.
+
+        Ordered command lists are reserved for specialised ``BaseNode``
+        implementations such as ``ToolNode``. A regular callable-backed node
+        must return exactly one mapping or :class:`Command`.
+        """
+        if isinstance(result, list):
+            raise InvalidNodeReturns(
+                "Regular node functions must return a dict or Command, "
+                "not list[Command]."
+            )
+
+        return BaseNode._normalise_single_result(result)
+
+
     async def execute(
         self,
         state: dict,
-    ) -> Command | list[Command]:
+    ) -> Command:
         """Execute the callable and return its normalised command result.
 
         Args:
             state: State snapshot supplied to the node callable.
 
         Returns:
-            One command or an ordered list of commands.
+            Exactly one normalised command.
         """
         return await self.func(state)

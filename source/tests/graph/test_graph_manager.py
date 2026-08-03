@@ -1,5 +1,7 @@
 """Unit tests for graph construction and transition validation."""
 
+import math
+
 import pytest
 
 from apix.core.graph import END, START, GraphManager
@@ -19,6 +21,45 @@ def test_add_node_and_add_nodes_are_fluent():
 
     assert manager.add_node(source) is manager
     assert manager.add_nodes([target]) is manager
+
+
+@pytest.mark.parametrize(
+    ("timeout", "expected"),
+    [
+        (None, None),
+        (0, None),
+        (-1, None),
+        (1, 1.0),
+        (1.5, 1.5),
+    ],
+)
+def test_add_node_stores_normalised_timeout(timeout, expected):
+    """Node timeouts are graph-specific and non-positive means unlimited."""
+    manager = GraphManager().add_node(source, timeout=timeout)
+
+    assert manager._node_timeouts["source"] == expected
+
+
+@pytest.mark.parametrize("timeout", [True, "1", object()])
+def test_add_node_rejects_non_numeric_timeout_without_registering_node(timeout):
+    """Invalid timeout types leave the manager unchanged."""
+    manager = GraphManager()
+
+    with pytest.raises(TypeError, match="timeout must be a number or None"):
+        manager.add_node(source, timeout=timeout)
+
+    assert manager.has_node("source") is False
+
+
+@pytest.mark.parametrize("timeout", [math.inf, -math.inf, math.nan])
+def test_add_node_rejects_non_finite_timeout_without_registering_node(timeout):
+    """NaN and infinity cannot represent executable deadlines."""
+    manager = GraphManager()
+
+    with pytest.raises(ValueError, match="timeout must be finite"):
+        manager.add_node(source, timeout=timeout)
+
+    assert manager.has_node("source") is False
 
 
 @pytest.mark.parametrize("reserved_name", [START, END])
@@ -110,3 +151,15 @@ def test_compile_requires_start_transition():
     """A compiled graph must have an entry transition from START."""
     with pytest.raises(ValueError, match="outgoing transition from `START`"):
         GraphManager().add_node(source).compile_graph()
+
+
+def test_compile_forwards_node_timeouts_to_runtime():
+    """The compiled graph retains the manager's per-node timeout policy."""
+    graph = (
+        GraphManager()
+        .add_node(source, timeout=2.5)
+        .add_edge(START, "source")
+        .compile_graph()
+    )
+
+    assert graph._node_timeouts == {"source": 2.5}

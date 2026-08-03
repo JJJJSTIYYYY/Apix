@@ -11,6 +11,7 @@ from apix.core.event.event_writer import event_pipe_writer
 from apix.common.type import InvalidNodeReturns
 from apix.core.graph import (
     AutoMerge,
+    BaseNode,
     END,
     START,
     Command,
@@ -30,6 +31,17 @@ async def stop_event_loop_after_module():
     yield
     await apix_event_loop.stop()
     await event_pipe_writer.clear()
+
+
+class CommandListNode(BaseNode):
+    """Specialised node used to exercise the multi-command runtime contract."""
+
+    def __init__(self, commands: list[Command], name: str = "commands"):
+        self.name = name
+        self.commands = commands
+
+    async def execute(self, state: dict) -> list[Command]:
+        return self.commands
 
 
 async def test_start_node_routes_to_configured_node():
@@ -99,12 +111,14 @@ async def test_annotated_state_field_auto_increases_across_nodes():
 
 
 async def test_command_list_is_applied_sequentially_in_original_order():
-    """Each command sees state produced by the preceding command."""
-    def append_messages(state):
-        return [
+    """A specialised BaseNode may return commands in application order."""
+    append_messages = CommandListNode(
+        [
             Command(update={"messages": ["second"]}),
             Command(update={"messages": ["third"]}),
-        ]
+        ],
+        "append_messages",
+    )
 
     graph = (
         GraphManager(AccumulatingState)
@@ -127,15 +141,72 @@ async def test_command_list_is_applied_sequentially_in_original_order():
 
 
 async def test_empty_command_list_is_a_noop_and_uses_default_route():
-    """An empty command list still completes the node transition."""
+    """An empty list from a specialised node uses its default transition."""
+    no_op = CommandListNode([], "no_op")
     graph = (
         GraphManager()
-        .add_node(lambda state: [], "no_op")
+        .add_node(no_op)
         .add_edge(START, "no_op")
         .compile_graph()
     )
 
     assert await graph.invoke({"value": 1}) == {"value": 1}
+
+
+@pytest.mark.parametrize(
+    ("commands", "expected_route"),
+    [
+        ([Command(goto="first"), Command()], "default"),
+        ([Command(goto="first"), Command(goto="second")], "second"),
+        ([Command(goto="first"), Command(goto=None)], None),
+        ([Command(), Command(goto="second")], "second"),
+    ],
+)
+async def test_later_command_overwrites_previous_goto(
+    commands,
+    expected_route,
+):
+    """Every later command replaces the previously resolved route."""
+    command_node = CommandListNode(commands, "command_node")
+
+    def first(state):
+        return {"route": "first"}
+
+    def second(state):
+        return {"route": "second"}
+
+    def default(state):
+        return {"route": "default"}
+
+    graph = (
+        GraphManager()
+        .add_nodes([command_node, first, second, default])
+        .add_edge(START, command_node.name)
+        .add_edge(command_node.name, "default")
+        .compile_graph()
+    )
+
+    result = await graph.invoke({})
+
+    assert result.get("route") == expected_route
+
+
+async def test_later_command_overwrites_same_state_key():
+    """Ordinary state updates use deterministic later-command-wins order."""
+    command_node = CommandListNode(
+        [
+            Command(update={"winner": "first"}),
+            Command(update={"winner": "second"}),
+        ]
+    )
+    graph = (
+        GraphManager()
+        .add_node(command_node)
+        .add_edge(START, command_node.name)
+        .compile_graph()
+    )
+
+    assert await graph.invoke({}) == {"winner": "second"}
 
 
 async def test_replace_explicitly_overwrites_auto_increase_field():
@@ -407,6 +478,67 @@ async def test_node_exception_is_propagated_to_caller():
     graph = GraphManager().add_node(fail).add_edge(START, "fail").compile_graph()
 
     with pytest.raises(RuntimeError, match="node failed"):
+        await graph.invoke({})
+
+
+async def test_node_without_timeout_waits_for_normal_completion():
+    """Omitting timeout leaves node execution unlimited."""
+    async def slow_but_valid(state):
+        await asyncio.sleep(0.02)
+        return {"finished": True}
+
+    graph = (
+        GraphManager()
+        .add_node(slow_but_valid)
+        .add_edge(START, "slow_but_valid")
+        .compile_graph()
+    )
+
+    assert graph._node_timeouts["slow_but_valid"] is None
+    assert await graph.invoke({}) == {"finished": True}
+
+
+async def test_explicit_node_timeout_fails_invocation_and_cancels_node():
+    """A configured timeout settles completion with a visible error."""
+    cancelled = asyncio.Event()
+
+    async def slow(state):
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    graph = (
+        GraphManager()
+        .add_node(slow, timeout=0.02)
+        .add_edge(START, "slow")
+        .compile_graph()
+    )
+
+    with pytest.raises(
+        TimeoutError,
+        match=r"Graph node `slow` timed out after 0.02 seconds",
+    ):
+        await graph.invoke({})
+
+    assert cancelled.is_set()
+    assert graph._active_runs == set()
+
+
+async def test_node_raised_timeout_error_is_not_mislabeled_as_deadline():
+    """A node's own TimeoutError remains distinct from graph timeout."""
+    async def fail(state):
+        raise TimeoutError("provider timeout")
+
+    graph = (
+        GraphManager()
+        .add_node(fail, timeout=1)
+        .add_edge(START, "fail")
+        .compile_graph()
+    )
+
+    with pytest.raises(TimeoutError, match="provider timeout"):
         await graph.invoke({})
 
 

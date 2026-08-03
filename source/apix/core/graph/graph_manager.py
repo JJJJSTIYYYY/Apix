@@ -40,6 +40,7 @@ class GraphManager:
         """
         self._state_schema = state_schema
         self._nodes: dict[str, BaseNode] = {}
+        self._node_timeouts: dict[str, float | None] = {}
         self._default_gotos: dict[str, str] = {}
         self._generated_names: set[str] = set()
 
@@ -54,18 +55,24 @@ class GraphManager:
         self,
         node_func: NodeFunction | BaseNode,
         node_name: str | None = None,
+        *,
+        timeout: float | None = None,
     ):
         """Register a user-defined state-processing node.
 
         Args:
             node_func: Synchronous or asynchronous node callable.
             node_name: Unique node name, defaulting to the callable's name.
+            timeout: Maximum node execution time in seconds. ``None`` and
+                values less than or equal to zero wait indefinitely.
 
         Returns:
             This manager, allowing fluent graph construction.
 
         Raises:
-            ValueError: If the name is reserved or already registered.
+            ValueError: If the name is reserved, already registered, or the
+                timeout is not finite.
+            TypeError: If timeout is not a number or ``None``.
         """
         if not isinstance(node_func, BaseNode):
             node = Node(node_func, node_name)
@@ -77,7 +84,9 @@ class GraphManager:
         if node.name in self._nodes:
             raise ValueError(f"Node `{node.name}` is already registered.")
 
+        normalised_timeout = NodeGraph.normalise_timeout(timeout)
         self._nodes[node.name] = node
+        self._node_timeouts[node.name] = normalised_timeout
         return self
 
 
@@ -209,5 +218,6 @@ class GraphManager:
         return NodeGraph(
             self._nodes,
             self._default_gotos,
+            node_timeouts=self._node_timeouts,
             state_schema=self._state_schema,
         )

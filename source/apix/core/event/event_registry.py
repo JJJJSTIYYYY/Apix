@@ -20,9 +20,13 @@ class ApixEventRegistry:
         return cls._instance
 
     def __init__(self):
+        if getattr(self, "_initialized", False):
+            return
+
         self._handlers: dict[str, list[HandlerEntry]] = {}
         self._handlers_meta: dict[str, HandlerMeta] = {}
         self._register_order = 0
+        self._initialized = True
 
     def get_handlers(
         self,
@@ -162,7 +166,7 @@ class ApixEventRegistry:
         priority: float | None = None,
         between_handlers: tuple[str | None, str | None] | None = None,
         stop_when_error: bool = True,
-        time_out: float = 30,
+        time_out: float = -1,
         background: bool = False,
     ):
         """
@@ -287,8 +291,9 @@ class ApixEventRegistry:
                 an exception.
 
             time_out:
-                Maximum handler execution time in seconds. A value less than
-                or equal to zero disables the timeout.
+                Maximum handler execution time in seconds. The default ``-1``
+                waits indefinitely. Any value less than or equal to zero
+                disables the timeout.
 
             background:
                 If ``True``, the handler runs in the background without

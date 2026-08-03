@@ -119,6 +119,28 @@ async def test_stream_yields_queued_chunks_before_propagating_node_error():
         await anext(stream)
 
 
+async def test_stream_yields_queued_chunks_before_node_timeout():
+    """A deadline preserves chunks emitted before the node was cancelled."""
+    async def node(state):
+        get_stream_writer()({"status": "started"})
+        await asyncio.sleep(60)
+
+    graph = (
+        GraphManager()
+        .add_node(node, timeout=0.02)
+        .add_edge(START, "node")
+        .compile_graph()
+    )
+    stream = graph.stream({})
+
+    assert await anext(stream) == {"status": "started"}
+    with pytest.raises(
+        TimeoutError,
+        match=r"Graph node `node` timed out after 0.02 seconds",
+    ):
+        await anext(stream)
+
+
 async def test_stream_rejects_non_dict_state():
     """Streaming and regular invocation enforce the same input contract."""
     graph = (

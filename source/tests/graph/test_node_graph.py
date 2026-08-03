@@ -55,6 +55,19 @@ class AutoMergeState(TypedDict):
     replaced: list[int]
 
 
+class MissingAdd:
+    """AutoMerge value whose addition protocol is deliberately unavailable."""
+
+    __add__ = None
+
+
+class UnsupportedAdd:
+    """AutoMerge value that rejects the supplied update type."""
+
+    def __add__(self, value):
+        return NotImplemented
+
+
 def test_apply_command_auto_increases_annotated_fields():
     """Marked existing fields call __add__; unmarked fields are replaced."""
     graph = NodeGraph(
@@ -110,6 +123,38 @@ def test_apply_command_initializes_missing_auto_increase_field():
     )
 
     assert state == {"values": [1]}
+
+
+def test_auto_merge_requires_callable_add_method():
+    """A marked current value must expose a callable addition protocol."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoMergeState,
+    )
+
+    with pytest.raises(TypeError, match="does not provide a callable __add__"):
+        graph.apply_command(
+            Command(update={"values": [1]}),
+            START,
+            _graph_context({"values": MissingAdd()}),
+        )
+
+
+def test_auto_merge_rejects_not_implemented_addition():
+    """NotImplemented becomes a useful state merge error."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoMergeState,
+    )
+
+    with pytest.raises(TypeError, match="could not add an update"):
+        graph.apply_command(
+            Command(update={"values": [1]}),
+            START,
+            _graph_context({"values": UnsupportedAdd()}),
+        )
 
 
 def test_replace_bypasses_auto_increase_and_is_unwrapped():
@@ -174,6 +219,16 @@ def test_node_graph_rejects_non_class_state_schema():
             {},
             {START: END},
             state_schema={},
+        )
+
+
+def test_node_graph_rejects_timeout_for_unknown_node():
+    """Direct construction validates every timeout target."""
+    with pytest.raises(ValueError, match="unknown nodes: missing"):
+        NodeGraph(
+            {},
+            {START: END},
+            node_timeouts={"missing": 1},
         )
 
 
