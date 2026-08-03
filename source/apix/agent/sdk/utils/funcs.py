@@ -5,7 +5,6 @@ import time
 from typing import Callable, Generator, Literal
 
 from apix.common.type import IdentityError, ApixIdentity
-from apix.common.utils.logger import logger
 
 
 def get_date_natural_language() -> str:

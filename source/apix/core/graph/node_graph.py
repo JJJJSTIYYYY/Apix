@@ -14,6 +14,7 @@ from apix.core.graph.base import (
     Command,
     Reset,
     get_auto_increase_keys,
+    get_keep_ref_keys
 )
 from apix.core.graph.node import BaseNode
 from apix.core.stream import (
@@ -58,9 +59,39 @@ class NodeGraph:
         self._auto_increase_keys = get_auto_increase_keys(
             state_schema
         )
+        self._keep_ref_keys = get_keep_ref_keys(
+            state_schema
+        )
         self._active_runs: set[str] = set()
         self._listener_namespace = uuid.uuid4().hex
         self._register_node_listeners()
+
+
+    def _copy_state(self, state: dict) -> dict:
+        """Deep copy state while preserving references marked with ``KeepRef``.
+
+        Fields marked with ``Annotated[..., KeepRef()]`` keep their original
+        object references instead of being deep-copied. Other fields follow the
+        normal ``copy.deepcopy`` behavior.
+        """
+        if not isinstance(state, dict):
+            raise TypeError("Graph state must be a dict.")
+
+        if not self._keep_ref_keys:
+            return copy.deepcopy(state)
+
+        keep_refs = {
+            key: state[key]
+            for key in self._keep_ref_keys
+            if key in state
+        }
+
+        copied_state = copy.deepcopy(state)
+
+        for key, value in keep_refs.items():
+            copied_state[key] = value
+
+        return copied_state
 
 
     def _register_node_listeners(self) -> None:
@@ -146,7 +177,7 @@ class NodeGraph:
         completion = asyncio.get_running_loop().create_future()
         context = {
             "run_id": run_id,
-            "state": copy.deepcopy(state),
+            "state": self._copy_state(state),
             "steps": 0,
             "completion": completion,
             "stream_writer": stream_writer,
@@ -173,7 +204,7 @@ class NodeGraph:
             writer = context.get("stream_writer", noop_stream_writer())
             with stream_writer_context(writer):
                 result = await self._nodes[node_name].execute(
-                    copy.deepcopy(context["state"])
+                    self._copy_state(context["state"])
                 )
             commands = result if isinstance(result, list) else [result]
             if not commands:
@@ -211,7 +242,7 @@ class NodeGraph:
         if steps > self._max_steps:
             raise RecursionError(f"Graph exceeded its maximum of {self._max_steps} steps.")
 
-        state = copy.deepcopy(context["state"])
+        state = self._copy_state(context["state"])
         update = copy.deepcopy(update)
 
         for key, value in update.items():
@@ -270,16 +301,14 @@ class NodeGraph:
         )
 
 
-    @staticmethod
-    def _finish(context: dict) -> None:
+    def _finish(self, context: dict) -> None:
         """Resolve an invocation with the state carried by its END event."""
         completion = context["completion"]
         if not completion.done():
-            completion.set_result(copy.deepcopy(context["state"]))
+            completion.set_result(self._copy_state(context["state"]))
 
 
-    @staticmethod
-    def _fail(context: dict, error: Exception) -> None:
+    def _fail(self, context: dict, error: Exception) -> None:
         """Resolve an invocation with the exception raised by a graph node."""
         completion = context["completion"]
         if not completion.done():

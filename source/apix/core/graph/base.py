@@ -32,6 +32,27 @@ class AutoMerge:
 
 
 @dataclass(frozen=True, slots=True)
+class KeepRef:
+    """Mark an ``Annotated`` state field to keep its reference during copying.
+
+    This class contains no runtime data. It is only metadata inspected by
+    :class:`NodeGraph` when a state copy operation is performed.
+
+    When a marked field is copied, the graph keeps the original field value's
+    reference instead of creating a copied object. Other state fields continue
+    to follow the normal copy behavior.
+
+    This is useful for fields that represent shared runtime resources or
+    mutable objects that should remain synchronized across copied states.
+
+    Example:
+        ``context: Annotated[ContextOrganizer, KeepRef()]``
+    """
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class Reset:
     """Explicitly replace a state field during a command update.
 
@@ -90,6 +111,56 @@ def get_auto_increase_keys(
             and any(
                 marker is AutoMerge
                 or isinstance(marker, AutoMerge)
+                for marker in get_args(annotation)[1:]
+            )
+        )
+    )
+
+
+def get_keep_ref_keys(
+    state_schema: type | None,
+) -> frozenset[str]:
+    """Return fields marked with :class:`KeepRef` in a state schema.
+
+    ``state_schema`` is normally a ``TypedDict`` class. Regular annotated
+    classes are also accepted because only their resolved type hints are
+    inspected.
+
+    Both ``KeepRef`` and ``KeepRef()`` metadata forms are supported.
+
+    Args:
+        state_schema:
+            State schema whose ``Annotated`` metadata should be inspected.
+            ``None`` returns an empty set.
+
+    Raises:
+        TypeError:
+            If ``state_schema`` is not a class.
+        NameError:
+            If the schema contains an unresolved forward reference.
+    """
+    if state_schema is None:
+        return frozenset()
+
+    if not isinstance(state_schema, type):
+        raise TypeError(
+            "`state_schema` must be a class or None, "
+            f"got {type(state_schema).__name__}."
+        )
+
+    type_hints = get_type_hints(
+        state_schema,
+        include_extras=True,
+    )
+
+    return frozenset(
+        key
+        for key, annotation in type_hints.items()
+        if (
+            get_origin(annotation) is Annotated
+            and any(
+                marker is KeepRef
+                or isinstance(marker, KeepRef)
                 for marker in get_args(annotation)[1:]
             )
         )

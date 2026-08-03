@@ -1,8 +1,4 @@
-from typing import Annotated, Literal, NotRequired, TypedDict
-
-from apix.agent.sdk.utils.message import AnyMessage
-from apix.common.type import ApixIdentity
-from apix.core.graph.base import AutoMerge
+from typing import Literal, TypedDict
 
 
 class RoleSchema(TypedDict):

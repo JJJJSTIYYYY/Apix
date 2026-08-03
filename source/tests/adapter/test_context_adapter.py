@@ -50,6 +50,31 @@ def test_build_user_context_formats_and_escapes_every_supported_section():
     assert adapter._build_user_context({}) == ""
 
 
+def test_build_user_context_uses_fallbacks_and_ignores_invalid_sections():
+    adapter = AIContextAdapter()
+
+    context = adapter._build_user_context(
+        {
+            "referenced_message": {"content": ""},
+            "uploaded_files": "not-a-list",
+            "task": {"name": "partial"},
+        }
+    )
+
+    assert "<role>[UNKNOWN]</role>" in context
+    assert "<speaker>[UNKNOWN]</speaker>" in context
+    assert "<content>[CONTENT MISSED]</content>" in context
+    assert "<uploaded_files>" not in context
+    assert "<task>\n  <name>partial</name>\n</task>" in context
+    assert adapter._build_user_context(
+        {
+            "referenced_message": [],
+            "uploaded_files": {},
+            "task": {"type": "", "name": "", "prompt": ""},
+        }
+    ) == ""
+
+
 def testensure_tool_messages_reorders_deduplicates_and_fills_missing():
     adapter = AIContextAdapter()
     ai = ApixAiMessage(
@@ -74,6 +99,19 @@ def testensure_tool_messages_reorders_deduplicates_and_fills_missing():
     assert messages[1].content == adapter._MISSING_TOOL_OUTPUT
     assert messages[2] is first_b
     assert messages[3] is following
+
+
+def test_ensure_tool_message_handles_empty_and_non_tool_call_messages():
+    adapter = AIContextAdapter()
+    messages = [
+        ApixUserMessage(content="question"),
+        ApixAiMessage(content="answer"),
+    ]
+
+    adapter.ensure_tool_message([])
+    adapter.ensure_tool_message(messages)
+
+    assert len(messages) == 2
 
 
 @pytest.mark.parametrize(
@@ -133,6 +171,90 @@ def test_convert_persisted_messages_handles_todo_context_abort_and_json():
     assert "<active_file>main.py</active_file>" in messages[1].content
 
 
+def test_convert_persisted_messages_covers_all_roles_defaults_and_skips():
+    adapter = AIContextAdapter()
+    messages, todo = adapter.convert_to_apix_messages(
+        [
+            {"role": "user", "content": ""},
+            {
+                "role": "user",
+                "message_uid": "user-id",
+                "name": "Alice",
+                "content": "question",
+            },
+            {"role": "ai", "content": ""},
+            {
+                "role": "ai",
+                "content": "",
+                "extensions": {
+                    "tool_calls": [
+                        {
+                            "call_id": "call-1",
+                            "tool_name": "search",
+                            "args": {},
+                        }
+                    ]
+                },
+            },
+            {"role": "tool", "content": ""},
+            {
+                "role": "tool",
+                "name": "search",
+                "content": "result",
+                "extensions": {"tool_call_id": "call-1"},
+            },
+            {"role": "system", "content": ""},
+            {"role": "system", "content": "rules"},
+            {
+                "role": "info",
+                "name": "todo",
+                "extensions": {
+                    "todo_list": [
+                        {"content": "done", "status": "completed"}
+                    ]
+                },
+            },
+            {"role": "unknown", "content": "ignored"},
+        ],
+    )
+
+    assert todo is None
+    assert [message.role for message in messages] == [
+        "user",
+        "ai",
+        "tool",
+        "system",
+    ]
+    assert messages[0].message_uid == "user-id"
+    assert messages[0].name == "Alice"
+    assert messages[1].name == "assistant"
+    assert messages[2].tool_call_id == "call-1"
+    assert messages[3].name == "system"
+
+
+def test_convert_persisted_messages_strict_mode_fills_missing_tool_output():
+    messages, _ = AIContextAdapter().convert_to_apix_messages(
+        [
+            {
+                "role": "ai",
+                "extensions": {
+                    "tool_calls": [
+                        {
+                            "call_id": "missing",
+                            "tool_name": "search",
+                            "args": None,
+                        }
+                    ]
+                },
+            }
+        ]
+    )
+
+    assert len(messages) == 2
+    assert isinstance(messages[1], ApixToolMessage)
+    assert messages[1].tool_call_id == "missing"
+
+
 def test_convert_to_dict_message_filter_and_decode_helpers():
     adapter = AIContextAdapter()
     message = ApixAiMessage(
@@ -159,6 +281,54 @@ def test_convert_to_dict_message_filter_and_decode_helpers():
             ApixUserMessage(content="no"),
             "generation",
         )
+
+
+def test_convert_tool_message_to_full_dict_uses_independent_payloads():
+    adapter = AIContextAdapter()
+    message = ApixToolMessage(
+        message_uid="tool-id",
+        name="search",
+        content="result",
+        metadata={"duration": 1},
+        extensions={"custom": {"value": 1}},
+        tool_call_id="call-1",
+    )
+
+    result = adapter.convert_to_dict_message(
+        message,
+        "generation-id",
+        parent_id="parent-id",
+    )
+
+    assert result == {
+        "message_uid": "tool-id",
+        "generation_id": "generation-id",
+        "role": "tool",
+        "name": "search",
+        "content": "result",
+        "node_id": "eneration-id-apix",
+        "parent_id": "parent-id",
+        "metadata": {"duration": 1},
+        "extensions": {
+            "custom": {"value": 1},
+            "tool_call_id": "call-1",
+        },
+    }
+    result["metadata"]["duration"] = 2
+    result["extensions"]["custom"]["value"] = 2
+    assert message.metadata == {"duration": 1}
+    assert message.extensions["custom"] == {"value": 1}
+
+    filtered = adapter.convert_to_dict_message(
+        ApixToolMessage(content="", tool_call_id="call-2"),
+        "generation-id",
+        filter=True,
+    )
+    assert filtered == {
+        "role": "tool",
+        "content": "",
+        "extensions": {"tool_call_id": "call-2"},
+    }
 
 
 def test_drop_tool_messages_supports_complete_and_streamed_write_todos_calls():
@@ -200,6 +370,24 @@ def test_drop_tool_messages_supports_complete_and_streamed_write_todos_calls():
         adapter.drop_tool_messages([before], min_keep=-1)
 
 
+def test_drop_tool_messages_preserves_empty_input_tail_and_non_tool_messages():
+    adapter = AIContextAdapter()
+    user = ApixUserMessage(content="question")
+    old_tool = tool_message("old")
+    recent_tool = tool_message("recent")
+
+    assert adapter.drop_tool_messages([]) == []
+    dropped = adapter.drop_tool_messages(
+        [user, old_tool, recent_tool],
+        split_by_todos=False,
+        min_keep=1,
+    )
+
+    assert dropped[0] is user
+    assert dropped[1].content == "[Tool Result Outdated]"
+    assert dropped[2] is recent_tool
+
+
 def test_split_messages_keeps_ai_tool_chain_together():
     adapter = AIContextAdapter()
     messages = [
@@ -219,6 +407,57 @@ def test_split_messages_keeps_ai_tool_chain_together():
     assert adapter.split_messages([], keep_recent=2) == ([], [])
     assert adapter.split_messages(messages, keep_recent=0) == (messages, [])
     assert adapter.split_messages(messages, keep_recent=10) == ([], messages)
+
+
+def test_split_messages_auto_mode_uses_latest_user_or_keeps_everything():
+    adapter = AIContextAdapter()
+    first = ApixAiMessage(content="old")
+    user = ApixUserMessage(content="latest")
+    answer = ApixAiMessage(content="answer")
+
+    assert adapter.split_messages([first, user, answer]) == (
+        [first],
+        [user, answer],
+    )
+    assert adapter.split_messages([first, answer]) == (
+        [],
+        [first, answer],
+    )
+
+
+def test_split_messages_handles_complete_and_orphan_tool_blocks():
+    adapter = AIContextAdapter()
+    ai = ApixAiMessage(
+        tool_calls=[
+            {"call_id": "a", "tool_name": "tool", "args": {}},
+            {"call_id": "b", "tool_name": "tool", "args": {}},
+        ]
+    )
+    first_tool = tool_message("a")
+    second_tool = tool_message("b")
+    tail = ApixUserMessage(content="tail")
+
+    summarized, recent = adapter.split_messages(
+        [ai, first_tool, second_tool, tail],
+        keep_recent=2,
+    )
+    assert summarized == []
+    assert recent == [ai, first_tool, second_tool, tail]
+
+    summarized, recent = adapter.split_messages(
+        [ai, first_tool, second_tool, tail],
+        keep_recent=3,
+    )
+    assert summarized == []
+    assert recent == [ai, first_tool, second_tool, tail]
+
+    orphan_prefix = ApixUserMessage(content="prefix")
+    summarized, recent = adapter.split_messages(
+        [orphan_prefix, first_tool, second_tool, tail],
+        keep_recent=2,
+    )
+    assert summarized == [orphan_prefix, first_tool, second_tool]
+    assert recent == [tail]
 
 
 def test_filter_apix_messages_handles_chunks_and_ignores_empty_ai_messages():
@@ -244,3 +483,23 @@ def test_filter_apix_messages_handles_chunks_and_ignores_empty_ai_messages():
     assert messages[0].content == "question"
     assert messages[1].content == "why\n\nanswer"
     assert index == "chunk-id"
+
+
+def test_filter_apix_messages_can_drop_reasoning_and_keep_ai_content():
+    ai = ApixAiMessage(
+        message_uid="ai-id",
+        content="answer",
+        reasoning="private reasoning",
+        name="Alice",
+    )
+
+    systems, messages, index = AIContextAdapter().filter_apix_messages(
+        [ai],
+        keep_reasoning=False,
+    )
+
+    assert systems == []
+    assert len(messages) == 1
+    assert messages[0].content == "answer"
+    assert messages[0].name == "Alice"
+    assert index == "ai-id"
