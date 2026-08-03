@@ -187,7 +187,8 @@ async def test_finish_and_fail_do_not_replace_completed_future():
         "completion": completion,
     }
 
-    NodeGraph._finish(context)
-    NodeGraph._fail(context, RuntimeError("late failure"))
+    graph = NodeGraph({}, {START: END})
+    graph._finish(context)
+    graph._fail(context, RuntimeError("late failure"))
 
     assert await completion == {"original": True}

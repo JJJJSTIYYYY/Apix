@@ -86,12 +86,25 @@ class NodeGraph:
             if key in state
         }
 
-        copied_state = copy.deepcopy(state)
-
-        for key, value in keep_refs.items():
-            copied_state[key] = value
-
-        return copied_state
+        # Exclude kept fields before deepcopy so resource-like values do not
+        # need to support copying at all. Rebuild in the original key order;
+        # this also keeps normal deepcopy alias semantics among unmarked
+        # fields without leaking KeepRef semantics to an unmarked alias.
+        copied_values = copy.deepcopy(
+            {
+                key: value
+                for key, value in state.items()
+                if key not in keep_refs
+            }
+        )
+        return {
+            key: (
+                keep_refs[key]
+                if key in keep_refs
+                else copied_values[key]
+            )
+            for key in state
+        }
 
 
     def _register_node_listeners(self) -> None:
@@ -243,7 +256,7 @@ class NodeGraph:
             raise RecursionError(f"Graph exceeded its maximum of {self._max_steps} steps.")
 
         state = self._copy_state(context["state"])
-        update = copy.deepcopy(update)
+        update = self._copy_state(update) # Keep ref too
 
         for key, value in update.items():
             if isinstance(value, Reset):
