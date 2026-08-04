@@ -3,13 +3,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable, Mapping
 from copy import deepcopy
+from dataclasses import replace
 import json
 from time import perf_counter
 from typing import Any, Self
 from uuid import uuid4
 
+
 from apix.agent.sdk.adapter.bot.base import (
+    MessageConfig,
     ModelCapabilities,
+    ReasoningConfig,
     ReasoningEffort,
 )
 from apix.agent.sdk.tool import Tool, ToolNode
@@ -40,10 +44,7 @@ def _model_dump(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Mapping):
-        return {
-            str(key): _model_dump(item)
-            for key, item in value.items()
-        }
+        return {str(key): _model_dump(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_model_dump(item) for item in value]
 
@@ -63,6 +64,43 @@ def _model_dump(value: Any) -> Any:
             if not key.startswith("_") and item is not None
         }
     return value
+
+
+def _merge_mappings(*mappings: Mapping[str, Any]) -> dict[str, Any]:
+    """Deep-merge mappings while isolating all retained values."""
+    merged: dict[str, Any] = {}
+    for mapping in mappings:
+        for key, value in mapping.items():
+            previous = merged.get(key)
+            if isinstance(previous, Mapping) and isinstance(value, Mapping):
+                merged[key] = _merge_mappings(previous, value)
+            else:
+                merged[key] = deepcopy(value)
+    return merged
+
+
+def _set_path(target: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    """Set a value at a nested request path, preserving sibling values."""
+    current = target
+    for key in path[:-1]:
+        child = current.get(key)
+        if isinstance(child, Mapping):
+            nested = deepcopy(dict(child))
+        else:
+            nested = {}
+        current[key] = nested
+        current = nested
+    current[path[-1]] = deepcopy(value)
+
+
+def _read_path(value: Any, path: tuple[str, ...]) -> Any:
+    """Read a mixed attribute/mapping path from an APIX message."""
+    current = value
+    for key in path:
+        current = _read(current, key)
+        if current is None:
+            return None
+    return current
 
 
 class BaseBot(ABC):
@@ -95,6 +133,10 @@ class BaseBot(ABC):
             raise ValueError("endpoint must be a non-empty string")
         if not isinstance(api_key, str):
             raise TypeError("api_key must be a string")
+        if capabilities is not None and not isinstance(
+            capabilities, ModelCapabilities
+        ):
+            raise TypeError("capabilities must be a ModelCapabilities object")
 
         self.model = model.strip()
         self.name = name.strip()
@@ -157,16 +199,13 @@ class BaseBot(ABC):
         ordered = list(system_prompt or [])
         if self.role_definition:
             ordered.append(
-                ApixSystemMessage(
-                    content=self.role_definition,
-                    name=self.name,
-                )
+                ApixSystemMessage(content=self.role_definition, name=self.name)
             )
         ordered.extend(messages)
         return ordered
 
     def _supports_role(self, role: str) -> bool:
-        supported = self.capabilities.supports_role
+        supported = self.capabilities.message_config.supported_roles
         return not supported or role in supported
 
     @staticmethod
@@ -189,13 +228,7 @@ class BaseBot(ABC):
         self,
         message: ApixMessageBase,
     ) -> dict[str, Any] | list[dict[str, Any]] | None:
-        """Serialize one APIX message to OpenAI Chat Completions format.
-
-        Provider classes may override this method when their wire protocol is
-        not Chat Completions compatible (OpenAI Responses and Ollama do so).
-        Unsupported roles are intentionally filtered according to
-        :class:`ModelCapabilities`.
-        """
+        """Serialize one APIX message to Chat Completions format."""
         if not isinstance(message, ApixMessageBase):
             raise TypeError(
                 "message must be a complete ApixMessageBase instance"
@@ -208,12 +241,8 @@ class BaseBot(ABC):
         if api_role in {"assistant", "tool"} and content is None:
             content = ""
 
-        result: dict[str, Any] = {
-            "role": api_role,
-            "content": content,
-        }
-
-        if self.capabilities.supports_name and message.name:
+        result: dict[str, Any] = {"role": api_role, "content": content}
+        if self.capabilities.message_config.include_name and message.name:
             result["name"] = message.name
 
         if isinstance(message, ApixAiMessage):
@@ -222,23 +251,16 @@ class BaseBot(ABC):
                     self._chat_tool_call(tool_call)
                     for tool_call in message.tool_calls
                 ]
-            if (
-                self.capabilities.require_reasoning_content
-                and message.reasoning is not None
-            ):
-                result["reasoning_content"] = message.reasoning
-            if self.capabilities.require_reasoning_details:
-                reasoning_details = message.extensions.get(
-                    "reasoning_details"
-                )
-                if isinstance(reasoning_details, list):
-                    result["reasoning_details"] = deepcopy(
-                        reasoning_details
-                    )
+            history_fields = (
+                self.capabilities.reasoning_config.history_field_map
+            )
+            for api_field, source_path in history_fields.items():
+                value = _read_path(message, source_path)
+                if value is not None:
+                    result[api_field] = deepcopy(value)
 
         if isinstance(message, ApixToolMessage):
             result["tool_call_id"] = message.tool_call_id
-
         return result
 
     def _prepare_api_messages(
@@ -345,8 +367,7 @@ class BaseBot(ABC):
         details = _read(message, "reasoning_details")
         if isinstance(details, list):
             return "".join(
-                str(_read(item, "text", "") or "")
-                for item in details
+                str(_read(item, "text", "") or "") for item in details
             )
         return ""
 
@@ -378,7 +399,7 @@ class BaseBot(ABC):
         message_uid: str | None = None,
         duration: float | None = None,
     ) -> ApixAiMessage | ApixAiMessageChunk:
-        """Convert an OpenAI-compatible Chat response into APIX messages."""
+        """Convert a Chat Completions response into APIX messages."""
         choices = _read(response, "choices") or []
         choice = choices[0] if choices else None
         metadata = self._metadata(response, duration=duration)
@@ -435,7 +456,7 @@ class BaseBot(ABC):
         system_prompt: list[ApixSystemMessage] | None = None,
         reasoning: bool = True,
         reasoning_effort: ReasoningEffort = "high",
-        extra_body: dict[str, Any] = {},
+        extra_body: Mapping[str, Any] | None = None,
     ) -> ApixAiMessage:
         """Invoke the provider and return one complete APIX AI message."""
 
@@ -446,24 +467,29 @@ class BaseBot(ABC):
         system_prompt: list[AnyMessage] | None = None,
         reasoning: bool = True,
         reasoning_effort: ReasoningEffort = "high",
-        extra_body: dict[str, Any] = {},
+        extra_body: Mapping[str, Any] | None = None,
     ) -> AsyncIterator[ApixAiMessageChunk]:
         """Stream provider deltas as APIX AI message chunks."""
-        if False:
-            yield ApixAiMessageChunk()
+        raise NotImplementedError
 
 
 class BaseOpenAIBot(BaseBot):
-    """Base implementation for OpenAI Chat Completions compatible APIs."""
+    """Shared adapter for APIs implemented through the OpenAI Python SDK."""
 
+    default_endpoint: str | None = None
     capabilities = ModelCapabilities(
-        supports_role=["developer", "system", "user", "ai", "tool"],
-        supports_effort=["none", "low", "medium", "high"],
-        reasoning_effort_map={
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-        },
+        message_config=MessageConfig(
+            supported_roles=("developer", "system", "user", "ai", "tool"),
+        ),
+        reasoning_config=ReasoningConfig(
+            supported_efforts=("none", "low", "medium", "high"),
+            effort_map={
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+            },
+            disabled_effort="none",
+        ),
     )
 
     def __init__(
@@ -472,7 +498,7 @@ class BaseOpenAIBot(BaseBot):
         model: str,
         name: str = "assistant",
         role_definition: str = "",
-        endpoint: str,
+        endpoint: str | None = None,
         api_key: str,
         capabilities: ModelCapabilities | None = None,
         client: Any | None = None,
@@ -482,18 +508,20 @@ class BaseOpenAIBot(BaseBot):
                 "api_key must be supplied explicitly; APIX does not read it "
                 "from configuration or environment variables"
             )
+        resolved_endpoint = endpoint or self.default_endpoint
+        if resolved_endpoint is None:
+            raise ValueError("endpoint must be supplied for this provider")
         super().__init__(
             model=model,
             name=name,
             role_definition=role_definition,
-            endpoint=endpoint,
+            endpoint=resolved_endpoint,
             api_key=api_key,
             capabilities=capabilities,
         )
 
         if client is None:
             from openai import AsyncOpenAI
-
             client = AsyncOpenAI(
                 api_key=api_key,
                 base_url=self.endpoint,
@@ -502,37 +530,70 @@ class BaseOpenAIBot(BaseBot):
             )
         self._client = client
 
-    def _reasoning_request(
+    def _resolve_reasoning_effort(
         self,
         reasoning: bool,
         reasoning_effort: ReasoningEffort,
-    ) -> dict[str, Any]:
-        if not self.capabilities.supports_reasoning:
-            return {}
+    ) -> str | None:
+        config = self.capabilities.reasoning_config
+        if reasoning:
+            mapped = config.effort_map.get(
+                reasoning_effort,
+                reasoning_effort,
+            )
+        else:
+            mapped = config.disabled_effort
+        if mapped is None:
+            return None
 
-        if not reasoning:
-            if "none" in self.capabilities.supports_effort:
-                return {"reasoning_effort": "none"}
-            return {}
-
-        mapped = (
-            self.capabilities.reasoning_effort_map or {}
-        ).get(reasoning_effort, reasoning_effort)
-        supported = self.capabilities.supports_effort
+        supported = config.supported_efforts
         if supported and mapped not in supported:
             raise ValueError(
                 f"{self.provider} does not support reasoning effort "
                 f"{reasoning_effort!r} (mapped to {mapped!r})"
             )
-        return {"reasoning_effort": mapped}
+        return mapped
+
+    def _reasoning_request(
+        self,
+        reasoning: bool,
+        reasoning_effort: ReasoningEffort,
+    ) -> dict[str, Any]:
+        config = self.capabilities.reasoning_config
+        if not config.supported:
+            return {}
+
+        request = deepcopy(dict(config.request_defaults))
+        effort = self._resolve_reasoning_effort(
+            reasoning,
+            reasoning_effort,
+        )
+        if effort is not None and config.effort_path:
+            _set_path(request, config.effort_path, effort)
+        return request
 
     def _provider_extra_body(
         self,
-        extra_body: dict[str, Any],
+        extra_body: Mapping[str, Any] | None,
         *,
         reasoning: bool,
     ) -> dict[str, Any]:
-        return dict(extra_body or {})
+        if extra_body is not None and not isinstance(extra_body, Mapping):
+            raise TypeError("extra_body must be a mapping or None")
+
+        request_config = self.capabilities.request_config
+        reasoning_config = self.capabilities.reasoning_config
+        reasoning_defaults = (
+            reasoning_config.enabled_extra_body
+            if reasoning
+            else reasoning_config.disabled_extra_body
+        )
+        return _merge_mappings(
+            request_config.extra_body_defaults,
+            reasoning_config.extra_body_defaults,
+            reasoning_defaults,
+            extra_body or {},
+        )
 
     def _chat_request(
         self,
@@ -541,32 +602,403 @@ class BaseOpenAIBot(BaseBot):
         *,
         reasoning: bool,
         reasoning_effort: ReasoningEffort,
-        extra_body: dict[str, Any],
+        extra_body: Mapping[str, Any] | None,
         stream: bool,
     ) -> dict[str, Any]:
-        request: dict[str, Any] = {
-            "model": self.model,
-            "messages": self._prepare_api_messages(
-                messages,
-                system_prompt,
+        request_config = self.capabilities.request_config
+        request = _merge_mappings(
+            request_config.request_defaults,
+            self._reasoning_request(reasoning, reasoning_effort),
+            (
+                self.capabilities.stream_config.request_defaults
+                if stream
+                else {}
             ),
-            "stream": stream,
-        }
-        if self._tool_schemas and self.capabilities.supports_tools:
-            request["tools"] = self.tool_schemas
-
-        request.update(
-            self._reasoning_request(reasoning, reasoning_effort)
         )
+        request.update(
+            {
+                "model": self.model,
+                "messages": self._prepare_api_messages(
+                    messages,
+                    system_prompt,
+                ),
+                "stream": stream,
+            }
+        )
+        if self._tool_schemas and self.capabilities.tool_config.supported:
+            request["tools"] = self.tool_schemas
         body = self._provider_extra_body(
             extra_body,
             reasoning=reasoning,
         )
         if body:
             request["extra_body"] = body
-        if stream and self.capabilities.supports_stream_usage:
-            request["stream_options"] = {"include_usage": True}
         return request
+
+    @staticmethod
+    def _responses_content(content: Any) -> Any:
+        if not isinstance(content, list):
+            return content
+
+        converted: list[dict[str, Any]] = []
+        for part in content:
+            if not isinstance(part, Mapping):
+                continue
+            item = dict(part)
+            part_type = item.get("type")
+            if part_type == "text":
+                converted.append(
+                    {"type": "input_text", "text": item.get("text", "")}
+                )
+            elif part_type == "image_url":
+                image_url = item.get("image_url")
+                if isinstance(image_url, Mapping):
+                    image_url = image_url.get("url")
+                converted.append(
+                    {"type": "input_image", "image_url": image_url}
+                )
+            else:
+                converted.append(item)
+        return converted
+
+    def _convert_responses_message(
+        self,
+        message: ApixMessageBase,
+    ) -> dict[str, Any] | list[dict[str, Any]] | None:
+        if not isinstance(message, ApixMessageBase):
+            raise TypeError(
+                "message must be a complete ApixMessageBase instance"
+            )
+        if not self._supports_role(message.role):
+            return None
+
+        if isinstance(message, ApixToolMessage):
+            return {
+                "type": "function_call_output",
+                "call_id": message.tool_call_id,
+                "output": str(message.content or ""),
+            }
+
+        if isinstance(message, ApixAiMessage):
+            retained = message.extensions.get("response_output")
+            if isinstance(retained, list) and retained:
+                return deepcopy(retained)
+
+            items: list[dict[str, Any]] = []
+            if message.content is not None:
+                items.append(
+                    {"role": "assistant", "content": message.content}
+                )
+            for tool_call in message.tool_calls:
+                items.append(
+                    {
+                        "type": "function_call",
+                        "call_id": tool_call["call_id"],
+                        "name": tool_call["tool_name"],
+                        "arguments": json.dumps(
+                            tool_call.get("args") or {},
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
+                    }
+                )
+            return items or [{"role": "assistant", "content": ""}]
+
+        return {
+            "role": message.role,
+            "content": self._responses_content(message.content),
+        }
+
+    def convert_message_for_api(
+        self,
+        message: ApixMessageBase,
+    ) -> dict[str, Any] | list[dict[str, Any]] | None:
+        if self.capabilities.request_config.api_style == "responses":
+            return self._convert_responses_message(message)
+        return super().convert_message_for_api(message)
+
+    def _response_tools(self) -> list[dict[str, Any]]:
+        tools: list[dict[str, Any]] = []
+        for schema in self._tool_schemas:
+            function = schema.get("function")
+            if not isinstance(function, Mapping) or not function.get("name"):
+                continue
+            converted = {
+                "type": "function",
+                "name": function["name"],
+                "description": function.get("description", ""),
+                "parameters": deepcopy(function.get("parameters", {})),
+            }
+            if "strict" in function:
+                converted["strict"] = bool(function["strict"])
+            tools.append(converted)
+        return tools
+
+    def _responses_request(
+        self,
+        messages: list[AnyMessage],
+        system_prompt: list[AnyMessage] | None,
+        *,
+        reasoning: bool,
+        reasoning_effort: ReasoningEffort,
+        extra_body: Mapping[str, Any] | None,
+        stream: bool,
+    ) -> dict[str, Any]:
+        request_config = self.capabilities.request_config
+        request = _merge_mappings(
+            request_config.request_defaults,
+            self._reasoning_request(reasoning, reasoning_effort),
+            (
+                self.capabilities.stream_config.request_defaults
+                if stream
+                else {}
+            ),
+        )
+        request.update(
+            {
+                "model": self.model,
+                "input": self._prepare_api_messages(
+                    messages,
+                    system_prompt,
+                ),
+                "stream": stream,
+            }
+        )
+        if self._tool_schemas and self.capabilities.tool_config.supported:
+            tools = self._response_tools()
+            if tools:
+                request["tools"] = tools
+        body = self._provider_extra_body(
+            extra_body,
+            reasoning=reasoning,
+        )
+        if body:
+            request["extra_body"] = body
+        return request
+
+    @staticmethod
+    def _response_output(response: Any) -> list[Any]:
+        value = _read(response, "output", [])
+        return list(value) if value else []
+
+    @staticmethod
+    def _response_reasoning(output: list[Any]) -> str:
+        parts: list[str] = []
+        for item in output:
+            if _read(item, "type") != "reasoning":
+                continue
+            for summary in _read(item, "summary", []) or []:
+                text = _read(summary, "text")
+                if text:
+                    parts.append(str(text))
+        return "".join(parts)
+
+    @classmethod
+    def _response_tool_calls(cls, output: list[Any]) -> list[ToolCall]:
+        calls: list[ToolCall] = []
+        for item in output:
+            if _read(item, "type") != "function_call":
+                continue
+            call_id = _read(item, "call_id") or _read(item, "id")
+            name = _read(item, "name")
+            if not call_id or not name:
+                raise ValueError(
+                    "Responses function call is missing call_id/name"
+                )
+            calls.append(
+                ToolCall(
+                    call_id=str(call_id),
+                    tool_name=str(name),
+                    args=cls._parse_tool_arguments(
+                        _read(item, "arguments")
+                    ),
+                )
+            )
+        return calls
+
+    @staticmethod
+    def _response_text(output: list[Any]) -> tuple[str | None, str | None]:
+        text_parts: list[str] = []
+        refusal_parts: list[str] = []
+        for item in output:
+            if _read(item, "type") != "message":
+                continue
+            for part in _read(item, "content", []) or []:
+                part_type = _read(part, "type")
+                if part_type == "output_text":
+                    text_parts.append(str(_read(part, "text", "") or ""))
+                elif part_type == "refusal":
+                    refusal_parts.append(
+                        str(_read(part, "refusal", "") or "")
+                    )
+        return (
+            "".join(text_parts) or None,
+            "".join(refusal_parts) or None,
+        )
+
+    @classmethod
+    def _response_finish_reason(cls, response: Any) -> str:
+        output = cls._response_output(response)
+        if any(_read(item, "type") == "function_call" for item in output):
+            return "tool_calls"
+
+        status = _read(response, "status")
+        if status == "incomplete":
+            details = _read(response, "incomplete_details", {})
+            reason = _read(details, "reason")
+            return cls._normalize_finish_reason(reason) or "unknown"
+        if status == "completed":
+            return "stop"
+        return "unknown"
+
+    def _convert_responses_to_apix(
+        self,
+        response: Any,
+        *,
+        stream: bool,
+        message_uid: str | None,
+        duration: float | None,
+    ) -> ApixAiMessage | ApixAiMessageChunk:
+        if not stream:
+            output = self._response_output(response)
+            content, refusal = self._response_text(output)
+            finish_reason = self._response_finish_reason(response)
+            metadata = self._metadata(response, duration=duration)
+            metadata["finish_reason"] = finish_reason
+            return ApixAiMessage(
+                content=content,
+                name=self.name,
+                metadata=metadata,
+                extensions={"response_output": _model_dump(output)},
+                tool_calls=self._response_tool_calls(output),
+                refusal=refusal,
+                reasoning=self._response_reasoning(output) or None,
+                finish_reason=finish_reason,
+            )
+
+        event_type = str(_read(response, "type", "") or "")
+        response_object = _read(response, "response")
+        metadata = self._metadata(
+            response_object or response,
+            duration=duration,
+        )
+        response_id = _read(response, "response_id")
+        if response_id:
+            metadata["id"] = response_id
+
+        content_delta = ""
+        reasoning_delta = ""
+        refusal_delta = ""
+        tool_deltas: tuple[ToolCallDelta, ...] = ()
+        finish_reason = None
+        extensions: dict[str, Any] = {}
+
+        if event_type == "response.output_text.delta":
+            content_delta = str(_read(response, "delta", "") or "")
+        elif event_type in {
+            "response.reasoning_summary_text.delta",
+            "response.reasoning_text.delta",
+        }:
+            reasoning_delta = str(_read(response, "delta", "") or "")
+        elif event_type == "response.refusal.delta":
+            refusal_delta = str(_read(response, "delta", "") or "")
+        elif event_type == "response.output_item.added":
+            item = _read(response, "item", {})
+            if _read(item, "type") == "function_call":
+                arguments = _read(item, "arguments", "")
+                if isinstance(arguments, Mapping):
+                    arguments = json.dumps(
+                        dict(arguments),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                tool_deltas = (
+                    ToolCallDelta(
+                        index=int(_read(response, "output_index", 0)),
+                        call_id_delta=str(
+                            _read(item, "call_id", "") or ""
+                        ),
+                        tool_name_delta=str(_read(item, "name", "") or ""),
+                        arguments_delta=str(arguments or ""),
+                    ),
+                )
+        elif event_type == "response.function_call_arguments.delta":
+            tool_deltas = (
+                ToolCallDelta(
+                    index=int(_read(response, "output_index", 0)),
+                    arguments_delta=str(_read(response, "delta", "") or ""),
+                ),
+            )
+        elif event_type in {
+            "response.completed",
+            "response.incomplete",
+            "response.failed",
+        }:
+            completed = response_object or response
+            finish_reason = self._response_finish_reason(completed)
+            metadata = self._metadata(completed, duration=duration)
+            metadata["finish_reason"] = finish_reason
+            output = self._response_output(completed)
+            if output:
+                extensions["response_output"] = _model_dump(output)
+
+        return ApixAiMessageChunk(
+            content_delta=content_delta,
+            reasoning_delta=reasoning_delta,
+            refusal_delta=refusal_delta,
+            tool_call_deltas=tool_deltas,
+            finish_reason=finish_reason,
+            message_uid=message_uid or uuid4().hex,
+            name=self.name,
+            metadata=metadata,
+            extensions=extensions,
+        )
+
+    def convert_message_to_apix(
+        self,
+        response: Any,
+        *,
+        stream: bool = False,
+        message_uid: str | None = None,
+        duration: float | None = None,
+    ) -> ApixAiMessage | ApixAiMessageChunk:
+        if self.capabilities.request_config.api_style == "responses":
+            return self._convert_responses_to_apix(
+                response,
+                stream=stream,
+                message_uid=message_uid,
+                duration=duration,
+            )
+        return super().convert_message_to_apix(
+            response,
+            stream=stream,
+            message_uid=message_uid,
+            duration=duration,
+        )
+
+    def _request(
+        self,
+        messages: list[AnyMessage],
+        system_prompt: list[AnyMessage] | None,
+        *,
+        reasoning: bool,
+        reasoning_effort: ReasoningEffort,
+        extra_body: Mapping[str, Any] | None,
+        stream: bool,
+    ) -> dict[str, Any]:
+        builder = (
+            self._responses_request
+            if self.capabilities.request_config.api_style == "responses"
+            else self._chat_request
+        )
+        return builder(
+            messages,
+            system_prompt,
+            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
+            extra_body=extra_body,
+            stream=stream,
+        )
 
     async def invoke(
         self,
@@ -574,19 +1006,22 @@ class BaseOpenAIBot(BaseBot):
         system_prompt: list[ApixSystemMessage] | None = None,
         reasoning: bool = True,
         reasoning_effort: ReasoningEffort = "high",
-        extra_body: dict[str, Any] = {},
+        extra_body: Mapping[str, Any] | None = None,
     ) -> ApixAiMessage:
         started = perf_counter()
-        response = await self._client.chat.completions.create(
-            **self._chat_request(
-                messages,
-                system_prompt,
-                reasoning=reasoning,
-                reasoning_effort=reasoning_effort,
-                extra_body=extra_body,
-                stream=False,
-            )
+        request = self._request(
+            messages,
+            system_prompt,
+            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
+            extra_body=extra_body,
+            stream=False,
         )
+        if self.capabilities.request_config.api_style == "responses":
+            response = await self._client.responses.create(**request)
+        else:
+            response = await self._client.chat.completions.create(**request)
+
         converted = self.convert_message_to_apix(
             response,
             duration=perf_counter() - started,
@@ -595,26 +1030,41 @@ class BaseOpenAIBot(BaseBot):
             raise TypeError("provider returned a streaming chunk to invoke")
         return converted
 
+    @staticmethod
+    def _incremental_reasoning(
+        current: str,
+        previous: str,
+    ) -> tuple[str, str]:
+        if current.startswith(previous):
+            return current[len(previous) :], current
+        return current, previous + current
+
     async def stream(
         self,
         messages: list[AnyMessage],
         system_prompt: list[AnyMessage] | None = None,
         reasoning: bool = True,
         reasoning_effort: ReasoningEffort = "high",
-        extra_body: dict[str, Any] = {},
+        extra_body: Mapping[str, Any] | None = None,
     ) -> AsyncIterator[ApixAiMessageChunk]:
         started = perf_counter()
-        response_stream = await self._client.chat.completions.create(
-            **self._chat_request(
-                messages,
-                system_prompt,
-                reasoning=reasoning,
-                reasoning_effort=reasoning_effort,
-                extra_body=extra_body,
-                stream=True,
-            )
+        request = self._request(
+            messages,
+            system_prompt,
+            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
+            extra_body=extra_body,
+            stream=True,
         )
+        if self.capabilities.request_config.api_style == "responses":
+            response_stream = await self._client.responses.create(**request)
+        else:
+            response_stream = await self._client.chat.completions.create(
+                **request
+            )
+
         message_uid = uuid4().hex
+        reasoning_snapshot = ""
         async for response in response_stream:
             converted = self.convert_message_to_apix(
                 response,
@@ -623,5 +1073,32 @@ class BaseOpenAIBot(BaseBot):
                 duration=perf_counter() - started,
             )
             if not isinstance(converted, ApixAiMessageChunk):
-                raise TypeError("provider returned a complete message to stream")
-            yield converted
+                raise TypeError(
+                    "provider returned a complete message to stream"
+                )
+
+            if (
+                self.capabilities.reasoning_config.stream_delta_mode
+                == "cumulative"
+                and converted.reasoning_delta
+            ):
+                reasoning_delta, reasoning_snapshot = (
+                    self._incremental_reasoning(
+                        converted.reasoning_delta,
+                        reasoning_snapshot,
+                    )
+                )
+                converted = replace(
+                    converted,
+                    reasoning_delta=reasoning_delta,
+                )
+
+            if self.capabilities.request_config.api_style == "responses":
+                if (
+                    converted.has_delta
+                    or converted.is_finished
+                    or converted.extensions
+                ):
+                    yield converted
+            else:
+                yield converted

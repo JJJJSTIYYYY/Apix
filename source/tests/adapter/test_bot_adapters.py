@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -8,10 +9,13 @@ from apix.agent.sdk.adapter.bot import (
     BaseBot,
     BaseOpenAIBot,
     DeepSeekBot,
+    MessageConfig,
     MiniMaxBot,
     ModelCapabilities,
     OllamaBot,
     OpenAIBot,
+    ReasoningConfig,
+    RequestConfig,
     XiaomiMIMOBot,
 )
 from apix.agent.sdk.adapter.bot.base_bot import _model_dump, _read
@@ -19,6 +23,7 @@ from apix.agent.sdk.tool import ToolNode, tool
 from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixAiMessageAccumulator,
+    ApixAiMessageChunk,
     ApixDeveloperMessage,
     ApixSystemMessage,
     ApixToolMessage,
@@ -99,9 +104,14 @@ def chat_response(*, content="answer", reasoning=None, tool_calls=None):
 def test_capability_defaults_are_isolated_and_hierarchy_is_correct():
     first = ModelCapabilities()
     second = ModelCapabilities()
-    first.supports_role.append("user")
 
-    assert second.supports_role == []
+    assert first.message_config.supported_roles == ()
+    assert second.message_config.supported_roles == ()
+    assert first.request_config is not second.request_config
+    assert first.message_config is not second.message_config
+    assert first.reasoning_config is not second.reasoning_config
+    assert first.tool_config is not second.tool_config
+    assert first.stream_config is not second.stream_config
     assert issubclass(BaseOpenAIBot, BaseBot)
     assert issubclass(OpenAIBot, BaseOpenAIBot)
     assert issubclass(DeepSeekBot, BaseOpenAIBot)
@@ -200,10 +210,14 @@ def test_bind_tools_replaces_and_copies_schemas():
 
 def test_chat_serialization_and_argument_validation_edge_cases():
     capabilities = ModelCapabilities(
-        supports_role=["user", "ai", "tool"],
-        supports_effort=["low"],
-        reasoning_effort_map={"low": "low", "medium": "low", "high": "high"},
-        supports_name=True,
+        message_config=MessageConfig(
+            supported_roles=("user", "ai", "tool"),
+            include_name=True,
+        ),
+        reasoning_config=ReasoningConfig(
+            supported_efforts=("low",),
+            effort_map={"low": "low", "medium": "low", "high": "high"},
+        ),
     )
     bot = DeepSeekBot(
         model="deepseek",
@@ -485,7 +499,7 @@ async def test_openai_responses_invoke_preserves_output_items_and_tools():
     request = client.create.calls[0]
     assert request["reasoning"] == {"effort": "none"}
     assert request["store"] is False
-    assert request["include"] == ["reasoning.encrypted_content"]
+    assert "include" not in request
     assert [item["content"] for item in request["input"]] == [
         "global",
         "Be Alice.",
@@ -572,9 +586,16 @@ async def test_openai_responses_stream_builds_tool_call_and_final_state():
 
 
 def test_openai_responses_manual_serialization_multimodal_and_no_reasoning_model():
-    capabilities = ModelCapabilities(
-        supports_role=["user", "ai", "tool"],
-        supports_reasoning=False,
+    capabilities = replace(
+        OpenAIBot.capabilities,
+        message_config=replace(
+            OpenAIBot.capabilities.message_config,
+            supported_roles=("user", "ai", "tool"),
+        ),
+        reasoning_config=replace(
+            OpenAIBot.capabilities.reasoning_config,
+            supported=False,
+        ),
     )
     bot = OpenAIBot(
         model="non-reasoning",
@@ -832,3 +853,375 @@ def test_ollama_constructor_auth_and_tool_message_serialization(monkeypatch):
         bot.convert_message_for_api(object())
     with pytest.raises(ValueError, match="function name"):
         bot._ollama_tool_calls([{"function": {}}])
+
+
+def test_provider_classes_only_declare_provider_endpoint_and_capabilities():
+    for bot_class in (OpenAIBot, DeepSeekBot, MiniMaxBot, XiaomiMIMOBot):
+        public_members = {
+            name
+            for name in bot_class.__dict__
+            if not name.startswith("_")
+        }
+        assert public_members == {
+            "provider",
+            "default_endpoint",
+            "capabilities",
+        }
+
+    assert OpenAIBot.capabilities.request_config.api_style == "responses"
+    assert (
+        DeepSeekBot.capabilities.reasoning_config.history_field_map[
+            "reasoning_content"
+        ]
+        == ("reasoning",)
+    )
+    assert (
+        MiniMaxBot.capabilities.reasoning_config.stream_delta_mode
+        == "cumulative"
+    )
+    assert XiaomiMIMOBot.capabilities.reasoning_config.effort_path is None
+
+
+def test_constructor_capability_and_endpoint_validation():
+    with pytest.raises(TypeError, match="ModelCapabilities"):
+        OllamaBot(
+            model="qwen3",
+            client=object(),
+            capabilities=object(),
+        )
+
+    with pytest.raises(ValueError, match="endpoint must be supplied"):
+        BaseOpenAIBot(model="model", api_key="key", client=object())
+
+
+def test_openai_compatible_client_factory_uses_runtime_configuration(
+    monkeypatch,
+):
+    import openai
+
+    captured = {}
+    fake_client = FakeChatClient(chat_response())
+
+    def client_factory(**kwargs):
+        captured.update(kwargs)
+        return fake_client
+
+    monkeypatch.setattr(openai, "AsyncOpenAI", client_factory)
+    bot = DeepSeekBot(
+        model="deepseek-v4-flash",
+        api_key="secret",
+        endpoint="https://deepseek.example.test/",
+    )
+
+    assert bot.endpoint == "https://deepseek.example.test"
+    assert captured["api_key"] == "secret"
+    assert captured["base_url"] == bot.endpoint
+    assert captured["max_retries"] > 0
+    assert captured["timeout"] > 0
+
+
+def test_capabilities_drive_reasoning_summary_extra_body_and_tools():
+    capabilities = replace(
+        OpenAIBot.capabilities,
+        request_config=RequestConfig(
+            api_style="responses",
+            request_defaults={"store": False},
+            extra_body_defaults={
+                "default": 1,
+                "overridden": "default",
+            },
+        ),
+        reasoning_config=replace(
+            OpenAIBot.capabilities.reasoning_config,
+            request_defaults={"reasoning": {"summary": "auto"}},
+            enabled_extra_body={"thinking": {"type": "enabled"}},
+        ),
+    )
+    bot = OpenAIBot(
+        model="gpt-test",
+        api_key="key",
+        capabilities=capabilities,
+        client=FakeResponsesClient({}),
+    )
+    bot._tool_schemas = [
+        {},
+        {"function": "invalid"},
+        {
+            "function": {
+                "name": "strict_tool",
+                "description": "Strict tool",
+                "parameters": {"type": "object"},
+                "strict": True,
+            }
+        },
+    ]
+
+    request = bot._responses_request(
+        [ApixUserMessage(content="hi")],
+        None,
+        reasoning=True,
+        reasoning_effort="medium",
+        extra_body={
+            "overridden": "caller",
+            "thinking": {"budget": 128},
+            "custom": 2,
+        },
+        stream=False,
+    )
+
+    assert request["reasoning"] == {"effort": "medium", "summary": "auto"}
+    assert request["extra_body"] == {
+        "default": 1,
+        "overridden": "caller",
+        "thinking": {"type": "enabled", "budget": 128},
+        "custom": 2,
+    }
+    assert request["tools"] == [
+        {
+            "type": "function",
+            "name": "strict_tool",
+            "description": "Strict tool",
+            "parameters": {"type": "object"},
+            "strict": True,
+        }
+    ]
+
+    with pytest.raises(TypeError, match="extra_body"):
+        bot._provider_extra_body([], reasoning=True)
+
+
+def test_response_and_chat_serialization_cover_composite_inputs():
+    openai_bot = OpenAIBot(
+        model="gpt-test",
+        api_key="key",
+        client=FakeResponsesClient({}),
+    )
+    prepared = openai_bot._prepare_api_messages(
+        [
+            ApixAiMessage(
+                tool_calls=[
+                    {
+                        "call_id": "call",
+                        "tool_name": "weather",
+                        "args": {"city": "Tokyo"},
+                    }
+                ]
+            )
+        ],
+        None,
+    )
+    assert prepared[0]["type"] == "function_call"
+
+    minimax_bot = MiniMaxBot(
+        model="minimax-test",
+        api_key="key",
+        client=FakeChatClient(chat_response()),
+    )
+    serialized = minimax_bot.convert_message_for_api(
+        ApixAiMessage(content="answer", reasoning="thinking")
+    )
+    assert serialized["reasoning_content"] == "thinking"
+    assert "reasoning_details" not in serialized
+
+    content = openai_bot._responses_content(
+        [
+            "ignored",
+            {"type": "text", "text": "hello"},
+            {"type": "image_url", "image_url": "image-data"},
+        ]
+    )
+    assert content == [
+        {"type": "input_text", "text": "hello"},
+        {"type": "input_image", "image_url": "image-data"},
+    ]
+
+    deltas = DeepSeekBot._chat_tool_call_deltas(
+        [
+            {
+                "function": {
+                    "name": "weather",
+                    "arguments": {"city": "Tokyo"},
+                }
+            }
+        ]
+    )
+    assert deltas[0].arguments_delta == '{"city":"Tokyo"}'
+
+
+def test_response_validation_and_completed_finish_reason():
+    bot = OpenAIBot(
+        model="gpt-test",
+        api_key="key",
+        client=FakeResponsesClient({}),
+    )
+    with pytest.raises(ValueError, match="call_id/name"):
+        bot._response_tool_calls(
+            [{"type": "function_call", "name": "weather"}]
+        )
+    assert bot._response_finish_reason(
+        {"status": "completed", "output": []}
+    ) == "stop"
+
+
+@pytest.mark.asyncio
+async def test_base_stream_contract_raises_when_called_directly():
+    bot = DeepSeekBot(
+        model="deepseek-v4-flash",
+        api_key="key",
+        client=FakeChatClient(chat_response()),
+    )
+    with pytest.raises(NotImplementedError):
+        await BaseBot.stream(bot, [])
+
+
+@pytest.mark.asyncio
+async def test_minimax_stream_normalizes_cumulative_reasoning_details():
+    client = FakeChatClient(
+        lambda: async_stream(
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "reasoning_details": [{"text": "think"}]
+                        },
+                        "finish_reason": None,
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "reasoning_details": [{"text": "thinking"}]
+                        },
+                        "finish_reason": None,
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "reasoning_details": [{"text": " independently"}]
+                        },
+                        "finish_reason": "stop",
+                    }
+                ]
+            },
+        )
+    )
+    bot = MiniMaxBot(model="MiniMax-M3", api_key="key", client=client)
+
+    chunks = [
+        chunk
+        async for chunk in bot.stream([ApixUserMessage(content="hi")])
+    ]
+    assert [chunk.reasoning_delta for chunk in chunks] == [
+        "think",
+        "ing",
+        " independently",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_invoke_and_stream_reject_wrong_conversion(
+    monkeypatch,
+):
+    invoke_bot = DeepSeekBot(
+        model="deepseek-v4-flash",
+        api_key="key",
+        client=FakeChatClient(chat_response()),
+    )
+    monkeypatch.setattr(
+        invoke_bot,
+        "convert_message_to_apix",
+        lambda *args, **kwargs: ApixAiMessageChunk(),
+    )
+    with pytest.raises(TypeError, match="streaming chunk"):
+        await invoke_bot.invoke([ApixUserMessage(content="hi")])
+
+    stream_bot = DeepSeekBot(
+        model="deepseek-v4-flash",
+        api_key="key",
+        client=FakeChatClient(lambda: async_stream(chat_response())),
+    )
+    monkeypatch.setattr(
+        stream_bot,
+        "convert_message_to_apix",
+        lambda *args, **kwargs: ApixAiMessage(),
+    )
+    with pytest.raises(TypeError, match="complete message"):
+        async for _ in stream_bot.stream([ApixUserMessage(content="hi")]):
+            pass
+
+
+def test_ollama_capability_validation_and_role_filtering():
+    bot = OllamaBot(model="qwen3", client=FakeOllamaClient({}))
+    assert bot.convert_message_for_api(
+        ApixDeveloperMessage(content="unsupported")
+    ) is None
+    with pytest.raises(TypeError, match="extra_body"):
+        bot._ollama_request(
+            [ApixUserMessage(content="hi")],
+            None,
+            reasoning=True,
+            reasoning_effort="high",
+            extra_body=[],
+            stream=False,
+        )
+
+    unsupported = replace(
+        OllamaBot.capabilities,
+        reasoning_config=replace(
+            OllamaBot.capabilities.reasoning_config,
+            effort_map={
+                "low": "xhigh",
+                "medium": "medium",
+                "high": "high",
+            },
+        ),
+    )
+    unsupported_bot = OllamaBot(
+        model="qwen3",
+        capabilities=unsupported,
+        client=FakeOllamaClient({}),
+    )
+    with pytest.raises(ValueError, match="does not support"):
+        unsupported_bot._ollama_request(
+            [ApixUserMessage(content="hi")],
+            None,
+            reasoning=True,
+            reasoning_effort="low",
+            extra_body=None,
+            stream=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_ollama_invoke_and_stream_reject_wrong_conversion(monkeypatch):
+    invoke_bot = OllamaBot(
+        model="qwen3",
+        client=FakeOllamaClient({"message": {}, "done": True}),
+    )
+    monkeypatch.setattr(
+        invoke_bot,
+        "convert_message_to_apix",
+        lambda *args, **kwargs: ApixAiMessageChunk(),
+    )
+    with pytest.raises(TypeError, match="chunk"):
+        await invoke_bot.invoke([ApixUserMessage(content="hi")])
+
+    stream_bot = OllamaBot(
+        model="qwen3",
+        client=FakeOllamaClient(
+            lambda: async_stream({"message": {}, "done": True})
+        ),
+    )
+    monkeypatch.setattr(
+        stream_bot,
+        "convert_message_to_apix",
+        lambda *args, **kwargs: ApixAiMessage(),
+    )
+    with pytest.raises(TypeError, match="message to stream"):
+        async for _ in stream_bot.stream([ApixUserMessage(content="hi")]):
+            pass

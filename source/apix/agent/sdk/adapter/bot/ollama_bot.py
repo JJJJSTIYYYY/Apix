@@ -7,7 +7,9 @@ from typing import Any
 from uuid import uuid4
 
 from apix.agent.sdk.adapter.bot.base import (
+    MessageConfig,
     ModelCapabilities,
+    ReasoningConfig,
     ReasoningEffort,
 )
 from apix.agent.sdk.adapter.bot.base_bot import (
@@ -33,15 +35,18 @@ class OllamaBot(BaseBot):
 
     provider = "ollama"
     capabilities = ModelCapabilities(
-        supports_role=["system", "user", "ai", "tool"],
-        supports_effort=["low", "medium", "high", "max"],
-        reasoning_effort_map={
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-        },
-        require_reasoning_content=True,
-        api_style="ollama",
+        message_config=MessageConfig(
+            supported_roles=("system", "user", "ai", "tool"),
+        ),
+        reasoning_config=ReasoningConfig(
+            effort_path=None,
+            supported_efforts=("low", "medium", "high", "max"),
+            effort_map={
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+            },
+        ),
     )
 
     def __init__(
@@ -129,9 +134,11 @@ class OllamaBot(BaseBot):
         *,
         reasoning: bool,
         reasoning_effort: ReasoningEffort,
-        extra_body: dict[str, Any],
+        extra_body: Mapping[str, Any] | None,
         stream: bool,
     ) -> dict[str, Any]:
+        if extra_body is not None and not isinstance(extra_body, Mapping):
+            raise TypeError("extra_body must be a mapping or None")
         request: dict[str, Any] = dict(extra_body or {})
         request.update(
             {
@@ -141,17 +148,22 @@ class OllamaBot(BaseBot):
                     system_prompt,
                 ),
                 "stream": stream,
-                "think": (
-                    (self.capabilities.reasoning_effort_map or {}).get(
-                        reasoning_effort,
-                        reasoning_effort,
-                    )
-                    if reasoning
-                    else False
-                ),
             }
         )
-        if self._tool_schemas:
+        reasoning_config = self.capabilities.reasoning_config
+        if reasoning_config.supported:
+            effort = reasoning_config.effort_map.get(
+                reasoning_effort,
+                reasoning_effort,
+            )
+            supported = reasoning_config.supported_efforts
+            if reasoning and supported and effort not in supported:
+                raise ValueError(
+                    f"ollama does not support reasoning effort "
+                    f"{reasoning_effort!r} (mapped to {effort!r})"
+                )
+            request["think"] = effort if reasoning else False
+        if self._tool_schemas and self.capabilities.tool_config.supported:
             request["tools"] = self.tool_schemas
         return request
 
@@ -179,7 +191,7 @@ class OllamaBot(BaseBot):
         import json
 
         deltas: list[ToolCallDelta] = []
-        for index, item in enumerate(value or []):
+        for fallback_index, item in enumerate(value or []):
             function = _read(item, "function", {})
             arguments = _read(function, "arguments", {})
             if isinstance(arguments, Mapping):
@@ -190,7 +202,9 @@ class OllamaBot(BaseBot):
                 )
             deltas.append(
                 ToolCallDelta(
-                    index=index,
+                    index=int(
+                        _read(function, "index", fallback_index)
+                    ),
                     call_id_delta=str(
                         _read(item, "id") or f"call_{uuid4().hex}"
                     ),
@@ -282,7 +296,7 @@ class OllamaBot(BaseBot):
         system_prompt: list[ApixSystemMessage] | None = None,
         reasoning: bool = True,
         reasoning_effort: ReasoningEffort = "high",
-        extra_body: dict[str, Any] = {},
+        extra_body: Mapping[str, Any] | None = None,
     ) -> ApixAiMessage:
         started = perf_counter()
         response = await self._client.chat(
@@ -309,7 +323,7 @@ class OllamaBot(BaseBot):
         system_prompt: list[AnyMessage] | None = None,
         reasoning: bool = True,
         reasoning_effort: ReasoningEffort = "high",
-        extra_body: dict[str, Any] = {},
+        extra_body: Mapping[str, Any] | None = None,
     ) -> AsyncIterator[ApixAiMessageChunk]:
         started = perf_counter()
         response_stream = await self._client.chat(
