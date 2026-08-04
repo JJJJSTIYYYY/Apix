@@ -851,11 +851,19 @@ class ToolNode(BaseNode):
             self.tool_set.append(wrapped_tool)
             self._tools_by_name[wrapped_tool.name] = wrapped_tool
 
-    def get_schemas(self) -> list[dict[str, Any]]:
-        """Return OpenAI tool definitions in registration order."""
+    def get_schemas(self, filter_names: set[str] | None = None) -> list[dict[str, Any]]:
+        """Return OpenAI tool definitions in registration order.
+        
+        Args:
+            filter_names: Optional set of tool names to filter the returned schemas.
+
+        Returns:
+            A list of tool schemas with OpenAI format for the registered tools, optionally filtered by name.
+        """
         return [
             registered_tool.get_schema()
             for registered_tool in self.tool_set
+            if filter_names is None or registered_tool.name in filter_names
         ]
 
     @staticmethod

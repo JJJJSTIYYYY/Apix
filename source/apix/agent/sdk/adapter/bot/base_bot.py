@@ -113,10 +113,11 @@ class BaseBot(ABC):
     def bind_tools(
         self,
         tool_set: Iterable[Tool] | ToolNode,
+        tool_permission_set: set[str] | None = None,
     ) -> Self:
         """Replace the tools bound to subsequent invoke and stream calls."""
         if isinstance(tool_set, ToolNode):
-            schemas = tool_set.get_schemas()
+            schemas = tool_set.get_schemas(filter_names=tool_permission_set)
         else:
             if isinstance(tool_set, (str, bytes)):
                 raise TypeError(
