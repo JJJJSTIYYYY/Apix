@@ -163,6 +163,7 @@ class ApixEventRegistry:
     def subscribe(
         self,
         *event_names: str,
+        exist_ok: bool = True,
         priority: float | None = None,
         between_handlers: tuple[str | None, str | None] | None = None,
         stop_when_error: bool = True,
@@ -175,6 +176,13 @@ class ApixEventRegistry:
         Args:
             event_names:
                 One or more event names to subscribe to.
+
+            exist_ok:
+                If ``True``, registering a handler with the same function name
+                for the same event(s) has no effect and the existing handler
+                is kept. If ``False``, attempting to register a handler with
+                the same function name for the same event(s) raises
+                ``EventHandlerAlreadyRegistered``.
 
             priority:
                 Handler priority. Handlers with higher priority values are
@@ -322,8 +330,8 @@ class ApixEventRegistry:
                 of the subscribed events.
 
             EventHandlerAlreadyRegistered:
-                If another handler with the same function name has already
-                been registered.
+                If ``exist_ok`` is ``False`` and another handler with the same
+                function name has already been registered.
         """
 
         if not event_names:
@@ -384,6 +392,8 @@ class ApixEventRegistry:
             handler_name = func.__name__
 
             if handler_name in self._handlers_meta:
+                if exist_ok:
+                    return func
                 raise EventHandlerAlreadyRegistered(
                     f"Handler `{handler_name}` already registered."
                 )

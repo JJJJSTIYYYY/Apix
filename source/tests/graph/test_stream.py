@@ -8,8 +8,8 @@ import pytest_asyncio
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.core.graph import START, GraphManager
-from apix.core.stream import get_stream_writer
-from apix.core.stream.stream_writer import StreamChannel
+from apix.core.graph.stream import get_stream_writer
+from apix.core.graph.stream.stream_writer import StreamChannel
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")

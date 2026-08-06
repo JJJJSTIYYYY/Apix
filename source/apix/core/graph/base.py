@@ -45,6 +45,12 @@ class KeepRef:
     This is useful for fields that represent shared runtime resources or
     mutable objects that should remain synchronized across copied states.
 
+    !!! Warning:
+        Fields marked with ``KeepRef`` are not recommended for concurrent use.
+        Since copied states share the same object reference, concurrent graph
+        executions or parallel node operations may access and mutate the same
+        object, causing unexpected side effects or race conditions.
+
     Example:
         ``context: Annotated[ContextOrganizer, KeepRef()]``
     """
@@ -67,7 +73,7 @@ class Reset:
     value: Any
 
 
-def get_auto_increase_keys(
+def get_auto_merge_keys(
     state_schema: type | None,
 ) -> frozenset[str]:
     """Return fields marked with :class:`AutoMerge` in a state schema.

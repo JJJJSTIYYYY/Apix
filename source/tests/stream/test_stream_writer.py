@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from apix.core.stream import StreamWriter, get_stream_writer
-from apix.core.stream.stream_writer import (
+from apix.core.graph.stream import StreamWriter, get_stream_writer
+from apix.core.graph.stream.stream_writer import (
     StreamChannel,
     noop_stream_writer,
     stream_writer_context,

@@ -238,6 +238,7 @@ async def test_finish_and_fail_do_not_replace_completed_future():
     completion = asyncio.get_running_loop().create_future()
     completion.set_result({"original": True})
     context = {
+        "run_id": "test_run",
         "state": {"replacement": True},
         "completion": completion,
     }

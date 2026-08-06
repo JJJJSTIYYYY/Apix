@@ -856,8 +856,39 @@ class TestOnEventDecorator:
         ]
         assert registry._register_order == 1
 
-    def test_on_event_duplicate_handler_raises(self):
-        """Registering the same handler name twice should raise."""
+    def test_on_event_duplicate_handler_is_ignored_by_default(self):
+        """Default duplicate registration keeps the existing handler."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def original_handler(event: ApixEvent):
+            pass
+
+        async def replacement_handler(event: ApixEvent):
+            pass
+
+        original_handler.__name__ = "same_handler"
+        replacement_handler.__name__ = "same_handler"
+
+        registry.subscribe("event.a", priority=3)(original_handler)
+        original_entry = registry.get_handlers("event.a")[0]
+        original_meta = registry.get_all_handlers_meta()["same_handler"]
+
+        decorated = registry.subscribe(
+            "event.a",
+            priority=1,
+            stop_when_error=False,
+            background=True,
+        )(replacement_handler)
+
+        assert decorated is replacement_handler
+        assert registry.get_handlers("event.a") == [original_entry]
+        assert registry.get_handlers("event.a")[0].callback is original_handler
+        assert registry.get_all_handlers_meta()["same_handler"] == original_meta
+        assert registry._register_order == 1
+
+    def test_on_event_duplicate_handler_raises_when_exist_ok_is_false(self):
+        """Strict duplicate registration raises without changing state."""
         registry = ApixEventRegistry()
         _reset_registry(registry)
 
@@ -867,9 +898,12 @@ class TestOnEventDecorator:
         registry.subscribe("event.a")(my_handler)
 
         with pytest.raises(EventHandlerAlreadyRegistered) as exc_info:
-            registry.subscribe("event.b")(my_handler)
+            registry.subscribe("event.a", exist_ok=False)(my_handler)
         assert "my_handler" in str(exc_info.value)
-        assert registry.get_handlers("event.b") == []
+        assert [
+            handler.name
+            for handler in registry.get_handlers("event.a")
+        ] == ["my_handler"]
         assert registry._register_order == 1
 
     def test_on_event_multiple_events_registration_is_atomic(self):
