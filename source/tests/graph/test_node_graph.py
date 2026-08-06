@@ -13,6 +13,10 @@ from apix.core.graph import (
     NodeGraph,
     Reset,
 )
+from apix.core.graph.context_store import GraphContextStore
+from apix.core.graph.context_store.context_store_manager import (
+    _context_store_manager,
+)
 
 
 def _graph_context(state=None):
@@ -248,3 +252,119 @@ async def test_finish_and_fail_do_not_replace_completed_future():
     graph._fail(context, RuntimeError("late failure"))
 
     assert await completion == {"original": True}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "context",
+    [
+        None,
+        {},
+        {"run_id": 1, "state": {}, "completion": None},
+        {"run_id": "run", "state": [], "completion": None},
+        {"run_id": "run", "state": {}, "completion": None},
+    ],
+)
+async def test_is_active_context_rejects_malformed_event_context(context):
+    """Graph listeners ignore events that do not carry a valid run context."""
+    graph = NodeGraph({}, {START: END})
+
+    assert await graph._is_active_context(context) is False
+
+
+@pytest.fixture
+def empty_context_store_manager():
+    """Isolate tests that exercise the process-wide store manager."""
+    _context_store_manager.clear_stores()
+    yield
+    _context_store_manager.clear_stores()
+
+
+@pytest.mark.asyncio
+async def test_abort_rejects_unknown_store_id(empty_context_store_manager):
+    """Abort requires a store registered by a live invocation."""
+    graph = NodeGraph({}, {START: END})
+
+    with pytest.raises(
+        ValueError,
+        match=r"Unknown graph context store ID `missing`",
+    ):
+        await graph.abort("missing")
+
+
+@pytest.mark.asyncio
+async def test_abort_rejects_store_for_inactive_run(
+    empty_context_store_manager,
+):
+    """A retained or foreign store cannot abort an inactive graph run."""
+    graph = NodeGraph({}, {START: END})
+    completion = asyncio.get_running_loop().create_future()
+    context = {
+        "run_id": "inactive-run",
+        "state": {"checkpoint": 1},
+        "steps": 0,
+        "completion": completion,
+    }
+    store = GraphContextStore("inactive-store")
+    store.set_store("inactive-run", context)
+    _context_store_manager.add_store(store)
+
+    with pytest.raises(
+        ValueError,
+        match=r"Unknown graph run ID `inactive-run`",
+    ):
+        await graph.abort(store.get_store_id())
+
+    assert not completion.done()
+    assert _context_store_manager.get_store("inactive-store") is store
+
+
+@pytest.mark.asyncio
+async def test_abort_finishes_active_run_with_saved_snapshot(
+    empty_context_store_manager,
+):
+    """Abort resolves completion, deactivates the run, and removes its store."""
+    graph = NodeGraph({}, {START: END})
+    completion = asyncio.get_running_loop().create_future()
+    context = {
+        "run_id": "active-run",
+        "state": {"history": ["saved"]},
+        "steps": 2,
+        "completion": completion,
+    }
+    store = GraphContextStore("active-store")
+    store.set_store("active-run", context)
+    _context_store_manager.add_store(store)
+    graph._active_runs.add("active-run")
+
+    await graph.abort(store.get_store_id())
+
+    result = await completion
+    assert result == {"history": ["saved"]}
+    assert result is not context["state"]
+    assert "active-run" not in graph._active_runs
+    assert _context_store_manager.get_store("active-store") is None
+
+
+@pytest.mark.asyncio
+async def test_abort_cannot_finish_same_run_twice(
+    empty_context_store_manager,
+):
+    """Successful abort removes the store used to identify the invocation."""
+    graph = NodeGraph({}, {START: END})
+    completion = asyncio.get_running_loop().create_future()
+    context = {
+        "run_id": "active-run",
+        "state": {},
+        "steps": 0,
+        "completion": completion,
+    }
+    store = GraphContextStore("single-use-store")
+    store.set_store("active-run", context)
+    _context_store_manager.add_store(store)
+    graph._active_runs.add("active-run")
+
+    await graph.abort(store.get_store_id())
+
+    with pytest.raises(ValueError, match="Unknown graph context store ID"):
+        await graph.abort(store.get_store_id())

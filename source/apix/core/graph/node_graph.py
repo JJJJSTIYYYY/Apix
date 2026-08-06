@@ -227,9 +227,8 @@ class NodeGraph:
         """Interrupt a graph invocation by its store ID.
 
         The graph's :data:`END` node is not executed, so the invocation's
-        completion future is resolved with a :class:`RuntimeError`. Any
-        queued chunks are yielded to the stream consumer before the exception
-        is raised.
+        completion future is resolved with the most recently saved state
+        snapshot. Any queued chunks are yielded before a stream ends.
 
         When this method is called, the graph execution is not interrupted
         immediately. Each node execution is performed against a previously
@@ -242,7 +241,7 @@ class NodeGraph:
         !!! If a graph invocation has no store, it cannot be aborted.
 
         Raises:
-            ValueError: If the graph invoked without a store or the store ID is unknown.
+            ValueError: If the store ID is unknown or its run is not active.
         """
         context_store = _context_store_manager.get_store(context_store_id)
         if not context_store:
@@ -333,8 +332,9 @@ class NodeGraph:
                     command_context,
                 )
 
-            next_context = {**context, "state": state, "steps": context["steps"] + 1}
-            await self._post_next(next_node, next_context)
+            context["state"] = state
+            context["steps"] += 1
+            await self._post_next(next_node, context)
         except Exception as exc:
             self._fail(context, exc)
 
