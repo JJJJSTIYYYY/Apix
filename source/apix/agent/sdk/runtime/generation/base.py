@@ -24,8 +24,8 @@ def get_generation_id() -> str:
 
 
 @contextmanager
-def stream_writer_context(generation_id: str) -> Generator[None]:
-    """Bind a writer for the duration of one node execution."""
+def generation_id_context(generation_id: str) -> Generator[None]:
+    """Bind a generation id for the duration of one node execution."""
     token = _current_generation_id.set(generation_id)
     try:
         yield

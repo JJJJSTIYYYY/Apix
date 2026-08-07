@@ -28,17 +28,18 @@ class ResourceCleaner:
         return cls._instance
 
     def __init__(self):
+        if getattr(self, "_initialized", False):
+            return
+        
         # Registered cleanup functions
         self._cleaners: list[Callable[[], Union[int, Awaitable[int]]]] = []
-
         # Background task
         self._task: Optional[asyncio.Task] = None
-
         # Default interval (seconds)
         self._interval = CACHE_CLEAN_INTERVAL
-
         # Running flag
         self._running = False
+        self._initialized = True
 
     # -----------------------------
     # Registration
