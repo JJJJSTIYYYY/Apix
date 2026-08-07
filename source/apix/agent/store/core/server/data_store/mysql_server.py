@@ -195,23 +195,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler(failure_factory=_identity_failure)
     async def create_a_user(self, payload: dict) -> dict:
-        """
-        Ensure user account exists. Call procedure create_a_user.
-        If user not exist, raise RuntimeError.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str, # user_uid
-                "username": str,
-                "password": str, # encrypted
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
         user_uid = payload["user_uid"]
         username = payload["username"]
         password = payload["password"]
@@ -227,22 +210,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler(failure_factory=_identity_failure)
     async def verify_user(self, payload: dict) -> dict:
-        """
-        Ensure user account exists. Call procedure verify_user.
-        If user not exist, raise RuntimeError.
-
-        Args:
-            payload: Dict, the format is {
-                "username": str,
-                "password": str, # encrypted
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
         username = payload["username"]
         password = payload["password"]
         res = await self._call_procedure("verify_user", (username, password))
@@ -258,22 +225,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def ensure_user_exists(self, payload: dict, exist: bool = True) -> dict:
-        """
-        Ensure user account exists. Call procedure ensure_user_exists.
-        If user not exist, raise RuntimeError.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-            }
-            exist: ensure exist if ture, else ensure not exist.
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
         user_uid = payload["user_uid"]
         user_name = payload.get("username")
         res = await self._call_procedure("ensure_user_exists", (user_uid, user_name))
@@ -290,20 +241,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def fetch_conversation_list(self, payload: dict) -> dict:
-        """
-        Get conversation history list for a user. Call procedure fetch_conversation_list.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [...] (list of conversation histories dicts),
-            }
-        """
         user_uid = payload["user_uid"]
         rows = await self._call_procedure("fetch_conversation_list", (str(user_uid),))
         return {
@@ -314,20 +251,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_conversation_meta_by_id(self, payload: dict) -> dict:
-        """
-        Get a conversation metadata. Call procedure get_conversation_meta_by_id.
-
-        Args:
-            payload: Dict, the format is {
-                "conversation_uid": conversation id,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [...] (list of conversation meta dicts),
-            }
-        """
         conversation_uid = payload["conversation_uid"]
         rows = await self._call_procedure("get_conversation_meta_by_id", (conversation_uid,))
         return {
@@ -338,23 +261,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def create_conversation(self, payload: dict) -> dict:
-        """
-        Create a new conversation record. Call procedure create_conversation.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "platform": str,
-                "title": "conversation title",
-                "workspace": "Agent work dir",
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "conversation_uid",
-            }
-        """
         user_uid = payload["user_uid"]
         platform = payload.get("platform", "default")
         conversation_uid = self._conversation_id_generator()
@@ -365,32 +271,12 @@ class MysqlService(DataServerBase):
         await self._call_procedure("create_conversation", (user_uid, platform, conversation_uid, title, workspace, is_cron))
         return {
             "success": True,
-            "messages": f"{conversation_uid}",
+            "messages": {"conversation_uid": conversation_uid},
         }
         
 
     @data_store_handler
     async def update_conversation(self, payload: dict) -> dict:
-        """
-        Update a conversation record. Call procedure update_conversation.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "title": "Conversation title",
-                "workspace": "Agent work dir",
-                "is_pinned": bool,
-                "is_deleted": bool,
-                "has_new_message": bool
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "conversation_uid",
-            }
-        """
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
         workspace = payload.get("workspace", None)
@@ -404,7 +290,7 @@ class MysqlService(DataServerBase):
         )
         return {
             "success": True,
-            "messages": f"{conversation_uid}",
+            "messages": "success",
         }
 
     # --------------------------------------------------
@@ -413,32 +299,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def append_message(self, payload: dict) -> dict:
-        """
-        Persist a message. Call procedure append_message.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "message": {
-                    "message_uid": unique message id,
-                    "generation_id": str,
-                    "role": 'user', 'ai', 'system', 'tool', 'info'
-                    "name": "assistant / user / tool name",
-                    "content": "message content",
-                    "metadata": {...},
-                    "extensions": {...},
-                    "node_id": str,
-                    "parent_id": str,
-                }
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or dict,
-            }
-        """
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
         message = payload["message"]
@@ -496,26 +356,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def delete_messages(self, payload: dict) -> dict:
-        """
-        Persist a peice of message. Call procedure delete_messages.
-        If len of messages list in payload is over one piece, only append the last one.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "messages": [ 
-                    str, 
-                    ...
-                ] # list of message node_id
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list[dict],
-            }
-        """
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
         messages = payload["messages"]
@@ -541,24 +381,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def fetch_messages_after_cursor(self, payload: dict) -> dict:
-        """
-        Get a batch of messages after cursor (include this cursor). Call procedure fetch_messages_after_cursor.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "cursor": int, # fetch messages with msg_cursor >= after_cursor
-                "limit": int, # max number of messages to fetch
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [...] (list of message dicts),
-                "next_cursor": new cursor = latest_msg_cursor + 1.
-            }
-        """
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
         after_cursor = payload.get("cursor", 0)
@@ -575,30 +397,6 @@ class MysqlService(DataServerBase):
         
     @data_store_handler
     async def search_messages_by_keyword(self, payload: dict) -> dict:
-        """
-        Search messages in all conversations. Call procedure search_messages_by_keyword.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str,
-                "keyword": str
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [...] (list of result dicts),
-            }
-
-            Result dict format: {
-                "conversation_uid": str,
-                "generation_id": str,
-                "role": str,
-                "content": str,
-                "title": str,
-                "last_active_at": str
-            }
-        """
         user_uid = payload["user_uid"]
         keyword: str = payload["keyword"]
 
@@ -627,34 +425,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def insert_skill_info(self, payload: dict) -> dict:
-        """
-        Insert uploaded skill metadata into MySQL.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "skills": [
-                    {
-                        "skill_id": str,
-                        "skill_name": str,
-                        "skill_description": str,
-                        "skill_version": str,
-                        "package_path": str,
-                        "package_size": int,
-                        "package_sha256": str,
-                    },
-                    ...
-                ]
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "success" or "fail: {e}",
-            }
-        """
-
         user_uid = payload["user_uid"]
         skill_info_list = payload.get("skills", [])
 
@@ -681,26 +451,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def update_skill_status(self, payload: dict) -> dict:
-        """
-        Update skill status (activate / deactivate / delete).
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "skill_id": str,
-                "is_active": bool | None,
-                "deleted": bool | None,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
-
-
         user_uid = payload["user_uid"]
         skill_id = payload["skill_id"]
         is_active = payload.get("is_active")
@@ -720,36 +470,6 @@ class MysqlService(DataServerBase):
         
     @data_store_handler
     async def fetch_available_skills(self, payload: dict) -> dict:
-        """
-        Fetch available skills for user.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "limit": int, // Optional, default 5.
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": [
-                    {
-                        "skill_id": str,
-                        "skill_name": str,
-                        "skill_description": str,
-                        "skill_version": str,
-                        "package_path": str,
-                        "package_size": int,
-                        "is_active": bool,
-                        "upload_at": str,
-                    },
-                    ...
-                ]
-            }
-        """
-
-
         user_uid = payload["user_uid"]
         limit = payload.get("limit", 5)
 
@@ -764,36 +484,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def fetch_target_skill(self, payload: dict) -> dict:
-        """
-        Fetch target skill for user.
-
-        Args:
-            payload: Dict, the format is
-            {
-                "user_uid": str,
-                "skill_id": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": [
-                    {
-                        "skill_id": str,
-                        "skill_name": str,
-                        "skill_description": str,
-                        "skill_version": str,
-                        "package_path": str,
-                        "package_size": int,
-                        "is_active": bool,
-                        "upload_at": str,
-                    }
-                ]
-            }
-        """
-
-        logger.info("[MysqlService][fetch_target_skill] enter.")
-
         user_uid = payload["user_uid"]
         skill_id = payload["skill_id"]
         rows = await self._call_procedure(
@@ -811,31 +501,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def fetch_shortterm_memory(self, payload: dict) -> dict:
-        """
-        Get a batch of memories. Call procedure fetch_shortterm_memory.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or [...] (list of message dicts),
-            }
-
-        NOTE:
-        message dicts format:
-            "messages": [
-                {
-                    "memory_id": str,
-                    "content": str,
-                    "created_timestamp": int,
-                }
-            ]
-        """
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
         rows = await self._call_procedure("fetch_shortterm_memory", (user_uid, conversation_uid))
@@ -847,23 +512,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def insert_shortterm_memory(self, payload: dict) -> dict:
-        """
-        Get a batch of memories. Call procedure insert_shortterm_memory.
-
-        Args:
-            payload: Dict, the format is {
-                "memory_id": str, # Related message_uid
-                "user_uid": user id,,
-                "conversation_uid": conversation id,
-                "content": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
         memory_id = payload["memory_id"]
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
@@ -878,22 +526,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def delete_shortterm_memory(self, payload: dict) -> dict:
-        """
-        Get a batch of memories. Call procedure delete_shortterm_memory.
-
-        Args:
-            payload: Dict, the format is {
-                "memory_ids": list[str], # Related message_uid values
-                "user_uid": user id,,
-                "conversation_uid": conversation id,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
         memory_ids = payload["memory_ids"]
         user_uid = payload["user_uid"]
         conversation_uid = payload["conversation_uid"]
@@ -909,44 +541,44 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def fetch_longterm_memory(self, payload: dict) -> dict:
-        """Fetch all active long-term memories owned by a user."""
-        rows = await self._call_procedure(
-            "fetch_longterm_memory",
-            (payload["user_uid"],),
-        )
-        return {"success": True, "messages": rows}
+        user_uid = payload["user_uid"]
+        rows = await self._call_procedure("fetch_longterm_memory", (user_uid,))
+        return {
+            "success": True, 
+            "messages": rows
+        }
 
     @data_store_handler
     async def insert_longterm_memory(self, payload: dict) -> dict:
-        """Insert one long-term memory."""
         memory_id = payload["memory_id"]
+        user_uid = payload["user_uid"]
+        title = payload["title"]
+        date = payload["date"]
+        content = payload["content"]
+        source = payload["source"]
         await self._call_procedure(
             "insert_longterm_memory",
-            (
-                memory_id,
-                payload["user_uid"],
-                payload["title"],
-                payload["date"],
-                payload["content"],
-                payload["source"],
-            ),
+            (memory_id, user_uid, title, date, content, source),
         )
-        return {"success": True, "messages": {"memory_id": memory_id}}
+        return {
+            "success": True, 
+            "messages": {
+                "memory_id": memory_id
+            }
+        }
 
     @data_store_handler
     async def update_longterm_memory(self, payload: dict) -> dict:
-        """Partially update or soft-delete one long-term memory."""
+        memory_id = payload["memory_id"]
+        user_uid = payload["user_uid"]
+        title = payload.get("title")
+        date = payload.get("date")
+        content = payload.get("content")
+        source = payload.get("source")
+        is_deleted = payload.get("is_deleted")
         await self._call_procedure(
             "update_longterm_memory",
-            (
-                payload["memory_id"],
-                payload["user_uid"],
-                payload.get("title"),
-                payload.get("date"),
-                payload.get("content"),
-                payload.get("source"),
-                payload.get("is_deleted"),
-            ),
+            (memory_id, user_uid, title, date, content, source, is_deleted),
         )
         return {"success": True, "messages": "success"}
         
@@ -956,26 +588,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def create_llm_provider(self, payload: dict) -> dict:
-        """
-        Insert a llm provider meta in database. Call procedure create_llm_provider.
-
-        Args:
-            payload: Dict, the format is {
-                "provider_id": str, # provider's unique id (uuid4)
-                "user_uid": str, # to indicate which user the data is from
-                "provider_name": str, # provider's name, not null
-                "type": str, # provider's protocol, default openai
-                "endpoint": str, # provider's endpoint, not null
-                "model_list": str, # provider's model list, not null
-                "description": str, # description for provider, default null
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or dict {"provider_id": str},
-            }
-        """
         provider_id = payload["provider_id"]
         user_uid = payload["user_uid"]
         provider_name = payload["provider_name"]
@@ -997,31 +609,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_llm_providers(self, payload: dict) -> dict:
-        """
-        Get all llm provider meta in database. Call procedure get_llm_providers.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str, # to indicate which user the request from
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list [
-                    {
-                        "provider_id": str,
-                        "provider_name": str,
-                        "type": str,
-                        "endpoint": str,
-                        "model_list": list,
-                        "description": str,
-                        "created_at": str
-                    },
-                    ...
-                ],
-            }
-        """
         user_uid = payload["user_uid"]
         rows = await self._call_procedure("get_llm_providers", (user_uid, ))
         return {
@@ -1032,30 +619,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_llm_provider_by_id(self, payload: dict) -> dict:
-        """
-        Get a llm provider meta in database. Call procedure get_llm_provider_by_id.
-
-        Args:
-            payload: Dict, the format is {
-                "provider_id": str, # provider's unique id (uuid4)
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list [
-                    {
-                        "provider_id": str,
-                        "provider_name": str,
-                        "type": str,
-                        "endpoint": str,
-                        "model_list": list,
-                        "description": str,
-                        "created_at": str
-                    }
-                ],
-            }
-        """
         provider_id = payload["provider_id"]
         rows = await self._call_procedure("get_llm_provider_by_id", (provider_id, ))
         return {
@@ -1066,27 +629,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def update_llm_provider(self, payload: dict) -> dict:
-        """
-        Update a llm provider meta in database, include is_deleted status. Call procedure update_llm_provider.
-
-        Args:
-            payload: Dict, the format is {
-                "provider_id": str, # provider's unique id (uuid4)
-                "user_uid": str, # to indicate which user the data is from
-                "provider_name": str, # Optional, provider's name
-                "type": str, # Optional, provider's protocol
-                "endpoint": str, # Optional, provider's endpoint
-                "model_list": str, # Optional, provider's model list
-                "description": str, # Optional, description for provider
-                "is_deleted": bool, # Optional, delete if true
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success",
-            }
-        """
         provider_id = payload["provider_id"]
         user_uid = payload["user_uid"]
         provider_name = payload.get("provider_name")
@@ -1114,29 +656,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def create_mcp_server(self, payload: dict) -> dict:
-        """
-        Insert a mcp server meta in database. Call procedure create_mcp_server.
-
-        Args:
-            payload: Dict, the format is {
-                "mcp_id": str,
-                "user_uid": str,
-                "mcp_name": str,
-                "transport": str,
-                "endpoint": str,
-                "config": dict,
-                "description": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or {
-                    "mcp_id": str
-                },
-            }
-        """
-
         mcp_id = payload["mcp_id"]
         user_uid = payload["user_uid"]
         mcp_name = payload["mcp_name"]
@@ -1161,25 +680,8 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_mcp_servers(self, payload: dict) -> dict:
-        """
-        Get all mcp servers in database. Call procedure get_mcp_servers.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list
-            }
-        """
-
         user_uid = payload["user_uid"]
-
         rows = await self._call_procedure("get_mcp_servers", (user_uid,),)
-
         return {
             "success": True,
             "messages": rows,
@@ -1189,25 +691,8 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_enabled_mcp_servers(self, payload: dict) -> dict:
-        """
-        Get enabled mcp servers in database. Call procedure get_enabled_mcp_servers.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list
-            }
-        """
-
         user_uid = payload["user_uid"]
-
         rows = await self._call_procedure("get_enabled_mcp_servers", (user_uid,),)
-
         return {
             "success": True,
             "messages": rows,
@@ -1217,33 +702,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def update_mcp_server(self, payload: dict) -> dict:
-        """
-        Update a mcp server meta in database. Call procedure update_mcp_server.
-
-        Args:
-            payload: Dict, the format is {
-                "mcp_id": str,
-                "user_uid": str,
-
-                "mcp_name": str,
-                "transport": str,
-                "endpoint": str,
-                "config": dict,
-                "description": str,
-
-                "enabled": bool,
-                "tool_count": int,
-
-                "is_deleted": bool,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "success" or "fail: {e}"
-            }
-        """
-
         mcp_id = payload["mcp_id"]
         user_uid = payload["user_uid"]
 
@@ -1279,33 +737,6 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def create_cron_task(self, payload: dict) -> dict:
-        """
-        Create a cron task in database. Call procedure create_cron_task.
-
-        Args:
-            payload: Dict, the format is {
-                "task_id": str,
-                "user_uid": str,
-                "conversation_uid": str,
-                "platform": str,
-                "task_name": str,
-                "prompt": str,
-                "execute": str,
-                "exec_time": str, # ISO-8601
-                "repeat": Literal["once", "day", "week", "month", "year"],
-                "extra_config": dict,
-                "description": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or {
-                    "task_id": str
-                }
-            }
-        """
-
         task_id = payload["task_id"]
         user_uid = payload["user_uid"]
         conversation_uid = payload.get("conversation_uid")
@@ -1339,21 +770,7 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_all_enabled_cron_tasks(self, payload: dict) -> dict:
-        """
-        Get all cron tasks in database. Call procedure get_all_enabled_cron_tasks.
-
-        Args:
-            payload: Dict, the format is { }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list
-            }
-        """
-
         rows = await self._call_procedure("get_all_enabled_cron_tasks", (),)
-
         return {
             "success": True,
             "messages": rows,
@@ -1363,25 +780,8 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_cron_tasks(self, payload: dict) -> dict:
-        """
-        Get all cron tasks in database. Call procedure get_cron_tasks.
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list
-            }
-        """
-
         user_uid = payload["user_uid"]
-
         rows = await self._call_procedure("get_cron_tasks", (user_uid,),)
-
         return {
             "success": True,
             "messages": rows,
@@ -1391,25 +791,8 @@ class MysqlService(DataServerBase):
 
     @data_store_handler
     async def get_cron_task_by_id(self, payload: dict) -> dict:
-        """
-        Get a cron task in database. Call procedure get_cron_task_by_id.
-
-        Args:
-            payload: Dict, the format is {
-                "task_id": str,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or list
-            }
-        """
-
         task_id = payload["task_id"]
-
         rows = await self._call_procedure("get_cron_task_by_id", (task_id,),)
-
         return {
             "success": True,
             "messages": rows,
@@ -1419,31 +802,6 @@ class MysqlService(DataServerBase):
         
     @data_store_handler
     async def update_cron_task(self, payload: dict) -> dict:
-        """
-        Update a cron task in database. Call procedure update_cron_task.
-
-        Args:
-            payload: Dict, the format is {
-                "task_id": str,
-                "conversation_uid": str,
-                "platform": str,
-                "task_name": str,
-                "prompt": str,
-                "execute": str,
-                "exec_time": str, # ISO-8601
-                "repeat": Literal["once", "day", "week", "month", "year"],
-                "extra_config": dict,
-                "description": str,
-                "is_deleted": bool,
-            }
-
-        Return:
-            dict, the format is {
-                "success": bool,
-                "messages": "fail: {e}" or "success"
-            }
-        """
-
         task_id = payload["task_id"]
         conversation_uid = payload.get("conversation_uid")
         platform = payload.get("platform")

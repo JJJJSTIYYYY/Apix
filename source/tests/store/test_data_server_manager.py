@@ -24,7 +24,7 @@ def make_dependencies():
             return_value={"success": True, "messages": "success"}
         ),
         create_conversation=AsyncMock(
-            return_value={"success": True, "messages": "conversation-1"}
+            return_value={"success": True, "messages": {"conversation_uid": "conversation-1"}}
         ),
     )
     return cache_store, data_store, SimpleNamespace(), SimpleNamespace()
@@ -136,7 +136,7 @@ async def test_submit_and_wait_matches_public_usage_example(monkeypatch):
         await manager.stop()
 
     assert query_id == "fixed-query-id"
-    assert result == {"success": True, "messages": "conversation-1"}
+    assert result == {"success": True, "messages": {"conversation_uid": "conversation-1"}}
     data_store.ensure_user_exists.assert_awaited_once_with(payload)
     data_store.create_conversation.assert_awaited_once_with(payload)
     assert query_id not in manager._results

@@ -211,7 +211,7 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
             "workspace": "/work",
             "is_cron": True,
         }
-    ) == {"success": True, "messages": "conv-1"}
+    ) == {"success": True, "messages": {"conversation_uid": "conv-1"}}
     call.assert_awaited_with(
         "create_conversation", ("u-1", "web", "conv-1", "Title", "/work", True)
     )
@@ -225,7 +225,7 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
             "is_deleted": False,
             "has_new_message": True,
         }
-    ) == {"success": True, "messages": "conv-1"}
+    ) == {"success": True, "messages": "success"}
     call.assert_awaited_with(
         "update_conversation",
         ("u-1", "conv-1", "New", "/new", True, False, True),

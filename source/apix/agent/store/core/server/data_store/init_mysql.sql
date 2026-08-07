@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     is_deleted BOOLEAN DEFAULT FALSE,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    latest_timestamp BIGINT NOT NULL DEFAULT 0,
+    -- latest_timestamp BIGINT NOT NULL DEFAULT 0,
 
     work_space VARCHAR(255) DEFAULT NULL COMMENT 'Agent work dir',
 

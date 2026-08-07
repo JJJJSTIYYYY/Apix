@@ -32,7 +32,7 @@ async def create_user_and_conversation(
             "workspace": "/workspace/demo",
         }
     )
-    assert conversation == {"success": True, "messages": conversation_uid}
+    assert conversation == {"success": True, "messages": {"conversation_uid": conversation_uid}}
 
 
 @pytest.mark.asyncio
@@ -152,7 +152,7 @@ async def test_users_conversations_and_messages(db, monkeypatch):
             "workspace": "/tmp/work",
             "is_cron": True,
         }
-    ) == {"success": True, "messages": "conv-1"}
+    ) == {"success": True, "messages": {"conversation_uid": "conv-1"}}
     conversations = (await db.fetch_conversation_list({"user_uid": "user-1"}))[
         "messages"
     ]
@@ -169,7 +169,7 @@ async def test_users_conversations_and_messages(db, monkeypatch):
             "workspace": "/tmp/new",
             "is_pinned": True,
         }
-    ) == {"success": True, "messages": "conv-1"}
+    ) == {"success": True, "messages": "success"}
     meta = (await db.get_conversation_meta_by_id(
         {"conversation_uid": "conv-1"}
     ))["messages"][0]

@@ -291,7 +291,7 @@ async def test_update_conversation_expires_deleted_conversation_cache():
     cache_store = SimpleNamespace(expire_immediately=AsyncMock())
     data_store = SimpleNamespace(
         update_conversation=AsyncMock(
-            return_value={"success": True, "messages": "updated"}
+            return_value={"success": True, "messages": "success"}
         )
     )
     executor = _executor(
@@ -317,7 +317,7 @@ async def test_update_conversation_skips_cache_and_normalizes_failure():
     cache_store = SimpleNamespace(expire_immediately=AsyncMock())
     data_store = SimpleNamespace(
         update_conversation=AsyncMock(
-            return_value={"success": True, "messages": "updated"}
+            return_value={"success": True, "messages": "success"}
         )
     )
     executor = _executor(

@@ -290,7 +290,7 @@ class SqliteService(DataServerBase):
                 payload.get("is_cron", False),
             ),
         )
-        return {"success": True, "messages": conversation_uid}
+        return {"success": True, "messages": {"conversation_uid": conversation_uid}}
 
     @data_store_handler
     async def update_conversation(self, payload: dict) -> dict:
@@ -315,7 +315,7 @@ class SqliteService(DataServerBase):
                 conversation_uid,
             ),
         )
-        return {"success": True, "messages": conversation_uid}
+        return {"success": True, "messages": "success"}
 
     # --------------------------------------------------
     # Messages

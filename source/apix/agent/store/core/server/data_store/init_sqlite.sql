@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     is_cron INTEGER NOT NULL DEFAULT 0,
     is_deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    latest_timestamp INTEGER NOT NULL DEFAULT 0,
+    -- latest_timestamp INTEGER NOT NULL DEFAULT 0,
     work_space TEXT,
     UNIQUE (user_uid, conversation_uid),
     FOREIGN KEY (user_uid) REFERENCES users(user_uid) ON DELETE CASCADE
