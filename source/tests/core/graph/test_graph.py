@@ -8,7 +8,7 @@ import pytest_asyncio
 
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
-from apix.common.type import InvalidNodeReturns
+from apix.core.utils.exception import InvalidNodeReturnsError
 from apix.core.graph import (
     AutoMerge,
     BaseNode,
@@ -551,7 +551,7 @@ async def test_invalid_node_result_is_propagated_to_caller():
         .compile_graph()
     )
 
-    with pytest.raises(InvalidNodeReturns, match="must return a dict or Command"):
+    with pytest.raises(InvalidNodeReturnsError, match="must return a dict or Command"):
         await graph.invoke({})
 
 

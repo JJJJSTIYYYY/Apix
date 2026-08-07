@@ -6,7 +6,7 @@ from apix.core.event.base import (
     HandlerEntry,
     HandlerMeta,
 )
-from apix.common.type import EventHandlerNotRegistered, EventHandlerAlreadyRegistered
+from apix.core.utils.exception import EventHandlerNotRegisteredError, EventHandlerAlreadyRegisteredError
 from apix.common.utils.logger import logger
 
 
@@ -49,7 +49,7 @@ class ApixEventRegistry:
         )
 
         if not handler:
-            raise EventHandlerNotRegistered(
+            raise EventHandlerNotRegisteredError(
                 f"Handler `{handler_name}` "
                 f"not registered."
             )
@@ -113,13 +113,13 @@ class ApixEventRegistry:
                     right_index = index
 
             if left_name is not None and left_index is None:
-                raise EventHandlerNotRegistered(
+                raise EventHandlerNotRegisteredError(
                     f"Handler `{left_name}` not registered "
                     f"for event `{event_name}`."
                 )
 
             if right_name is not None and right_index is None:
-                raise EventHandlerNotRegistered(
+                raise EventHandlerNotRegisteredError(
                     f"Handler `{right_name}` not registered "
                     f"for event `{event_name}`."
                 )
@@ -182,7 +182,7 @@ class ApixEventRegistry:
                 for the same event(s) has no effect and the existing handler
                 is kept. If ``False``, attempting to register a handler with
                 the same function name for the same event(s) raises
-                ``EventHandlerAlreadyRegistered``.
+                ``EventHandlerAlreadyRegisteredError``.
 
             priority:
                 Handler priority. Handlers with higher priority values are
@@ -325,11 +325,11 @@ class ApixEventRegistry:
                 have the same name, or the supplied left and right
                 boundaries are reversed.
 
-            EventHandlerNotRegistered:
+            EventHandlerNotRegisteredError:
                 If a non-``None`` boundary handler is not registered for one
                 of the subscribed events.
 
-            EventHandlerAlreadyRegistered:
+            EventHandlerAlreadyRegisteredError:
                 If ``exist_ok`` is ``False`` and another handler with the same
                 function name has already been registered.
         """
@@ -394,7 +394,7 @@ class ApixEventRegistry:
             if handler_name in self._handlers_meta:
                 if exist_ok:
                     return func
-                raise EventHandlerAlreadyRegistered(
+                raise EventHandlerAlreadyRegisteredError(
                     f"Handler `{handler_name}` already registered."
                 )
 

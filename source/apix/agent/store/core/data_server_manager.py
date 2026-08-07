@@ -215,7 +215,6 @@ async def query_store(action: str, payload: dict) -> Any:
     )
     result = await data_server_manager.wait_result(query_id)
     if not result.get("success"):
-        logger.error(f"Failed to access store: {result.get("messages")}")
-        raise RuntimeError("Some error occured in store layer, please check the logs for detail.")
+        raise RuntimeError(f"Failed to access store: {result.get("messages")}")
 
     return result

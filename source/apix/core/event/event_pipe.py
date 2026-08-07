@@ -22,7 +22,7 @@ from uuid import uuid4
 
 import httpx
 
-from apix.common.type.exception import EventChannelPermissionError, EventChannelUnavailableError
+from apix.core.utils.exception import EventChannelPermissionError, EventChannelUnavailableError
 from apix.config.base_config import (
     EVENT_CHANNEL_CONFIG,
     EVENT_CHANNEL_TYPE,

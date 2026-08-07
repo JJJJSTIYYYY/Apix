@@ -8,10 +8,7 @@ error handling, and metadata retrieval.
 import pytest
 
 from apix.core.event.base import ApixEvent, HandlerEntry
-from apix.common.type import (
-    EventHandlerNotRegistered,
-    EventHandlerAlreadyRegistered,
-)
+from apix.core.utils.exception import EventHandlerNotRegisteredError, EventHandlerAlreadyRegisteredError
 from apix.core.event.event_registry import ApixEventRegistry, apix_event_registry
 
 
@@ -343,7 +340,7 @@ class TestFindInsertIndex:
         )
 
         with pytest.raises(
-            EventHandlerNotRegistered,
+            EventHandlerNotRegisteredError,
             match="nonexistent",
         ) as exc_info:
             registry._find_insert_index(
@@ -366,7 +363,7 @@ class TestFindInsertIndex:
         )
 
         with pytest.raises(
-            EventHandlerNotRegistered,
+            EventHandlerNotRegisteredError,
             match="nonexistent",
         ) as exc_info:
             registry._find_insert_index(
@@ -392,7 +389,7 @@ class TestFindInsertIndex:
         )
 
         with pytest.raises(
-            EventHandlerNotRegistered,
+            EventHandlerNotRegisteredError,
             match="right_h",
         ):
             registry._find_insert_index(
@@ -416,7 +413,7 @@ class TestFindInsertIndex:
         )
 
         with pytest.raises(
-            EventHandlerNotRegistered,
+            EventHandlerNotRegisteredError,
             match="left_h",
         ):
             registry._find_insert_index(
@@ -531,7 +528,7 @@ class TestFindInsertIndex:
         registry = ApixEventRegistry()
 
         with pytest.raises(
-            EventHandlerNotRegistered,
+            EventHandlerNotRegisteredError,
             match="left_h",
         ):
             registry._find_insert_index(
@@ -634,11 +631,11 @@ class TestGetHandlerMeta:
         assert meta["priority"] == 2.5
 
     def test_get_handler_meta_not_found_raises(self):
-        """Should raise EventHandlerNotRegistered for unknown handler."""
+        """Should raise EventHandlerNotRegisteredError for unknown handler."""
         registry = ApixEventRegistry()
         _reset_registry(registry)
 
-        with pytest.raises(EventHandlerNotRegistered) as exc_info:
+        with pytest.raises(EventHandlerNotRegisteredError) as exc_info:
             registry.get_handler_meta("nonexistent")
         assert "nonexistent" in str(exc_info.value)
 
@@ -897,7 +894,7 @@ class TestOnEventDecorator:
 
         registry.subscribe("event.a")(my_handler)
 
-        with pytest.raises(EventHandlerAlreadyRegistered) as exc_info:
+        with pytest.raises(EventHandlerAlreadyRegisteredError) as exc_info:
             registry.subscribe("event.a", exist_ok=False)(my_handler)
         assert "my_handler" in str(exc_info.value)
         assert [
@@ -924,7 +921,7 @@ class TestOnEventDecorator:
         registry.subscribe("event.a")(right)
         register_order = registry._register_order
 
-        with pytest.raises(EventHandlerNotRegistered, match="right"):
+        with pytest.raises(EventHandlerNotRegisteredError, match="right"):
             registry.subscribe(
                 "event.a",
                 "event.b",

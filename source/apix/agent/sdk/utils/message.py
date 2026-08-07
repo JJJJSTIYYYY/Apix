@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal, TypeAlias, TypedDict
 from uuid import uuid4
 
-from apix.common.type import ChunkMergeError, IncompleteToolCallError
+from apix.agent.sdk.utils.exception import ChunkMergeError, IncompleteToolCallError
 
 
 # ============================================================

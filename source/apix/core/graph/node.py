@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from abc import ABC, abstractmethod
 from typing import Any, TypeGuard
 
-from apix.common.type import InvalidNodeReturns
+from apix.core.utils.exception import InvalidNodeReturnsError
 from apix.core.graph.base import Command, NodeFunction
 
 
@@ -39,7 +39,7 @@ class BaseNode(ABC):
         by item and preserve their original order.
 
         Raises:
-            InvalidNodeReturns: If the value cannot represent a valid command.
+            InvalidNodeReturnsError: If the value cannot represent a valid command.
         """
         if isinstance(result, list):
             return [
@@ -57,13 +57,13 @@ class BaseNode(ABC):
             goto = result.goto
 
             if not isinstance(update, Mapping):
-                raise InvalidNodeReturns("Command.update must be a dict.")
+                raise InvalidNodeReturnsError("Command.update must be a dict.")
             if (
                 result.has_goto
                 and goto is not None
                 and not isinstance(goto, str)
             ):
-                raise InvalidNodeReturns(
+                raise InvalidNodeReturnsError(
                     "Command.goto must be a string or None."
                 )
 
@@ -72,7 +72,7 @@ class BaseNode(ABC):
             return Command(update=dict(update))
 
         if not isinstance(result, Mapping):
-            raise InvalidNodeReturns(
+            raise InvalidNodeReturnsError(
                 "Node functions must return a dict or Command, or "
                 f"list[Command], got {type(result).__name__}."
             )
@@ -141,7 +141,7 @@ class Node(BaseNode):
         must return exactly one mapping or :class:`Command`.
         """
         if isinstance(result, list):
-            raise InvalidNodeReturns(
+            raise InvalidNodeReturnsError(
                 "Regular node functions must return a dict or Command, "
                 "not list[Command]."
             )

@@ -4,7 +4,7 @@ from dataclasses import is_dataclass
 
 import pytest
 
-from apix.common.type import InvalidNodeReturns
+from apix.core.utils.exception import InvalidNodeReturnsError
 from apix.core.graph import BaseNode, Command, Node
 
 
@@ -53,7 +53,7 @@ async def test_regular_node_rejects_an_ordered_command_list():
     ]
     node = Node(lambda state: commands, "multi_command")
 
-    with pytest.raises(InvalidNodeReturns, match="not list\\[Command\\]"):
+    with pytest.raises(InvalidNodeReturnsError, match="not list\\[Command\\]"):
         await node.execute({})
 
 
@@ -126,7 +126,7 @@ async def test_node_rejects_non_mapping_results(result):
     """Every node result must be representable as a mapping command."""
     node = Node(lambda state: result, "invalid_node")
 
-    with pytest.raises(InvalidNodeReturns, match="must return a dict or Command"):
+    with pytest.raises(InvalidNodeReturnsError, match="must return a dict or Command"):
         await node.execute({})
 
 
@@ -138,7 +138,7 @@ async def test_node_rejects_non_mapping_command_update():
         "invalid_update",
     )
 
-    with pytest.raises(InvalidNodeReturns, match="Command.update must be a dict"):
+    with pytest.raises(InvalidNodeReturnsError, match="Command.update must be a dict"):
         await node.execute({})
 
 
@@ -147,5 +147,5 @@ async def test_node_rejects_non_string_command_goto():
     """Command.goto accepts only node names or None."""
     node = Node(lambda state: Command(goto=1), "invalid_goto")
 
-    with pytest.raises(InvalidNodeReturns, match="Command.goto must be a string or None"):
+    with pytest.raises(InvalidNodeReturnsError, match="Command.goto must be a string or None"):
         await node.execute({})

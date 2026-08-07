@@ -53,17 +53,14 @@ class OllamaBot(BaseBot):
         self,
         *,
         model: str,
-        name: str = "assistant",
-        role_definition: str = "",
         endpoint: str | None = None,
         api_key: str = "",
         capabilities: ModelCapabilities | None = None,
+        role_definition: str = "",
         client: Any | None = None,
     ) -> None:
         super().__init__(
             model=model,
-            name=name,
-            role_definition=role_definition,
             endpoint=(
                 endpoint
                 if endpoint is not None
@@ -71,6 +68,7 @@ class OllamaBot(BaseBot):
             ),
             api_key=api_key,
             capabilities=capabilities,
+            role_definition=role_definition,
         )
         if client is None:
             from ollama import AsyncClient

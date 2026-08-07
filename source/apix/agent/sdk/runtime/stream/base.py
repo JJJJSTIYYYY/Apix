@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Required, TypedDict
 
-from apix.common.type.global_type import ApixIdentity
+from apix.common.type import ApixIdentity
 
 
 class MinimalChunkData(TypedDict, total=False):

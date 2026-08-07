@@ -28,9 +28,9 @@ from typing import (
 )
 from uuid import UUID
 
+from apix.agent.sdk.utils.exception import InvalidToolArgsError
 from apix.agent.sdk.utils.funcs import timer
 from apix.common.utils.logger import logger
-from apix.common.type import InvalidToolArgs
 from apix.core.graph import Command, BaseNode
 from apix.agent.sdk.tool.base import ToolFunction
 from apix.agent.sdk.tool.tool_context import ToolInjectionContext, AutoInjection
@@ -669,7 +669,7 @@ class Tool:
                 **arguments
             ) # Cheak required arguments.
         except TypeError as exc:
-            raise InvalidToolArgs(
+            raise InvalidToolArgsError(
                 f"Invalid arguments for tool {self.name!r}: {exc}"
             ) from exc
 

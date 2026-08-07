@@ -1,13 +1,13 @@
-class PlatformNotRegisteredError(Exception):
+class ProviderNotFoundError(Exception):
     
-    def __init__(self, message="Platform not registered error.", platform=None):
+    def __init__(self, message="Custom provider not found.", provider=None):
         """        
         Args:
             message: error message
             errors: error object
         """
         self.message = message
-        self.errors = platform if platform else ''
+        self.errors = provider if provider else ''
         super().__init__(self.message)
     
     def __str__(self):
@@ -15,21 +15,31 @@ class PlatformNotRegisteredError(Exception):
         return f"{self.message}{error_details}"
 
 
-class InvalidOutputsError(Exception):
+class ProviderTypeMismatchError(Exception):
     
-    def __init__(self, message="Invalid outputs detected", errors=None):
+    def __init__(self, message="Provider type mismatch.", provider=None):
         """        
         Args:
             message: error message
             errors: error object
         """
         self.message = message
-        self.errors = errors if errors else []
+        self.errors = provider if provider else ''
         super().__init__(self.message)
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
         return f"{self.message}{error_details}"
+    
 
-class IdentityError(ValueError):
-    """Ambiguous apix identity. Unknow user_uid, platform or conversation_uid"""
+class InvalidToolArgsError(TypeError):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+class ChunkMergeError(ValueError):
+    """Chunks belonging to different streams were merged."""
+
+
+class IncompleteToolCallError(ValueError):
+    """A streamed tool call cannot be converted into a complete tool call."""

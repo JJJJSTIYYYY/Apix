@@ -19,6 +19,7 @@ from apix.agent.sdk.adapter.bot.mimo_bot import XiaomiMIMOBot
 from apix.agent.sdk.adapter.bot.minimax_bot import MiniMaxBot
 from apix.agent.sdk.adapter.bot.ollama_bot import OllamaBot
 from apix.agent.sdk.adapter.bot.openai_bot import OpenAIBot
+from apix.agent.sdk.adapter.bot.custom_bot import CustomBot, get_custom_provider_meta
 
 __all__ = [
     "ApiStyle",
@@ -39,4 +40,6 @@ __all__ = [
     "StreamDeltaMode",
     "ToolConfig",
     "XiaomiMIMOBot",
+    "CustomBot",
+    "get_custom_provider_meta",
 ]

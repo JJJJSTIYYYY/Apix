@@ -34,7 +34,7 @@ from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
 )
-from apix.common.type import InvalidToolArgs
+from apix.agent.sdk.utils.exception import InvalidToolArgsError
 from apix.core.graph import Command, GraphManager
 
 
@@ -843,7 +843,7 @@ async def test_tool_execute_validates_state_name_and_bound_arguments():
             _tool_call("other", "call-name", {"value": "ok"}),
         )
 
-    with pytest.raises(InvalidToolArgs, match="Invalid arguments"):
+    with pytest.raises(InvalidToolArgsError, match="Invalid arguments"):
         await required.execute(
             {},
             _tool_call("required", "call-args"),

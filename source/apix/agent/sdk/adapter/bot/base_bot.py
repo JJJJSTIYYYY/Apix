@@ -17,6 +17,7 @@ from apix.agent.sdk.adapter.bot.base import (
     ReasoningEffort,
 )
 from apix.agent.sdk.tool import Tool, ToolNode
+from apix.agent.sdk.utils.context import RoleSchema, to_prompt
 from apix.agent.sdk.utils.message import (
     AnyMessage,
     ApixAiMessage,
@@ -117,18 +118,13 @@ class BaseBot(ABC):
         self,
         *,
         model: str,
-        name: str,
-        role_definition: str,
         endpoint: str,
         api_key: str,
         capabilities: ModelCapabilities | None = None,
+        role_definition: RoleSchema | None = None,
     ) -> None:
         if not isinstance(model, str) or not model.strip():
             raise ValueError("model must be a non-empty string")
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("name must be a non-empty string")
-        if not isinstance(role_definition, str):
-            raise TypeError("role_definition must be a string")
         if not isinstance(endpoint, str) or not endpoint.strip():
             raise ValueError("endpoint must be a non-empty string")
         if not isinstance(api_key, str):
@@ -139,18 +135,23 @@ class BaseBot(ABC):
             raise TypeError("capabilities must be a ModelCapabilities object")
 
         self.model = model.strip()
-        self.name = name.strip()
-        self.role_definition = role_definition.strip()
         self.endpoint = endpoint.rstrip("/")
         self.api_key = api_key
         if capabilities is not None:
             self.capabilities = capabilities
+        self.role_definition = role_definition
         self._tool_schemas: list[dict[str, Any]] = []
 
     @property
     def tool_schemas(self) -> list[dict[str, Any]]:
         """Return an isolated copy of the currently bound tool schemas."""
         return deepcopy(self._tool_schemas)
+
+    def bind_role_schema(self, role_schema: RoleSchema) -> Self:
+        """Bind a role schema to the bot instance."""
+        if not isinstance(role_schema, dict) or not "definition" in role_schema or not "name" in role_schema:
+            raise TypeError("role_schema must be a RoleSchema object")
+        return replace(self, role_definition=role_schema)
 
     def bind_tools(
         self,
@@ -199,7 +200,7 @@ class BaseBot(ABC):
         ordered = list(system_prompt or [])
         if self.role_definition:
             ordered.append(
-                ApixSystemMessage(content=self.role_definition, name=self.name)
+                ApixSystemMessage(content=to_prompt(self.role_definition, "RoleSchema"))
             )
         ordered.extend(messages)
         return ordered
@@ -496,11 +497,10 @@ class BaseOpenAIBot(BaseBot):
         self,
         *,
         model: str,
-        name: str = "assistant",
-        role_definition: str = "",
         endpoint: str | None = None,
         api_key: str,
         capabilities: ModelCapabilities | None = None,
+        role_definition: RoleSchema | None = None,
         client: Any | None = None,
     ) -> None:
         if not api_key:
@@ -513,11 +513,10 @@ class BaseOpenAIBot(BaseBot):
             raise ValueError("endpoint must be supplied for this provider")
         super().__init__(
             model=model,
-            name=name,
-            role_definition=role_definition,
             endpoint=resolved_endpoint,
             api_key=api_key,
             capabilities=capabilities,
+            role_definition=role_definition,
         )
 
         if client is None:
