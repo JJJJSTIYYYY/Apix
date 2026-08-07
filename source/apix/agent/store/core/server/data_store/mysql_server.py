@@ -2,9 +2,7 @@ import asyncio
 import re
 import json
 import time
-from functools import wraps
 from pathlib import Path
-from typing import Awaitable, Callable, TypeVar, cast
 
 try:
     import aiomysql
@@ -16,16 +14,10 @@ except ImportError as exc:
 from fastapi.encoders import jsonable_encoder
 
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
+from apix.agent.store.core.server.data_store.utils import data_store_handler
 from apix.common.lifespan.auto_init import auto_init
 from apix.config.base_config import MYSQL_BASE_URL, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, MYSQL_CHARSET, AUTO_COMMIT
 from apix.common.utils.logger import logger
-
-
-TaskHandler = TypeVar(
-    "TaskHandler",
-    bound=Callable[..., Awaitable[dict]],
-)
-FailureFactory = Callable[[Exception], dict]
 
 
 def _split_mysql_script(script: str) -> list[str]:
@@ -69,37 +61,6 @@ def _identity_failure(exc: Exception) -> dict:
             "uid": None,
         },
     }
-
-
-def data_store_handler(
-    func: TaskHandler | None = None,
-    *,
-    failure_factory: FailureFactory | None = None,
-) -> TaskHandler | Callable[[TaskHandler], TaskHandler]:
-    """Normalize unhandled failures from public data-store methods."""
-
-    def decorator(handler: TaskHandler) -> TaskHandler:
-        @wraps(handler)
-        async def wrapper(*args, **kwargs) -> dict:
-            logger.trace()
-            try:
-                return await handler(*args, **kwargs)
-            except Exception as exc:
-                logger.exception(
-                    f"Data-store handler `{handler.__name__}` failed: {exc}"
-                )
-                if failure_factory is not None:
-                    return failure_factory(exc)
-                return {
-                    "success": False,
-                    "messages": f"fail: {exc}",
-                }
-
-        return cast(TaskHandler, wrapper)
-
-    if func is None:
-        return decorator
-    return decorator(func)
 
 
 class MysqlService(DataServerBase):

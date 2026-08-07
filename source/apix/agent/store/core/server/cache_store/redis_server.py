@@ -8,6 +8,7 @@ except ImportError as exc:
     ) from exc
 
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
+from apix.agent.store.core.server.cache_store.utils import cache_store_handler
 from apix.common.lifespan.auto_init import auto_init
 from apix.common.utils.logger import logger
 from apix.config.base_config import MEMO_REDIS_URL, REDIS_POOL_SIZE, HOT_CACHE_DEFAULT_EXPIRE_SECONDS, STATIC_CACHE_DEFAULT_EXPIRE_SECONDS
@@ -39,467 +40,250 @@ class RedisService(CacheServerBase):
     # Memo Redis (Conversation Cache)
     # ------------------------------------------------------------------
 
+    @cache_store_handler
     async def append_message(self, payload: dict) -> dict:
-        """
-        Append message ONLY IF redis key already exists.
-        This method should only be called after append message to MySQL and then backfilling Redis.
+        key = self._build_memo_key(payload)
 
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "message": {
-                    "message_uid": "application unique message id",
-                    "role": 'user', 'ai', 'system', 'tool', 'info'
-                    "name": "assistant / user / tool name",
-                    "content": "message content",
-                    "metadata": {...},
-                    "extensions": {...},
-                    "node_id": str,
-                    "parent_id": str,
-                    "msg_cursor": int,
-                    "timestamp": str,
-                    "is_deleted": bool,
-                }
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}",
-            }
-        """
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-
-            # Redis miss → skip silently
-            if not await self._memo_redis.exists(key):
-                logger.warning(
-                    "Redis key not exists."
-                )
-                return {
-                    "success": True,
-                    "messages": "success",
-                }
-
-            message = payload.get("message", {})
-
-            async with self._memo_redis.pipeline() as pipe:
-                pipe.rpush(key, json.dumps(message, ensure_ascii=False))
-
-                pipe.expire(key, HOT_CACHE_DEFAULT_EXPIRE_SECONDS)
-                await pipe.execute()
-
+        # Redis miss → skip silently
+        if not await self._memo_redis.exists(key):
+            logger.warning("Redis key not exists.")
             return {
                 "success": True,
                 "messages": "success",
             }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False, 
-                "messages": f"fail: {e}"
-            }
-        
+        message = payload.get("message", {})
+
+        async with self._memo_redis.pipeline() as pipe:
+            pipe.rpush(key, json.dumps(message, ensure_ascii=False))
+            pipe.expire(key, HOT_CACHE_DEFAULT_EXPIRE_SECONDS)
+            await pipe.execute()
+
+        return {
+            "success": True,
+            "messages": "success",
+        }
+
+    @cache_store_handler
     async def backfill_messages(self, payload: dict) -> dict:
-        """
-        Backfill FULL messages into Redis (overwrite mode).
+        key = self._build_memo_key(payload)
+        messages = payload.get("messages", [])
 
-        This method should only be called after fetching FULL messages from MySQL.
+        if not isinstance(messages, list):
+            raise ValueError("Messages must be a list")
 
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "messages": [ ... ]  # FULL message list
-            }
+        # Empty list is allowed → clear cache
+        async with self._memo_redis.pipeline() as pipe:
+            # ---- Overwrite instead of append ----
+            pipe.delete(key)
 
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}",
-            }
-        """
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-            messages = payload.get("messages", [])
+            if messages:
+                pipe.rpush(
+                    key,
+                    *[json.dumps(msg, ensure_ascii=False) for msg in messages]
+                )
 
-            if not isinstance(messages, list):
-                raise ValueError("Messages must be a list")
+            pipe.expire(key, HOT_CACHE_DEFAULT_EXPIRE_SECONDS)
+            await pipe.execute()
 
-            # Empty list is allowed → clear cache
-            async with self._memo_redis.pipeline() as pipe:
-                # ---- Overwrite instead of append ----
-                pipe.delete(key)
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
-                if messages:
-                    pipe.rpush(
-                        key,
-                        *[json.dumps(msg, ensure_ascii=False) for msg in messages]
-                    )
-
-                pipe.expire(key, HOT_CACHE_DEFAULT_EXPIRE_SECONDS)
-                await pipe.execute()
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}"
-            }
-        
+    @cache_store_handler
     async def get_recent_messages(self, payload: dict) -> dict:
-        """
-        Fetch FULL messages from Redis cache (no cursor).
+        key = self._build_memo_key(payload)
 
-        Redis miss should be handled by caller (fallback to MySQL and backfill).
-
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-            }
-
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "fail: {e}" or [...] (list of message dicts),
-                "cache_hit": bool
-            }
-        """
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-
-            # ---- Fetch FULL list from Redis ----
-            raw = await self._memo_redis.lrange(key, 0, -1)
-            if not raw:
-                # Redis miss: empty or expired
-                return {
-                    "success": True,
-                    "messages": [],
-                    "cache_hit": False,
-                }
-
-            # ---- Decode all messages ----
-            messages = [json.loads(m) for m in raw]
-
+        # ---- Fetch FULL list from Redis ----
+        raw = await self._memo_redis.lrange(key, 0, -1)
+        if not raw:
+            # Redis miss: empty or expired
             return {
                 "success": True,
-                "messages": messages,
-                "cache_hit": True,
+                "messages": [],
+                "cache_hit": False,
             }
 
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
+        # ---- Decode all messages ----
+        messages = [json.loads(message) for message in raw]
+
+        return {
+            "success": True,
+            "messages": messages,
+            "cache_hit": True,
+        }
+
+    @cache_store_handler
     async def cache_current_messages_branch_chain(self, payload: dict) -> dict:
-        """
-        Cache the node id chain of the user's current message branch.
+        node_id_chain = payload.get("node_id_chain", [])
 
-        The chain contains all node ids from the root node to the current
-        branch tip node, preserving the exact branch path selected by the user.
+        if not isinstance(node_id_chain, list):
+            raise ValueError("node_id_chain must be a list")
 
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "node_id_chain": list
-            }
+        key = self._build_memo_key(payload, prefix="chain")
 
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}",
-            }
-        """
-        logger.trace()
-        try:
-            node_id_chain = payload.get("node_id_chain", [])
+        await self._memo_redis.set(
+            key,
+            json.dumps(node_id_chain, ensure_ascii=False),
+            ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+        )
 
-            if not isinstance(node_id_chain, list):
-                raise ValueError("node_id_chain must be a list")
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
-            key = self._build_memo_key(payload, prefix='chain')
-
-            await self._memo_redis.set(
-                key,
-                json.dumps(node_id_chain, ensure_ascii=False),
-                ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
-            )
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(
-                f"Error: {type(e).__name__}: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
-        
+    @cache_store_handler
     async def update_current_messages_branch_chain_cache(self, payload: dict) -> dict:
-        """
-        Best effort to update the cached chain.
+        node_id = payload["node_id"]
+        parent_id = payload["parent_id"]
 
-        If parent_id exist in cached chain, update node_id to cache,
-        otherwise do nothing.
+        key = self._build_memo_key(payload, prefix="chain")
 
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id,
-                "node_id": str,
-                "parent_id": str,
-            }
+        cached_chain = await self._memo_redis.get(key)
 
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "success / fail: {e}",
-            }
-        """
-        logger.trace()
-        try:
-            node_id = payload["node_id"]
-            parent_id = payload["parent_id"]
-
-            key = self._build_memo_key(payload, prefix="chain")
-
-            cached_chain = await self._memo_redis.get(key)
-
-            # Cache miss, do nothing
-            if not cached_chain:
-                return {
-                    "success": True,
-                    "messages": "cache not found",
-                }
-
-            node_id_chain = json.loads(cached_chain)
-
-            if not isinstance(node_id_chain, list):
-                raise ValueError("Cached node_id_chain must be a list")
-
-            # Parent node not in current branch chain, do nothing
-            if parent_id not in node_id_chain:
-                return {
-                    "success": True,
-                    "messages": "parent_id not found in cache",
-                }
-
-            parent_index = node_id_chain.index(parent_id)
-            
-            if (
-                parent_index == len(node_id_chain) - 2
-                and node_id_chain[-1] == node_id
-            ):
-                return {
-                    "success": True,
-                    "messages": "already up to date",
-                }
-
-            # Keep nodes before and including parent_id, then append new node_id as branch tip.
-            new_chain = node_id_chain[: parent_index + 1]
-            new_chain.append(node_id)
-
-            await self._memo_redis.set(
-                key,
-                json.dumps(new_chain, ensure_ascii=False),
-                ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
-            )
-
+        # Cache miss, do nothing
+        if not cached_chain:
             return {
                 "success": True,
-                "messages": "success",
+                "messages": "cache not found",
             }
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {type(e).__name__}: {e}"
-            )
+        node_id_chain = json.loads(cached_chain)
+
+        if not isinstance(node_id_chain, list):
+            raise ValueError("Cached node_id_chain must be a list")
+
+        # Parent node not in current branch chain, do nothing
+        if parent_id not in node_id_chain:
             return {
-                "success": False,
-                "messages": f"fail: {e}",
+                "success": True,
+                "messages": "parent_id not found in cache",
             }
-        
+
+        parent_index = node_id_chain.index(parent_id)
+
+        if (
+            parent_index == len(node_id_chain) - 2
+            and node_id_chain[-1] == node_id
+        ):
+            return {
+                "success": True,
+                "messages": "already up to date",
+            }
+
+        # Keep nodes through parent_id, then append node_id as the branch tip.
+        new_chain = node_id_chain[: parent_index + 1]
+        new_chain.append(node_id)
+
+        await self._memo_redis.set(
+            key,
+            json.dumps(new_chain, ensure_ascii=False),
+            ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+        )
+
+        return {
+            "success": True,
+            "messages": "success",
+        }
+
+    @cache_store_handler
     async def get_current_messages_branch_chain(self, payload: dict) -> dict:
-        """
-        Fetch the cached node id chain of the user's current message branch.
+        key = self._build_memo_key(payload, prefix="chain")
 
-        Args:
-            payload: Dict, the format is {
-                "user_uid": user id,
-                "conversation_uid": conversation id
-            }
+        raw = await self._memo_redis.get(key)
 
-        Return:
-            dict, the format is {
-                "success": True / False,
-                "messages": "fail: {e}" or list,
-                "cache_hit": bool
-            }
-        """
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload, prefix='chain')
-
-            raw = await self._memo_redis.get(key)
-
-            if not raw:
-                return {
-                    "success": True,
-                    "messages": [],
-                    "cache_hit": False,
-                }
-
-            node_id_chain = json.loads(raw)
-
+        if not raw:
             return {
                 "success": True,
-                "messages": node_id_chain,
-                "cache_hit": True,
+                "messages": [],
+                "cache_hit": False,
             }
 
-        except Exception as e:
-            logger.exception(
-                f"Error: {type(e).__name__}: {e}"
-            )
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        node_id_chain = json.loads(raw)
+
+        return {
+            "success": True,
+            "messages": node_id_chain,
+            "cache_hit": True,
+        }
 
     # ------------------------------------------------------------------
     # Read-through Resource Cache
     # ------------------------------------------------------------------
 
+    @cache_store_handler
     async def backfill_resource(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            messages = payload.get("messages")
-            if not isinstance(messages, list):
-                raise ValueError("Resource messages must be a list")
-            await self._memo_redis.set(
-                self._build_resource_key(payload),
-                json.dumps(messages, ensure_ascii=False),
-                ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
-            )
-            return {"success": True, "messages": "success"}
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+        messages = payload.get("messages")
+        if not isinstance(messages, list):
+            raise ValueError("Resource messages must be a list")
+        await self._memo_redis.set(
+            self._build_resource_key(payload),
+            json.dumps(messages, ensure_ascii=False),
+            ex=STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+        )
+        return {"success": True, "messages": "success"}
 
-
+    @cache_store_handler
     async def get_resource(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            raw = await self._memo_redis.get(
-                self._build_resource_key(payload)
-            )
-            if raw is None:
-                return {
-                    "success": True,
-                    "messages": [],
-                    "cache_hit": False,
-                }
-            messages = json.loads(raw)
-            if not isinstance(messages, list):
-                raise ValueError("Cached resource messages must be a list")
+        raw = await self._memo_redis.get(self._build_resource_key(payload))
+        if raw is None:
             return {
                 "success": True,
-                "messages": messages,
-                "cache_hit": True,
+                "messages": [],
+                "cache_hit": False,
             }
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+        messages = json.loads(raw)
+        if not isinstance(messages, list):
+            raise ValueError("Cached resource messages must be a list")
+        return {
+            "success": True,
+            "messages": messages,
+            "cache_hit": True,
+        }
 
-
+    @cache_store_handler
     async def invalidate_resource(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            if payload.get("cache_key") is not None:
-                keys = [self._build_resource_key(payload)]
-            else:
-                keys = [
-                    key
-                    async for key in self._memo_redis.scan_iter(
-                        match=f"{self._build_resource_prefix(payload)}*"
-                    )
-                ]
-            if keys:
-                await self._memo_redis.delete(*keys)
-            return {"success": True, "messages": "success"}
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+        if payload.get("cache_key") is not None:
+            keys = [self._build_resource_key(payload)]
+        else:
+            keys = [
+                key
+                async for key in self._memo_redis.scan_iter(
+                    match=f"{self._build_resource_prefix(payload)}*"
+                )
+            ]
+        if keys:
+            await self._memo_redis.delete(*keys)
+        return {"success": True, "messages": "success"}
 
 
     # ------------------------------------------------------------------
     # TTL
     # ------------------------------------------------------------------
 
-    async def set_expire(self, payload: dict, ttl_seconds: int = HOT_CACHE_DEFAULT_EXPIRE_SECONDS) -> dict:
-        """
-        set_expire to given ttl_seconds.
-        In order to unified:
-        - When payload dictionary contains key 'task_hash', it will be seen as set tasks TTL in redis.
-        - Else set conversation message list's TTL.
-        """
-        logger.trace()
-        try:
-            await self._memo_redis.expire(
-                self._build_memo_key(payload), ttl_seconds
-            )
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {"success": False, "messages": f"fail: {e}"}
+    @cache_store_handler
+    async def set_expire(
+        self,
+        payload: dict,
+        ttl_seconds: int = HOT_CACHE_DEFAULT_EXPIRE_SECONDS,
+    ) -> dict:
+        await self._memo_redis.expire(
+            self._build_memo_key(payload), ttl_seconds
+        )
         return {
-                "success": True,
-                "messages": "success",
-            }
+            "success": True,
+            "messages": "success",
+        }
 
+    @cache_store_handler
     async def expire_immediately(self, payload: dict) -> dict:
-        """
-        Expire key immediately.
-
-        Unified behavior:
-        - When payload contains 'task_hash', fetch task info then delete task redis key.
-        - Else delete memo redis key.
-        """
-        logger.trace()
-        try:
-            await self._memo_redis.delete(
-                self._build_memo_key(payload)
-            )
-
-            return {
-                "success": True,
-                "messages": "success",
-            }
-
-        except Exception as e:
-            logger.exception(f"Error: {type(e).__name__}: {e}")
-            return {
-                "success": False,
-                "messages": f"fail: {e}",
-            }
+        await self._memo_redis.delete(self._build_memo_key(payload))
+        return {
+            "success": True,
+            "messages": "success",
+        }
 
 
 cache_server = RedisService(MEMO_REDIS_URL)

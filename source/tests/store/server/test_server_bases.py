@@ -1,10 +1,14 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
+from apix.agent.store.core.server.cache_store import utils as cache_utils
+from apix.agent.store.core.server.cache_store.utils import cache_store_handler
 from apix.agent.store.core.server.data_store import data_server_base as data_base_module
+from apix.agent.store.core.server.data_store import utils as data_utils
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
+from apix.agent.store.core.server.data_store.utils import data_store_handler
 from apix.agent.store.core.server.rag_store.rag_server import RagService, rag_server
 
 
@@ -129,3 +133,72 @@ async def test_data_base_generates_string_id_and_default_optional_methods(monkey
 def test_rag_service_is_available_as_module_singleton():
     assert isinstance(rag_server, RagService)
     assert isinstance(RagService(), RagService)
+
+
+@pytest.mark.asyncio
+async def test_data_store_handler_traces_and_normalizes_failures(monkeypatch):
+    trace = Mock()
+    exception = Mock()
+    monkeypatch.setattr(data_utils.logger, "trace", trace)
+    monkeypatch.setattr(data_utils.logger, "exception", exception)
+
+    @data_store_handler
+    async def successful(value):
+        return {"success": True, "messages": value}
+
+    @data_store_handler
+    async def failing():
+        raise ValueError("database unavailable")
+
+    @data_store_handler(
+        failure_factory=lambda exc: {
+            "success": False,
+            "messages": {"error": type(exc).__name__},
+        }
+    )
+    async def custom_failure():
+        raise KeyError("missing identity")
+
+    assert successful.__name__ == "successful"
+    assert await successful("stored") == {
+        "success": True,
+        "messages": "stored",
+    }
+    assert await failing() == {
+        "success": False,
+        "messages": "fail: database unavailable",
+    }
+    assert await custom_failure() == {
+        "success": False,
+        "messages": {"error": "KeyError"},
+    }
+    assert trace.call_count == 3
+    assert exception.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cache_store_handler_traces_and_normalizes_failures(monkeypatch):
+    trace = Mock()
+    exception = Mock()
+    monkeypatch.setattr(cache_utils.logger, "trace", trace)
+    monkeypatch.setattr(cache_utils.logger, "exception", exception)
+
+    @cache_store_handler
+    async def successful(value):
+        return {"success": True, "messages": value}
+
+    @cache_store_handler
+    async def failing():
+        raise RuntimeError("cache unavailable")
+
+    assert successful.__name__ == "successful"
+    assert await successful("cached") == {
+        "success": True,
+        "messages": "cached",
+    }
+    assert await failing() == {
+        "success": False,
+        "messages": "fail: cache unavailable",
+    }
+    assert trace.call_count == 2
+    exception.assert_called_once()

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
+from apix.agent.store.core.server.cache_store.utils import cache_store_handler
 from apix.common.lifespan.auto_init import auto_init
 from apix.common.utils.logger import logger
 from apix.config.base_config import BASE_DIR, HOT_CACHE_DEFAULT_EXPIRE_SECONDS, STATIC_CACHE_DEFAULT_EXPIRE_SECONDS
@@ -69,210 +70,173 @@ class BuiltinService(CacheServerBase):
                 raise
 
 
+    @cache_store_handler
     async def append_message(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-            message = payload.get("message", {})
-            async with self._lock:
-                item = self._get_item(key)
-                if item is None:
-                    logger.warning("Builtin cache key not exists.")
-                    return {"success": True, "messages": "success"}
-                item["value"].append(copy.deepcopy(message))
-                item["expires_at"] = time.time() + HOT_CACHE_DEFAULT_EXPIRE_SECONDS
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
+        key = self._build_memo_key(payload)
+        message = payload.get("message", {})
+        async with self._lock:
+            item = self._get_item(key)
+            if item is None:
+                logger.warning("Builtin cache key not exists.")
+                return {"success": True, "messages": "success"}
+            item["value"].append(copy.deepcopy(message))
+            item["expires_at"] = time.time() + HOT_CACHE_DEFAULT_EXPIRE_SECONDS
+        return {"success": True, "messages": "success"}
 
+    @cache_store_handler
     async def backfill_messages(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-            messages = payload.get("messages", [])
-            if not isinstance(messages, list):
-                raise ValueError("Messages must be a list")
-            async with self._lock:
-                # Redis leaves no key when an empty list is backfilled.
-                if messages:
-                    self._set_item(key, copy.deepcopy(messages), HOT_CACHE_DEFAULT_EXPIRE_SECONDS)
-                else:
-                    self._cache.pop(key, None)
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
-
-    async def get_recent_messages(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-            async with self._lock:
-                item = self._get_item(key)
-                if item is None or not item["value"]:
-                    return {"success": True, "messages": [], "cache_hit": False}
-                return {
-                    "success": True,
-                    "messages": copy.deepcopy(item["value"]),
-                    "cache_hit": True,
-                }
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
-
-    async def cache_current_messages_branch_chain(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            node_id_chain = payload.get("node_id_chain", [])
-            if not isinstance(node_id_chain, list):
-                raise ValueError("node_id_chain must be a list")
-            key = self._build_memo_key(payload, prefix="chain")
-            async with self._lock:
-                self._set_item(key, copy.deepcopy(node_id_chain), STATIC_CACHE_DEFAULT_EXPIRE_SECONDS)
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
-
-    async def update_current_messages_branch_chain_cache(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            node_id = payload["node_id"]
-            parent_id = payload["parent_id"]
-            key = self._build_memo_key(payload, prefix="chain")
-            async with self._lock:
-                item = self._get_item(key)
-                if item is None:
-                    return {"success": True, "messages": "cache not found"}
-                node_id_chain = item["value"]
-                if not isinstance(node_id_chain, list):
-                    raise ValueError("Cached node_id_chain must be a list")
-                if parent_id not in node_id_chain:
-                    return {"success": True, "messages": "parent_id not found in cache"}
-                parent_index = node_id_chain.index(parent_id)
-                if parent_index == len(node_id_chain) - 2 and node_id_chain[-1] == node_id:
-                    return {"success": True, "messages": "already up to date"}
+        key = self._build_memo_key(payload)
+        messages = payload.get("messages", [])
+        if not isinstance(messages, list):
+            raise ValueError("Messages must be a list")
+        async with self._lock:
+            # Redis leaves no key when an empty list is backfilled.
+            if messages:
                 self._set_item(
-                    key, node_id_chain[: parent_index + 1] + [node_id], STATIC_CACHE_DEFAULT_EXPIRE_SECONDS
+                    key,
+                    copy.deepcopy(messages),
+                    HOT_CACHE_DEFAULT_EXPIRE_SECONDS,
                 )
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
+            else:
+                self._cache.pop(key, None)
+        return {"success": True, "messages": "success"}
 
-    async def get_current_messages_branch_chain(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload, prefix="chain")
-            async with self._lock:
-                item = self._get_item(key)
-                if item is None:
-                    return {"success": True, "messages": [], "cache_hit": False}
+    @cache_store_handler
+    async def get_recent_messages(self, payload: dict) -> dict:
+        key = self._build_memo_key(payload)
+        async with self._lock:
+            item = self._get_item(key)
+            if item is None or not item["value"]:
+                return {"success": True, "messages": [], "cache_hit": False}
+            return {
+                "success": True,
+                "messages": copy.deepcopy(item["value"]),
+                "cache_hit": True,
+            }
+
+    @cache_store_handler
+    async def cache_current_messages_branch_chain(self, payload: dict) -> dict:
+        node_id_chain = payload.get("node_id_chain", [])
+        if not isinstance(node_id_chain, list):
+            raise ValueError("node_id_chain must be a list")
+        key = self._build_memo_key(payload, prefix="chain")
+        async with self._lock:
+            self._set_item(
+                key,
+                copy.deepcopy(node_id_chain),
+                STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+            )
+        return {"success": True, "messages": "success"}
+
+    @cache_store_handler
+    async def update_current_messages_branch_chain_cache(self, payload: dict) -> dict:
+        node_id = payload["node_id"]
+        parent_id = payload["parent_id"]
+        key = self._build_memo_key(payload, prefix="chain")
+        async with self._lock:
+            item = self._get_item(key)
+            if item is None:
+                return {"success": True, "messages": "cache not found"}
+            node_id_chain = item["value"]
+            if not isinstance(node_id_chain, list):
+                raise ValueError("Cached node_id_chain must be a list")
+            if parent_id not in node_id_chain:
                 return {
                     "success": True,
-                    "messages": copy.deepcopy(item["value"]),
-                    "cache_hit": True,
+                    "messages": "parent_id not found in cache",
                 }
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
+            parent_index = node_id_chain.index(parent_id)
+            if (
+                parent_index == len(node_id_chain) - 2
+                and node_id_chain[-1] == node_id
+            ):
+                return {"success": True, "messages": "already up to date"}
+            self._set_item(
+                key,
+                node_id_chain[: parent_index + 1] + [node_id],
+                STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+            )
+        return {"success": True, "messages": "success"}
 
+    @cache_store_handler
+    async def get_current_messages_branch_chain(self, payload: dict) -> dict:
+        key = self._build_memo_key(payload, prefix="chain")
+        async with self._lock:
+            item = self._get_item(key)
+            if item is None:
+                return {"success": True, "messages": [], "cache_hit": False}
+            return {
+                "success": True,
+                "messages": copy.deepcopy(item["value"]),
+                "cache_hit": True,
+            }
+
+    @cache_store_handler
     async def set_expire(
         self, payload: dict, ttl_seconds: int = HOT_CACHE_DEFAULT_EXPIRE_SECONDS
     ) -> dict:
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-            async with self._lock:
-                item = self._get_item(key)
-                if item is not None:
-                    item["expires_at"] = time.time() + ttl_seconds
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
-        
+        key = self._build_memo_key(payload)
+        async with self._lock:
+            item = self._get_item(key)
+            if item is not None:
+                item["expires_at"] = time.time() + ttl_seconds
+        return {"success": True, "messages": "success"}
 
+    @cache_store_handler
     async def expire_immediately(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            key = self._build_memo_key(payload)
-            async with self._lock:
-                self._cache.pop(key, None)
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
+        key = self._build_memo_key(payload)
+        async with self._lock:
+            self._cache.pop(key, None)
+        return {"success": True, "messages": "success"}
 
     # ------------------------------------------------------------------
     # Read-through Resource Cache
     # ------------------------------------------------------------------
 
+    @cache_store_handler
     async def backfill_resource(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            messages = payload.get("messages")
-            if not isinstance(messages, list):
-                raise ValueError("Resource messages must be a list")
-            key = self._build_resource_key(payload)
-            async with self._lock:
-                self._set_item(
-                    key,
-                    copy.deepcopy(messages),
-                    STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
-                )
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
+        messages = payload.get("messages")
+        if not isinstance(messages, list):
+            raise ValueError("Resource messages must be a list")
+        key = self._build_resource_key(payload)
+        async with self._lock:
+            self._set_item(
+                key,
+                copy.deepcopy(messages),
+                STATIC_CACHE_DEFAULT_EXPIRE_SECONDS,
+            )
+        return {"success": True, "messages": "success"}
 
-
+    @cache_store_handler
     async def get_resource(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            key = self._build_resource_key(payload)
-            async with self._lock:
-                item = self._get_item(key)
-                if item is None:
-                    return {
-                        "success": True,
-                        "messages": [],
-                        "cache_hit": False,
-                    }
+        key = self._build_resource_key(payload)
+        async with self._lock:
+            item = self._get_item(key)
+            if item is None:
                 return {
                     "success": True,
-                    "messages": copy.deepcopy(item["value"]),
-                    "cache_hit": True,
+                    "messages": [],
+                    "cache_hit": False,
                 }
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
+            return {
+                "success": True,
+                "messages": copy.deepcopy(item["value"]),
+                "cache_hit": True,
+            }
 
-
+    @cache_store_handler
     async def invalidate_resource(self, payload: dict) -> dict:
-        logger.trace()
-        try:
-            async with self._lock:
-                if payload.get("cache_key") is not None:
-                    self._cache.pop(self._build_resource_key(payload), None)
-                else:
-                    prefix = self._build_resource_prefix(payload)
-                    matching_keys = [
-                        key for key in self._cache if key.startswith(prefix)
-                    ]
-                    for key in matching_keys:
-                        self._cache.pop(key, None)
-            return {"success": True, "messages": "success"}
-        except Exception as error:
-            logger.exception(f"Error: {type(error).__name__}: {error}")
-            return {"success": False, "messages": f"fail: {error}"}
+        async with self._lock:
+            if payload.get("cache_key") is not None:
+                self._cache.pop(self._build_resource_key(payload), None)
+            else:
+                prefix = self._build_resource_prefix(payload)
+                matching_keys = [
+                    key for key in self._cache if key.startswith(prefix)
+                ]
+                for key in matching_keys:
+                    self._cache.pop(key, None)
+        return {"success": True, "messages": "success"}
 
         
     def _set_item(self, key: str, value: Any, ttl_seconds: int) -> None:
