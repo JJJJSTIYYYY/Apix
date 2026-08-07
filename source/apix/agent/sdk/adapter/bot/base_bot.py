@@ -121,7 +121,7 @@ class BaseBot(ABC):
         endpoint: str,
         api_key: str,
         capabilities: ModelCapabilities | None = None,
-        role_definition: RoleSchema | None = None,
+        role_schema: RoleSchema | None = None,
     ) -> None:
         if not isinstance(model, str) or not model.strip():
             raise ValueError("model must be a non-empty string")
@@ -139,7 +139,9 @@ class BaseBot(ABC):
         self.api_key = api_key
         if capabilities is not None:
             self.capabilities = capabilities
-        self.role_definition = role_definition
+        self.role_schema: RoleSchema | None = None
+        if role_schema is not None:
+            self.bind_role_schema(role_schema)
         self._tool_schemas: list[dict[str, Any]] = []
 
     @property
@@ -149,9 +151,27 @@ class BaseBot(ABC):
 
     def bind_role_schema(self, role_schema: RoleSchema) -> Self:
         """Bind a role schema to the bot instance."""
-        if not isinstance(role_schema, dict) or not "definition" in role_schema or not "name" in role_schema:
+        if (
+            not isinstance(role_schema, dict)
+            or not isinstance(role_schema.get("name"), str)
+            or not role_schema["name"].strip()
+            or not isinstance(role_schema.get("definition"), str)
+            or (
+                role_schema.get("title") is not None
+                and not isinstance(role_schema.get("title"), str)
+            )
+        ):
             raise TypeError("role_schema must be a RoleSchema object")
-        return replace(self, role_definition=role_schema)
+
+        self.role_schema = deepcopy(role_schema)
+        return self
+
+    @property
+    def name(self) -> str:
+        """Return the bound role name or the default assistant name."""
+        if self.role_schema is None:
+            return "assistant"
+        return self.role_schema["name"].strip()
 
     def bind_tools(
         self,
@@ -198,9 +218,9 @@ class BaseBot(ABC):
             raise TypeError("system_prompt must be a list or None")
 
         ordered = list(system_prompt or [])
-        if self.role_definition:
+        if self.role_schema:
             ordered.append(
-                ApixSystemMessage(content=to_prompt(self.role_definition, "RoleSchema"))
+                ApixSystemMessage(content=to_prompt(self.role_schema, "RoleSchema"))
             )
         ordered.extend(messages)
         return ordered
@@ -500,7 +520,7 @@ class BaseOpenAIBot(BaseBot):
         endpoint: str | None = None,
         api_key: str,
         capabilities: ModelCapabilities | None = None,
-        role_definition: RoleSchema | None = None,
+        role_schema: RoleSchema | None = None,
         client: Any | None = None,
     ) -> None:
         if not api_key:
@@ -516,7 +536,7 @@ class BaseOpenAIBot(BaseBot):
             endpoint=resolved_endpoint,
             api_key=api_key,
             capabilities=capabilities,
-            role_definition=role_definition,
+            role_schema=role_schema,
         )
 
         if client is None:

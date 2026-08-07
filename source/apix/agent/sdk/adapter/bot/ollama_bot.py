@@ -17,6 +17,7 @@ from apix.agent.sdk.adapter.bot.base_bot import (
     _model_dump,
     _read,
 )
+from apix.agent.sdk.utils.context import RoleSchema
 from apix.agent.sdk.utils.message import (
     AnyMessage,
     ApixAiMessage,
@@ -56,7 +57,7 @@ class OllamaBot(BaseBot):
         endpoint: str | None = None,
         api_key: str = "",
         capabilities: ModelCapabilities | None = None,
-        role_definition: str = "",
+        role_schema: RoleSchema | None = None,
         client: Any | None = None,
     ) -> None:
         super().__init__(
@@ -68,7 +69,7 @@ class OllamaBot(BaseBot):
             ),
             api_key=api_key,
             capabilities=capabilities,
-            role_definition=role_definition,
+            role_schema=role_schema,
         )
         if client is None:
             from ollama import AsyncClient

@@ -152,8 +152,18 @@ def test_sdk_object_helpers_support_mappings_attributes_and_dump_protocols():
     ("kwargs", "error"),
     [
         ({"model": ""}, ValueError),
-        ({"model": "m", "name": ""}, ValueError),
-        ({"model": "m", "role_definition": None}, TypeError),
+        ({"model": "m", "role_schema": "assistant"}, TypeError),
+        (
+            {
+                "model": "m",
+                "role_schema": {
+                    "name": "",
+                    "title": None,
+                    "definition": "Be helpful.",
+                },
+            },
+            TypeError,
+        ),
         ({"model": "m", "endpoint": ""}, ValueError),
         ({"model": "m", "api_key": None}, TypeError),
     ],
@@ -161,8 +171,7 @@ def test_sdk_object_helpers_support_mappings_attributes_and_dump_protocols():
 def test_base_constructor_validates_required_properties(kwargs, error):
     defaults = {
         "model": "m",
-        "name": "assistant",
-        "role_definition": "",
+        "role_schema": None,
         "endpoint": "http://localhost:11434",
         "api_key": "",
         "client": object(),
@@ -170,6 +179,80 @@ def test_base_constructor_validates_required_properties(kwargs, error):
     defaults.update(kwargs)
     with pytest.raises(error):
         OllamaBot(**defaults)
+
+
+def test_bind_role_schema_binds_copies_and_replaces_role():
+    bot = DeepSeekBot(
+        model="deepseek-chat",
+        api_key="key",
+        client=object(),
+    )
+    role_schema = {
+        "name": " Alice ",
+        "title": "Assistant",
+        "definition": "Be concise.",
+    }
+
+    assert hasattr(bot, "name")
+    assert bot.role_schema is None
+    assert bot.bind_role_schema(role_schema) is bot
+    assert hasattr(bot, "name")
+    assert bot.role_schema == role_schema
+    assert [
+        message.content
+        for message in bot._ordered_messages(
+            [ApixUserMessage(content="question")],
+            [ApixSystemMessage(content="global")],
+        )
+    ] == [
+        "global",
+        (
+            "## Role Definition\n\n"
+            "- Your name: Alice.\n"
+            "- Your title: Assistant.\n"
+            "- Your Characteristics:\n"
+            "  Be concise.\n"
+        ),
+        "question",
+    ]
+
+    role_schema["name"] = "Changed externally"
+    assert bot.role_schema["name"] == " Alice "
+
+    replacement = {
+        "name": "Bob",
+        "title": None,
+        "definition": "Be thorough.",
+    }
+    bot.bind_role_schema(replacement)
+    assert bot.role_schema == replacement
+
+
+@pytest.mark.parametrize(
+    "role_schema",
+    [
+        None,
+        "assistant",
+        {},
+        {"name": "Alice"},
+        {"name": 1, "definition": "Be helpful."},
+        {"name": "Alice", "definition": None},
+        {
+            "name": "Alice",
+            "title": 1,
+            "definition": "Be helpful.",
+        },
+    ],
+)
+def test_bind_role_schema_rejects_invalid_values(role_schema):
+    bot = DeepSeekBot(
+        model="deepseek-chat",
+        api_key="key",
+        client=object(),
+    )
+
+    with pytest.raises(TypeError, match="RoleSchema"):
+        bot.bind_role_schema(role_schema)
 
 
 def test_explicit_api_key_is_required_for_openai_compatible_bots():
@@ -279,8 +362,11 @@ async def test_deepseek_invoke_orders_prompts_filters_roles_and_round_trips_reas
     bot = DeepSeekBot(
         model="deepseek-v4-flash",
         api_key="key",
-        name="Alice",
-        role_definition="You are Alice.",
+        role_schema={
+            "name": "Alice",
+            "title": None,
+            "definition": "You are Alice.",
+        },
         client=client,
     ).bind_tools([weather])
 
@@ -296,7 +382,12 @@ async def test_deepseek_invoke_orders_prompts_filters_roles_and_round_trips_reas
     request = client.create.calls[0]
     assert [item["content"] for item in request["messages"]] == [
         "global",
-        "You are Alice.",
+        (
+            "## Role Definition\n\n"
+            "- Your name: Alice.\n"
+            "- Your Characteristics:\n"
+            "  You are Alice.\n"
+        ),
         "weather?",
     ]
     assert request["reasoning_effort"] == "high"
@@ -485,8 +576,11 @@ async def test_openai_responses_invoke_preserves_output_items_and_tools():
     bot = OpenAIBot(
         model="gpt-test",
         api_key="key",
-        name="Alice",
-        role_definition="Be Alice.",
+        role_schema={
+            "name": "Alice",
+            "title": None,
+            "definition": "Be Alice.",
+        },
         client=client,
     ).bind_tools([weather])
 
@@ -502,7 +596,12 @@ async def test_openai_responses_invoke_preserves_output_items_and_tools():
     assert "include" not in request
     assert [item["content"] for item in request["input"]] == [
         "global",
-        "Be Alice.",
+        (
+            "## Role Definition\n\n"
+            "- Your name: Alice.\n"
+            "- Your Characteristics:\n"
+            "  Be Alice.\n"
+        ),
         "weather",
     ]
     assert request["tools"][0] == {
@@ -772,8 +871,11 @@ async def test_ollama_native_protocol_invoke_and_stream():
     )
     bot = OllamaBot(
         model="qwen3",
-        name="Alice",
-        role_definition="Be Alice.",
+        role_schema={
+            "name": "Alice",
+            "title": None,
+            "definition": "Be Alice.",
+        },
         client=client,
     ).bind_tools([weather])
 
@@ -785,7 +887,12 @@ async def test_ollama_native_protocol_invoke_and_stream():
     request = client.calls[0]
     assert [message["content"] for message in request["messages"]] == [
         "global",
-        "Be Alice.",
+        (
+            "## Role Definition\n\n"
+            "- Your name: Alice.\n"
+            "- Your Characteristics:\n"
+            "  Be Alice.\n"
+        ),
         "weather",
     ]
     assert request["think"] is False
