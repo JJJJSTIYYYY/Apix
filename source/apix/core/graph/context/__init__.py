@@ -1,4 +1,6 @@
-from apix.core.graph.context.base import GraphContext
-from apix.core.graph.context.graph_context import GraphContext
+from apix.core.graph.context.graph_context import (
+    GraphContext,
+    GraphContextStatus,
+)
 
-__all__ = ["GraphContext", "GraphContext"]
+__all__ = ["GraphContext", "GraphContextStatus"]

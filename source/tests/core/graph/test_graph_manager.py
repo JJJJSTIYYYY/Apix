@@ -163,3 +163,19 @@ def test_compile_forwards_node_timeouts_to_runtime():
     )
 
     assert graph._node_timeouts == {"source": 2.5}
+
+
+@pytest.mark.parametrize(
+    ("using_namespace", "expected"),
+    [(None, ""), ("", ""), ("agent-runtime", "agent-runtime")],
+)
+def test_compile_forwards_listener_namespace(using_namespace, expected):
+    """GraphManager exposes NodeGraph's listener namespace selection."""
+    graph = (
+        GraphManager()
+        .add_node(source)
+        .add_edge(START, "source")
+        .compile_graph(using_namespace=using_namespace)
+    )
+
+    assert graph._listener_namespace == expected

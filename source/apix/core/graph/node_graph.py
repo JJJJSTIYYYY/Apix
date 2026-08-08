@@ -6,6 +6,7 @@ import math
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from functools import partial
 from typing import Any
 
 from apix.core.event import ApixEvent, EventType, apix_event_loop, apix_event_registry, event_pipe_writer
@@ -14,12 +15,10 @@ from apix.core.graph.base import (
     START,
     Command,
     Reset,
-    get_auto_merge_keys,
-    get_keep_ref_keys
+    _copy_state,
+    get_node_name_in_namespace,
 )
-from apix.core.graph.context.graph_context_manager import _graph_context_manager
-from apix.core.graph.context.base import GraphContext
-from apix.core.graph.context.graph_context import GraphContext
+from apix.core.graph.context import GraphContext
 from apix.core.graph.node import BaseNode
 from apix.core.graph.stream import (
     StreamChannel,
@@ -46,6 +45,7 @@ class NodeGraph:
         node_timeouts: dict[str, float | None] | None = None,
         max_steps: int = 1024,
         state_schema: type | None = None,
+        using_namespace: str | None = None,
     ):
         """Create a compiled graph and register listeners for all node names.
 
@@ -55,9 +55,11 @@ class NodeGraph:
             node_timeouts: Optional per-node execution limits in seconds.
                 ``None`` and non-positive values wait indefinitely.
             max_steps: Maximum number of user-node executions in one run.
-            state_schema: Optional annotated state schema. Fields marked with
-                ``Annotated[..., AutoMerge()]`` are combined through their
-                current value's ``__add__`` method when updated.
+            state_schema: Default annotated schema for invocation contexts.
+                Fields marked with ``Annotated[..., AutoMerge()]`` are
+                combined through their current value's ``__add__`` method.
+            using_namespace: Namespace used by the graph's event listeners.
+                ``None`` and an empty string select the global namespace.
         """
         self._nodes = dict(nodes)
         self._default_gotos = dict(default_gotos)
@@ -76,16 +78,13 @@ class NodeGraph:
             for node_name in self._nodes
         }
         self._max_steps = max_steps
-        self._state_schema = state_schema
-        self._auto_increase_keys = get_auto_merge_keys(
-            state_schema
-        )
-        self._keep_ref_keys = get_keep_ref_keys(
-            state_schema
-        )
+        # Validate once at compilation, then create invocation-local contexts
+        # carrying all schema-derived state behavior.
+        GraphContext(state_schema)
+        self._context_factory = partial(GraphContext, state_schema)
         self._active_runs: set[str] = set()
         self._active_runs_lock = asyncio.Lock()
-        self._listener_namespace = uuid.uuid4().hex
+        self._listener_namespace = using_namespace or ""
         self._register_node_listeners()
 
 
@@ -106,54 +105,16 @@ class NodeGraph:
             return None
         return normalised
 
-
-    def _copy_state(self, state: dict) -> dict:
-        """Deep copy state while preserving references marked with ``KeepRef``.
-
-        Fields marked with ``Annotated[..., KeepRef()]`` keep their original
-        object references instead of being deep-copied. Other fields follow the
-        normal ``copy.deepcopy`` behavior.
-        """
-        if not isinstance(state, dict):
-            raise TypeError("Graph state must be a dict.")
-
-        if not self._keep_ref_keys:
-            return copy.deepcopy(state)
-
-        keep_refs = {
-            key: state[key]
-            for key in self._keep_ref_keys
-            if key in state
-        }
-
-        # Exclude kept fields before deepcopy so resource-like values do not
-        # need to support copying at all. Rebuild in the original key order;
-        # this also keeps normal deepcopy alias semantics among unmarked
-        # fields without leaking KeepRef semantics to an unmarked alias.
-        copied_values = copy.deepcopy(
-            {
-                key: value
-                for key, value in state.items()
-                if key not in keep_refs
-            }
-        )
-        return {
-            key: (
-                keep_refs[key]
-                if key in keep_refs
-                else copied_values[key]
-            )
-            for key in state
-        }
-
-
     def _register_node_listeners(self) -> None:
         """Subscribe handlers for user nodes plus the predefined start/end nodes."""
         for node_name in (START, *self._nodes, END):
             async def run_node(event: ApixEvent, *, _node_name: str = node_name) -> None:
                 """Extract context state and execute the event's graph node."""
                 context = event.context
-                if not await self._is_active_context(context):
+                if not await self._is_active_context(
+                    context,
+                    consume_event=True,
+                ):
                     return
                 if _node_name == START:
                     await self._execute_start(context)
@@ -162,35 +123,67 @@ class NodeGraph:
                 else:
                     await self._execute_node(_node_name, context)
 
-            run_node.__name__ = f"graph_listener_{self._listener_namespace}_{node_name}"
+            run_node.__name__ = get_node_name_in_namespace(node_name, self._listener_namespace)
             apix_event_registry.subscribe(node_name)(run_node)
 
 
-    async def _is_active_context(self, context: object) -> bool:
-        """Return whether an event context belongs to an active invocation."""
-        if not (
-            isinstance(context, dict)
-            and isinstance(context.get("run_id"), str)
-            and isinstance(context.get("state"), dict)
-            and isinstance(context.get("completion"), asyncio.Future)
+    async def _is_active_context(
+        self,
+        context: object,
+        *,
+        consume_event: bool = False,
+    ) -> bool:
+        """Return whether an event context belongs to an active invocation.
+
+        A completed or aborted context is removed from ``_active_runs`` when
+        its next queued event is inspected. The invocation's own ``finally``
+        block performs the same cleanup when no later event exists.
+        """
+        if (
+            not isinstance(context, GraphContext)
+            or not context._belongs_to(self._listener_namespace)
         ):
             return False
+        if consume_event:
+            context._event_received()
+        if not context.is_bound:
+            return False
 
+        run_id = context.run_id
+        assert run_id is not None
         async with self._active_runs_lock:
-            return context["run_id"] in self._active_runs
+            if run_id not in self._active_runs:
+                return False
+            if not context.is_active:
+                self._active_runs.discard(run_id)
+                return False
+            return True
 
 
-    async def invoke(self, state: dict, context_store: GraphContext = None) -> dict:
+    async def invoke(
+        self,
+        state: dict,
+        graph_context: GraphContext | None = None,
+    ) -> dict:
         """Start a graph invocation at :data:`START` and return its final state.
 
         The input state is deep-copied into the first event context. Independent
         invocations may run concurrently because all evolving state stays in
         their event contexts rather than on this graph object.
+
+        Args:
+            state: Initial graph state.
+            graph_context: Optional recoverable invocation context. Retaining
+                this object lets the caller abort or resume the run.
         """
-        return await self._invoke(state, noop_stream_writer(), context_store)
+        return await self._invoke(state, noop_stream_writer(), graph_context)
 
 
-    async def stream(self, state: dict, context_store: GraphContext = None) -> AsyncIterator[Any]:
+    async def stream(
+        self,
+        state: dict,
+        graph_context: GraphContext | None = None,
+    ) -> AsyncIterator[Any]:
         """Yield custom chunks emitted by nodes during one graph invocation.
 
         Nodes emit chunks by calling :func:`get_stream_writer` and invoking the
@@ -200,13 +193,15 @@ class NodeGraph:
 
         Args:
             state: Initial graph state. It is deep-copied before execution.
+            graph_context: Optional recoverable invocation context. Retaining
+                this object lets the caller abort or resume the stream.
 
         Yields:
             Custom chunks in the order in which nodes emitted them.
         """
         channel = StreamChannel()
         execution_task = asyncio.create_task(
-            self._invoke(state, channel.writer, context_store),
+            self._invoke(state, channel.writer, graph_context),
             name=f"graph-stream-{uuid.uuid4().hex}",
         )
         execution_task.add_done_callback(lambda task: channel.close())
@@ -223,8 +218,8 @@ class NodeGraph:
             channel.close()
 
 
-    async def abort(self, context_store_id: str) -> None:
-        """Interrupt a graph invocation by its store ID.
+    async def abort(self, graph_context: GraphContext) -> None:
+        """Interrupt the invocation represented by ``graph_context``.
 
         The graph's :data:`END` node is not executed, so the invocation's
         completion future is resolved with the most recently saved state
@@ -238,45 +233,64 @@ class NodeGraph:
         The :meth:`invoke` and :meth:`stream` interfaces return immediately
         with the state from the snapshot saved before the current node began.
 
-        !!! If a graph invocation has no store, it cannot be aborted.
+        The same operation is also available directly through
+        :meth:`GraphContext.abort`.
 
         Raises:
-            ValueError: If the store ID is unknown or its run is not active.
+            TypeError: If ``graph_context`` is not a GraphContext instance.
+            ValueError: If the context is not active in this graph.
         """
-        context_store = _graph_context_manager.get_store(context_store_id)
-        if not context_store:
-            raise ValueError(f"Unknown graph context store ID `{context_store_id}`.")
-        run_id = context_store.run_id
-        async with self._active_runs_lock:
-            if run_id not in self._active_runs:
-                raise ValueError(f"Unknown graph run ID `{run_id}`.")
-            self._active_runs.discard(run_id)
-        self._finish(context_store.graph_context)
+        if not isinstance(graph_context, GraphContext):
+            raise TypeError("NodeGraph.abort requires a GraphContext instance.")
+
+        if not await self._is_active_context(graph_context):
+            raise ValueError("Graph context is not active in this graph.")
+
+        graph_context.abort()
 
 
-    async def _invoke(self, state: dict, stream_writer: StreamWriter, context_store: GraphContext = None) -> dict:
+    async def _invoke(
+        self,
+        state: dict,
+        stream_writer: StreamWriter,
+        graph_context: GraphContext | None = None,
+    ) -> dict:
         """Run a graph with the writer assigned to each executing node."""
         if not isinstance(state, dict):
             raise TypeError("Graph state must be a dict.")
+        if graph_context is not None and not isinstance(
+            graph_context,
+            GraphContext,
+        ):
+            raise TypeError("graph_context must be a GraphContext or None.")
 
-        await apix_event_loop.start()
+        context = graph_context or self._context_factory()
+        if graph_context is not None:
+            context._adopt_default_state_schema(self._context_factory())
+
         run_id = "graph-"+uuid.uuid4().hex
         completion = asyncio.get_running_loop().create_future()
-        context: GraphContext = {
-            "run_id": run_id,
-            "state": self._copy_state(state),
-            "steps": 0,
-            "completion": completion,
-            "stream_writer": stream_writer,
-        }
-        if context_store is not None:
-            context_store.set_store(run_id, context)
-            _graph_context_manager.add_store(context_store)
-        async with self._active_runs_lock:
-            self._active_runs.add(run_id)
         try:
-            await self._post_next(START, context)
+            await apix_event_loop.start()
+            first_node = context._bind(
+                owner_id=self._listener_namespace,
+                run_id=run_id,
+                state=state,
+                completion=completion,
+                stream_writer=stream_writer,
+            )
+            async with self._active_runs_lock:
+                self._active_runs.add(run_id)
+            await self._post_next(first_node, context)
             return await completion
+        except asyncio.CancelledError:
+            if context._is_current_run(run_id):
+                context.abort()
+            raise
+        except Exception as exc:
+            if context.status in ("pending", "running"):
+                context._fail(exc)
+            raise
         finally:
             async with self._active_runs_lock:
                 self._active_runs.discard(run_id)
@@ -284,19 +298,25 @@ class NodeGraph:
 
     async def _execute_start(self, context: GraphContext) -> None:
         """Route the predefined start node to its configured successor."""
+        run_id = context.run_id
         try:
+            if not context._is_current_run(run_id):
+                return
             await self._post_next(self._default_gotos[START], context)
         except Exception as exc:
-            self._fail(context, exc)
+            if context._is_current_run(run_id):
+                self._fail(context, exc)
 
 
     async def _execute_node(self, node_name: str, context: GraphContext) -> None:
         """Inject context state into one node and emit its next-node event."""
+        run_id = context.run_id
+        context._node_started()
         try:
-            writer = context.get("stream_writer", noop_stream_writer())
+            writer = context.stream_writer or noop_stream_writer()
             with stream_writer_context(writer):
                 execution = self._nodes[node_name].execute(
-                    self._copy_state(context["state"])
+                    _copy_state(context.state, context._keep_ref_keys)
                 )
                 timeout = self._node_timeouts[node_name]
                 if timeout is None:
@@ -313,16 +333,23 @@ class NodeGraph:
                             f"Graph node `{node_name}` timed out after "
                             f"{timeout:g} seconds."
                         ) from exc
+
+            # An aborted attempt may finish its old node after a caller has
+            # already received the saved snapshot. Its result must never
+            # mutate a recovered context or enqueue another event.
+            if not context._is_current_run(run_id):
+                return
+
             commands = result if isinstance(result, list) else [result]
             if not commands:
                 commands = [Command()]
 
-            state = context["state"]
+            state = context.state
             next_node = self._default_gotos.get(node_name, END)
-            command_context = {**context}
+            command_context = copy.copy(context)
 
             for command in commands:
-                command_context["state"] = state
+                command_context.state = state
                 # Every command resolves a route independently. Later
                 # commands overwrite the route selected by earlier commands;
                 # an omitted goto resolves to this node's default route.
@@ -332,11 +359,14 @@ class NodeGraph:
                     command_context,
                 )
 
-            context["state"] = state
-            context["steps"] += 1
+            context.state = state
+            context.steps += 1
             await self._post_next(next_node, context)
         except Exception as exc:
-            self._fail(context, exc)
+            if context._is_current_run(run_id):
+                self._fail(context, exc)
+        finally:
+            context._node_finished()
 
 
     def apply_command(self, command: Command, node_name: str, context: GraphContext) -> tuple[dict, str]:
@@ -349,21 +379,21 @@ class NodeGraph:
         update = command.update
         if not isinstance(update, dict):
             raise TypeError("Command.update must be a dict.")
-        steps = context.get("steps", 0) + 1
+        steps = context.steps + 1
         if steps > self._max_steps:
             raise RecursionError(f"Graph exceeded its maximum of {self._max_steps} steps.")
 
-        state = self._copy_state(context["state"])
+        state = _copy_state(context.state, context._keep_ref_keys)
         # Command updates are state transfers too. Preserve a KeepRef value
         # when a node returns the marked field explicitly (including when it
         # returns its complete state snapshot).
-        update = self._copy_state(update)
+        update = _copy_state(update, context._keep_ref_keys)
 
         for key, value in update.items():
             if isinstance(value, Reset):
                 state[key] = value.value
             elif (
-                key in self._auto_increase_keys
+                key in context._auto_increase_keys
                 and key in state
             ):
                 current_value = state[key]
@@ -408,24 +438,24 @@ class NodeGraph:
         """Post a node-name event while retaining the invocation context."""
         if node_name not in (START, END) and node_name not in self._nodes:
             raise ValueError(f"Unknown graph node `{node_name}`.")
-        await event_pipe_writer.post_event(
-            event_type=EventType.WORKFLOW,
-            event_name=node_name,
-            context=context,
-        )
+        context._set_next_node(node_name)
+        context._event_posted()
+        try:
+            await event_pipe_writer.post_event(
+                event_type=EventType.WORKFLOW,
+                event_name=node_name,
+                context=context,
+            )
+        except BaseException:
+            context._event_received()
+            raise
 
 
     def _finish(self, context: GraphContext) -> None:
         """Resolve an invocation with the state carried by its END event."""
-        completion = context["completion"]
-        if not completion.done():
-            completion.set_result(self._copy_state(context["state"]))
-        _graph_context_manager.remove_store_by_run_id(context["run_id"])
+        context._finish()
 
 
     def _fail(self, context: GraphContext, error: Exception) -> None:
         """Resolve an invocation with the exception raised by a graph node."""
-        completion = context["completion"]
-        if not completion.done():
-            completion.set_exception(error)
-        _graph_context_manager.remove_store_by_run_id(context["run_id"])
+        context._fail(error)

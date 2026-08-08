@@ -614,13 +614,13 @@ async def test_graphs_with_same_node_name_do_not_handle_each_others_runs():
         GraphManager()
         .add_node(graph_a_node, "shared")
         .add_edge(START, "shared")
-        .compile_graph()
+        .compile_graph(using_namespace="graph-a")
     )
     graph_b = (
         GraphManager()
         .add_node(graph_b_node, "shared")
         .add_edge(START, "shared")
-        .compile_graph()
+        .compile_graph(using_namespace="graph-b")
     )
 
     results = await asyncio.gather(graph_a.invoke({}), graph_b.invoke({}))

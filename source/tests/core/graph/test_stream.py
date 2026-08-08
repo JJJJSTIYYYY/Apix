@@ -8,6 +8,7 @@ import pytest_asyncio
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.core.graph import START, GraphManager
+from apix.core.graph.context import GraphContext
 from apix.core.graph.stream import get_stream_writer
 from apix.core.graph.stream.stream_writer import StreamChannel
 
@@ -175,7 +176,7 @@ async def test_concurrent_streams_keep_writer_channels_isolated():
 
 
 async def test_closing_stream_early_cancels_its_graph_run():
-    """Closing the async generator releases its active invocation."""
+    """Closing the async generator releases its run and registered context."""
     release_node = asyncio.Event()
 
     async def node(state):
@@ -184,14 +185,84 @@ async def test_closing_stream_early_cancels_its_graph_run():
         return {}
 
     graph = GraphManager().add_node(node).add_edge(START, "node").compile_graph()
-    stream = graph.stream({})
+    context = GraphContext()
+    stream = graph.stream({}, context)
 
     assert await anext(stream) == "started"
     await stream.aclose()
 
     assert graph._active_runs == set()
+    assert context.status == "aborted"
     release_node.set()
     await asyncio.sleep(0)
+
+
+async def test_completed_context_cannot_be_reused():
+    """A GraphContext is consumed by its first invocation."""
+    graph = (
+        GraphManager()
+        .add_node(lambda state: {"finished": True}, "node")
+        .add_edge(START, "node")
+        .compile_graph()
+    )
+    context = GraphContext()
+
+    assert await graph.invoke({}, context) == {"finished": True}
+
+    assert context.status == "finished"
+    with pytest.raises(RuntimeError, match="must be pending"):
+        await graph.invoke({}, context)
+
+
+async def test_aborted_stream_context_can_resume_with_a_new_writer():
+    """Stream recovery waits for stale work and binds a fresh channel."""
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    first_finished = asyncio.Event()
+    attempts = 0
+
+    async def node(state):
+        nonlocal attempts
+        attempts += 1
+        writer = get_stream_writer()
+        if attempts == 1:
+            writer("first:started")
+            first_started.set()
+            await release_first.wait()
+            first_finished.set()
+            return {"stale": True}
+        writer("resumed:started")
+        await asyncio.sleep(0)
+        writer("resumed:finished")
+        return {"recovered": True}
+
+    graph = GraphManager().add_node(node).add_edge(START, "node").compile_graph()
+    context = GraphContext()
+    first_stream = graph.stream({"initial": True}, context)
+
+    assert await anext(first_stream) == "first:started"
+    await first_started.wait()
+    await graph.abort(context)
+    with pytest.raises(StopAsyncIteration):
+        await anext(first_stream)
+
+    resume_task = asyncio.create_task(context.resume())
+    await asyncio.sleep(0)
+    assert not resume_task.done()
+
+    release_first.set()
+    await first_finished.wait()
+    await resume_task
+
+    chunks = [
+        chunk
+        async for chunk in graph.stream(context.state, context)
+    ]
+
+    assert chunks == ["resumed:started", "resumed:finished"]
+    assert context.state == {"initial": True, "recovered": True}
+    assert "stale" not in context.state
+    assert context.status == "finished"
 
 
 async def test_stream_channel_close_is_idempotent_and_rejects_late_writes():

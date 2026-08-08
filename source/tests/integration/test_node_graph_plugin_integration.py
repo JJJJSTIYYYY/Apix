@@ -49,7 +49,7 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
     # insertion range; NodeGraph listeners use the default priority of 1.
     @apix_event_registry.subscribe(node_name, priority=10)
     async def plugin_demo_authentication(event: ApixEvent) -> None:
-        event.context["state"]["pipeline"].append("authentication-plugin")
+        event.context.state["pipeline"].append("authentication-plugin")
 
     # A plugin is just another event subscriber. Function names identify the
     # two existing handlers between which it should be inserted.
@@ -61,7 +61,7 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
         ),
     )
     async def plugin_demo_enrichment(event: ApixEvent) -> None:
-        state = event.context["state"]
+        state = event.context.state
         state["pipeline"].append("enrichment-plugin")
         state["plugin_value"] = "injected through event plugin"
 

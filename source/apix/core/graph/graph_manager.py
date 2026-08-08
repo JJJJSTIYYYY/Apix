@@ -34,9 +34,9 @@ class GraphManager:
 
         Args:
             state_schema:
-                Optional annotated state schema. :class:`NodeGraph` uses it to
-                discover fields marked with :class:`AutoMerge`. Omitting it
-                preserves normal dictionary overwrite behaviour.
+                Optional annotated state schema used as the default for each
+                invocation's :class:`GraphContext`. Omitting it preserves
+                normal dictionary overwrite behaviour.
         """
         self._state_schema = state_schema
         self._nodes: dict[str, BaseNode] = {}
@@ -207,8 +207,16 @@ class GraphManager:
         return self
 
 
-    def compile_graph(self) -> NodeGraph:
+    def compile_graph(
+        self,
+        using_namespace: str | None = None,
+    ) -> NodeGraph:
         """Compile this definition into an event-listening :class:`NodeGraph`.
+
+        Args:
+            using_namespace: Namespace used by the compiled graph's event
+                listeners. ``None`` and an empty string select the global
+                namespace.
 
         Raises:
             ValueError: If no transition has been defined from :data:`START`.
@@ -220,4 +228,5 @@ class GraphManager:
             self._default_gotos,
             node_timeouts=self._node_timeouts,
             state_schema=self._state_schema,
+            using_namespace=using_namespace,
         )

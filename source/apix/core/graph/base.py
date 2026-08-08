@@ -1,5 +1,6 @@
 """Shared types and predefined node names for graph execution."""
 
+import copy
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,8 +18,8 @@ from typing import (
 class AutoMerge:
     """Mark an ``Annotated`` state field as auto-increasing.
 
-    This class contains no runtime data. It is only metadata inspected by
-    :class:`NodeGraph` when a :class:`Command` update is applied.
+    This class contains no runtime data. It is metadata collected by
+    :class:`GraphContext` and used when a :class:`Command` update is applied.
 
     When an existing marked field is updated, the graph calls the current
     value's ``__add__`` method with the update value. A field that is not yet
@@ -35,8 +36,8 @@ class AutoMerge:
 class KeepRef:
     """Mark an ``Annotated`` state field to keep its reference during copying.
 
-    This class contains no runtime data. It is only metadata inspected by
-    :class:`NodeGraph` when a state copy operation is performed.
+    This class contains no runtime data. It is metadata collected by
+    :class:`GraphContext` and used when a state copy operation is performed.
 
     When a marked field is copied, the graph keeps the original field value's
     reference instead of creating a copied object. Other state fields continue
@@ -71,6 +72,51 @@ class Reset:
     """
 
     value: Any
+
+
+def _copy_state(
+    state: dict,
+    keep_ref_keys: frozenset[str],
+) -> dict:
+    """Copy graph state while preserving fields marked with ``KeepRef``.
+
+    Args:
+        state: State mapping to copy.
+        keep_ref_keys: Fields whose values must retain object identity.
+
+    Raises:
+        TypeError: If ``state`` is not a dictionary.
+    """
+    if not isinstance(state, dict):
+        raise TypeError("Graph state must be a dict.")
+
+    if not keep_ref_keys:
+        return copy.deepcopy(state)
+
+    keep_refs = {
+        key: state[key]
+        for key in keep_ref_keys
+        if key in state
+    }
+
+    # Exclude kept fields before deepcopy so resource-like values do not need
+    # to support copying. Rebuilding in original key order also preserves the
+    # alias behavior of ordinary fields.
+    copied_values = copy.deepcopy(
+        {
+            key: value
+            for key, value in state.items()
+            if key not in keep_refs
+        }
+    )
+    return {
+        key: (
+            keep_refs[key]
+            if key in keep_refs
+            else copied_values[key]
+        )
+        for key in state
+    }
 
 
 def get_auto_merge_keys(
@@ -221,3 +267,14 @@ NodeFunction: TypeAlias = (
     | Callable[[dict[str, Any]], Awaitable[NodeResult]]
 )
 """A synchronous or asynchronous callable that receives graph state."""
+
+
+def get_node_name_in_namespace(node_name: str, namespace: str | None) -> str:
+    """Return a node name qualified by a namespace.
+
+    Args:
+        node_name: Node name to qualify.
+        namespace: Namespace to prepend. ``None`` and an empty string select
+            the global namespace, which does not modify the node name.
+    """
+    return f"graph_listener_{namespace or ""}_{node_name}"

@@ -5,26 +5,48 @@ from typing import Annotated, TypedDict
 
 import pytest
 
+from apix.core.event import apix_event_loop, event_pipe_writer
 from apix.core.graph import (
     AutoMerge,
     Command,
     END,
     START,
+    Node,
     NodeGraph,
     Reset,
 )
 from apix.core.graph.context import GraphContext
-from apix.core.graph.context.graph_context_manager import (
-    _graph_context_manager,
-)
+from apix.core.graph.stream import noop_stream_writer
 
 
-def _graph_context(state=None):
+def _graph_context(
+    state=None,
+    state_schema: type | None = None,
+) -> GraphContext:
     """Build the minimal context required by apply_command."""
-    return {
-        "state": state or {},
-        "steps": 0,
-    }
+    context = GraphContext(state_schema)
+    context.state = state if state is not None else {}
+    return context
+
+
+def _bound_context(
+    graph: NodeGraph,
+    run_id: str,
+    state: dict,
+    *,
+    steps: int = 0,
+) -> GraphContext:
+    """Build a fully bound context for lifecycle unit tests."""
+    context = GraphContext()
+    context._bind(
+        owner_id=graph._listener_namespace,
+        run_id=run_id,
+        state=state,
+        completion=asyncio.get_running_loop().create_future(),
+        stream_writer=noop_stream_writer(),
+    )
+    context.steps = steps
+    return context
 
 
 def test_apply_command_rejects_non_dict_update():
@@ -33,6 +55,29 @@ def test_apply_command_rejects_non_dict_update():
 
     with pytest.raises(TypeError, match="Command.update must be a dict"):
         graph.apply_command(Command(update=[]), START, _graph_context())
+
+
+@pytest.mark.parametrize("using_namespace", [None, ""])
+def test_empty_listener_namespace_uses_global_namespace(using_namespace):
+    """None and an empty string both select the global listener namespace."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        using_namespace=using_namespace,
+    )
+
+    assert graph._listener_namespace == ""
+
+
+def test_listener_namespace_uses_supplied_value():
+    """A non-empty listener namespace is retained without random suffixes."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        using_namespace="agent-runtime",
+    )
+
+    assert graph._listener_namespace == "agent-runtime"
 
 
 def test_apply_command_rejects_non_string_goto():
@@ -84,7 +129,8 @@ def test_apply_command_auto_increases_annotated_fields():
             "values": [1],
             "total": 2,
             "replaced": [1],
-        }
+        },
+        AutoMergeState,
     )
 
     state, next_node = graph.apply_command(
@@ -105,7 +151,7 @@ def test_apply_command_auto_increases_annotated_fields():
         "replaced": [2],
     }
     assert next_node == END
-    assert context["state"] == {
+    assert context.state == {
         "values": [1],
         "total": 2,
         "replaced": [1],
@@ -123,7 +169,7 @@ def test_apply_command_initializes_missing_auto_increase_field():
     state, _ = graph.apply_command(
         Command(update={"values": [1]}),
         START,
-        _graph_context(),
+        _graph_context(state_schema=AutoMergeState),
     )
 
     assert state == {"values": [1]}
@@ -141,7 +187,10 @@ def test_auto_merge_requires_callable_add_method():
         graph.apply_command(
             Command(update={"values": [1]}),
             START,
-            _graph_context({"values": MissingAdd()}),
+            _graph_context(
+                {"values": MissingAdd()},
+                AutoMergeState,
+            ),
         )
 
 
@@ -157,7 +206,10 @@ def test_auto_merge_rejects_not_implemented_addition():
         graph.apply_command(
             Command(update={"values": [1]}),
             START,
-            _graph_context({"values": UnsupportedAdd()}),
+            _graph_context(
+                {"values": UnsupportedAdd()},
+                AutoMergeState,
+            ),
         )
 
 
@@ -172,7 +224,8 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
         {
             "values": [1, 2],
             "replaced": [1, 2],
-        }
+        },
+        AutoMergeState,
     )
 
     state, _ = graph.apply_command(
@@ -190,7 +243,7 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
         "values": [3],
         "replaced": [4],
     }
-    assert context["state"] == {
+    assert context.state == {
         "values": [1, 2],
         "replaced": [1, 2],
     }
@@ -207,7 +260,7 @@ def test_replace_initializes_missing_auto_increase_field():
     state, _ = graph.apply_command(
         Command(update={"values": Reset([1])}),
         START,
-        _graph_context(),
+        _graph_context(state_schema=AutoMergeState),
     )
 
     assert state == {"values": [1]}
@@ -226,6 +279,23 @@ def test_node_graph_rejects_non_class_state_schema():
         )
 
 
+def test_state_schema_metadata_lives_on_graph_context():
+    """NodeGraph retains only a factory for invocation-local state behavior."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoMergeState,
+    )
+    context = graph._context_factory()
+
+    assert not hasattr(graph, "_state_schema")
+    assert not hasattr(graph, "_auto_increase_keys")
+    assert not hasattr(graph, "_keep_ref_keys")
+    assert context._state_schema is AutoMergeState
+    assert context._auto_increase_keys == frozenset({"values", "total"})
+    assert context._keep_ref_keys == frozenset()
+
+
 def test_node_graph_rejects_timeout_for_unknown_node():
     """Direct construction validates every timeout target."""
     with pytest.raises(ValueError, match="unknown nodes: missing"):
@@ -239,15 +309,16 @@ def test_node_graph_rejects_timeout_for_unknown_node():
 @pytest.mark.asyncio
 async def test_finish_and_fail_do_not_replace_completed_future():
     """Late END or failure events cannot overwrite an invocation result."""
-    completion = asyncio.get_running_loop().create_future()
-    completion.set_result({"original": True})
-    context = {
-        "run_id": "test_run",
-        "state": {"replacement": True},
-        "completion": completion,
-    }
-
     graph = NodeGraph({}, {START: END})
+    context = _bound_context(
+        graph,
+        "test-run",
+        {"replacement": True},
+    )
+    completion = context.completion
+    assert completion is not None
+    completion.set_result({"original": True})
+
     graph._finish(context)
     graph._fail(context, RuntimeError("late failure"))
 
@@ -260,6 +331,7 @@ async def test_finish_and_fail_do_not_replace_completed_future():
     [
         None,
         {},
+        GraphContext(),
         {"run_id": 1, "state": {}, "completion": None},
         {"run_id": "run", "state": [], "completion": None},
         {"run_id": "run", "state": {}, "completion": None},
@@ -272,99 +344,224 @@ async def test_is_active_context_rejects_malformed_event_context(context):
     assert await graph._is_active_context(context) is False
 
 
-@pytest.fixture
-def empty_context_store_manager():
-    """Isolate tests that exercise the process-wide store manager."""
-    _graph_context_manager.clear_stores()
-    yield
-    _graph_context_manager.clear_stores()
+@pytest.mark.asyncio
+async def test_is_active_context_rejects_owned_but_unbound_context():
+    """Ownership alone is insufficient without invocation runtime fields."""
+    graph = NodeGraph({}, {START: END})
+    context = GraphContext()
+    context._owner_id = graph._listener_namespace
+
+    assert await graph._is_active_context(context) is False
 
 
 @pytest.mark.asyncio
-async def test_abort_rejects_unknown_store_id(empty_context_store_manager):
-    """Abort requires a store registered by a live invocation."""
+async def test_is_active_context_discards_completed_run():
+    """A completed context removes its stale active-run entry on inspection."""
+    graph = NodeGraph({}, {START: END})
+    context = _bound_context(graph, "completed-run", {"value": 1})
+    graph._active_runs.add("completed-run")
+    context.abort()
+
+    assert await graph._is_active_context(context) is False
+    assert "completed-run" not in graph._active_runs
+
+
+@pytest.mark.asyncio
+async def test_abort_rejects_non_context():
+    """Abort accepts a GraphContext rather than an identifier."""
     graph = NodeGraph({}, {START: END})
 
-    with pytest.raises(
-        ValueError,
-        match=r"Unknown graph context store ID `missing`",
-    ):
+    with pytest.raises(TypeError, match="requires a GraphContext"):
         await graph.abort("missing")
 
 
 @pytest.mark.asyncio
-async def test_abort_rejects_store_for_inactive_run(
-    empty_context_store_manager,
-):
-    """A retained or foreign store cannot abort an inactive graph run."""
+async def test_abort_rejects_unbound_context():
+    """An unbound context cannot identify a graph invocation."""
     graph = NodeGraph({}, {START: END})
-    completion = asyncio.get_running_loop().create_future()
-    context = {
-        "run_id": "inactive-run",
-        "state": {"checkpoint": 1},
-        "steps": 0,
-        "completion": completion,
-    }
-    store = GraphContext("inactive-store")
-    store.set_store("inactive-run", context)
-    _graph_context_manager.add_store(store)
 
-    with pytest.raises(
-        ValueError,
-        match=r"Unknown graph run ID `inactive-run`",
-    ):
-        await graph.abort(store.get_store_id())
-
-    assert not completion.done()
-    assert _graph_context_manager.get_store("inactive-store") is store
+    with pytest.raises(ValueError, match="not active in this graph"):
+        await graph.abort(GraphContext())
 
 
 @pytest.mark.asyncio
-async def test_abort_finishes_active_run_with_saved_snapshot(
-    empty_context_store_manager,
-):
-    """Abort resolves completion, deactivates the run, and removes its store."""
+async def test_abort_rejects_context_for_inactive_run():
+    """A retained or foreign context cannot abort an inactive graph run."""
     graph = NodeGraph({}, {START: END})
-    completion = asyncio.get_running_loop().create_future()
-    context = {
-        "run_id": "active-run",
-        "state": {"history": ["saved"]},
-        "steps": 2,
-        "completion": completion,
-    }
-    store = GraphContext("active-store")
-    store.set_store("active-run", context)
-    _graph_context_manager.add_store(store)
+    context = _bound_context(graph, "inactive-run", {"checkpoint": 1})
+
+    with pytest.raises(ValueError, match="not active in this graph"):
+        await graph.abort(context)
+
+    completion = context.completion
+    assert completion is not None
+    assert not completion.done()
+
+
+@pytest.mark.asyncio
+async def test_abort_finishes_active_run_with_saved_snapshot():
+    """Abort resolves completion and inactive inspection removes the run."""
+    graph = NodeGraph({}, {START: END})
+    context = _bound_context(
+        graph,
+        "active-run",
+        {"history": ["saved"]},
+        steps=2,
+    )
+    completion = context.completion
+    assert completion is not None
     graph._active_runs.add("active-run")
 
-    await graph.abort(store.get_store_id())
+    await graph.abort(context)
 
     result = await completion
     assert result == {"history": ["saved"]}
-    assert result is not context["state"]
+    assert result is not context.state
+    assert await graph._is_active_context(context) is False
     assert "active-run" not in graph._active_runs
-    assert _graph_context_manager.get_store("active-store") is None
 
 
 @pytest.mark.asyncio
-async def test_abort_cannot_finish_same_run_twice(
-    empty_context_store_manager,
-):
-    """Successful abort removes the store used to identify the invocation."""
+async def test_abort_cannot_finish_same_run_twice():
+    """A completed context cannot be aborted through the graph twice."""
     graph = NodeGraph({}, {START: END})
-    completion = asyncio.get_running_loop().create_future()
-    context = {
-        "run_id": "active-run",
-        "state": {},
-        "steps": 0,
-        "completion": completion,
-    }
-    store = GraphContext("single-use-store")
-    store.set_store("active-run", context)
-    _graph_context_manager.add_store(store)
+    context = _bound_context(graph, "active-run", {})
     graph._active_runs.add("active-run")
 
-    await graph.abort(store.get_store_id())
+    await graph.abort(context)
 
-    with pytest.raises(ValueError, match="Unknown graph context store ID"):
-        await graph.abort(store.get_store_id())
+    with pytest.raises(ValueError, match="not active in this graph"):
+        await graph.abort(context)
+
+
+@pytest.mark.asyncio
+async def test_invoke_rejects_non_context_argument():
+    """The optional invocation context has an explicit runtime type contract."""
+    graph = NodeGraph({}, {START: END})
+
+    with pytest.raises(TypeError, match="GraphContext or None"):
+        await graph.invoke({}, {})
+
+
+@pytest.mark.asyncio
+async def test_cancel_before_bind_does_not_abort_pending_context(monkeypatch):
+    """Cancellation during event-loop startup leaves an unbound context pending."""
+    graph = NodeGraph({}, {START: END})
+    context = GraphContext()
+
+    async def cancel_start():
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(apix_event_loop, "start", cancel_start)
+
+    with pytest.raises(asyncio.CancelledError):
+        await graph.invoke({}, context)
+
+    assert context.status == "pending"
+    assert context.is_bound is False
+
+
+@pytest.mark.asyncio
+async def test_post_failure_marks_running_context_failed(monkeypatch):
+    """A setup failure after binding resolves the context as failed."""
+    graph = NodeGraph({}, {START: END})
+    context = GraphContext()
+    error = RuntimeError("post failed")
+
+    async def fail_post(node_name, bound_context):
+        raise error
+
+    monkeypatch.setattr(graph, "_post_next", fail_post)
+
+    with pytest.raises(RuntimeError, match="post failed"):
+        await graph.invoke({}, context)
+
+    assert context.status == "failed"
+    assert context.completion is not None
+    with pytest.raises(RuntimeError, match="post failed"):
+        await context.completion
+    await apix_event_loop.stop()
+
+
+@pytest.mark.asyncio
+async def test_execute_start_ignores_stale_context():
+    """A stale START event cannot enqueue work for an aborted attempt."""
+    graph = NodeGraph({}, {START: END})
+    context = _bound_context(graph, "stale-start", {})
+    completion = context.completion
+    assert completion is not None
+    context.abort()
+
+    await graph._execute_start(context)
+
+    assert await completion == {}
+    assert context._pending_events == 0
+
+
+@pytest.mark.asyncio
+async def test_execute_start_ignores_error_after_attempt_becomes_stale(monkeypatch):
+    """A stale START failure cannot overwrite an aborted result."""
+    graph = NodeGraph({}, {START: END})
+    context = _bound_context(graph, "stale-start", {"saved": True})
+    completion = context.completion
+    assert completion is not None
+
+    async def abort_then_fail(node_name, bound_context):
+        bound_context.abort()
+        raise RuntimeError("late start failure")
+
+    monkeypatch.setattr(graph, "_post_next", abort_then_fail)
+
+    await graph._execute_start(context)
+
+    assert await completion == {"saved": True}
+    assert context.status == "aborted"
+
+
+@pytest.mark.asyncio
+async def test_execute_node_ignores_error_after_attempt_becomes_stale():
+    """A late node error cannot fail an already aborted attempt."""
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def fail_late(state):
+        started.set()
+        await release.wait()
+        raise RuntimeError("late node failure")
+
+    graph = NodeGraph(
+        {"node": Node(fail_late)},
+        {START: "node", "node": END},
+    )
+    context = _bound_context(graph, "stale-node", {"saved": True})
+    completion = context.completion
+    assert completion is not None
+
+    execution = asyncio.create_task(graph._execute_node("node", context))
+    await started.wait()
+    context.abort()
+    release.set()
+    await execution
+
+    assert await completion == {"saved": True}
+    assert context.status == "aborted"
+    assert context._running_nodes == 0
+
+
+@pytest.mark.asyncio
+async def test_post_next_rolls_back_pending_event_on_failure(monkeypatch):
+    """A failed event write does not leave recovery permanently blocked."""
+    graph = NodeGraph({}, {START: END})
+    context = GraphContext()
+
+    async def fail_post_event(**kwargs):
+        raise RuntimeError("event pipe unavailable")
+
+    monkeypatch.setattr(event_pipe_writer, "post_event", fail_post_event)
+
+    with pytest.raises(RuntimeError, match="event pipe unavailable"):
+        await graph._post_next(END, context)
+
+    assert context.node_name == END
+    assert context._pending_events == 0
+    assert context._quiescent.is_set()

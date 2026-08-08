@@ -1,5 +1,6 @@
 """Tests for reference-preserving graph state fields."""
 
+import asyncio
 from typing import Annotated, Any, TypedDict
 
 import pytest
@@ -16,7 +17,8 @@ from apix.core.graph import (
     NodeGraph,
     START,
 )
-from apix.core.graph.base import get_keep_ref_keys
+from apix.core.graph.base import _copy_state, get_keep_ref_keys
+from apix.core.graph.context import GraphContext
 
 
 @pytest_asyncio.fixture(
@@ -72,8 +74,13 @@ class CombinedMarkerState(TypedDict):
     ]
 
 
-def _context(state: dict[str, Any]) -> dict[str, Any]:
-    return {"state": state, "steps": 0}
+def _context(
+    state: dict[str, Any],
+    state_schema: type | None = None,
+) -> GraphContext:
+    context = GraphContext(state_schema)
+    context.state = state
+    return context
 
 
 def test_get_keep_ref_keys_supports_instance_and_class_markers():
@@ -94,13 +101,12 @@ def test_copy_state_skips_deepcopy_for_marked_resource():
     """KeepRef works for resources whose copy protocol is deliberately disabled."""
     resource = UncopyableResource()
     ordinary = {"nested": [1]}
-    graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
-
-    copied = graph._copy_state(
+    copied = _copy_state(
         {
             "resource": resource,
             "ordinary": ordinary,
-        }
+        },
+        get_keep_ref_keys(KeepRefState),
     )
 
     assert copied["resource"] is resource
@@ -112,13 +118,12 @@ def test_copy_state_skips_deepcopy_for_marked_resource():
 def test_copy_state_applies_keep_ref_per_field_not_per_object():
     """An unmarked alias is still copied even when a marked field shares it."""
     shared: list[str] = ["value"]
-    graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
-
-    copied = graph._copy_state(
+    copied = _copy_state(
         {
             "class_marker": shared,
             "ordinary": shared,
-        }
+        },
+        get_keep_ref_keys(KeepRefState),
     )
 
     assert copied["class_marker"] is shared
@@ -130,9 +135,10 @@ def test_copy_state_applies_keep_ref_per_field_not_per_object():
 def test_copy_state_without_present_marked_fields_remains_normal_deepcopy():
     """A schema marker does not alter unrelated or absent state fields."""
     original = {"ordinary": {"values": [1]}}
-    graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
-
-    copied = graph._copy_state(original)
+    copied = _copy_state(
+        original,
+        get_keep_ref_keys(KeepRefState),
+    )
 
     assert copied == original
     assert copied is not original
@@ -140,10 +146,8 @@ def test_copy_state_without_present_marked_fields_remains_normal_deepcopy():
 
 
 def test_copy_state_rejects_non_dictionary_input():
-    graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
-
     with pytest.raises(TypeError, match="Graph state must be a dict"):
-        graph._copy_state([])
+        _copy_state([], get_keep_ref_keys(KeepRefState))
 
 
 def test_apply_command_preserves_explicit_keep_ref_update():
@@ -160,7 +164,10 @@ def test_apply_command_preserves_explicit_keep_ref_update():
             }
         ),
         START,
-        _context({"resource": original_resource}),
+        _context(
+            {"resource": original_resource},
+            KeepRefState,
+        ),
     )
 
     assert state["resource"] is replacement_resource
@@ -235,8 +242,9 @@ async def test_auto_merge_and_keep_ref_work_on_the_same_state_field():
         .compile_graph()
     )
 
-    assert graph._keep_ref_keys == frozenset({"accumulator"})
-    assert graph._auto_increase_keys == frozenset({"accumulator"})
+    context = GraphContext(CombinedMarkerState)
+    assert context._keep_ref_keys == frozenset({"accumulator"})
+    assert context._auto_increase_keys == frozenset({"accumulator"})
 
     result = await graph.invoke({"accumulator": accumulator})
 
@@ -252,3 +260,45 @@ async def test_auto_merge_and_keep_ref_work_on_the_same_state_field():
         ["first-update"],
         ["second-update"],
     ]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_context_abort_uses_the_graph_keep_ref_snapshotter():
+    """Direct abort preserves graph-specific state snapshot semantics."""
+    resource = UncopyableResource()
+    node_started = asyncio.Event()
+    release_node = asyncio.Event()
+    node_finished = asyncio.Event()
+
+    async def waiting_node(state: dict[str, Any]) -> dict[str, Any]:
+        node_started.set()
+        await release_node.wait()
+        node_finished.set()
+        return {}
+
+    graph = (
+        GraphManager(KeepRefState)
+        .add_node(waiting_node)
+        .add_edge(START, "waiting_node")
+        .compile_graph()
+    )
+    context = GraphContext()
+    invocation = asyncio.create_task(
+        graph.invoke(
+            {
+                "resource": resource,
+                "ordinary": {"nested": [1]},
+            },
+            context,
+        )
+    )
+
+    await asyncio.wait_for(node_started.wait(), timeout=1)
+    context.abort()
+    result = await asyncio.wait_for(invocation, timeout=1)
+
+    assert result["resource"] is resource
+    assert result["ordinary"] == {"nested": [1]}
+
+    release_node.set()
+    await asyncio.wait_for(node_finished.wait(), timeout=1)
