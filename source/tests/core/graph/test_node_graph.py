@@ -13,8 +13,8 @@ from apix.core.graph import (
     NodeGraph,
     Reset,
 )
-from apix.core.graph.context_store import GraphContextStore
-from apix.core.graph.context_store.context_store_manager import (
+from apix.core.graph.context import GraphContextStore
+from apix.core.graph.context.context_store_manager import (
     _context_store_manager,
 )
 

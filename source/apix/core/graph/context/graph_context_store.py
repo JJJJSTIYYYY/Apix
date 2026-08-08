@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from apix.core.graph.context_store.base import GraphContext
+from apix.core.graph.context.base import GraphContext
 
 
 class GraphContextStore:

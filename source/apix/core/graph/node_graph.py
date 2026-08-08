@@ -17,9 +17,9 @@ from apix.core.graph.base import (
     get_auto_merge_keys,
     get_keep_ref_keys
 )
-from apix.core.graph.context_store.context_store_manager import _context_store_manager
-from apix.core.graph.context_store.base import GraphContext
-from apix.core.graph.context_store.graph_context_store import GraphContextStore
+from apix.core.graph.context.context_store_manager import _context_store_manager
+from apix.core.graph.context.base import GraphContext
+from apix.core.graph.context.graph_context_store import GraphContextStore
 from apix.core.graph.node import BaseNode
 from apix.core.graph.stream import (
     StreamChannel,

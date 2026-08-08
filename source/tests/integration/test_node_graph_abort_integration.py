@@ -9,8 +9,8 @@ import pytest_asyncio
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.core.graph import AutoMerge, END, START, GraphManager
-from apix.core.graph.context_store import GraphContextStore
-from apix.core.graph.context_store.context_store_manager import (
+from apix.core.graph.context import GraphContextStore
+from apix.core.graph.context.context_store_manager import (
     _context_store_manager,
 )
 from apix.core.graph.stream import get_stream_writer
