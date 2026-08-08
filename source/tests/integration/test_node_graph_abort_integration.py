@@ -9,9 +9,9 @@ import pytest_asyncio
 from apix.core.event.event_loop import apix_event_loop
 from apix.core.event.event_writer import event_pipe_writer
 from apix.core.graph import AutoMerge, END, START, GraphManager
-from apix.core.graph.context import GraphContextStore
-from apix.core.graph.context.context_store_manager import (
-    _context_store_manager,
+from apix.core.graph.context import GraphContext
+from apix.core.graph.context.graph_context_manager import (
+    _graph_context_manager,
 )
 from apix.core.graph.stream import get_stream_writer
 
@@ -31,9 +31,9 @@ class AbortState(TypedDict, total=False):
 @pytest_asyncio.fixture(autouse=True, scope="module", loop_scope="session")
 async def clean_graph_runtime_after_module():
     """Leave the shared event runtime clean for other integration modules."""
-    _context_store_manager.clear_stores()
+    _graph_context_manager.clear_stores()
     yield
-    _context_store_manager.clear_stores()
+    _graph_context_manager.clear_stores()
     await apix_event_loop.stop()
     await event_pipe_writer.clear()
 
@@ -75,7 +75,7 @@ async def test_abort_invoke_returns_last_completed_snapshot_and_stops_routing():
         .add_edge("final", END)
         .compile_graph()
     )
-    store = GraphContextStore("invoke-abort")
+    store = GraphContext("invoke-abort")
     invocation = asyncio.create_task(
         graph.invoke({"history": ["initial"]}, store)
     )
@@ -91,7 +91,7 @@ async def test_abort_invoke_returns_last_completed_snapshot_and_stops_routing():
     assert not slow_finished.is_set()
     assert not final_called.is_set()
     assert graph._active_runs == set()
-    assert _context_store_manager.get_store(store.get_store_id()) is None
+    assert _graph_context_manager.get_store(store.get_store_id()) is None
 
     # Abort is cooperative: the running node is allowed to finish, but its
     # result cannot reactivate routing or mutate the returned checkpoint.
@@ -148,7 +148,7 @@ async def test_abort_stream_flushes_chunks_then_stops_complex_graph():
         .add_edge("unused", "final")
         .compile_graph()
     )
-    store = GraphContextStore("stream-abort")
+    store = GraphContext("stream-abort")
     stream = graph.stream({"history": ["initial"]}, store)
 
     chunks = [
@@ -165,7 +165,7 @@ async def test_abort_stream_flushes_chunks_then_stops_complex_graph():
     assert not slow_finished.is_set()
     assert not final_called.is_set()
     assert graph._active_runs == set()
-    assert _context_store_manager.get_store(store.get_store_id()) is None
+    assert _graph_context_manager.get_store(store.get_store_id()) is None
 
     release_slow.set()
     await asyncio.wait_for(slow_finished.wait(), timeout=1)

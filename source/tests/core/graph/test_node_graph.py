@@ -13,9 +13,9 @@ from apix.core.graph import (
     NodeGraph,
     Reset,
 )
-from apix.core.graph.context import GraphContextStore
-from apix.core.graph.context.context_store_manager import (
-    _context_store_manager,
+from apix.core.graph.context import GraphContext
+from apix.core.graph.context.graph_context_manager import (
+    _graph_context_manager,
 )
 
 
@@ -275,9 +275,9 @@ async def test_is_active_context_rejects_malformed_event_context(context):
 @pytest.fixture
 def empty_context_store_manager():
     """Isolate tests that exercise the process-wide store manager."""
-    _context_store_manager.clear_stores()
+    _graph_context_manager.clear_stores()
     yield
-    _context_store_manager.clear_stores()
+    _graph_context_manager.clear_stores()
 
 
 @pytest.mark.asyncio
@@ -305,9 +305,9 @@ async def test_abort_rejects_store_for_inactive_run(
         "steps": 0,
         "completion": completion,
     }
-    store = GraphContextStore("inactive-store")
+    store = GraphContext("inactive-store")
     store.set_store("inactive-run", context)
-    _context_store_manager.add_store(store)
+    _graph_context_manager.add_store(store)
 
     with pytest.raises(
         ValueError,
@@ -316,7 +316,7 @@ async def test_abort_rejects_store_for_inactive_run(
         await graph.abort(store.get_store_id())
 
     assert not completion.done()
-    assert _context_store_manager.get_store("inactive-store") is store
+    assert _graph_context_manager.get_store("inactive-store") is store
 
 
 @pytest.mark.asyncio
@@ -332,9 +332,9 @@ async def test_abort_finishes_active_run_with_saved_snapshot(
         "steps": 2,
         "completion": completion,
     }
-    store = GraphContextStore("active-store")
+    store = GraphContext("active-store")
     store.set_store("active-run", context)
-    _context_store_manager.add_store(store)
+    _graph_context_manager.add_store(store)
     graph._active_runs.add("active-run")
 
     await graph.abort(store.get_store_id())
@@ -343,7 +343,7 @@ async def test_abort_finishes_active_run_with_saved_snapshot(
     assert result == {"history": ["saved"]}
     assert result is not context["state"]
     assert "active-run" not in graph._active_runs
-    assert _context_store_manager.get_store("active-store") is None
+    assert _graph_context_manager.get_store("active-store") is None
 
 
 @pytest.mark.asyncio
@@ -359,9 +359,9 @@ async def test_abort_cannot_finish_same_run_twice(
         "steps": 0,
         "completion": completion,
     }
-    store = GraphContextStore("single-use-store")
+    store = GraphContext("single-use-store")
     store.set_store("active-run", context)
-    _context_store_manager.add_store(store)
+    _graph_context_manager.add_store(store)
     graph._active_runs.add("active-run")
 
     await graph.abort(store.get_store_id())

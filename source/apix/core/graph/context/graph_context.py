@@ -3,7 +3,7 @@ from uuid import uuid4
 from apix.core.graph.context.base import GraphContext
 
 
-class GraphContextStore:
+class GraphContext:
     """Graph context store for managing the context of graph runs."""
 
     store_id: str | None

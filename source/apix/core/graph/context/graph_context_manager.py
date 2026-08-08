@@ -1,7 +1,7 @@
-from apix.core.graph.context.graph_context_store import GraphContextStore
+from apix.core.graph.context.graph_context import GraphContext
 
 
-class _GraphContextStoreManager:
+class _GraphContextManager:
     """Manager for the graph context store."""
 
     _instance = None
@@ -14,11 +14,11 @@ class _GraphContextStoreManager:
     def __init__(self):
         if getattr(self, "_initialized", False):
             return
-        self._store: dict[str, GraphContextStore] = {}
+        self._store: dict[str, GraphContext] = {}
         self._run_id_index: dict[str, str] = {}
         self._initialized = True
 
-    def add_store(self, store: GraphContextStore) -> None:
+    def add_store(self, store: GraphContext) -> None:
         """Register one fully initialized store in both lookup tables.
 
         A store ID and run ID may each identify only one active store. Strict
@@ -27,7 +27,7 @@ class _GraphContextStoreManager:
         """
         if store.run_id is None or store.graph_context is None:
             raise ValueError(
-                "GraphContextStore must be initialized with set_store() "
+                "GraphContext must be initialized with set_store() "
                 "before registration."
             )
         if store.store_id in self._store:
@@ -42,7 +42,7 @@ class _GraphContextStoreManager:
         self._store[store.store_id] = store
         self._run_id_index[store.run_id] = store.store_id
 
-    def get_store(self, store_id: str) -> GraphContextStore | None:
+    def get_store(self, store_id: str) -> GraphContext | None:
         """Get the graph context store for the given store_id."""
         return self._store.get(store_id)
 
@@ -64,4 +64,4 @@ class _GraphContextStoreManager:
         self._run_id_index.clear()
 
 
-_context_store_manager = _GraphContextStoreManager()
+_graph_context_manager = _GraphContextManager()

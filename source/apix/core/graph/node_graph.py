@@ -17,9 +17,9 @@ from apix.core.graph.base import (
     get_auto_merge_keys,
     get_keep_ref_keys
 )
-from apix.core.graph.context.context_store_manager import _context_store_manager
+from apix.core.graph.context.graph_context_manager import _graph_context_manager
 from apix.core.graph.context.base import GraphContext
-from apix.core.graph.context.graph_context_store import GraphContextStore
+from apix.core.graph.context.graph_context import GraphContext
 from apix.core.graph.node import BaseNode
 from apix.core.graph.stream import (
     StreamChannel,
@@ -180,7 +180,7 @@ class NodeGraph:
             return context["run_id"] in self._active_runs
 
 
-    async def invoke(self, state: dict, context_store: GraphContextStore = None) -> dict:
+    async def invoke(self, state: dict, context_store: GraphContext = None) -> dict:
         """Start a graph invocation at :data:`START` and return its final state.
 
         The input state is deep-copied into the first event context. Independent
@@ -190,7 +190,7 @@ class NodeGraph:
         return await self._invoke(state, noop_stream_writer(), context_store)
 
 
-    async def stream(self, state: dict, context_store: GraphContextStore = None) -> AsyncIterator[Any]:
+    async def stream(self, state: dict, context_store: GraphContext = None) -> AsyncIterator[Any]:
         """Yield custom chunks emitted by nodes during one graph invocation.
 
         Nodes emit chunks by calling :func:`get_stream_writer` and invoking the
@@ -243,7 +243,7 @@ class NodeGraph:
         Raises:
             ValueError: If the store ID is unknown or its run is not active.
         """
-        context_store = _context_store_manager.get_store(context_store_id)
+        context_store = _graph_context_manager.get_store(context_store_id)
         if not context_store:
             raise ValueError(f"Unknown graph context store ID `{context_store_id}`.")
         run_id = context_store.run_id
@@ -254,7 +254,7 @@ class NodeGraph:
         self._finish(context_store.graph_context)
 
 
-    async def _invoke(self, state: dict, stream_writer: StreamWriter, context_store: GraphContextStore = None) -> dict:
+    async def _invoke(self, state: dict, stream_writer: StreamWriter, context_store: GraphContext = None) -> dict:
         """Run a graph with the writer assigned to each executing node."""
         if not isinstance(state, dict):
             raise TypeError("Graph state must be a dict.")
@@ -271,7 +271,7 @@ class NodeGraph:
         }
         if context_store is not None:
             context_store.set_store(run_id, context)
-            _context_store_manager.add_store(context_store)
+            _graph_context_manager.add_store(context_store)
         async with self._active_runs_lock:
             self._active_runs.add(run_id)
         try:
@@ -420,7 +420,7 @@ class NodeGraph:
         completion = context["completion"]
         if not completion.done():
             completion.set_result(self._copy_state(context["state"]))
-        _context_store_manager.remove_store_by_run_id(context["run_id"])
+        _graph_context_manager.remove_store_by_run_id(context["run_id"])
 
 
     def _fail(self, context: GraphContext, error: Exception) -> None:
@@ -428,4 +428,4 @@ class NodeGraph:
         completion = context["completion"]
         if not completion.done():
             completion.set_exception(error)
-        _context_store_manager.remove_store_by_run_id(context["run_id"])
+        _graph_context_manager.remove_store_by_run_id(context["run_id"])
