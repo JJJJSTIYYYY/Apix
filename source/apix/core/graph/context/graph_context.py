@@ -45,6 +45,9 @@ class GraphContext:
     A failed or aborted context may be returned to ``pending`` with
     :meth:`resume`; a finished context is terminal.
 
+    A context belongs to a graph namespace rather than a specific graph
+    instance, so it may resume on a replacement graph using the same namespace.
+
     Args:
         state_schema: Optional annotated schema used to derive ``AutoMerge``
             and ``KeepRef`` fields. A graph's default schema is adopted when a

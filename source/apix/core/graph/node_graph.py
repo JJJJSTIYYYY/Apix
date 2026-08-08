@@ -4,7 +4,7 @@ import asyncio
 import copy
 import math
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 from functools import partial
 from typing import Any
@@ -84,7 +84,11 @@ class NodeGraph:
         self._context_factory = partial(GraphContext, state_schema)
         self._active_runs: set[str] = set()
         self._active_runs_lock = asyncio.Lock()
+        self._invocation_count = 0
         self._listener_namespace = using_namespace or ""
+        self._listener_handler_names: list[str] = []
+        self._decomposed = False
+        self._on_decompose: Callable[["NodeGraph"], None] | None = None
         self._register_node_listeners()
 
 
@@ -107,24 +111,65 @@ class NodeGraph:
 
     def _register_node_listeners(self) -> None:
         """Subscribe handlers for user nodes plus the predefined start/end nodes."""
-        for node_name in (START, *self._nodes, END):
-            async def run_node(event: ApixEvent, *, _node_name: str = node_name) -> None:
-                """Extract context state and execute the event's graph node."""
-                context = event.context
-                if not await self._is_active_context(
-                    context,
-                    consume_event=True,
-                ):
-                    return
-                if _node_name == START:
-                    await self._execute_start(context)
-                elif _node_name == END:
-                    self._finish(context)
-                else:
-                    await self._execute_node(_node_name, context)
+        try:
+            for node_name in (START, *self._nodes, END):
+                async def run_node(event: ApixEvent, *, _node_name: str = node_name) -> None:
+                    """Extract context state and execute the event's graph node."""
+                    context = event.context
+                    if not await self._is_active_context(
+                        context,
+                        consume_event=True,
+                    ):
+                        return
+                    if _node_name == START:
+                        await self._execute_start(context)
+                    elif _node_name == END:
+                        self._finish(context)
+                    else:
+                        await self._execute_node(_node_name, context)
 
-            run_node.__name__ = get_node_name_in_namespace(node_name, self._listener_namespace)
-            apix_event_registry.subscribe(node_name)(run_node)
+                run_node.__name__ = get_node_name_in_namespace(node_name, self._listener_namespace)
+                apix_event_registry.subscribe(
+                    node_name,
+                    exist_ok=False,
+                )(run_node)
+                self._listener_handler_names.append(run_node.__name__)
+        except BaseException:
+            self._unregister_node_listeners()
+            raise
+
+
+    def _unregister_node_listeners(self) -> None:
+        """Remove every event handler successfully registered by this graph."""
+        for handler_name in self._listener_handler_names:
+            apix_event_registry.unsubscribe(handler_name)
+        self._listener_handler_names.clear()
+
+
+    def decompose(self) -> None:
+        """Invalidate this graph and unregister all of its event listeners.
+
+        Decomposition is idempotent. A graph with an invocation in progress
+        cannot be decomposed because removing its listeners would leave that
+        invocation without a completion path.
+
+        Raises:
+            RuntimeError: If an invocation is currently in progress.
+        """
+        if self._decomposed:
+            return
+        if self._invocation_count:
+            raise RuntimeError(
+                "Cannot decompose a NodeGraph while invocations are active."
+            )
+
+        self._decomposed = True
+        self._unregister_node_listeners()
+
+        on_decompose = self._on_decompose
+        self._on_decompose = None
+        if on_decompose is not None:
+            on_decompose(self)
 
 
     async def _is_active_context(
@@ -263,6 +308,8 @@ class NodeGraph:
             GraphContext,
         ):
             raise TypeError("graph_context must be a GraphContext or None.")
+        if self._decomposed:
+            raise RuntimeError("NodeGraph has been decomposed.")
 
         context = graph_context or self._context_factory()
         if graph_context is not None:
@@ -270,6 +317,7 @@ class NodeGraph:
 
         run_id = "graph-"+uuid.uuid4().hex
         completion = asyncio.get_running_loop().create_future()
+        self._invocation_count += 1
         try:
             await apix_event_loop.start()
             first_node = context._bind(
@@ -292,8 +340,11 @@ class NodeGraph:
                 context._fail(exc)
             raise
         finally:
-            async with self._active_runs_lock:
-                self._active_runs.discard(run_id)
+            try:
+                async with self._active_runs_lock:
+                    self._active_runs.discard(run_id)
+            finally:
+                self._invocation_count -= 1
 
 
     async def _execute_start(self, context: GraphContext) -> None:

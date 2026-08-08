@@ -8,7 +8,7 @@ from apix.core.graph.base import (
     NodeResult,
     Reset,
 )
-from apix.core.graph.graph_manager import GraphManager
+from apix.core.graph.graph_manager import GraphManager, namespace_set
 from apix.core.graph.node import Node, BaseNode
 from apix.core.graph.node_graph import NodeGraph
 
@@ -25,5 +25,6 @@ __all__ = [
     "NodeGraph",
     "Reset",
     "START",
+    "namespace_set",
 ]
 """Public API for APIX's event-driven graph execution module."""

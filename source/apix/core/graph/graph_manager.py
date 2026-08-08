@@ -8,6 +8,18 @@ from apix.core.graph.node import BaseNode, Node
 from apix.core.graph.node_graph import NodeGraph
 
 
+namespace_set: set[str] = set()
+_namespace_graphs: dict[str, NodeGraph] = {}
+
+
+def _release_namespace(graph: NodeGraph) -> None:
+    """Release a compiled graph's namespace when that graph is decomposed."""
+    namespace = graph._listener_namespace
+    if _namespace_graphs.get(namespace) is graph:
+        _namespace_graphs.pop(namespace)
+        namespace_set.discard(namespace)
+
+
 class GraphManager:
     """Build the node and transition definition for a stateless graph.
 
@@ -210,6 +222,7 @@ class GraphManager:
     def compile_graph(
         self,
         using_namespace: str | None = None,
+        exist_ok: bool = False,
     ) -> NodeGraph:
         """Compile this definition into an event-listening :class:`NodeGraph`.
 
@@ -217,16 +230,36 @@ class GraphManager:
             using_namespace: Namespace used by the compiled graph's event
                 listeners. ``None`` and an empty string select the global
                 namespace.
+            exist_ok: If ``False``, compiling into an occupied namespace
+                raises ``ValueError``. If ``True``, the existing graph is
+                decomposed before the new graph is registered.
 
         Raises:
-            ValueError: If no transition has been defined from :data:`START`.
+            ValueError: If no transition has been defined from :data:`START`,
+                or if the namespace is occupied and ``exist_ok`` is ``False``.
+            RuntimeError: If replacement is requested while the existing
+                graph has an invocation in progress.
         """
         if START not in self._default_gotos:
             raise ValueError("A graph must define an outgoing transition from `START`.")
-        return NodeGraph(
+
+        namespace = using_namespace or ""
+        if namespace in namespace_set:
+            if not exist_ok:
+                namespace_name = namespace or "<global>"
+                raise ValueError(
+                    f"Graph namespace `{namespace_name}` is already in use."
+                )
+            _namespace_graphs[namespace].decompose()
+
+        graph = NodeGraph(
             self._nodes,
             self._default_gotos,
             node_timeouts=self._node_timeouts,
             state_schema=self._state_schema,
-            using_namespace=using_namespace,
+            using_namespace=namespace,
         )
+        graph._on_decompose = _release_namespace
+        namespace_set.add(namespace)
+        _namespace_graphs[namespace] = graph
+        return graph

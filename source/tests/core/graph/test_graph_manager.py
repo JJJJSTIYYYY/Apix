@@ -4,7 +4,9 @@ import math
 
 import pytest
 
-from apix.core.graph import END, START, GraphManager
+from apix.core.event import apix_event_registry
+from apix.core.graph import END, START, GraphManager, namespace_set
+from apix.core.graph.graph_manager import _namespace_graphs, _release_namespace
 
 
 def source(state):
@@ -179,3 +181,106 @@ def test_compile_forwards_listener_namespace(using_namespace, expected):
     )
 
     assert graph._listener_namespace == expected
+    assert expected in namespace_set
+    assert _namespace_graphs[expected] is graph
+
+
+def test_compile_rejects_occupied_namespace_by_default():
+    """An existing compiled graph is retained when replacement is disabled."""
+    first_graph = (
+        GraphManager()
+        .add_node(source)
+        .add_edge(START, "source")
+        .compile_graph(using_namespace="occupied")
+    )
+
+    with pytest.raises(ValueError, match="already in use"):
+        (
+            GraphManager()
+            .add_node(target)
+            .add_edge(START, "target")
+            .compile_graph(using_namespace="occupied")
+        )
+
+    assert first_graph._decomposed is False
+    assert _namespace_graphs["occupied"] is first_graph
+
+
+def test_compile_exist_ok_decomposes_and_replaces_original_graph():
+    """Replacement unregisters the old listeners before installing new ones."""
+    first_graph = (
+        GraphManager()
+        .add_node(source, "shared")
+        .add_edge(START, "shared")
+        .compile_graph(using_namespace="replaceable")
+    )
+    first_callbacks = {
+        handler.callback
+        for handler in apix_event_registry.get_handlers("shared")
+    }
+
+    replacement = (
+        GraphManager()
+        .add_node(target, "shared")
+        .add_edge(START, "shared")
+        .compile_graph(
+            using_namespace="replaceable",
+            exist_ok=True,
+        )
+    )
+    replacement_callbacks = {
+        handler.callback
+        for handler in apix_event_registry.get_handlers("shared")
+    }
+
+    assert first_graph._decomposed is True
+    assert first_graph._listener_handler_names == []
+    assert first_callbacks.isdisjoint(replacement_callbacks)
+    assert len(replacement_callbacks) == 1
+    assert namespace_set == {"replaceable"}
+    assert _namespace_graphs["replaceable"] is replacement
+
+    _release_namespace(first_graph)
+    assert namespace_set == {"replaceable"}
+    assert _namespace_graphs["replaceable"] is replacement
+
+
+def test_decompose_releases_namespace_for_later_compile():
+    """Direct decomposition keeps GraphManager's global index synchronized."""
+    first_graph = (
+        GraphManager()
+        .add_node(source)
+        .add_edge(START, "source")
+        .compile_graph(using_namespace="reusable")
+    )
+
+    first_graph.decompose()
+
+    assert "reusable" not in namespace_set
+    assert "reusable" not in _namespace_graphs
+
+    replacement = (
+        GraphManager()
+        .add_node(target)
+        .add_edge(START, "target")
+        .compile_graph(using_namespace="reusable")
+    )
+    assert _namespace_graphs["reusable"] is replacement
+
+
+def test_none_and_empty_string_share_global_namespace():
+    """Both global namespace spellings participate in one uniqueness check."""
+    (
+        GraphManager()
+        .add_node(source)
+        .add_edge(START, "source")
+        .compile_graph(using_namespace=None)
+    )
+
+    with pytest.raises(ValueError, match="<global>"):
+        (
+            GraphManager()
+            .add_node(target)
+            .add_edge(START, "target")
+            .compile_graph(using_namespace="")
+        )

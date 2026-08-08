@@ -5,7 +5,12 @@ from typing import Annotated, TypedDict
 
 import pytest
 
-from apix.core.event import apix_event_loop, event_pipe_writer
+from apix.core.event import (
+    apix_event_loop,
+    apix_event_registry,
+    event_pipe_writer,
+)
+from apix.core.utils.exception import EventHandlerAlreadyRegisteredError
 from apix.core.graph import (
     AutoMerge,
     Command,
@@ -565,3 +570,98 @@ async def test_post_next_rolls_back_pending_event_on_failure(monkeypatch):
     assert context.node_name == END
     assert context._pending_events == 0
     assert context._quiescent.is_set()
+
+
+def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
+    """Decomposition removes owned listeners while retaining graph plugins."""
+    async def retained_plugin(event):
+        pass
+
+    apix_event_registry.subscribe("node")(retained_plugin)
+    graph = NodeGraph(
+        {"node": Node(lambda state: {})},
+        {START: "node", "node": END},
+        using_namespace="decompose",
+    )
+    graph_handler_names = set(graph._listener_handler_names)
+
+    graph.decompose()
+    graph.decompose()
+
+    assert graph._decomposed is True
+    assert graph._listener_handler_names == []
+    assert graph_handler_names.isdisjoint(
+        apix_event_registry.get_all_handlers_meta()
+    )
+    assert [
+        handler.name
+        for handler in apix_event_registry.get_handlers("node")
+    ] == [retained_plugin.__name__]
+
+    apix_event_registry.unsubscribe(retained_plugin.__name__)
+
+
+def test_listener_registration_failure_rolls_back_partial_handlers():
+    """A constructor collision cannot leak listeners registered before it."""
+    async def conflicting_handler(event):
+        pass
+
+    conflicting_handler.__name__ = "graph_listener_rollback_node"
+    apix_event_registry.subscribe("foreign")(conflicting_handler)
+
+    with pytest.raises(EventHandlerAlreadyRegisteredError):
+        NodeGraph(
+            {"node": Node(lambda state: {})},
+            {START: "node", "node": END},
+            using_namespace="rollback",
+        )
+
+    assert "graph_listener_rollback_START" not in (
+        apix_event_registry.get_all_handlers_meta()
+    )
+    assert apix_event_registry.get_handler_meta(
+        conflicting_handler.__name__
+    )["subscribe"] == ["foreign"]
+
+    apix_event_registry.unsubscribe(conflicting_handler.__name__)
+
+
+@pytest.mark.asyncio
+async def test_decomposed_graph_rejects_new_invocation():
+    """A decomposed graph cannot silently enqueue an unhandled START event."""
+    graph = NodeGraph({}, {START: END})
+    graph.decompose()
+
+    with pytest.raises(RuntimeError, match="has been decomposed"):
+        await graph.invoke({})
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_decompose_rejects_active_invocation():
+    """Listeners remain installed until an active invocation completes."""
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def blocking_node(state):
+        started.set()
+        await release.wait()
+        return {"finished": True}
+
+    graph = NodeGraph(
+        {"node": Node(blocking_node)},
+        {START: "node", "node": END},
+        using_namespace="active-decompose",
+    )
+    invocation = asyncio.create_task(graph.invoke({}))
+    await started.wait()
+
+    with pytest.raises(RuntimeError, match="invocations are active"):
+        graph.decompose()
+
+    assert graph._decomposed is False
+    assert graph._listener_handler_names
+
+    release.set()
+    assert await invocation == {"finished": True}
+    graph.decompose()
+    await apix_event_loop.stop()

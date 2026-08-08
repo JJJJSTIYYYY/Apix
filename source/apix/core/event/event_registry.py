@@ -63,6 +63,47 @@ class ApixEventRegistry:
             self._handlers_meta
         )
 
+    def unsubscribe(
+        self,
+        handler_name: str,
+        *,
+        missing_ok: bool = True,
+    ) -> None:
+        """Remove one handler from every event to which it is subscribed.
+
+        Args:
+            handler_name: Function name used when the handler was registered.
+            missing_ok: If ``True``, an unknown handler has no effect. If
+                ``False``, it raises :class:`EventHandlerNotRegisteredError`.
+        """
+        handler_meta = self._handlers_meta.pop(handler_name, None)
+        if handler_meta is None:
+            if missing_ok:
+                return
+            raise EventHandlerNotRegisteredError(
+                f"Handler `{handler_name}` not registered."
+            )
+
+        for event_name in handler_meta["subscribe"]:
+            handlers = self._handlers.get(event_name)
+            if handlers is None:
+                continue
+
+            retained_handlers = [
+                handler
+                for handler in handlers
+                if handler.name != handler_name
+            ]
+            if retained_handlers:
+                self._handlers[event_name] = retained_handlers
+            else:
+                self._handlers.pop(event_name, None)
+
+        logger.debug(
+            f"Unregistered handler {handler_name} from events "
+            f"{handler_meta['subscribe']}"
+        )
+
     def _find_insert_index(
         self,
         event_name: str,

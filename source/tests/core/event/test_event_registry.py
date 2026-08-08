@@ -66,6 +66,71 @@ class TestEventRegistrySingleton:
         _reset_registry(registry)
 
 
+class TestUnsubscribe:
+    """Tests for removing registered event handlers."""
+
+    def test_unsubscribe_removes_handler_from_all_events(self):
+        """One call removes entries, metadata, and now-empty event buckets."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def removable_handler(event: ApixEvent):
+            pass
+
+        registry.subscribe("event.a", "event.b")(removable_handler)
+        registry.unsubscribe(removable_handler.__name__)
+
+        assert registry.get_handlers("event.a") == []
+        assert registry.get_handlers("event.b") == []
+        with pytest.raises(EventHandlerNotRegisteredError):
+            registry.get_handler_meta(removable_handler.__name__)
+
+    def test_unsubscribe_preserves_other_handlers(self):
+        """Removing one subscriber leaves unrelated entries in place."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def retained_handler(event: ApixEvent):
+            pass
+
+        async def removed_handler(event: ApixEvent):
+            pass
+
+        registry.subscribe("event.a", time_out=1)(retained_handler)
+        registry.subscribe("event.a")(removed_handler)
+        registry.unsubscribe(removed_handler.__name__)
+
+        assert [
+            handler.name
+            for handler in registry.get_handlers("event.a")
+        ] == [retained_handler.__name__]
+
+    def test_unsubscribe_missing_handler_is_idempotent_by_default(self):
+        """Repeated cleanup is safe unless strict missing handling is requested."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        registry.unsubscribe("missing")
+
+        with pytest.raises(EventHandlerNotRegisteredError, match="missing"):
+            registry.unsubscribe("missing", missing_ok=False)
+
+    def test_unsubscribe_tolerates_missing_event_bucket(self):
+        """Externally cleared event entries do not prevent metadata cleanup."""
+        registry = ApixEventRegistry()
+        _reset_registry(registry)
+
+        async def removable_handler(event: ApixEvent):
+            pass
+
+        registry.subscribe("event.a")(removable_handler)
+        registry._handlers.clear()
+
+        registry.unsubscribe(removable_handler.__name__)
+
+        assert removable_handler.__name__ not in registry._handlers_meta
+
+
 # ============================
 # Tests: _find_insert_index
 # ============================

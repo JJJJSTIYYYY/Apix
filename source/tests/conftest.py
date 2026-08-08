@@ -3,10 +3,16 @@
 import pytest
 
 from apix.core.event import apix_event_registry
+from apix.core.graph.graph_manager import _namespace_graphs, namespace_set
 
 
 def _clear_node_graph_listeners() -> None:
     """Remove listeners registered by NodeGraph instances from prior tests."""
+    for graph in tuple(_namespace_graphs.values()):
+        graph.decompose()
+    _namespace_graphs.clear()
+    namespace_set.clear()
+
     handler_names = {
         name
         for name in apix_event_registry._handlers_meta
