@@ -22,7 +22,7 @@ class ApixEventLoop:
         self._event_consumer_task: asyncio.Task | None = None
 
         self._dispatch_tasks: set[asyncio.Task] = set()
-        self._dispatch_semaphore = asyncio.Semaphore(100)
+        self._dispatch_semaphore = asyncio.Semaphore(100) # back pressure
 
         self._background_handler_tasks: set[asyncio.Task] = set()
         self._background_handler_semaphore = asyncio.Semaphore(100)
@@ -106,6 +106,7 @@ class ApixEventLoop:
                     self._dispatch_semaphore.release()
                     raise
 
+                # Dispatch event to handler without blocking.
                 task = asyncio.create_task(
                     self._dispatch_event_and_ack(event),
                 )

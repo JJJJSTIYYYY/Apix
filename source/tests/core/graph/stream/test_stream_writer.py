@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from apix.core.graph.stream import StreamWriter, get_stream_writer
-from apix.core.graph.stream.stream_writer import (
+from apix.core.graph.context import StreamWriter, get_stream_writer
+from apix.core.graph.context.stream_writer import (
     StreamChannel,
     noop_stream_writer,
     stream_writer_context,
@@ -34,7 +34,7 @@ def test_stream_writer_write_method_sends_chunk():
 
 def test_get_stream_writer_requires_bound_context():
     """Code outside graph node execution cannot access a writer."""
-    with pytest.raises(RuntimeError, match="only available while a graph node"):
+    with pytest.raises(RuntimeError, match="only available while a graph context is bound"):
         get_stream_writer()
 
 
@@ -48,7 +48,7 @@ def test_stream_writer_context_binds_and_restores_writer():
         get_stream_writer()(1)
 
     assert chunks == [1]
-    with pytest.raises(RuntimeError, match="only available while a graph node"):
+    with pytest.raises(RuntimeError, match="only available while a graph context is bound"):
         get_stream_writer()
 
 
@@ -72,7 +72,7 @@ def test_stream_writer_context_resets_after_exception():
         with stream_writer_context(writer):
             raise ValueError("failed")
 
-    with pytest.raises(RuntimeError, match="only available while a graph node"):
+    with pytest.raises(RuntimeError, match="only available while a graph context is bound"):
         get_stream_writer()
 
 

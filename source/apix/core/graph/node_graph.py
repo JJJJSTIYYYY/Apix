@@ -19,8 +19,9 @@ from apix.core.graph.base import (
     get_node_name_in_namespace,
 )
 from apix.core.graph.context import GraphContext
+from apix.core.graph.context.manager import apix_graph_context
 from apix.core.graph.node import BaseNode
-from apix.core.graph.stream import (
+from apix.core.graph.context import (
     StreamChannel,
     StreamWriter,
     noop_stream_writer,
@@ -144,6 +145,11 @@ class NodeGraph:
         for handler_name in self._listener_handler_names:
             apix_event_registry.unsubscribe(handler_name)
         self._listener_handler_names.clear()
+
+
+    def set_max_steps(self, steps: int):
+        self._max_steps = steps
+        return self
 
 
     def decompose(self) -> None:
@@ -364,8 +370,9 @@ class NodeGraph:
         run_id = context.run_id
         context._node_started()
         try:
-            writer = context.stream_writer or noop_stream_writer()
-            with stream_writer_context(writer):
+            # writer = context.stream_writer or noop_stream_writer()
+            # with stream_writer_context(writer):
+            with apix_graph_context(context):
                 execution = self._nodes[node_name].execute(
                     _copy_state(context.state, context._keep_ref_keys)
                 )

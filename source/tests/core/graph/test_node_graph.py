@@ -21,7 +21,7 @@ from apix.core.graph import (
     Reset,
 )
 from apix.core.graph.context import GraphContext
-from apix.core.graph.stream import noop_stream_writer
+from apix.core.graph.context import noop_stream_writer
 
 
 def _graph_context(

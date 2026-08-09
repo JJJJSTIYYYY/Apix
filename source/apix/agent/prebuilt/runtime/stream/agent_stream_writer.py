@@ -7,11 +7,11 @@ import uuid
 from enum import Enum
 from typing import Any, Optional
 
-from apix.agent.sdk.runtime.generation.base import get_generation_id
-from apix.agent.sdk.runtime.stream.base import AgentStreamChunkType, MinimalChunkData, AgentStreamChunk
+from apix.agent.prebuilt.runtime.generation.base import get_generation_id
+from apix.agent.prebuilt.runtime.stream.base import AgentStreamChunkType, MinimalChunkData, AgentStreamChunk
 from apix.common.type import ApixIdentity
 from apix.common.utils.logger import logger
-from apix.core.graph.stream import get_stream_writer
+from apix.core.graph.context import get_stream_writer
 from apix.core.event import ApixEvent
 
 

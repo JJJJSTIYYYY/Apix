@@ -11,5 +11,6 @@ class ApixIdentity(TypedDict):
 
 # Data schema for apix system entry point
 class ApixEntryDataSchema(TypedDict):
+    target: ApixIdentity
     action: str
     data: Any

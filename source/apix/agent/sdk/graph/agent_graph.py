@@ -1,24 +1,10 @@
-from typing import Any, AsyncIterator
-
 from apix.agent.sdk.utils.message import AnyMessage, ApixAiMessage
 from apix.core.graph import NodeGraph, GraphManager
 from apix.core.graph.base import END
 
 
 class AgentGraph(NodeGraph):
-    """Apix agent graph."""
-
-    def __init__(self):
-        super().__init__()
-
-
-    async def invoke(self, state):
-        """Start a agent graph invocation at :data:`START` and return its final state."""
-        return await super().invoke(state)
-    
-    def stream(self, state) -> AsyncIterator[Any]:
-        """Yield custom chunks emitted by nodes during one agent graph invocation."""
-        return super().stream(state)
+    """Apix agent graph. Thick wrapper for :class:`NodeGraph`."""
 
 
 class AgentGraphCreator(GraphManager):
@@ -36,7 +22,7 @@ class AgentGraphCreator(GraphManager):
             .add_edge(START, "first")
         )
 
-        agent_graph = agent_graph_manager.compile_graph()
+        agent_graph = agent_graph_manager.compile_agent()
         ```
     """
 
@@ -57,7 +43,7 @@ class AgentGraphCreator(GraphManager):
         super().__init__(state_schema)
         self.messages_key = messages_key
 
-    def create_agent(self) -> AgentGraph:
+    def compile_agent(self) -> AgentGraph:
         return super().compile_graph()
 
     def add_prebuilt_tools_router(

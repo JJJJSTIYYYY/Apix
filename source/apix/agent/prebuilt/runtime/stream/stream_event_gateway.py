@@ -135,7 +135,7 @@ class StreamEventHandler(EventHandler):
 
     async def _handle_stream_event(
         self,
-        client_id: str,
+        user_uid: str,
         generation_id: str,
         target: ApixIdentity,
         astream,
@@ -158,35 +158,35 @@ class StreamEventHandler(EventHandler):
         await asyncio.sleep(5)
 
         data = payload.get("data") or {}
-        client_id = data.get("client_id")
+        user_uid = data.get("user_uid")
         session_id = data.get("session_id", "")
-        history_id = data.get("history_id")
+        conversation_uid = data.get("conversation_uid")
         platform = data.get("platform", "default")
         associated_account = data.get("associated_account")
         target: ApixIdentity = {
-            "id": client_id,
+            "id": user_uid,
             "platform": platform,
-            "conversation_id": history_id,
+            "conversation_id": conversation_uid,
             "associated_account": associated_account
         }
 
         if not data.get("config"):
             data["config"] = {
                 "auto_save_config": False,
-                "client_id": client_id,
-                "history_id": history_id,
+                "user_uid": user_uid,
+                "conversation_uid": conversation_uid,
                 "platform": platform,
             }
-        data["config"]["work_dir"] = await get_conversation_workspace(history_id)
+        data["config"]["work_dir"] = await get_conversation_workspace(conversation_uid)
 
         try:
-            generation_id = await generation_manager.create_generation(client_id, history_id, platform)
+            generation_id = await generation_manager.create_generation(user_uid, conversation_uid, platform)
         except Exception as e:
-            logger.error(f"Create generation failed client={client_id}: {e}")
+            logger.error(f"Create generation failed client={user_uid}: {e}")
 
-        gen = self.gen_mgr.get_generation(client_id, generation_id)
+        gen = self.gen_mgr.get_generation(user_uid, generation_id)
         if not gen:
-            logger.error(f"Please create a generation first. client_id={client_id}, generation_id={generation_id}")
+            logger.error(f"Please create a generation first. user_uid={user_uid}, generation_id={generation_id}")
             return
 
         agent = None
@@ -215,9 +215,9 @@ class StreamEventHandler(EventHandler):
             initial_state: MainAgentState = {
                 "agent_name": "APIX",
                 "agent_role": agent_role,
-                "client_id": client_id,
+                "user_uid": user_uid,
                 "session_id": session_id,
-                "history_id": history_id,
+                "conversation_uid": conversation_uid,
                 "target": target,
                 "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
                 "generation_id": generation_id,
@@ -272,7 +272,7 @@ class StreamEventHandler(EventHandler):
                     )
                     await self._send_envelope(target, envelop)
 
-                if await self.gen_mgr.is_generation_aborted(client_id, generation_id):
+                if await self.gen_mgr.is_generation_aborted(user_uid, generation_id):
                     await astream.aclose()
                     envelop = self._build_envelope(
                         event="msg_stream_abort",
@@ -287,7 +287,7 @@ class StreamEventHandler(EventHandler):
                     logger.warning(f"This generation has been aborted, generation_id = {generation_id}")
                     return
 
-                await self.gen_mgr.update_cache_tokens(client_id, generation_id, achunk)
+                await self.gen_mgr.update_cache_tokens(user_uid, generation_id, achunk)
                 # await asyncio.sleep(0.06)
                 await self._send_envelope(target, achunk)
 
@@ -304,10 +304,10 @@ class StreamEventHandler(EventHandler):
             await self.gen_mgr._set_generation_status(gen, 'finished')
 
         except Exception as e:
-            logger.error(f"Error for user {client_id}: {traceback.format_exc()}")
+            logger.error(f"Error for user {user_uid}: {traceback.format_exc()}")
 
-            if client_id:
-                await self.gen_mgr.abort_generation(client_id, generation_id)
+            if user_uid:
+                await self.gen_mgr.abort_generation(user_uid, generation_id)
 
             envelop = self._build_envelope(
                 event="msg_stream_abort",
@@ -322,7 +322,7 @@ class StreamEventHandler(EventHandler):
 
         finally:
             await ai_agent.done(agent)
-            await agent_sandbox.done(client_id=client_id, work_dir=work_dir)
+            await agent_sandbox.done(user_uid=user_uid, work_dir=work_dir)
 
 
     async def resolve_block(self, payload: ApixEntryDataSchema):
@@ -335,9 +335,9 @@ class StreamEventHandler(EventHandler):
         block_id = data.get('block_id')
         message = data.get('messages')
         target: ApixIdentity = {
-            'id': data.get('client_id'),
+            'id': data.get('user_uid'),
             'platform': data.get('platform'),
-            'conversation_id': data.get('history_id')
+            'conversation_id': data.get('conversation_uid')
         }
         if not block_id: 
             raise ValueError(f"Missing required fields in payload: {data}")
@@ -352,14 +352,14 @@ class StreamEventHandler(EventHandler):
         logger.trace()
 
         data = payload.get("data") or {}
-        client_id = data.get("client_id")
-        history_id = data.get("history_id", "")
+        user_uid = data.get("user_uid")
+        conversation_uid = data.get("conversation_uid", "")
         platform = data.get("platform", "")
 
-        if not client_id or not history_id or not platform:
+        if not user_uid or not conversation_uid or not platform:
             raise ValueError(f"Missing required fields in payload: {data}")
 
-        await generation_manager.abort_by_history_id(client_id, history_id)
+        await generation_manager.abort_by_conversation_uid(user_uid, conversation_uid)
 
 
     async def await_for_generation(self, payload: ApixEntryDataSchema):
@@ -368,18 +368,18 @@ class StreamEventHandler(EventHandler):
         history to complete.
 
         This handler blocks until every running generation under the given
-        ``history_id`` transitions from ``running`` to either ``finished`` or
+        ``conversation_uid`` transitions from ``running`` to either ``finished`` or
         ``aborted``. If no matching running generation exists, it returns
         immediately.
         '''
         logger.trace()
 
         data = payload.get("data") or {}
-        client_id = data.get("client_id")
-        history_id = data.get("history_id", "")
-        await generation_manager.await_by_history_id(
-            client_id,
-            history_id
+        user_uid = data.get("user_uid")
+        conversation_uid = data.get("conversation_uid", "")
+        await generation_manager.await_by_conversation_uid(
+            user_uid,
+            conversation_uid
         )
 
 

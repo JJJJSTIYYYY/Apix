@@ -6,11 +6,6 @@ from typing import Any, Required, TypedDict
 from apix.common.type import ApixIdentity
 
 
-class MinimalChunkData(TypedDict, total=False):
-    event_name: Required[str]
-    content: Required[Any] # Serializable object
-
-
 class AgentStreamChunkType(str, Enum):
     ESSENTIAL_INFO_RETURN = 'essential_info_return'
     LLM_STREAM_START = "llm_stream_start"
@@ -26,18 +21,15 @@ class AgentStreamChunkType(str, Enum):
     ERROR_OCCURRED = "error_occurred"
 
 
-@dataclass(slots=True)
-class AgentStreamChunk:
+class MinimalChunkData(TypedDict, total=False):
+    chunk_name: Required[str]
+    content: Required[Any] # Serializable object
+
+
+class AgentStreamChunk(TypedDict):
     chunk_id: str
     chunk_type: AgentStreamChunkType
     generation_id: str
     target: ApixIdentity
     data: MinimalChunkData
     timestamp: float
-
-    @property
-    def datetime(self) -> datetime:
-        '''
-        Convert timestamp to datetime object.
-        '''
-        return datetime.fromtimestamp(self.timestamp)

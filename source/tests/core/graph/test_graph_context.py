@@ -9,7 +9,7 @@ import pytest
 from apix.core.graph import AutoMerge, KeepRef
 from apix.core.graph.base import START
 from apix.core.graph.context import GraphContext
-from apix.core.graph.stream import noop_stream_writer
+from apix.core.graph.context import noop_stream_writer
 
 
 class ContextState(TypedDict):
