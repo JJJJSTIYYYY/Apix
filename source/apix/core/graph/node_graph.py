@@ -25,7 +25,6 @@ from apix.core.graph.context import (
     StreamChannel,
     StreamWriter,
     noop_stream_writer,
-    stream_writer_context,
 )
 
 
@@ -370,8 +369,6 @@ class NodeGraph:
         run_id = context.run_id
         context._node_started()
         try:
-            # writer = context.stream_writer or noop_stream_writer()
-            # with stream_writer_context(writer):
             with apix_graph_context(context):
                 execution = self._nodes[node_name].execute(
                     _copy_state(context.state, context._keep_ref_keys)

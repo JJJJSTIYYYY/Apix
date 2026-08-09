@@ -102,7 +102,7 @@ async def test_invoke_graph_uses_a_noop_stream_writer():
 
 async def test_get_stream_writer_is_unavailable_outside_node_execution():
     """Writer context is reset after each node finishes."""
-    with pytest.raises(RuntimeError, match="only available while a graph node"):
+    with pytest.raises(RuntimeError, match="only available while a graph context"):
         get_stream_writer()
 
 

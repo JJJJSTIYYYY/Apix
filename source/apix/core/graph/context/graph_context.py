@@ -13,7 +13,7 @@ from apix.core.graph.base import (
     get_auto_merge_keys,
     get_keep_ref_keys,
 )
-from apix.core.graph.context import StreamWriter
+from apix.core.graph.context.stream_writer import StreamWriter
 
 
 GraphContextStatus: TypeAlias = Literal[

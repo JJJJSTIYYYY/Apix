@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Generator
+from collections.abc import Generator
 from contextvars import ContextVar
 
 from apix.core.graph.context.graph_context import GraphContext
@@ -13,8 +13,8 @@ _current_graph_context: ContextVar["GraphContext | None"] = ContextVar(
 
 
 @contextmanager
-def apix_graph_context(context: GraphContext) -> Generator[None]:
-    """Bind a writer for the duration of one node execution."""
+def apix_graph_context(context: GraphContext) -> Generator[None, None, None]:
+    """Bind a graph context for the duration of one node execution."""
     token = _current_graph_context.set(context)
     try:
         yield

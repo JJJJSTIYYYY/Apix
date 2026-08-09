@@ -1,17 +1,11 @@
 """Invocation-local message queue and writer for graph streaming."""
 
 import asyncio
-from collections.abc import AsyncIterator, Callable, Iterator, Generator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 
 _STREAM_END = object()
-_current_stream_writer: ContextVar["StreamWriter | None"] = ContextVar(
-    "apix_stream_writer",
-    default=None,
-)
 
 
 class StreamWriter:
@@ -59,30 +53,6 @@ class StreamChannel(AsyncIterator[Any]):
         if chunk is _STREAM_END:
             raise StopAsyncIteration
         return chunk
-
-
-def get_stream_writer() -> StreamWriter:
-    """Return the writer bound to the graph node currently being executed.
-
-    Raises:
-        RuntimeError: If called outside a graph node execution context.
-    """
-    writer = _current_stream_writer.get()
-    if writer is None:
-        raise RuntimeError(
-            "get_stream_writer() is only available while a graph node is running."
-        )
-    return writer
-
-
-@contextmanager
-def stream_writer_context(writer: StreamWriter) -> Generator[None]:
-    """Bind a writer for the duration of one node execution."""
-    token = _current_stream_writer.set(writer)
-    try:
-        yield
-    finally:
-        _current_stream_writer.reset(token)
 
 
 _NOOP_STREAM_WRITER = StreamWriter(lambda chunk: None)

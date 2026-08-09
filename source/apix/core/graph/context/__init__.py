@@ -1,9 +1,7 @@
 from apix.core.graph.context.stream_writer import (
-    StreamWriter, 
-    get_stream_writer, 
-    stream_writer_context, 
-    noop_stream_writer, 
-    StreamChannel
+    StreamChannel,
+    StreamWriter,
+    noop_stream_writer,
 )
 from apix.core.graph.context.graph_context import (
     GraphContext,
@@ -11,18 +9,17 @@ from apix.core.graph.context.graph_context import (
 )
 from apix.core.graph.context.manager import (
     apix_graph_context,
-    get_stream_writer, 
-    get_graph_context
+    get_graph_context,
+    get_stream_writer,
 )
 
 __all__ = [
-    "GraphContext", 
+    "GraphContext",
     "GraphContextStatus",
-    "StreamWriter", 
+    "StreamWriter",
     "get_graph_context",
-    "get_stream_writer", 
+    "get_stream_writer",
     "apix_graph_context",
-    "noop_stream_writer", 
-    "stream_writer_context", 
-    "StreamChannel"
+    "noop_stream_writer",
+    "StreamChannel",
 ]
