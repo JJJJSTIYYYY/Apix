@@ -3,8 +3,8 @@
 import asyncio
 import copy
 import math
-import uuid
-from collections.abc import AsyncIterator, Callable
+from uuid import uuid4
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import suppress
 from functools import partial
 from typing import Any
@@ -20,6 +20,7 @@ from apix.core.graph.base import (
 )
 from apix.core.graph.context import GraphContext
 from apix.core.graph.context.manager import apix_graph_context
+from apix.core.graph.interrupter.base import Block
 from apix.core.graph.node import BaseNode
 from apix.core.graph.context import (
     StreamChannel,
@@ -61,6 +62,8 @@ class NodeGraph:
             using_namespace: Namespace used by the graph's event listeners.
                 ``None`` and an empty string select the global namespace.
         """
+        if using_namespace == '<global>':
+            raise ValueError("Namespace `<global>` is a preserved namespace.")
         self._nodes = dict(nodes)
         self._default_gotos = dict(default_gotos)
         supplied_timeouts = dict(node_timeouts or {})
@@ -252,7 +255,7 @@ class NodeGraph:
         channel = StreamChannel()
         execution_task = asyncio.create_task(
             self._invoke(state, channel.writer, graph_context),
-            name=f"graph-stream-{uuid.uuid4().hex}",
+            name=f"graph-stream-{uuid4().hex}",
         )
         execution_task.add_done_callback(lambda task: channel.close())
 
@@ -320,13 +323,13 @@ class NodeGraph:
         if graph_context is not None:
             context._adopt_default_state_schema(self._context_factory())
 
-        run_id = "graph-"+uuid.uuid4().hex
+        run_id = "graph-"+uuid4().hex
         completion = asyncio.get_running_loop().create_future()
         self._invocation_count += 1
         try:
             await apix_event_loop.start()
             first_node = context._bind(
-                owner_id=self._listener_namespace,
+                context_namespace=self._listener_namespace,
                 run_id=run_id,
                 state=state,
                 completion=completion,
@@ -514,3 +517,13 @@ class NodeGraph:
     def _fail(self, context: GraphContext, error: Exception) -> None:
         """Resolve an invocation with the exception raised by a graph node."""
         context._fail(error)
+        
+
+    def add_interrupted_hook(
+        afunc: Callable[[Block], Awaitable[None]],
+        namespace: str | None = None
+    ):
+        apix_event_registry.subscribe(
+            f"graph_{namespace or ''}_interrupted",
+            exist_ok=True,
+        )(afunc)

@@ -22,6 +22,46 @@ def apix_graph_context(context: GraphContext) -> Generator[None, None, None]:
         _current_graph_context.reset(token)
 
 
+def get_current_run_id() -> str:
+    """Return the run_id bound to the graph currently being invoked.
+
+    Raises:
+        RuntimeError: If called outside a graph invocation context.
+    """
+    context = _current_graph_context.get()
+    if context is None:
+        raise RuntimeError(
+            "get_current_run_id() is only available while a graph is invoked."
+        )
+
+    run_id = context.run_id
+    if run_id is None:
+        raise RuntimeError(
+            "get_current_run_id() is only available while a graph is invoked."
+        )
+    return run_id
+
+
+def get_current_namespace() -> str:
+    """Return the namespace bound to the graph and context currently being invoked.
+
+    Raises:
+        RuntimeError: If called outside a graph invocation context.
+    """
+    context = _current_graph_context.get()
+    if context is None:
+        raise RuntimeError(
+            "get_current_namespace() is only available while a graph is invoked."
+        )
+
+    namespace = context._context_namespace
+    if namespace is None:
+        raise RuntimeError(
+            "get_current_namespace() is only available while a graph is invoked."
+        )
+    return namespace
+
+
 def get_stream_writer() -> StreamWriter:
     """Return the writer bound to the graph node currently being executed.
 
@@ -31,26 +71,26 @@ def get_stream_writer() -> StreamWriter:
     context = _current_graph_context.get()
     if context is None:
         raise RuntimeError(
-            "get_stream_writer() is only available while a graph context is bound."
+            "get_stream_writer() is only available while a graph is invoked."
         )
 
     writer = context.stream_writer
     if writer is None:
         raise RuntimeError(
-            "get_stream_writer() is only available while a graph node is running."
+            "get_stream_writer() is only available while a graph node is executed."
         )
     return writer
 
 
 def get_graph_context() -> GraphContext:
-    """Return the context bound to the graph node currently being executed.
+    """Return the context bound to the graph currently being invoked.
 
     Raises:
-        RuntimeError: If called outside a graph node execution context.
+        RuntimeError: If called outside a graph invocation context.
     """
     context = _current_graph_context.get()
     if context is None:
         raise RuntimeError(
-            "get_graph_context() is only available while a graph context is bound."
+            "get_graph_context() is only available while a graph is invoked."
         )
     return context

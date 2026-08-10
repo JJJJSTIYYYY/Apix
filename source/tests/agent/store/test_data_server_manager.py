@@ -116,7 +116,7 @@ async def test_start_and_stop_are_idempotent_and_restartable(manager):
 async def test_submit_and_wait_matches_public_usage_example(monkeypatch):
     manager, _, data_store = make_manager(worker_count=1)
     monkeypatch.setattr(
-        "apix.agent.store.core.data_server_manager.uuid.uuid4",
+        "apix.agent.store.core.data_server_manager.uuid4",
         lambda: "fixed-query-id",
     )
     payload = {

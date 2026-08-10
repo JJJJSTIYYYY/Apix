@@ -1,195 +1,81 @@
-# import asyncio
-# import uuid
+import asyncio
+from collections.abc import Awaitable
+from uuid import uuid4
 
-# from typing import Any, Optional
+from typing import Any, Callable, Optional
 
-# from apix.common.type import ApixIdentity
-# from apix.common.utils.logger import logger
+from apix.core.graph.context.manager import get_graph_context
+from apix.core.event import EventType, event_pipe_writer, apix_event_registry
+from apix.core.graph.interrupter.base import Block
 
 
-# class GraphInterrupter:
+async def interrupt(
+    *,
+    data: Any = None,
+    timeout: Optional[float] = None,
+) -> Any:
+    """
+    Send data and while in graph loop and block the agent graph at the same time.
+    Can be called from inside any graph node.
 
-#     # run_id -> block_id -> future
-#     _blocking_futures: dict[str, dict[str, asyncio.Future]] = {}
+    Args:
+        data: Optional chunk data.
+        timeout: Optional timeout in seconds for the blocking wait. If None, wait indefinitely.
+    """
 
-#     # Public API
-#     async def interrupt(
-#         self,
-#         *,
-#         data: Any = None,
-#         timeout: Optional[float] = None,
-#     ) -> Any:
-#         """
-#         Send structured chunk while in graph loop and block the agent graph at the same time.
-#         Can be called from inside any graph node.
+    block_id = uuid4().hex
 
-#         Args:
-#             chunk_type: Chunk type enum.
-#             target: Chunk receiver.
-#             data: Optional chunk data, should contains event_name and content at least if provided.
-#             timeout: Optional timeout in seconds for the blocking wait. If None, wait indefinitely.
-#         """
+    try:
+        context = get_graph_context()
+    except RuntimeError:
+        raise RuntimeError("interrupt() is only available while a graph is invoked.")
+    
+    run_id = context.run_id
+    namespace = context._context_namespace or ""
 
-#         block_id = uuid.uuid4().hex
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
 
-#         loop = asyncio.get_running_loop()
-#         future = loop.create_future()
+    block = Block(
+        run_id=run_id,
+        block_id=block_id,
+        namespace=namespace,
+        with_data=data,
+        _future=future
+    )
+    await event_pipe_writer.post_event(
+        event_type=EventType.WORKFLOW,
+        event_name=f"graph_{namespace}_interrupted",
+        context=block,
+    )
 
-#         target_hash = self._target_hash(target)
+    try:
+        if timeout is not None:
+            result = await asyncio.wait_for(block, timeout)
+        else:
+            result = await block
 
-#         if target_hash not in self._blocking_futures:
-#             self._blocking_futures[target_hash] = {}
+        return result
 
-#         self._blocking_futures[target_hash][block_id] = future
+    except TimeoutError:
+        return None
 
-#         data = data or {}
-#         data["block_id"] = block_id
 
-#         self._send_chunk(
-#             chunk_type=chunk_type,
-#             target=target,
-#             data=data,
-#             blocking=True,
-#             block_id=block_id,
-#         )
+def interrupted_hook(
+    namespace: str | None = None,
+) -> Callable[
+    [Callable[[Block], Awaitable[None]]],
+    Callable[[Block], Awaitable[None]],
+]:
+    """
+    Usage:
+        @interrupted_hook(namespace="agent")
+        async def on_interrupted(block: :class:`Block`):
+            ...
+    """
+    event_name = f"graph_{namespace or ''}_interrupted"
 
-#         logger.warning(
-#             f"Stream blocked. "
-#             f"target={target_hash} "
-#             f"block_id={block_id}"
-#         )
-
-#         try:
-#             if timeout:
-#                 result = await asyncio.wait_for(future, timeout)
-#             else:
-#                 result = await future
-
-#             logger.success(
-#                 f"Get result. "
-#                 f"target={target_hash} "
-#                 f"block_id={block_id}"
-#             )
-
-#             return result
-
-#         finally:
-
-#             target_futures = self._blocking_futures.get(target_hash)
-
-#             if target_futures:
-#                 target_futures.pop(block_id, None)
-
-#                 # Auto cleanup empty target bucket
-#                 if not target_futures:
-#                     self._blocking_futures.pop(target_hash, None)
-
-#     @classmethod
-#     def resolve_block(
-#         cls,
-#         *,
-#         target: ApixIdentity,
-#         block_id: str,
-#         result: Any = None,
-#     ) -> bool:
-#         """
-#         Resolve blocking event by target + block_id.
-#         """
-
-#         target_hash = cls._target_hash(target)
-
-#         future = (
-#             cls._blocking_futures
-#             .get(target_hash, {})
-#             .get(block_id)
-#         )
-
-#         if not future:
-#             return False
-
-#         if future.done():
-#             return False
-
-#         future.set_result(result)
-
-#         return True
-
-#     @classmethod
-#     def cancel_block(
-#         cls,
-#         *,
-#         target: ApixIdentity,
-#         block_id: str,
-#     ) -> bool:
-#         """
-#         Release blocking future with None result.
-
-#         Semantic:
-#         - blocking wait ends
-#         - no result received
-#         - coroutine continues execution
-#         """
-
-#         target_hash = cls._target_hash(target)
-
-#         future = (
-#             cls._blocking_futures
-#             .get(target_hash, {})
-#             .get(block_id)
-#         )
-
-#         if not future:
-#             return False
-
-#         if future.done():
-#             return False
-
-#         # Continue execution with empty result
-#         future.set_result(None)
-
-#         return True
-
-#     @classmethod
-#     def clear_all_block(
-#         cls,
-#         target: ApixIdentity,
-#     ) -> int:
-#         """
-#         Release all blocking futures with None result.
-
-#         Returns:
-#             int: released future count
-#         """
-
-#         target_hash = cls._target_hash(target)
-
-#         logger.warning(
-#             f"Clear block... "
-#             f"target={target_hash} "
-#         )
-
-#         target_futures = cls._blocking_futures.get(target_hash)
-
-#         if not target_futures:
-#             return 0
-
-#         cleared_count = 0
-
-#         for future in target_futures.values():
-
-#             if future.done():
-#                 continue
-
-#             # Continue execution with empty result
-#             future.set_result(None)
-
-#             cleared_count += 1
-
-#         cls._blocking_futures.pop(target_hash, None)
-
-#         logger.warning(
-#             f"Released {cleared_count} blocking futures "
-#             f"for target={target_hash}"
-#         )
-
-#         return cleared_count
+    return apix_event_registry.subscribe(
+        event_name,
+        exist_ok=True,
+    )

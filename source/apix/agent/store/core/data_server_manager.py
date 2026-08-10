@@ -1,5 +1,5 @@
 import asyncio
-import uuid
+from uuid import uuid4
 from typing import Any,  Callable
 
 from apix.agent.store.core.execute_layer import DataExecutors
@@ -121,7 +121,7 @@ class DataServerManager:
         """
         logger.trace()
         await self.start()
-        query_id = str(uuid.uuid4())
+        query_id = str(uuid4())
         loop = asyncio.get_running_loop()
         future = loop.create_future()
 

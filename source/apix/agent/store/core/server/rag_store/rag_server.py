@@ -5,7 +5,7 @@ import shutil
 from typing import Iterable
 import mimetypes
 import os
-import uuid
+from uuid import uuid4
 from pathlib import Path
 import zipfile
 import yaml

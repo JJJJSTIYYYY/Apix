@@ -88,7 +88,7 @@ class GraphContext:
         default="pending",
         init=False,
     )
-    _owner_id: str | None = field(
+    _context_namespace: str | None = field(
         default=None,
         init=False,
         repr=False,
@@ -180,7 +180,7 @@ class GraphContext:
     def _bind(
         self,
         *,
-        owner_id: str,
+        context_namespace: str,
         run_id: str,
         state: dict[str, Any],
         completion: Future[Any],
@@ -199,7 +199,7 @@ class GraphContext:
             raise RuntimeError(
                 "GraphContext must be pending before starting an invocation."
             )
-        if self._owner_id is not None and self._owner_id != owner_id:
+        if self._context_namespace is not None and self._context_namespace != context_namespace:
             raise ValueError(
                 "A recovered GraphContext must resume on its original graph."
             )
@@ -208,7 +208,7 @@ class GraphContext:
                 "GraphContext cannot start while its previous attempt is active."
             )
 
-        self._owner_id = owner_id
+        self._context_namespace = context_namespace
         self._has_started = True
         state_snapshot = _copy_state(state, self._keep_ref_keys)
 
@@ -224,9 +224,9 @@ class GraphContext:
         self._transition_to("running")
         return self.node_name
 
-    def _belongs_to(self, owner_id: str) -> bool:
+    def _belongs_to(self, context_namespace: str) -> bool:
         """Return whether this context belongs to a particular graph."""
-        return self._owner_id == owner_id
+        return self._context_namespace == context_namespace
 
     def _is_current_run(self, run_id: str | None) -> bool:
         """Return whether work still belongs to the active attempt."""

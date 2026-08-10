@@ -1,5 +1,5 @@
 import copy
-import uuid
+from uuid import uuid4
 
 from apix.core.event.base import (
     EventHandlerFunc,
@@ -462,7 +462,7 @@ class ApixEventRegistry:
                 )
 
                 entry = HandlerEntry(
-                    id=uuid.uuid4().hex,
+                    id=uuid4().hex,
                     name=handler_name,
                     subscribe=event_name,
                     callback=func,

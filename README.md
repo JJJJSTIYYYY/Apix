@@ -6,7 +6,7 @@
 
 中文文档 | [English](./README_en.md)
 
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat&logo=python)
 ![Electron](https://img.shields.io/badge/Electron-37-47848F?style=flat&logo=electron)
 ![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat&logo=vue.js)
 [![License](https://img.shields.io/badge/License-GPL%203.0-blue?style=flat)](./LICENSE)

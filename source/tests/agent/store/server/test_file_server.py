@@ -72,7 +72,10 @@ async def test_handle_skill_package_moves_valid_zip_and_extracts_metadata(
     monkeypatch, tmp_path
 ):
     monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path / "data"))
-    monkeypatch.setattr(file_module.uuid, "uuid4", lambda: SimpleNamespace(hex="fixedid"))
+    monkeypatch.setattr(
+        "apix.agent.store.core.server.file_store.file_server.uuid4",
+        lambda: SimpleNamespace(hex="fixedid")
+    )
     source = make_skill_zip(
         tmp_path / "skill.zip",
         "---\nname: demo\ndescription: Demo skill\nversion: 2.1.0\n---\n# Demo\n",

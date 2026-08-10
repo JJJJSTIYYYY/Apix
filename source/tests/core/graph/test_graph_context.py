@@ -22,12 +22,12 @@ def _bind(
     run_id: str,
     state: dict | None = None,
     *,
-    owner_id: str = "graph",
+    context_namespace: str = "graph",
 ) -> asyncio.Future:
     """Bind a context with the same runtime dependencies as NodeGraph."""
     completion = asyncio.get_running_loop().create_future()
     context._bind(
-        owner_id=owner_id,
+        context_namespace=context_namespace,
         run_id=run_id,
         state=state if state is not None else {"value": run_id},
         completion=completion,
@@ -263,12 +263,12 @@ async def test_context_cannot_start_while_running_or_after_finish():
 async def test_recovered_context_must_use_its_original_graph():
     """A node checkpoint cannot be resumed against another graph topology."""
     context = GraphContext()
-    _bind(context, "run-1", owner_id="first-graph")
+    _bind(context, "run-1", context_namespace="first-graph")
     context.abort()
     await context.resume()
 
     with pytest.raises(ValueError, match="original graph"):
-        _bind(context, "run-2", owner_id="second-graph")
+        _bind(context, "run-2", context_namespace="second-graph")
 
 
 @pytest.mark.asyncio

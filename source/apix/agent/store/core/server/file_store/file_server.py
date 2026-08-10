@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 import shutil
-import uuid
+from uuid import uuid4
 from pathlib import Path
 import zipfile
 import yaml
@@ -157,7 +157,7 @@ class FileService:
                 if source.suffix.lower() != ".zip":
                     raise ValueError(f"Skill package must be a zip file: {source.name}")
 
-                skill_id = uuid.uuid4().hex
+                skill_id = uuid4().hex
 
                 # Preserve the uploaded name and add an index on conflicts.
                 package_path = self._next_available_package_path(

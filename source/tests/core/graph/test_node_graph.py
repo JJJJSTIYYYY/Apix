@@ -44,7 +44,7 @@ def _bound_context(
     """Build a fully bound context for lifecycle unit tests."""
     context = GraphContext()
     context._bind(
-        owner_id=graph._listener_namespace,
+        context_namespace=graph._listener_namespace,
         run_id=run_id,
         state=state,
         completion=asyncio.get_running_loop().create_future(),
@@ -354,7 +354,7 @@ async def test_is_active_context_rejects_owned_but_unbound_context():
     """Ownership alone is insufficient without invocation runtime fields."""
     graph = NodeGraph({}, {START: END})
     context = GraphContext()
-    context._owner_id = graph._listener_namespace
+    context._context_namespace = graph._listener_namespace
 
     assert await graph._is_active_context(context) is False
 

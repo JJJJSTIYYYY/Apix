@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import json
 import time
-import uuid
+from uuid import uuid4
 
 from enum import Enum
 from typing import Any, Optional
@@ -58,7 +58,7 @@ class AgentStreamWriter:
             data["block_id"] = block_id
 
         chunk = AgentStreamChunk(
-            chunk_id=uuid.uuid4().hex,
+            chunk_id=uuid4().hex,
             chunk_type=chunk_type,
             generation_id=generation_id,
             target=target,
@@ -113,7 +113,7 @@ class AgentStreamWriter:
             timeout: Optional timeout in seconds for the blocking wait. If None, wait indefinitely.
         """
 
-        block_id = uuid.uuid4().hex
+        block_id = uuid4().hex
 
         loop = asyncio.get_running_loop()
         future = loop.create_future()

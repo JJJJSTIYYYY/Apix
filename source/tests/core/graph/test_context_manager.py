@@ -25,13 +25,13 @@ def test_graph_accessors_require_bound_context():
     """Context-dependent helpers reject calls outside node execution."""
     with pytest.raises(
         RuntimeError,
-        match="get_graph_context.*only available while a graph context is bound",
+        match="get_graph_context.*only available while a graph is invoked",
     ):
         get_graph_context()
 
     with pytest.raises(
         RuntimeError,
-        match="get_stream_writer.*only available while a graph context is bound",
+        match="get_stream_writer.*only available while a graph is invoked",
     ):
         get_stream_writer()
 
@@ -53,7 +53,7 @@ def test_bound_context_without_writer_rejects_stream_access():
         assert get_graph_context() is context
         with pytest.raises(
             RuntimeError,
-            match="get_stream_writer.*only available while a graph node is running",
+            match="get_stream_writer.*only available while a graph node is executed",
         ):
             get_stream_writer()
 
@@ -81,7 +81,7 @@ def test_apix_graph_context_resets_after_exception():
         with apix_graph_context(context):
             raise ValueError("failed")
 
-    with pytest.raises(RuntimeError, match="only available while a graph context"):
+    with pytest.raises(RuntimeError, match="only available while a graph is invoked"):
         get_graph_context()
 
 
