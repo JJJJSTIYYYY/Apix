@@ -21,6 +21,7 @@ from apix.core.graph.base import (
 from apix.core.graph.context import GraphContext
 from apix.core.graph.context.manager import apix_graph_context
 from apix.core.graph.interrupter.base import Block
+from apix.core.graph.interrupter.graph_interrupter import interrupted_hook
 from apix.core.graph.node import BaseNode
 from apix.core.graph.context import (
     StreamChannel,
@@ -520,10 +521,23 @@ class NodeGraph:
         
 
     def add_interrupted_hook(
+        self,
         afunc: Callable[[Block], Awaitable[None]],
-        namespace: str | None = None
-    ):
-        apix_event_registry.subscribe(
-            f"graph_{namespace or ''}_interrupted",
-            exist_ok=True,
+    ) -> Callable[[Block], Awaitable[None]]:
+        """Register a graph-owned interruption callback.
+
+        The graph's namespace is selected automatically. The callback is
+        unregistered by :meth:`decompose`, preventing a replacement graph from
+        accidentally dispatching blocks to a stale callback.
+        """
+        if self._decomposed:
+            raise RuntimeError(
+                "Cannot add an interrupted hook to a decomposed NodeGraph."
+            )
+
+        interrupted_hook(
+            self._listener_namespace,
+            exist_ok=False,
         )(afunc)
+        self._listener_handler_names.append(afunc.__name__)
+        return afunc

@@ -8,6 +8,8 @@ from apix.core.graph.context import (
     GraphContext,
     StreamWriter,
     apix_graph_context,
+    get_current_namespace,
+    get_current_run_id,
     get_graph_context,
     get_stream_writer,
 )
@@ -56,6 +58,35 @@ def test_bound_context_without_writer_rejects_stream_access():
             match="get_stream_writer.*only available while a graph node is executed",
         ):
             get_stream_writer()
+
+
+def test_run_identity_accessors_require_complete_runtime_binding():
+    """Run and namespace helpers reject both missing and partial bindings."""
+    with pytest.raises(RuntimeError, match="get_current_run_id.*only available"):
+        get_current_run_id()
+    with pytest.raises(RuntimeError, match="get_current_namespace.*only available"):
+        get_current_namespace()
+
+    context = GraphContext()
+    with apix_graph_context(context):
+        with pytest.raises(RuntimeError, match="get_current_run_id.*only available"):
+            get_current_run_id()
+        with pytest.raises(
+            RuntimeError,
+            match="get_current_namespace.*only available",
+        ):
+            get_current_namespace()
+
+
+def test_run_identity_accessors_return_bound_values():
+    """A complete node binding exposes its run ID and graph namespace."""
+    context = GraphContext()
+    context.run_id = "graph-run"
+    context._context_namespace = "agent"
+
+    with apix_graph_context(context):
+        assert get_current_run_id() == "graph-run"
+        assert get_current_namespace() == "agent"
 
 
 def test_nested_apix_graph_context_restores_outer_context():

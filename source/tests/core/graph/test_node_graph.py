@@ -85,6 +85,20 @@ def test_listener_namespace_uses_supplied_value():
     assert graph._listener_namespace == "agent-runtime"
 
 
+def test_reserved_global_namespace_token_is_rejected():
+    """The display-only global namespace label cannot become a real name."""
+    with pytest.raises(ValueError, match="preserved namespace"):
+        NodeGraph({}, {START: END}, using_namespace="<global>")
+
+
+def test_set_max_steps_is_fluent_and_updates_runtime_limit():
+    """The compatibility setter returns the graph and changes its limit."""
+    graph = NodeGraph({}, {START: END})
+
+    assert graph.set_max_steps(7) is graph
+    assert graph._max_steps == 7
+
+
 def test_apply_command_rejects_non_string_goto():
     """A direct apply_command call cannot route to a non-string target."""
     graph = NodeGraph({}, {START: END})
