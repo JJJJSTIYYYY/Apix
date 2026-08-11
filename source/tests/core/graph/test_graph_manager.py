@@ -6,7 +6,11 @@ import pytest
 
 from apix.core.event import apix_event_registry
 from apix.core.graph import END, START, GraphManager, namespace_set
-from apix.core.graph.base import _namespace_graphs, _release_namespace
+from apix.core.graph.base import (
+    _acquire_namespace,
+    _namespace_graphs,
+    _release_namespace,
+)
 
 
 def source(state):
@@ -204,6 +208,40 @@ def test_compile_rejects_occupied_namespace_by_default():
 
     assert first_graph._decomposed is False
     assert _namespace_graphs["occupied"] is first_graph
+
+
+def test_acquire_namespace_rejects_conflict_before_calling_factory():
+    """A rejected acquisition cannot construct or replace another graph."""
+    first_graph = (
+        GraphManager()
+        .add_node(source)
+        .add_edge(START, "source")
+        .compile_graph(using_namespace="factory-conflict")
+    )
+    factory_called = False
+
+    def graph_factory():
+        nonlocal factory_called
+        factory_called = True
+        return first_graph
+
+    with pytest.raises(ValueError, match="already in use"):
+        _acquire_namespace("factory-conflict", graph_factory)
+
+    assert factory_called is False
+    assert _namespace_graphs["factory-conflict"] is first_graph
+
+
+def test_acquire_namespace_does_not_register_failed_factory():
+    """Construction failure leaves an unoccupied namespace unacquired."""
+    def graph_factory():
+        raise RuntimeError("construction failed")
+
+    with pytest.raises(RuntimeError, match="construction failed"):
+        _acquire_namespace("factory-failure", graph_factory)
+
+    assert "factory-failure" not in namespace_set
+    assert "factory-failure" not in _namespace_graphs
 
 
 def test_compile_exist_ok_decomposes_and_replaces_original_graph():

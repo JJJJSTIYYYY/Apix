@@ -239,6 +239,33 @@ _namespace_graphs: dict[str, NodeGraph] = {}
 """Compiled graph indexed by its exclusive listener namespace."""
 
 
+def _acquire_namespace(
+    namespace: str,
+    graph_factory: Callable[[], NodeGraph],
+    *,
+    replace_existed: bool = False,
+) -> NodeGraph:
+    """Create a graph after acquiring its exclusive namespace.
+
+    An occupied namespace is rejected by default. With ``replace_existed=True``, its
+    current graph is decomposed before the replacement is constructed. The new
+    graph is registered only after its constructor succeeds, so a failed graph
+    factory cannot leave a partially acquired namespace.
+    """
+    if namespace in namespace_set:
+        if not replace_existed:
+            namespace_name = namespace or "<global>"
+            raise ValueError(
+                f"Graph namespace `{namespace_name}` is already in use."
+            )
+        _namespace_graphs[namespace].decompose()
+
+    graph = graph_factory()
+    namespace_set.add(namespace)
+    _namespace_graphs[namespace] = graph
+    return graph
+
+
 def _release_namespace(graph: NodeGraph) -> None:
     """Release ``graph`` only when it still owns its namespace."""
     namespace = graph._listener_namespace

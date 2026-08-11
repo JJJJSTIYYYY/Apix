@@ -8,9 +8,7 @@ from apix.core.graph.base import (
     START,
     Command,
     NodeFunction,
-    _namespace_graphs,
-    _release_namespace,
-    namespace_set,
+    _acquire_namespace,
 )
 from apix.core.graph.node import BaseNode, Node
 from apix.core.graph.node_graph import NodeGraph
@@ -240,21 +238,14 @@ class GraphManager:
             raise ValueError("A graph must define an outgoing transition from `START`.")
 
         namespace = using_namespace or ""
-        if namespace in namespace_set:
-            if not exist_ok:
-                namespace_name = namespace or "<global>"
-                raise ValueError(
-                    f"Graph namespace `{namespace_name}` is already in use."
-                )
-            _namespace_graphs[namespace].decompose()
-
-        graph = NodeGraph(
-            self._nodes,
-            self._default_gotos,
-            node_timeouts=self._node_timeouts,
-            state_schema=self._state_schema,
-            using_namespace=namespace,
+        return _acquire_namespace(
+            namespace,
+            lambda: NodeGraph(
+                self._nodes,
+                self._default_gotos,
+                node_timeouts=self._node_timeouts,
+                state_schema=self._state_schema,
+                using_namespace=namespace,
+            ),
+            replace_existed=exist_ok,
         )
-        namespace_set.add(namespace)
-        _namespace_graphs[namespace] = graph
-        return graph
