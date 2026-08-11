@@ -3,7 +3,7 @@
 import pytest
 
 from apix.core.event import apix_event_registry
-from apix.core.graph.graph_manager import _namespace_graphs, namespace_set
+from apix.core.graph.base import _namespace_graphs, namespace_set
 
 
 def _clear_node_graph_listeners() -> None:

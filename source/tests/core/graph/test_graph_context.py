@@ -1,6 +1,7 @@
-"""Focused tests for graph context state, lifecycle, and recovery."""
+"""Focused tests for graph context state, lifecycle, and snapshots."""
 
 import asyncio
+import json
 from dataclasses import is_dataclass
 from typing import Annotated, TypedDict
 
@@ -8,13 +9,13 @@ import pytest
 
 from apix.core.graph import AutoMerge, KeepRef
 from apix.core.graph.base import START
-from apix.core.graph.context import GraphContext
+from apix.core.graph.context import GraphContext, GraphContextSnapshot
 from apix.core.graph.context import noop_stream_writer
 
 
 class ContextState(TypedDict):
     values: Annotated[list[int], AutoMerge()]
-    resource: Annotated[object, KeepRef()]
+    resource: Annotated[dict, KeepRef()]
 
 
 def _bind(
@@ -36,14 +37,19 @@ def _bind(
     return completion
 
 
-def test_graph_context_is_a_slots_dataclass():
-    """The former TypedDict and store wrapper are represented by one class."""
+def test_graph_context_is_a_slots_dataclass_without_old_recovery_barrier():
+    """The context is one class and no longer owns quiescence bookkeeping."""
     context = GraphContext()
 
     assert is_dataclass(context)
     assert not hasattr(context, "__dict__")
     assert not hasattr(context, "graph_context")
     assert not hasattr(context, "_state_snapshotter")
+    assert not hasattr(context, "_has_snapshot")
+    assert not hasattr(context, "_pending_events")
+    assert not hasattr(context, "_running_nodes")
+    assert not hasattr(context, "_quiescent")
+    assert not hasattr(context, "resume")
 
 
 def test_context_owns_schema_derived_state_behavior():
@@ -55,8 +61,8 @@ def test_context_owns_schema_derived_state_behavior():
     assert context._keep_ref_keys == frozenset({"resource"})
 
 
-def test_new_context_is_pending_and_unbound():
-    """A new context begins at START without an invocation attempt."""
+def test_new_context_is_pending_unbound_and_has_no_snapshot():
+    """A new context begins at START without runtime or recovery state."""
     context = GraphContext()
 
     assert context.status == "pending"
@@ -64,6 +70,7 @@ def test_new_context_is_pending_and_unbound():
     assert context.state == {}
     assert context.node_name == START
     assert context.steps == 0
+    assert context.context_snapshot is None
     assert context.completion is None
     assert context.stream_writer is None
     assert context.is_consumed is False
@@ -72,8 +79,8 @@ def test_new_context_is_pending_and_unbound():
 
 
 @pytest.mark.asyncio
-async def test_bind_transitions_pending_to_running():
-    """Binding initializes one running attempt and its first snapshot."""
+async def test_bind_transitions_pending_to_running_without_taking_snapshot():
+    """START binding initializes runtime fields but leaves the snapshot absent."""
     context = GraphContext()
     state = {"value": 1}
     completion = _bind(context, "run-1", state)
@@ -83,32 +90,137 @@ async def test_bind_transitions_pending_to_running():
     assert context.state == state
     assert context.state is not state
     assert context.node_name == START
+    assert context.context_snapshot is None
     assert context.completion is completion
     assert context.is_consumed is True
     assert context.is_bound is True
     assert context.is_active is True
 
 
-def test_pending_context_can_be_aborted_and_resumed():
-    """The pending -> aborted -> pending transition needs no runtime future."""
+def test_snapshot_requires_an_active_bound_context():
+    """Detached and completed contexts cannot manufacture checkpoints."""
     context = GraphContext()
 
-    context.abort()
-    assert context.status == "aborted"
-
-    asyncio.run(context.resume())
-    assert context.status == "pending"
+    with pytest.raises(RuntimeError, match="only be taken from an active"):
+        context.take_a_snapshot()
 
 
-def test_pending_context_can_fail_and_resume():
-    """The pending -> failed -> pending transition supports setup retries."""
+@pytest.mark.asyncio
+async def test_take_a_snapshot_captures_recoverable_fields_by_reference():
+    """Taking a checkpoint performs no eager state copy."""
     context = GraphContext()
+    _bind(context, "run-1", {"nested": [1]}, context_namespace="agent")
+    context.node_name = "retry"
+    context.steps = 2
 
-    context._fail(RuntimeError("setup failed"))
-    assert context.status == "failed"
+    context.take_a_snapshot()
 
-    asyncio.run(context.resume())
-    assert context.status == "pending"
+    snapshot = context.context_snapshot
+    assert snapshot == {
+        "state": {"nested": [1]},
+        "node_name": "retry",
+        "steps": 2,
+        "namespace": "agent",
+    }
+    assert snapshot is not None
+    assert snapshot["state"] is context.state
+    assert "run_id" not in snapshot
+    assert "completion" not in snapshot
+    assert "stream_writer" not in snapshot
+    assert json.loads(json.dumps(snapshot)) == snapshot
+
+
+@pytest.mark.asyncio
+async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
+    """Recovery deliberately ignores KeepRef and isolates the new attempt."""
+    resource = {"items": [1]}
+    context = GraphContext(ContextState)
+    _bind(
+        context,
+        "run-1",
+        {"values": [1], "resource": resource},
+        context_namespace="agent",
+    )
+    context.node_name = "retry"
+    context.steps = 3
+    context.take_a_snapshot()
+    snapshot = context.context_snapshot
+    assert snapshot is not None
+    assert snapshot["state"]["resource"] is resource
+
+    recovered = GraphContext.from_snapshot(snapshot, ContextState)
+
+    assert recovered.status == "pending"
+    assert recovered.run_id is None
+    assert recovered.completion is None
+    assert recovered.stream_writer is None
+    assert recovered.is_consumed is False
+    assert recovered.node_name == "retry"
+    assert recovered.steps == 3
+    assert recovered._context_namespace == "agent"
+    assert recovered._state_schema is ContextState
+    assert recovered.context_snapshot is not snapshot
+    assert recovered.state is recovered.context_snapshot["state"]
+    assert recovered.state is not snapshot["state"]
+    assert recovered.state["values"] is not snapshot["state"]["values"]
+    assert recovered.state["resource"] is not resource
+    assert recovered.state["resource"]["items"] is not resource["items"]
+
+
+@pytest.mark.parametrize("snapshot", [None])
+def test_from_snapshot_rejects_missing_snapshot(snapshot):
+    """START failures without a checkpoint cannot be recovered."""
+    with pytest.raises(RuntimeError, match="without a snapshot"):
+        GraphContext.from_snapshot(snapshot)
+
+
+def test_from_snapshot_rejects_non_mapping():
+    """The public restoration API validates its container contract."""
+    with pytest.raises(TypeError, match="must be a dict"):
+        GraphContext.from_snapshot([])
+
+
+def test_from_snapshot_rejects_missing_fields():
+    """Partially persisted checkpoints fail with a useful field list."""
+    with pytest.raises(ValueError, match="missing required fields: namespace, steps"):
+        GraphContext.from_snapshot({"state": {}, "node_name": "node"})
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "message"),
+    [
+        ("state", [], "state must be a dict"),
+        ("node_name", 1, "node_name must be a string"),
+        ("steps", True, "steps must be an int"),
+        ("steps", 1.5, "steps must be an int"),
+        ("namespace", None, "namespace must be a string"),
+    ],
+)
+def test_from_snapshot_rejects_invalid_field_types(key, value, message):
+    """Stored fields retain explicit runtime contracts."""
+    snapshot: GraphContextSnapshot = {
+        "state": {},
+        "node_name": "node",
+        "steps": 0,
+        "namespace": "agent",
+    }
+    snapshot[key] = value
+
+    with pytest.raises(TypeError, match=message):
+        GraphContext.from_snapshot(snapshot)
+
+
+def test_from_snapshot_rejects_negative_steps():
+    """A checkpoint cannot precede the start of graph execution."""
+    snapshot: GraphContextSnapshot = {
+        "state": {},
+        "node_name": "node",
+        "steps": -1,
+        "namespace": "agent",
+    }
+
+    with pytest.raises(ValueError, match="cannot be negative"):
+        GraphContext.from_snapshot(snapshot)
 
 
 def test_invalid_status_transition_is_rejected():
@@ -119,76 +231,94 @@ def test_invalid_status_transition_is_rejected():
         context._transition_to("finished")
 
 
-@pytest.mark.asyncio
-async def test_bind_rejects_stale_in_flight_work():
-    """A pending recovery cannot bind until all stale work has drained."""
-    context = GraphContext()
-    context._event_posted()
+def test_pending_context_can_abort_or_fail_but_has_no_recovery_snapshot():
+    """Setup failures stay terminal because no ordinary node was checkpointed."""
+    aborted = GraphContext()
+    aborted.abort()
+    aborted.abort()
+    assert aborted.status == "aborted"
+    assert aborted.context_snapshot is None
 
-    with pytest.raises(RuntimeError, match="previous attempt is active"):
-        _bind(context, "run-1")
-
-    context._event_received()
-
-
-def test_drain_counters_never_become_negative():
-    """Duplicate drain notifications leave an already idle context idle."""
-    context = GraphContext()
-
-    context._event_received()
-    context._node_finished()
-
-    assert context._pending_events == 0
-    assert context._running_nodes == 0
-    assert context._quiescent.is_set()
+    failed = GraphContext()
+    failed._fail(RuntimeError("first"))
+    failed._fail(RuntimeError("second"))
+    assert failed.status == "failed"
+    assert failed.context_snapshot is None
 
 
 @pytest.mark.asyncio
-async def test_running_abort_resolves_snapshot_and_is_idempotent():
-    """Abort resolves the saved state and enters the aborted state once."""
+async def test_running_abort_resolves_the_saved_snapshot_and_is_idempotent():
+    """Abort returns the checkpoint even if newer context state is present."""
     context = GraphContext()
     completion = _bind(context, "run-1", {"history": ["saved"]})
+    context.node_name = "retry"
+    context.take_a_snapshot()
+    context.state = {"history": ["newer"]}
 
     context.abort()
     context.abort()
 
     result = await completion
     assert result == {"history": ["saved"]}
-    assert result is not context.state
-    assert result["history"] is not context.state["history"]
+    assert result is not context.context_snapshot["state"]
+    assert result["history"] is not context.context_snapshot["state"]["history"]
     assert context.status == "aborted"
     assert context.is_active is False
 
 
 @pytest.mark.asyncio
-async def test_finish_is_idempotent_and_ignores_non_running_contexts():
-    """Late and duplicate finish signals cannot alter lifecycle state."""
+async def test_finish_is_idempotent_and_does_not_replace_snapshot():
+    """END resolves current state while leaving the previous checkpoint intact."""
     pending = GraphContext()
     pending._finish()
     assert pending.status == "pending"
 
     finished = GraphContext()
     completion = _bind(finished, "run-1")
+    finished.node_name = "node"
+    finished.take_a_snapshot()
+    snapshot = finished.context_snapshot
+    finished.state = {"value": "finished"}
     finished._finish()
     finished._finish()
 
-    assert await completion == {"value": "run-1"}
+    assert await completion == {"value": "finished"}
     assert finished.status == "finished"
-
-
-def test_fail_is_idempotent():
-    """Only the first failure transition is applied."""
-    context = GraphContext()
-
-    context._fail(RuntimeError("first"))
-    context._fail(RuntimeError("second"))
-
-    assert context.status == "failed"
+    assert finished.context_snapshot is snapshot
+    assert finished.context_snapshot["state"] == {"value": "run-1"}
 
 
 @pytest.mark.asyncio
-async def test_finished_context_cannot_abort():
-    """The terminal finished state rejects interruption."""
+async def test_failed_context_restores_into_a_new_pending_context():
+    """The original attempt stays failed while its deep copy becomes reusable."""
+    context = GraphContext(ContextState)
+    completion = _bind(
+        context,
+        "run-1",
+        {"values": [1], "resource": {}},
+    )
+    context.node_name = "retry-node"
+    context.steps = 3
+    context.take_a_snapshot()
+    error = RuntimeError("failed")
+    context._fail(error)
+
+    with pytest.raises(RuntimeError, match="failed"):
+        await completion
+    recovered = GraphContext.from_snapshot(context.context_snapshot)
+
+    assert context.status == "failed"
+    assert recovered.status == "pending"
+    assert recovered.node_name == "retry-node"
+    assert recovered.steps == 3
+    assert recovered._state_schema is None
+    assert recovered.run_id is None
+    assert recovered.completion is None
+
+
+@pytest.mark.asyncio
+async def test_finished_context_cannot_abort_or_start_again():
+    """Finished contexts remain terminal and single-use."""
     context = GraphContext()
     completion = _bind(context, "run-1")
     context._finish()
@@ -196,117 +326,41 @@ async def test_finished_context_cannot_abort():
 
     with pytest.raises(RuntimeError, match="status finished"):
         context.abort()
+    with pytest.raises(RuntimeError, match="must be pending"):
+        _bind(context, "run-2")
 
 
 @pytest.mark.asyncio
-async def test_failed_context_can_resume_with_its_checkpoint():
-    """Failure retains state, node, steps, schema, and graph ownership."""
-    context = GraphContext(ContextState)
-    completion = _bind(
-        context,
-        "run-1",
-        {"values": [1], "resource": object()},
-    )
-    context.node_name = "retry-node"
-    context.steps = 3
-    error = RuntimeError("failed")
-
-    context._fail(error)
-
-    with pytest.raises(RuntimeError, match="failed"):
-        await completion
-    assert context.status == "failed"
-
-    await context.resume()
-
-    assert context.status == "pending"
-    assert context.node_name == "retry-node"
-    assert context.steps == 3
-    assert context._state_schema is ContextState
-    assert context.run_id is None
-    assert context.completion is None
-
-
-@pytest.mark.asyncio
-async def test_running_and_finished_contexts_cannot_resume():
-    """Only failed or aborted contexts may transition back to pending."""
-    running = GraphContext()
-    _bind(running, "running")
-
-    with pytest.raises(RuntimeError, match="Only failed or aborted"):
-        await running.resume()
-
-    finished = GraphContext()
-    completion = _bind(finished, "finished")
-    finished._finish()
-    await completion
-
-    with pytest.raises(RuntimeError, match="Only failed or aborted"):
-        await finished.resume()
-
-
-@pytest.mark.asyncio
-async def test_context_cannot_start_while_running_or_after_finish():
-    """Running and terminal contexts reject another invocation bind."""
+async def test_running_context_cannot_start_again():
+    """A context cannot represent two invocation attempts."""
     context = GraphContext()
     _bind(context, "run-1")
 
     with pytest.raises(RuntimeError, match="must be pending"):
         _bind(context, "run-2")
 
-    context._finish()
-    with pytest.raises(RuntimeError, match="must be pending"):
-        _bind(context, "run-3")
-
 
 @pytest.mark.asyncio
-async def test_recovered_context_must_use_its_original_graph():
-    """A node checkpoint cannot be resumed against another graph topology."""
-    context = GraphContext()
-    _bind(context, "run-1", context_namespace="first-graph")
-    context.abort()
-    await context.resume()
+async def test_recovered_context_must_use_its_original_namespace():
+    """A checkpoint may move to a replacement graph, but not another namespace."""
+    original = GraphContext()
+    _bind(original, "run-1", context_namespace="first-graph")
+    original.node_name = "retry"
+    original.take_a_snapshot()
+    original.abort()
+    recovered = GraphContext.from_snapshot(original.context_snapshot)
 
-    with pytest.raises(ValueError, match="original graph"):
-        _bind(context, "run-2", context_namespace="second-graph")
-
-
-@pytest.mark.asyncio
-async def test_resume_waits_for_queued_events_to_drain():
-    """A stale queued event must be consumed before pending can be restored."""
-    context = GraphContext()
-    _bind(context, "run-1")
-    context._event_posted()
-    context.abort()
-
-    resume_task = asyncio.create_task(context.resume())
-    await asyncio.sleep(0)
-    assert not resume_task.done()
-
-    context._event_received()
-    await resume_task
-
-    assert context.status == "pending"
+    with pytest.raises(ValueError, match="original namespace"):
+        _bind(recovered, "run-2", context_namespace="second-graph")
 
 
-@pytest.mark.asyncio
-async def test_only_one_concurrent_resume_can_claim_context():
-    """Concurrent waiters cannot both transition one context to pending."""
-    context = GraphContext()
-    _bind(context, "run-1")
-    context._event_posted()
-    context.abort()
+def test_default_schema_is_adopted_only_by_unconsumed_schema_less_context():
+    """Replacement graphs supply behavior without overwriting explicit schemas."""
+    default = GraphContext(ContextState)
+    fresh = GraphContext()
+    fresh._adopt_default_state_schema(default)
+    assert fresh._state_schema is ContextState
 
-    resume_tasks = [
-        asyncio.create_task(context.resume()),
-        asyncio.create_task(context.resume()),
-    ]
-    await asyncio.sleep(0)
-    context._event_received()
-
-    results = await asyncio.gather(*resume_tasks, return_exceptions=True)
-
-    assert sum(result is None for result in results) == 1
-    [error] = [result for result in results if isinstance(result, RuntimeError)]
-    assert "no longer available for recovery" in str(error)
-    assert context.status == "pending"
+    explicit = GraphContext(dict)
+    explicit._adopt_default_state_schema(default)
+    assert explicit._state_schema is dict

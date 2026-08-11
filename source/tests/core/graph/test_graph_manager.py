@@ -6,7 +6,7 @@ import pytest
 
 from apix.core.event import apix_event_registry
 from apix.core.graph import END, START, GraphManager, namespace_set
-from apix.core.graph.graph_manager import _namespace_graphs, _release_namespace
+from apix.core.graph.base import _namespace_graphs, _release_namespace
 
 
 def source(state):

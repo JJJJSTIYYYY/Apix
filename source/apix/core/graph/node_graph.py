@@ -16,6 +16,7 @@ from apix.core.graph.base import (
     Command,
     Reset,
     _copy_state,
+    _release_namespace,
     get_node_name_in_namespace,
 )
 from apix.core.graph.context import GraphContext
@@ -86,13 +87,10 @@ class NodeGraph:
         # carrying all schema-derived state behavior.
         GraphContext(state_schema)
         self._context_factory = partial(GraphContext, state_schema)
-        self._active_runs: set[str] = set()
-        self._active_runs_lock = asyncio.Lock()
         self._invocation_count = 0
         self._listener_namespace = using_namespace or ""
         self._listener_handler_names: list[str] = []
         self._decomposed = False
-        self._on_decompose: Callable[["NodeGraph"], None] | None = None
         self._register_node_listeners()
 
 
@@ -120,10 +118,7 @@ class NodeGraph:
                 async def run_node(event: ApixEvent, *, _node_name: str = node_name) -> None:
                     """Extract context state and execute the event's graph node."""
                     context = event.context
-                    if not await self._is_active_context(
-                        context,
-                        consume_event=True,
-                    ):
+                    if not self._is_active_context(context):
                         return
                     if _node_name == START:
                         await self._execute_start(context)
@@ -151,8 +146,15 @@ class NodeGraph:
 
 
     def set_max_steps(self, steps: int):
+        self._ensure_not_decomposed()
         self._max_steps = steps
         return self
+
+
+    def _ensure_not_decomposed(self) -> None:
+        """Reject business operations on an invalidated graph."""
+        if self._decomposed:
+            raise RuntimeError("NodeGraph has been decomposed.")
 
 
     def decompose(self) -> None:
@@ -174,44 +176,26 @@ class NodeGraph:
 
         self._decomposed = True
         self._unregister_node_listeners()
-
-        on_decompose = self._on_decompose
-        self._on_decompose = None
-        if on_decompose is not None:
-            on_decompose(self)
+        _release_namespace(self)
 
 
-    async def _is_active_context(
+    def _is_active_context(
         self,
         context: object,
-        *,
-        consume_event: bool = False,
     ) -> bool:
         """Return whether an event context belongs to an active invocation.
 
-        A completed or aborted context is removed from ``_active_runs`` when
-        its next queued event is inspected. The invocation's own ``finally``
-        block performs the same cleanup when no later event exists.
+        Context lifecycle and namespace ownership are the single source of
+        truth; the graph does not retain a duplicate run registry.
         """
         if (
             not isinstance(context, GraphContext)
             or not context._belongs_to(self._listener_namespace)
         ):
             return False
-        if consume_event:
-            context._event_received()
         if not context.is_bound:
             return False
-
-        run_id = context.run_id
-        assert run_id is not None
-        async with self._active_runs_lock:
-            if run_id not in self._active_runs:
-                return False
-            if not context.is_active:
-                self._active_runs.discard(run_id)
-                return False
-            return True
+        return context.is_active
 
 
     async def invoke(
@@ -228,9 +212,19 @@ class NodeGraph:
         Args:
             state: Initial graph state.
             graph_context: Optional recoverable invocation context. Retaining
-                this object lets the caller abort or resume the run.
+                this object lets the caller abort the run or restore its
+                snapshot into a new context.
         """
-        return await self._invoke(state, noop_stream_writer(), graph_context)
+        self._ensure_not_decomposed()
+        self._invocation_count += 1
+        try:
+            return await self._invoke(
+                state,
+                noop_stream_writer(),
+                graph_context,
+            )
+        finally:
+            self._invocation_count -= 1
 
 
     async def stream(
@@ -248,11 +242,14 @@ class NodeGraph:
         Args:
             state: Initial graph state. It is deep-copied before execution.
             graph_context: Optional recoverable invocation context. Retaining
-                this object lets the caller abort or resume the stream.
+                this object lets the caller abort the stream or restore its
+                snapshot into a new context.
 
         Yields:
             Custom chunks in the order in which nodes emitted them.
         """
+        self._ensure_not_decomposed()
+        self._invocation_count += 1
         channel = StreamChannel()
         execution_task = asyncio.create_task(
             self._invoke(state, channel.writer, graph_context),
@@ -270,6 +267,7 @@ class NodeGraph:
             with suppress(asyncio.CancelledError, Exception):
                 await execution_task
             channel.close()
+            self._invocation_count -= 1
 
 
     async def abort(self, graph_context: GraphContext) -> None:
@@ -280,12 +278,10 @@ class NodeGraph:
         snapshot. Any queued chunks are yielded before a stream ends.
 
         When this method is called, the graph execution is not interrupted
-        immediately. Each node execution is performed against a previously
-        saved state snapshot, and the snapshot is updated only after the node
-        completes successfully. Therefore, the current node will continue
-        running, but the interruption takes effect before the next node starts.
-        The :meth:`invoke` and :meth:`stream` interfaces return immediately
-        with the state from the snapshot saved before the current node began.
+        immediately. A snapshot is captured immediately before each ordinary
+        node starts. The current node may continue running, but its result
+        cannot be committed or routed after the abort. The :meth:`invoke` and
+        :meth:`stream` interfaces return immediately with the captured state.
 
         The same operation is also available directly through
         :meth:`GraphContext.abort`.
@@ -294,10 +290,11 @@ class NodeGraph:
             TypeError: If ``graph_context`` is not a GraphContext instance.
             ValueError: If the context is not active in this graph.
         """
+        self._ensure_not_decomposed()
         if not isinstance(graph_context, GraphContext):
             raise TypeError("NodeGraph.abort requires a GraphContext instance.")
 
-        if not await self._is_active_context(graph_context):
+        if not self._is_active_context(graph_context):
             raise ValueError("Graph context is not active in this graph.")
 
         graph_context.abort()
@@ -317,16 +314,12 @@ class NodeGraph:
             GraphContext,
         ):
             raise TypeError("graph_context must be a GraphContext or None.")
-        if self._decomposed:
-            raise RuntimeError("NodeGraph has been decomposed.")
-
         context = graph_context or self._context_factory()
         if graph_context is not None:
             context._adopt_default_state_schema(self._context_factory())
 
         run_id = "graph-"+uuid4().hex
         completion = asyncio.get_running_loop().create_future()
-        self._invocation_count += 1
         try:
             await apix_event_loop.start()
             first_node = context._bind(
@@ -336,42 +329,34 @@ class NodeGraph:
                 completion=completion,
                 stream_writer=stream_writer,
             )
-            async with self._active_runs_lock:
-                self._active_runs.add(run_id)
             await self._post_next(first_node, context)
             return await completion
         except asyncio.CancelledError:
-            if context._is_current_run(run_id):
+            # Cancelling ``await completion`` also cancels the Future before
+            # control reaches this handler, so ``is_active`` is already false.
+            # Lifecycle status remains the authoritative signal that a bound
+            # invocation still needs to be aborted.
+            if context.status == "running":
                 context.abort()
             raise
         except Exception as exc:
             if context.status in ("pending", "running"):
                 context._fail(exc)
             raise
-        finally:
-            try:
-                async with self._active_runs_lock:
-                    self._active_runs.discard(run_id)
-            finally:
-                self._invocation_count -= 1
 
 
     async def _execute_start(self, context: GraphContext) -> None:
         """Route the predefined start node to its configured successor."""
-        run_id = context.run_id
         try:
-            if not context._is_current_run(run_id):
-                return
             await self._post_next(self._default_gotos[START], context)
         except Exception as exc:
-            if context._is_current_run(run_id):
+            if context.is_active:
                 self._fail(context, exc)
 
 
     async def _execute_node(self, node_name: str, context: GraphContext) -> None:
         """Inject context state into one node and emit its next-node event."""
-        run_id = context.run_id
-        context._node_started()
+        context.take_a_snapshot()
         try:
             with apix_graph_context(context):
                 execution = self._nodes[node_name].execute(
@@ -396,7 +381,7 @@ class NodeGraph:
             # An aborted attempt may finish its old node after a caller has
             # already received the saved snapshot. Its result must never
             # mutate a recovered context or enqueue another event.
-            if not context._is_current_run(run_id):
+            if not context.is_active:
                 return
 
             commands = result if isinstance(result, list) else [result]
@@ -422,10 +407,8 @@ class NodeGraph:
             context.steps += 1
             await self._post_next(next_node, context)
         except Exception as exc:
-            if context._is_current_run(run_id):
+            if context.is_active:
                 self._fail(context, exc)
-        finally:
-            context._node_finished()
 
 
     def apply_command(self, command: Command, node_name: str, context: GraphContext) -> tuple[dict, str]:
@@ -498,16 +481,11 @@ class NodeGraph:
         if node_name not in (START, END) and node_name not in self._nodes:
             raise ValueError(f"Unknown graph node `{node_name}`.")
         context._set_next_node(node_name)
-        context._event_posted()
-        try:
-            await event_pipe_writer.post_event(
-                event_type=EventType.WORKFLOW,
-                event_name=node_name,
-                context=context,
-            )
-        except BaseException:
-            context._event_received()
-            raise
+        await event_pipe_writer.post_event(
+            event_type=EventType.WORKFLOW,
+            event_name=node_name,
+            context=context,
+        )
 
 
     def _finish(self, context: GraphContext) -> None:
@@ -530,10 +508,7 @@ class NodeGraph:
         unregistered by :meth:`decompose`, preventing a replacement graph from
         accidentally dispatching blocks to a stale callback.
         """
-        if self._decomposed:
-            raise RuntimeError(
-                "Cannot add an interrupted hook to a decomposed NodeGraph."
-            )
+        self._ensure_not_decomposed()
 
         interrupted_hook(
             self._listener_namespace,

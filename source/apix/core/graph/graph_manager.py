@@ -3,21 +3,17 @@
 import inspect
 from collections.abc import Mapping
 
-from apix.core.graph.base import END, START, Command, NodeFunction
+from apix.core.graph.base import (
+    END,
+    START,
+    Command,
+    NodeFunction,
+    _namespace_graphs,
+    _release_namespace,
+    namespace_set,
+)
 from apix.core.graph.node import BaseNode, Node
 from apix.core.graph.node_graph import NodeGraph
-
-
-namespace_set: set[str] = set()
-_namespace_graphs: dict[str, NodeGraph] = {}
-
-
-def _release_namespace(graph: NodeGraph) -> None:
-    """Release a compiled graph's namespace when that graph is decomposed."""
-    namespace = graph._listener_namespace
-    if _namespace_graphs.get(namespace) is graph:
-        _namespace_graphs.pop(namespace)
-        namespace_set.discard(namespace)
 
 
 class GraphManager:
@@ -259,7 +255,6 @@ class GraphManager:
             state_schema=self._state_schema,
             using_namespace=namespace,
         )
-        graph._on_decompose = _release_namespace
         namespace_set.add(namespace)
         _namespace_graphs[namespace] = graph
         return graph

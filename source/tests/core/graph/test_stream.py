@@ -191,7 +191,7 @@ async def test_closing_stream_early_cancels_its_graph_run():
     assert await anext(stream) == "started"
     await stream.aclose()
 
-    assert graph._active_runs == set()
+    assert graph._invocation_count == 0
     assert context.status == "aborted"
     release_node.set()
     await asyncio.sleep(0)
@@ -214,8 +214,8 @@ async def test_completed_context_cannot_be_reused():
         await graph.invoke({}, context)
 
 
-async def test_aborted_stream_context_can_resume_with_a_new_writer():
-    """Stream recovery waits for stale work and binds a fresh channel."""
+async def test_aborted_stream_snapshot_recovers_without_waiting_for_stale_work():
+    """A deep-copied context retries immediately with a fresh writer."""
     first_started = asyncio.Event()
     release_first = asyncio.Event()
     first_finished = asyncio.Event()
@@ -246,23 +246,22 @@ async def test_aborted_stream_context_can_resume_with_a_new_writer():
     with pytest.raises(StopAsyncIteration):
         await anext(first_stream)
 
-    resume_task = asyncio.create_task(context.resume())
-    await asyncio.sleep(0)
-    assert not resume_task.done()
-
-    release_first.set()
-    await first_finished.wait()
-    await resume_task
+    recovered = GraphContext.from_snapshot(context.context_snapshot)
 
     chunks = [
         chunk
-        async for chunk in graph.stream(context.state, context)
+        async for chunk in graph.stream(recovered.state, recovered)
     ]
 
     assert chunks == ["resumed:started", "resumed:finished"]
-    assert context.state == {"initial": True, "recovered": True}
-    assert "stale" not in context.state
-    assert context.status == "finished"
+    assert recovered.state == {"initial": True, "recovered": True}
+    assert "stale" not in recovered.state
+    assert recovered.status == "finished"
+    assert not first_finished.is_set()
+
+    release_first.set()
+    await first_finished.wait()
+    assert "stale" not in recovered.state
 
 
 async def test_stream_channel_close_is_idempotent_and_rejects_late_writes():

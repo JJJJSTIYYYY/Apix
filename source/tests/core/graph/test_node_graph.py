@@ -344,7 +344,6 @@ async def test_finish_and_fail_do_not_replace_completed_future():
     assert await completion == {"original": True}
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "context",
     [
@@ -356,33 +355,34 @@ async def test_finish_and_fail_do_not_replace_completed_future():
         {"run_id": "run", "state": {}, "completion": None},
     ],
 )
-async def test_is_active_context_rejects_malformed_event_context(context):
+def test_is_active_context_rejects_malformed_event_context(context):
     """Graph listeners ignore events that do not carry a valid run context."""
     graph = NodeGraph({}, {START: END})
 
-    assert await graph._is_active_context(context) is False
+    assert graph._is_active_context(context) is False
 
 
-@pytest.mark.asyncio
-async def test_is_active_context_rejects_owned_but_unbound_context():
+def test_is_active_context_rejects_owned_but_unbound_context():
     """Ownership alone is insufficient without invocation runtime fields."""
     graph = NodeGraph({}, {START: END})
     context = GraphContext()
     context._context_namespace = graph._listener_namespace
 
-    assert await graph._is_active_context(context) is False
+    assert graph._is_active_context(context) is False
 
 
 @pytest.mark.asyncio
-async def test_is_active_context_discards_completed_run():
-    """A completed context removes its stale active-run entry on inspection."""
+async def test_is_active_context_uses_context_lifecycle_as_source_of_truth():
+    """Completed contexts need no duplicate graph-owned run registry."""
     graph = NodeGraph({}, {START: END})
     context = _bound_context(graph, "completed-run", {"value": 1})
-    graph._active_runs.add("completed-run")
+    assert graph._is_active_context(context) is True
+
     context.abort()
 
-    assert await graph._is_active_context(context) is False
-    assert "completed-run" not in graph._active_runs
+    assert graph._is_active_context(context) is False
+    assert not hasattr(graph, "_active_runs")
+    assert not hasattr(graph, "_active_runs_lock")
 
 
 @pytest.mark.asyncio
@@ -408,18 +408,19 @@ async def test_abort_rejects_context_for_inactive_run():
     """A retained or foreign context cannot abort an inactive graph run."""
     graph = NodeGraph({}, {START: END})
     context = _bound_context(graph, "inactive-run", {"checkpoint": 1})
+    context.abort()
 
     with pytest.raises(ValueError, match="not active in this graph"):
         await graph.abort(context)
 
     completion = context.completion
     assert completion is not None
-    assert not completion.done()
+    assert completion.done()
 
 
 @pytest.mark.asyncio
 async def test_abort_finishes_active_run_with_saved_snapshot():
-    """Abort resolves completion and inactive inspection removes the run."""
+    """Abort resolves completion and lifecycle immediately becomes inactive."""
     graph = NodeGraph({}, {START: END})
     context = _bound_context(
         graph,
@@ -429,15 +430,15 @@ async def test_abort_finishes_active_run_with_saved_snapshot():
     )
     completion = context.completion
     assert completion is not None
-    graph._active_runs.add("active-run")
+    context.node_name = "retry"
+    context.take_a_snapshot()
 
     await graph.abort(context)
 
     result = await completion
     assert result == {"history": ["saved"]}
     assert result is not context.state
-    assert await graph._is_active_context(context) is False
-    assert "active-run" not in graph._active_runs
+    assert graph._is_active_context(context) is False
 
 
 @pytest.mark.asyncio
@@ -445,7 +446,8 @@ async def test_abort_cannot_finish_same_run_twice():
     """A completed context cannot be aborted through the graph twice."""
     graph = NodeGraph({}, {START: END})
     context = _bound_context(graph, "active-run", {})
-    graph._active_runs.add("active-run")
+    context.node_name = "retry"
+    context.take_a_snapshot()
 
     await graph.abort(context)
 
@@ -503,21 +505,6 @@ async def test_post_failure_marks_running_context_failed(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_execute_start_ignores_stale_context():
-    """A stale START event cannot enqueue work for an aborted attempt."""
-    graph = NodeGraph({}, {START: END})
-    context = _bound_context(graph, "stale-start", {})
-    completion = context.completion
-    assert completion is not None
-    context.abort()
-
-    await graph._execute_start(context)
-
-    assert await completion == {}
-    assert context._pending_events == 0
-
-
-@pytest.mark.asyncio
 async def test_execute_start_ignores_error_after_attempt_becomes_stale(monkeypatch):
     """A stale START failure cannot overwrite an aborted result."""
     graph = NodeGraph({}, {START: END})
@@ -564,12 +551,13 @@ async def test_execute_node_ignores_error_after_attempt_becomes_stale():
 
     assert await completion == {"saved": True}
     assert context.status == "aborted"
-    assert context._running_nodes == 0
+    assert context.context_snapshot is not None
+    assert context.context_snapshot["node_name"] == START
 
 
 @pytest.mark.asyncio
-async def test_post_next_rolls_back_pending_event_on_failure(monkeypatch):
-    """A failed event write does not leave recovery permanently blocked."""
+async def test_post_next_failure_needs_no_quiescence_rollback(monkeypatch):
+    """Posting failures no longer interact with deleted recovery counters."""
     graph = NodeGraph({}, {START: END})
     context = GraphContext()
 
@@ -582,8 +570,8 @@ async def test_post_next_rolls_back_pending_event_on_failure(monkeypatch):
         await graph._post_next(END, context)
 
     assert context.node_name == END
-    assert context._pending_events == 0
-    assert context._quiescent.is_set()
+    assert not hasattr(context, "_pending_events")
+    assert not hasattr(context, "_quiescent")
 
 
 def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
@@ -642,12 +630,18 @@ def test_listener_registration_failure_rolls_back_partial_handlers():
 
 @pytest.mark.asyncio
 async def test_decomposed_graph_rejects_new_invocation():
-    """A decomposed graph cannot silently enqueue an unhandled START event."""
+    """Every public business interface rejects an invalidated graph."""
     graph = NodeGraph({}, {START: END})
     graph.decompose()
 
     with pytest.raises(RuntimeError, match="has been decomposed"):
         await graph.invoke({})
+    with pytest.raises(RuntimeError, match="has been decomposed"):
+        await anext(graph.stream({}))
+    with pytest.raises(RuntimeError, match="has been decomposed"):
+        await graph.abort(GraphContext())
+    with pytest.raises(RuntimeError, match="has been decomposed"):
+        graph.set_max_steps(1)
 
 
 @pytest.mark.asyncio(loop_scope="session")

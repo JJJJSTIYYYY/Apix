@@ -160,7 +160,7 @@ async def test_graph_pauses_and_resumes_at_multiple_breakpoints():
         apix_event_registry.get_all_handlers_meta()
     )
 
-    with pytest.raises(RuntimeError, match="decomposed NodeGraph"):
+    with pytest.raises(RuntimeError, match="NodeGraph has been decomposed"):
         graph.add_interrupted_hook(capture_review_block)
 
 

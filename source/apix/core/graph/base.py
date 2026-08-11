@@ -1,4 +1,6 @@
-"""Shared types and predefined node names for graph execution."""
+"""Shared types, registries, and predefined names for graph execution."""
+
+from __future__ import annotations
 
 import copy
 from collections.abc import Awaitable, Callable
@@ -7,11 +9,15 @@ from enum import Enum
 from typing import (
     Annotated,
     Any,
+    TYPE_CHECKING,
     TypeAlias,
     get_args,
     get_origin,
     get_type_hints,
 )
+
+if TYPE_CHECKING:
+    from apix.core.graph.node_graph import NodeGraph
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +230,21 @@ START = "__start__"
 
 END = "__end__"
 """Predefined node name that completes every graph invocation."""
+
+
+namespace_set: set[str] = set()
+"""Namespaces currently owned by compiled graphs."""
+
+_namespace_graphs: dict[str, NodeGraph] = {}
+"""Compiled graph indexed by its exclusive listener namespace."""
+
+
+def _release_namespace(graph: NodeGraph) -> None:
+    """Release ``graph`` only when it still owns its namespace."""
+    namespace = graph._listener_namespace
+    if _namespace_graphs.get(namespace) is graph:
+        _namespace_graphs.pop(namespace)
+        namespace_set.discard(namespace)
 
 
 class _UnsetGoto(Enum):

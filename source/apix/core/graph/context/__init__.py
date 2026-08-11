@@ -5,6 +5,7 @@ from apix.core.graph.context.stream_writer import (
 )
 from apix.core.graph.context.graph_context import (
     GraphContext,
+    GraphContextSnapshot,
     GraphContextStatus,
 )
 from apix.core.graph.context.manager import (
@@ -17,6 +18,7 @@ from apix.core.graph.context.manager import (
 
 __all__ = [
     "GraphContext",
+    "GraphContextSnapshot",
     "GraphContextStatus",
     "StreamWriter",
     "get_graph_context",

@@ -523,7 +523,7 @@ async def test_explicit_node_timeout_fails_invocation_and_cancels_node():
         await graph.invoke({})
 
     assert cancelled.is_set()
-    assert graph._active_runs == set()
+    assert graph._invocation_count == 0
 
 
 async def test_node_raised_timeout_error_is_not_mislabeled_as_deadline():

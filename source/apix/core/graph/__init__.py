@@ -7,8 +7,9 @@ from apix.core.graph.base import (
     NodeFunction,
     NodeResult,
     Reset,
+    namespace_set,
 )
-from apix.core.graph.graph_manager import GraphManager, namespace_set
+from apix.core.graph.graph_manager import GraphManager
 from apix.core.graph.node import Node, BaseNode
 from apix.core.graph.node_graph import NodeGraph
 

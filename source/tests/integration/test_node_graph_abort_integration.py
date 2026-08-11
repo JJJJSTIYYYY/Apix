@@ -85,7 +85,7 @@ async def test_abort_invoke_returns_last_completed_snapshot_and_stops_routing():
     }
     assert not slow_finished.is_set()
     assert not final_called.is_set()
-    assert graph._active_runs == set()
+    assert graph._invocation_count == 0
 
     # Abort is cooperative: the running node is allowed to finish, but its
     # result cannot reactivate routing or mutate the returned checkpoint.
@@ -127,7 +127,7 @@ async def test_context_abort_directly_finishes_its_invocation():
     result = await asyncio.wait_for(invocation, timeout=0.5)
 
     assert result == {"history": ["initial"]}
-    assert graph._active_runs == set()
+    assert graph._invocation_count == 0
     assert not slow_finished.is_set()
 
     release_slow.set()
@@ -136,8 +136,8 @@ async def test_context_abort_directly_finishes_its_invocation():
     assert result == {"history": ["initial"]}
 
 
-async def test_aborted_context_waits_for_stale_node_then_resumes_checkpoint():
-    """Recovery retries the interrupted node without committing its stale result."""
+async def test_aborted_snapshot_recovers_while_stale_node_is_still_running():
+    """A new context retries without waiting or accepting the stale result."""
     first_started = asyncio.Event()
     release_first = asyncio.Event()
     first_finished = asyncio.Event()
@@ -172,28 +172,26 @@ async def test_aborted_context_waits_for_stale_node_then_resumes_checkpoint():
     assert context.status == "aborted"
     assert context.node_name == "recoverable"
 
-    resume_task = asyncio.create_task(context.resume())
-    await asyncio.sleep(0)
-    assert not resume_task.done()
-
-    release_first.set()
-    await asyncio.wait_for(first_finished.wait(), timeout=1)
-    await asyncio.wait_for(resume_task, timeout=1)
-    assert context.status == "pending"
-
-    result = await graph.invoke(context.state, context)
+    recovered = GraphContext.from_snapshot(context.context_snapshot)
+    result = await graph.invoke(recovered.state, recovered)
 
     assert result == {
         "history": ["initial", "recovered-result"],
     }
     assert "stale-result" not in result["history"]
     assert attempts == 2
-    assert context.status == "finished"
-    assert context.node_name == END
-    assert context.steps == 1
+    assert context.status == "aborted"
+    assert recovered.status == "finished"
+    assert recovered.node_name == END
+    assert recovered.steps == 1
+    assert not first_finished.is_set()
+
+    release_first.set()
+    await asyncio.wait_for(first_finished.wait(), timeout=1)
+    assert "stale-result" not in recovered.state["history"]
 
 
-async def test_failed_context_resumes_at_failed_node():
+async def test_failed_snapshot_recovers_at_failed_node():
     """A failed node is retried from its pre-execution state snapshot."""
     attempts = 0
 
@@ -219,12 +217,66 @@ async def test_failed_context_resumes_at_failed_node():
     assert context.node_name == "flaky"
     assert context.state == {"history": ["initial"]}
 
-    await context.resume()
-    result = await graph.invoke(context.state, context)
+    recovered = GraphContext.from_snapshot(context.context_snapshot)
+    result = await graph.invoke(recovered.state, recovered)
 
     assert result == {"history": ["initial", "recovered"]}
     assert attempts == 2
-    assert context.status == "finished"
+    assert context.status == "failed"
+    assert recovered.status == "finished"
+
+
+async def test_snapshot_recovers_on_replacement_graph_in_same_namespace():
+    """A decomposed graph cannot intercept or control its namespace successor."""
+    old_started = asyncio.Event()
+    release_old = asyncio.Event()
+    old_finished = asyncio.Event()
+
+    async def old_node(state):
+        old_started.set()
+        await release_old.wait()
+        old_finished.set()
+        return {"history": ["stale-old"]}
+
+    old_graph = (
+        GraphManager(AbortState)
+        .add_node(old_node, "shared")
+        .add_edge(START, "shared")
+        .compile_graph(using_namespace="replace-run")
+    )
+    old_context = GraphContext()
+    old_invocation = asyncio.create_task(
+        old_graph.invoke({"history": ["initial"]}, old_context)
+    )
+    await asyncio.wait_for(old_started.wait(), timeout=1)
+    await old_graph.abort(old_context)
+    assert await asyncio.wait_for(old_invocation, timeout=1) == {
+        "history": ["initial"]
+    }
+
+    old_graph.decompose()
+
+    def replacement_node(state):
+        return {"history": ["replacement"]}
+
+    replacement = (
+        GraphManager(AbortState)
+        .add_node(replacement_node, "shared")
+        .add_edge(START, "shared")
+        .compile_graph(using_namespace="replace-run")
+    )
+    recovered = GraphContext.from_snapshot(old_context.context_snapshot)
+    result = await replacement.invoke(recovered.state, recovered)
+
+    assert result == {"history": ["initial", "replacement"]}
+    assert recovered.status == "finished"
+    with pytest.raises(RuntimeError, match="has been decomposed"):
+        await old_graph.abort(recovered)
+
+    release_old.set()
+    await asyncio.wait_for(old_finished.wait(), timeout=1)
+    await asyncio.sleep(0)
+    assert "stale-old" not in recovered.state["history"]
 
 
 async def test_abort_stream_flushes_chunks_then_stops_complex_graph():
@@ -286,7 +338,7 @@ async def test_abort_stream_flushes_chunks_then_stops_complex_graph():
     assert chunks == ["prepare:started", "prepare:finished", "slow:started"]
     assert not slow_finished.is_set()
     assert not final_called.is_set()
-    assert graph._active_runs == set()
+    assert graph._invocation_count == 0
 
     release_slow.set()
     await asyncio.wait_for(slow_finished.wait(), timeout=1)
