@@ -25,17 +25,19 @@ APIX 是一个可拓展的**全栈的 AI Agent 协作平台**。它是一套完�
 
 ## 🌟 有什么新内容？
 
-- 相比于 APIX 2.x，APIX NEXT提供了全自研的Agent底座。
-- 抽象存储层，可以自定义选择 redis/内存 作为缓存，MySQL/Sqlite作为持久化数据层。
-- 更简化的部署流程，使用 内存 + Sqlite 即可实现pip一键安装。
-- CLI Agent支持，无需使用 Electron 客户端，即可完成你的工作。
-- 自研 Agent 底座，更小的外部依赖以及更可控的版本迭代。
-- 自由的插件拓展点，你可以在 Agent 运行时的任何节点，自由的订阅事件以实现各种高自由度的插件，全凭你的想象！
-- **APIX NEXT预计加入分布式Agent集群，敬请期待！！！**
+- [x] 相比于 APIX 2.x，APIX NEXT提供了全自研的Agent底座。
+- [x] 抽象存储层，可以自定义选择 redis/内存 作为缓存，MySQL/Sqlite作为持久化数据层。
+- [ ] 更简化的部署流程，使用 内存 + Sqlite 即可实现pip一键安装。
+- [ ] CLI Agent支持，无需使用 Electron 客户端，即可完成你的工作。
+- [x] 自研 Agent 底座，更小的外部依赖以及更可控的版本迭代。
+- [x] 自由的插件拓展点，你可以在 Agent 运行时的任何节点，自由的订阅事件以实现各种高自由度的插件，全凭你的想象！
+- [ ] **APIX NEXT预计加入分布式Agent集群，敬请期待！！！**
 
 ---
 
 ## ✨ 核心特性
+
+*以下内容部分来源于2.x分支，3.0正在全力开发中*
 
 <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
   <tr>
