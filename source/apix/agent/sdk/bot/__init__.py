@@ -1,6 +1,6 @@
 """Public LLM provider adapters."""
 
-from apix.agent.sdk.adapter.bot.base import (
+from apix.agent.sdk.bot.base import (
     ApiStyle,
     FieldPath,
     MessageConfig,
@@ -13,13 +13,13 @@ from apix.agent.sdk.adapter.bot.base import (
     StreamDeltaMode,
     ToolConfig,
 )
-from apix.agent.sdk.adapter.bot.base_bot import BaseBot, BaseOpenAIBot
-from apix.agent.sdk.adapter.bot.deepseek_bot import DeepSeekBot
-from apix.agent.sdk.adapter.bot.mimo_bot import XiaomiMIMOBot
-from apix.agent.sdk.adapter.bot.minimax_bot import MiniMaxBot
-from apix.agent.sdk.adapter.bot.ollama_bot import OllamaBot
-from apix.agent.sdk.adapter.bot.openai_bot import OpenAIBot
-from apix.agent.sdk.adapter.bot.custom_bot import CustomBot, get_custom_provider_meta
+from apix.agent.sdk.bot.base_bot import BaseBot, BaseOpenAIBot
+from apix.agent.sdk.bot.deepseek_bot import DeepSeekBot
+from apix.agent.sdk.bot.mimo_bot import XiaomiMIMOBot
+from apix.agent.sdk.bot.minimax_bot import MiniMaxBot
+from apix.agent.sdk.bot.ollama_bot import OllamaBot
+from apix.agent.sdk.bot.openai_bot import OpenAIBot
+from apix.agent.sdk.bot.custom_bot import CustomBot, get_custom_provider_meta
 
 __all__ = [
     "ApiStyle",

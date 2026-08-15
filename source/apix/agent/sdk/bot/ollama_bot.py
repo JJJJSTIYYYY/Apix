@@ -6,13 +6,13 @@ from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
-from apix.agent.sdk.adapter.bot.base import (
+from apix.agent.sdk.bot.base import (
     MessageConfig,
     ModelCapabilities,
     ReasoningConfig,
     ReasoningEffort,
 )
-from apix.agent.sdk.adapter.bot.base_bot import (
+from apix.agent.sdk.bot.base_bot import (
     BaseBot,
     _model_dump,
     _read,

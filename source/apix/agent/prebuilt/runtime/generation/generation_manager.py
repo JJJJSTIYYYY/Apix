@@ -8,12 +8,18 @@ from apix.agent.prebuilt.runtime.stream.agent_stream_writer import AgentStreamWr
 from apix.agent.prebuilt.runtime.generation.base import Generation
 from apix.common.lifespan.resource_cleaner import resource_cleaner
 from apix.common.utils.logger import logger
-from apix.agent.sdk.adapter.store.store_adapter import ai_store_adapter
+from apix.agent.prebuilt.adapter.store.store_adapter import ai_store_adapter
 from apix.common.type import ApixIdentity
 from apix.config.base_config import GENERATION_TTL
 
 
 class GenerationManager:
+    """Generation state magener.
+
+    This class is used for managing:
+    - Context: context for multi-agent invocation per user.
+    - Block: 
+    """
 
     def __init__(self):
         self._connections: Dict[str, Dict[str, Generation]] = {} # {user_uid. {generation_id, generation_state}}

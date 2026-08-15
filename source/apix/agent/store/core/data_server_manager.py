@@ -24,7 +24,6 @@ else:
     raise NotImplementedError()
 
 from apix.agent.store.core.server.file_store.file_server import FileService, file_server
-from apix.agent.store.core.server.rag_store.rag_server import RagService, rag_server
 
 class DataServerManager:
 
@@ -34,7 +33,6 @@ class DataServerManager:
         cache_store: CacheServerBase,
         data_store: DataServerBase,
         file_server: FileService,
-        rag_server: RagService,
         worker_count: int = 4,
     ):
         # Execution layer
@@ -42,7 +40,6 @@ class DataServerManager:
             cache_store=cache_store,
             data_store=data_store,
             file_server=file_server,
-            rag_server=rag_server
         )
 
         # Action -> executor handler
@@ -201,7 +198,6 @@ data_server_manager = DataServerManager(
     cache_store=cache_server,
     data_store=data_server,
     file_server=file_server,
-    rag_server=rag_server,
     worker_count=WORKER_COUNT,
 )
 auto_init.register(data_server_manager)

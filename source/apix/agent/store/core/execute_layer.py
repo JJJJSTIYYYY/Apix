@@ -10,7 +10,6 @@ from apix.agent.store.utils.message_node_helper import MessageNodeHelper
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
 from apix.agent.store.core.server.file_store.file_server import FileService
-from apix.agent.store.core.server.rag_store.rag_server import RagService
 from apix.agent.store.utils.decorator import task_handler
 from apix.common.utils.logger import logger
 
@@ -67,12 +66,10 @@ class DataExecutors:
         cache_store: CacheServerBase, 
         data_store: DataServerBase, 
         file_server: FileService,
-        rag_server: RagService
     ):
         self.cache_store = cache_store
         self.data_store = data_store
         self.file_server = file_server
-        self.rag_server = rag_server
 
     async def _read_through_resource(
         self,

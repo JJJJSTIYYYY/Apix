@@ -1,39 +1,36 @@
-from apix.agent.sdk.adapter.bot.base import (
+from apix.agent.sdk.bot.base import (
     MessageConfig,
     ModelCapabilities,
     ReasoningConfig,
     StreamConfig,
 )
-from apix.agent.sdk.adapter.bot.base_bot import BaseOpenAIBot
+from apix.agent.sdk.bot.base_bot import BaseOpenAIBot
 from apix.config.base_config import PROVIDER_BASE_URL
 
 
-class DeepSeekBot(BaseOpenAIBot):
-    """DeepSeek Chat Completions adapter."""
+class MiniMaxBot(BaseOpenAIBot):
+    """MiniMax OpenAI-compatible Chat Completions adapter."""
 
-    provider = "deepseek"
-    default_endpoint = PROVIDER_BASE_URL["deepseek"]
+    provider = "minimax"
+    default_endpoint = PROVIDER_BASE_URL["minimax"]
     capabilities = ModelCapabilities(
         message_config=MessageConfig(
             supported_roles=("system", "user", "ai", "tool"),
-            include_name=True,
         ),
         reasoning_config=ReasoningConfig(
-            supported_efforts=("low", "high", "max"),
-            effort_map={
-                "low": "low",
-                "medium": "high",
-                "high": "high",
-            },
+            effort_path=None,
+            extra_body_defaults={"reasoning_split": True},
             enabled_extra_body={
-                "thinking": {"type": "enabled"},
+                "thinking": {"type": "adaptive"},
             },
             disabled_extra_body={
                 "thinking": {"type": "disabled"},
             },
             history_field_map={
                 "reasoning_content": ("reasoning",),
+                "reasoning_details": ("extensions", "reasoning_details"),
             },
+            stream_delta_mode="cumulative",
         ),
         stream_config=StreamConfig(
             request_defaults={

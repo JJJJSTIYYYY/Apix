@@ -17,7 +17,6 @@ def make_executor(*, data_store, file_server):
         cache_store=SimpleNamespace(),
         data_store=data_store,
         file_server=file_server,
-        rag_server=SimpleNamespace(),
     )
 
 

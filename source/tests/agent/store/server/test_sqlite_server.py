@@ -56,7 +56,6 @@ async def test_lifecycle_helpers_and_transaction_rollback(tmp_path):
         "conversations",
         "messages",
         "agent_skills",
-        "rag_documents",
         "shortterm_memory",
         "longterm_memory",
         "llm_provider",

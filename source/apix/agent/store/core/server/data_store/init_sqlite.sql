@@ -103,31 +103,6 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_node
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_parent
     ON messages(conversation_id, parent_id);
 
-CREATE TABLE IF NOT EXISTS rag_documents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id TEXT NOT NULL UNIQUE,
-    document_name TEXT NOT NULL,
-    document_description TEXT NOT NULL DEFAULT '',
-    embed_engine TEXT CHECK (embed_engine IS NULL OR json_valid(embed_engine)),
-    mime_type TEXT NOT NULL DEFAULT 'unknown',
-    document_path TEXT NOT NULL,
-    document_size INTEGER NOT NULL,
-    document_sha256 TEXT,
-    user_uid TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 0,
-    deleted INTEGER NOT NULL DEFAULT 0,
-    upload_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TEXT,
-    FOREIGN KEY (user_uid) REFERENCES users(user_uid) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_rag_documents_user_id
-    ON rag_documents(user_uid, document_id);
-CREATE INDEX IF NOT EXISTS idx_rag_documents_user_upload
-    ON rag_documents(user_uid, upload_at DESC);
-CREATE INDEX IF NOT EXISTS idx_rag_documents_user_active
-    ON rag_documents(user_uid, deleted, upload_at DESC);
-
 CREATE TABLE IF NOT EXISTS agent_skills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     skill_id TEXT NOT NULL UNIQUE,

@@ -1,10 +1,10 @@
-from apix.agent.sdk.adapter.bot.base import (
+from apix.agent.sdk.bot.base import (
     MessageConfig,
     ModelCapabilities,
     ReasoningConfig,
     RequestConfig,
 )
-from apix.agent.sdk.adapter.bot.base_bot import BaseOpenAIBot
+from apix.agent.sdk.bot.base_bot import BaseOpenAIBot
 from apix.agent.sdk.utils.exception import ProviderNotFoundError, ProviderTypeMismatchError
 from apix.config.base_config import PROVIDER_BASE_URL
 from apix.agent.store import query_store

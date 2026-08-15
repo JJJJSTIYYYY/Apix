@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apix.agent.sdk.adapter.store import store_adapter as store_module
-from apix.agent.sdk.adapter.store.store_adapter import AIStoreAdapter
+from apix.agent.prebuilt.adapter.store import store_adapter as store_module
+from apix.agent.prebuilt.adapter.store.store_adapter import AIStoreAdapter
 
 
 @pytest.fixture

@@ -15,13 +15,11 @@ def _executor(
     data_store=None,
     cache_store=None,
     file_server=None,
-    rag_server=None,
 ) -> DataExecutors:
     return DataExecutors(
         data_store=data_store or SimpleNamespace(),
         cache_store=cache_store or SimpleNamespace(),
         file_server=file_server or SimpleNamespace(),
-        rag_server=rag_server or SimpleNamespace(),
     )
 
 

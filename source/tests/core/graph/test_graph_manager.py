@@ -283,6 +283,25 @@ def test_compile_exist_ok_decomposes_and_replaces_original_graph():
     assert _namespace_graphs["replaceable"] is replacement
 
 
+def test_decompose_releases_namespace_by_contextmanager():
+    graph = (
+        GraphManager()
+        .add_node(source)
+        .add_edge(START, "source")
+        .compile_graph(using_namespace="reusable")
+    )
+
+    assert "reusable" in namespace_set
+    assert "reusable" in _namespace_graphs
+
+    with graph:
+        pass
+
+    assert "reusable" not in namespace_set
+    assert "reusable" not in _namespace_graphs
+    assert True == graph._decomposed
+
+
 def test_decompose_releases_namespace_for_later_compile():
     """Direct decomposition keeps GraphManager's global index synchronized."""
     first_graph = (
@@ -291,6 +310,9 @@ def test_decompose_releases_namespace_for_later_compile():
         .add_edge(START, "source")
         .compile_graph(using_namespace="reusable")
     )
+
+    assert "reusable" in namespace_set
+    assert "reusable" in _namespace_graphs
 
     first_graph.decompose()
 

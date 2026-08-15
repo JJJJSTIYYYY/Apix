@@ -24,7 +24,7 @@ def test_mysql_schema_declares_longterm_memory_table_and_procedures():
     )
 
     assert "DROP TABLE" not in sql
-    assert sql.count("CREATE TABLE IF NOT EXISTS") == 10
+    assert sql.count("CREATE TABLE IF NOT EXISTS") == 9
     assert "CREATE TABLE IF NOT EXISTS longterm_memory" in sql
     assert "source ENUM('conversation', 'workspace')" in sql
     assert "CREATE PROCEDURE insert_longterm_memory" in sql

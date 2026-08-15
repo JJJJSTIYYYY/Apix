@@ -42,10 +42,10 @@ class AgentConfigSchema(TypedDict):
     enable_agent_swarm: bool
 
     # Search engine config
-    link_provider: str
-    link_api_key: str
-    content_provider: str
-    content_api_key: str
+    keyword_search_provider: str
+    keyword_search_api_key: str
+    web_scraping_provider: str
+    web_scraping_api_key: str
     web_cleaner_mode: Literal["rule", "llm"]
 
     embed_model: str  # The embed model for knowledge retrieval.
@@ -66,7 +66,7 @@ class GraphRuntimeContext(TypedDict):
     timestamp: int
 
 
-class MainAgentState(GraphRuntimeContext):
+class AgentState(GraphRuntimeContext):
     input: dict
     re_generate: bool
     messages: Annotated[list[AnyMessage], AutoMerge]
@@ -85,7 +85,7 @@ class MainAgentState(GraphRuntimeContext):
     loaded_skills_cache: list[tuple[str, bool, str]] # (name, injected, content): Skill name, injection status, and SKILL.md content
 
 
-class SubAgentState(MainAgentState):
+class SubAgentState(AgentState):
     final_goal: str
     task_id: str
     parent_task_id: str

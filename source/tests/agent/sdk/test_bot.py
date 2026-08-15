@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from apix.agent.sdk.adapter.bot import (
+from apix.agent.sdk.bot import (
     BaseBot,
     BaseOpenAIBot,
     DeepSeekBot,
@@ -18,7 +18,7 @@ from apix.agent.sdk.adapter.bot import (
     RequestConfig,
     XiaomiMIMOBot,
 )
-from apix.agent.sdk.adapter.bot.base_bot import _model_dump, _read
+from apix.agent.sdk.bot.base_bot import _model_dump, _read
 from apix.agent.sdk.tool import ToolNode, tool
 from apix.agent.sdk.utils.message import (
     ApixAiMessage,

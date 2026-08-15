@@ -8,11 +8,11 @@ import traceback
 import httpx
 
 from apix_agent.commons.common_func import convert_generation_id_to_message_node_id, get_conversation_workspace
-from apix_agent.commons.logger import logger
+from apix.common.utils.logger import logger
 from apix_agent.apix_agent_core.agent import ai_agent
 from apix_agent.apix_agent_core.generation_manager import generation_manager, GenerationManager
 from apix_agent.apix_agent_core.sandbox_manager.agent_sandbox_manager import agent_sandbox
-from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelope, ApixIdentity, MainAgentState, ProviderNotFound
+from apix_agent.commons.type_def import AgentConfigSchema, ApixEntryDataSchema, ApixEventEnvelope, ApixIdentity, AgentState, ProviderNotFound
 from apix_agent.commons.file_content_reader import load_from_yaml, write_to_yaml
 from apix_agent.global_config import BASE_DIR, BASE_URL, MEMORY_SERVICE_BASE_URL
 from apix_agent.apix_event_pipe.stream_event.agent_stream_writer import AgentStreamWriter
@@ -212,7 +212,7 @@ class StreamEventHandler(EventHandler):
                 raise ValueError(f"Unexpected data type: message is {class_name}, expected dict.")
 
             timestamp = int(time.time() * 1000)
-            initial_state: MainAgentState = {
+            initial_state: AgentState = {
                 "agent_name": "APIX",
                 "agent_role": agent_role,
                 "user_uid": user_uid,

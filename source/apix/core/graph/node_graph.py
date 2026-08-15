@@ -94,6 +94,15 @@ class NodeGraph:
         self._register_node_listeners()
 
 
+    def __enter__(self):
+        return self
+
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.decompose()
+        return False
+
+
     @staticmethod
     def normalise_timeout(
         timeout: float | None,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from apix.agent.sdk.adapter.context.context_adapter import AIContextAdapter
+from apix.agent.prebuilt.adapter.context.context_adapter import AIContextAdapter
 from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixAiMessageChunk,

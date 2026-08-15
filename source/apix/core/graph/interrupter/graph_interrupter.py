@@ -6,6 +6,7 @@ from uuid import uuid4
 from typing import Any, Callable
 
 from apix.core.graph.context.manager import get_graph_context
+from apix.core.graph.context.graph_context import GraphContext
 from apix.core.event import (
     ApixEvent,
     EventType,
@@ -22,6 +23,7 @@ async def interrupt(
     *,
     data: Any = None,
     timeout: float | None = None,
+    context: GraphContext | None = None
 ) -> Any:
     """
     Send data and while in graph loop and block the agent graph at the same time.
@@ -30,14 +32,21 @@ async def interrupt(
     Args:
         data: Optional chunk data.
         timeout: Optional timeout in seconds for the blocking wait. If None, wait indefinitely.
+        context: Optional graph context, if the interruption is not within a :class:`NodeFunction`,
+            it is required.
+
+    This method will post a :class:`Block` by event pipe, not by stream writer.
+    To receive a :class:`Block` posted by this method, it is required to register a handler
+    for event `graph_{namespace}_interrupted` and get block item from event context.
     """
 
-    try:
-        context = get_graph_context()
-    except RuntimeError as exc:
-        raise RuntimeError(
-            "interrupt() is only available while a graph is invoked."
-        ) from exc
+    if context is None:
+        try:
+            context = get_graph_context()
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "interrupt() is only available while a graph is invoked."
+            ) from exc
 
     if not context.is_active:
         raise RuntimeError(

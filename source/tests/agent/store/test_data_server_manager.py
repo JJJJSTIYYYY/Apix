@@ -27,16 +27,15 @@ def make_dependencies():
             return_value={"success": True, "messages": {"conversation_uid": "conversation-1"}}
         ),
     )
-    return cache_store, data_store, SimpleNamespace(), SimpleNamespace()
+    return cache_store, data_store, SimpleNamespace()
 
 
 def make_manager(worker_count=2):
-    cache_store, data_store, file_server, rag_server = make_dependencies()
+    cache_store, data_store, file_server = make_dependencies()
     manager = DataServerManager(
         cache_store=cache_store,
         data_store=data_store,
         file_server=file_server,
-        rag_server=rag_server,
         worker_count=worker_count,
     )
     return manager, cache_store, data_store

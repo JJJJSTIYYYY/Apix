@@ -10,7 +10,7 @@ from typing import Any, Self
 from uuid import uuid4
 
 
-from apix.agent.sdk.adapter.bot.base import (
+from apix.agent.sdk.bot.base import (
     MessageConfig,
     ModelCapabilities,
     ReasoningConfig,

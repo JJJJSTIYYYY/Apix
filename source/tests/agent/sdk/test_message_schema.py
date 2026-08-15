@@ -1,9 +1,9 @@
 import asyncio
 from unittest.mock import AsyncMock
 
-from apix.agent.sdk.adapter.store import store_adapter as store_adapter_module
-from apix.agent.sdk.adapter.context.context_adapter import AIContextAdapter
-from apix.agent.sdk.adapter.store.store_adapter import AIStoreAdapter
+from apix.agent.prebuilt.adapter.store import store_adapter as store_adapter_module
+from apix.agent.prebuilt.adapter.context.context_adapter import AIContextAdapter
+from apix.agent.prebuilt.adapter.store.store_adapter import AIStoreAdapter
 from apix.agent.sdk.utils.funcs import (
     convert_generation_id_to_message_node_id,
 )

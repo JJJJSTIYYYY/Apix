@@ -9,7 +9,6 @@ from apix.agent.store.core.server.data_store import data_server_base as data_bas
 from apix.agent.store.core.server.data_store import utils as data_utils
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
 from apix.agent.store.core.server.data_store.utils import data_store_handler
-from apix.agent.store.core.server.rag_store.rag_server import RagService, rag_server
 
 
 class ConcreteCacheServer(CacheServerBase):
@@ -128,11 +127,6 @@ async def test_data_base_generates_string_id_and_default_optional_methods(monkey
     assert await service.update_skill_status({}) is None
     assert await service.fetch_available_skills({}) is None
     assert await service.fetch_target_skill({}) is None
-
-
-def test_rag_service_is_available_as_module_singleton():
-    assert isinstance(rag_server, RagService)
-    assert isinstance(RagService(), RagService)
 
 
 @pytest.mark.asyncio
