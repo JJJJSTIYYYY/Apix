@@ -22,6 +22,7 @@ from uuid import uuid4
 
 import httpx
 
+from apix.common.utils.logger import logger
 from apix.core.utils.exception import EventChannelPermissionError, EventChannelUnavailableError
 from apix.config.base_config import (
     EVENT_CHANNEL_CONFIG,
@@ -655,6 +656,34 @@ class ApixEventPipe:
             return
         await self.get_channel(channel).put(event)
 
+    async def post_event(
+        self,
+        *,
+        event_type: EventType,
+        event_name: str,
+        context: Any = None,
+        channel: ChannelName = "builtin",
+        recipient: str | None = None,
+    ) -> None:
+        """Create and post an event to the selected channel.
+
+        Args:
+            event_type: Event category used by handlers and transports.
+            event_name: Name used by the registry to select handlers.
+            context: Optional event payload or runtime context.
+            channel: Target event channel. Local events use ``builtin``.
+            recipient: Destination node MQ id when using ``mailtruck``.
+        """
+        event = ApixEvent(
+            event_id="event-" + uuid4().hex,
+            event_type=event_type,
+            event_name=event_name,
+            context=context,
+            timestamp=time.time(),
+            accepted=False,
+        )
+        await self.put(event, channel, recipient=recipient)
+
     def put_nowait(
         self,
         event: Any,
@@ -688,6 +717,16 @@ class ApixEventPipe:
 
     async def join(self, channel: ChannelName = "builtin") -> None:
         await self.get_channel(channel).join()
+
+    async def clear(self, channel: ChannelName = "builtin") -> int:
+        """Remove and acknowledge all currently queued events."""
+        count = 0
+        while not self.empty(channel):
+            await self.get(channel)
+            self.task_done(channel)
+            count += 1
+        logger.info(f"Cleaned {count} in event pipe.")
+        return count
 
     async def send(self, event: ApixEvent, recipient: str) -> None:
         """Route an event to another node through the gateway."""

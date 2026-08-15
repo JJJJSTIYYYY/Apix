@@ -107,6 +107,57 @@ class TestBuiltinChannel:
         EVENT_PIPE.task_done()
 
 
+class TestApixEventPipeEvents:
+    @pytest.mark.asyncio
+    async def test_post_event_builds_event_with_current_timestamp(self):
+        pipe = ApixEventPipe(remote_enabled=False)
+        before = time.time()
+
+        await pipe.post_event(
+            event_type=EventType.WORKFLOW,
+            event_name="workflow.started",
+            context={"run_id": "run-1"},
+        )
+        event = await pipe.get()
+
+        assert event.event_id.startswith("event-")
+        assert event.event_type is EventType.WORKFLOW
+        assert event.event_name == "workflow.started"
+        assert event.context == {"run_id": "run-1"}
+        assert before <= event.timestamp <= time.time()
+        assert event.accepted is False
+        pipe.task_done()
+
+    @pytest.mark.asyncio
+    async def test_post_event_preserves_fifo_order(self):
+        pipe = ApixEventPipe(remote_enabled=False)
+        for name in ("event.1", "event.2", "event.3"):
+            await pipe.post_event(
+                event_type=EventType.INFO,
+                event_name=name,
+            )
+
+        events = [await pipe.get() for _ in range(3)]
+        assert [event.event_name for event in events] == [
+            "event.1",
+            "event.2",
+            "event.3",
+        ]
+        for _ in events:
+            pipe.task_done()
+
+    @pytest.mark.asyncio
+    async def test_clear_acknowledges_all_queued_events(self):
+        pipe = ApixEventPipe(remote_enabled=False)
+        await pipe.post_event(event_type=EventType.INFO, event_name="event.1")
+        await pipe.post_event(event_type=EventType.INFO, event_name="event.2")
+
+        assert await pipe.clear() == 2
+        assert pipe.empty()
+        await asyncio.wait_for(pipe.join(), timeout=0.1)
+        assert await pipe.clear() == 0
+
+
 class TestSerialization:
     def test_event_round_trip(self):
         event = make_event()

@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 
 from apix.core.event.event_loop import apix_event_loop
-from apix.core.event.event_writer import event_pipe_writer
+from apix.core.event import EVENT_PIPE
 from apix.core.graph import START, GraphManager
 from apix.core.graph.context import GraphContext
 from apix.core.graph.context import get_stream_writer
@@ -21,7 +21,7 @@ async def stop_event_loop_after_module():
     """Stop the shared event worker after this module's tests finish."""
     yield
     await apix_event_loop.stop()
-    await event_pipe_writer.clear()
+    await EVENT_PIPE.clear()
 
 
 async def _collect(graph, state):

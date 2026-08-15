@@ -9,7 +9,7 @@ from contextlib import suppress
 from functools import partial
 from typing import Any
 
-from apix.core.event import ApixEvent, EventType, apix_event_loop, apix_event_registry, event_pipe_writer
+from apix.core.event import EVENT_PIPE, ApixEvent, EventType, apix_event_loop, apix_event_registry
 from apix.core.graph.base import (
     END,
     START,
@@ -490,7 +490,7 @@ class NodeGraph:
         if node_name not in (START, END) and node_name not in self._nodes:
             raise ValueError(f"Unknown graph node `{node_name}`.")
         context._set_next_node(node_name)
-        await event_pipe_writer.post_event(
+        await EVENT_PIPE.post_event(
             event_type=EventType.WORKFLOW,
             event_name=node_name,
             context=context,

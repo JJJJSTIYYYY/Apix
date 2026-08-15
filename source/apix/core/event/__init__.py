@@ -11,7 +11,6 @@ from apix.core.event.event_pipe import (
 )
 from apix.core.utils.exception import *
 from apix.core.event.event_registry import ApixEventRegistry, apix_event_registry
-from apix.core.event.event_writer import EventPipeWriter, event_pipe_writer
 
 
 __all__ = [
@@ -23,6 +22,5 @@ __all__ = [
     "EventChannelUnavailableError", "EventHandlerNotRegisteredError",
     "EventHandlerAlreadyRegisteredError", "InvalidNodeReturnsError",
     "GraphNodeError",
-    "ApixEventRegistry", "apix_event_registry",
-    "EventPipeWriter", "event_pipe_writer"
+    "ApixEventRegistry", "apix_event_registry"
 ]

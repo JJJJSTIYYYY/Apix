@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from apix.core.event.event_loop import apix_event_loop
-from apix.core.event.event_writer import event_pipe_writer
+from apix.core.event import EVENT_PIPE
 from apix.core.graph import AutoMerge, END, START, GraphManager
 from apix.core.graph.context import GraphContext
 from apix.core.graph.context import get_stream_writer
@@ -30,7 +30,7 @@ async def clean_graph_runtime_after_module():
     """Leave the shared event runtime clean for other integration modules."""
     yield
     await apix_event_loop.stop()
-    await event_pipe_writer.clear()
+    await EVENT_PIPE.clear()
 
 
 async def test_abort_invoke_returns_last_completed_snapshot_and_stops_routing():

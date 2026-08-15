@@ -11,7 +11,7 @@ from apix.core.event import (
     EventType,
     apix_event_loop,
     apix_event_registry,
-    event_pipe_writer,
+    EVENT_PIPE,
 )
 from apix.core.graph import START, GraphManager
 from apix.core.graph.context import GraphContext, apix_graph_context
@@ -26,7 +26,7 @@ async def stop_event_loop_after_module():
     """Leave the process-global event worker clean for later test modules."""
     yield
     await apix_event_loop.stop()
-    await event_pipe_writer.clear()
+    await EVENT_PIPE.clear()
 
 
 def _block(*, data=None) -> Block:

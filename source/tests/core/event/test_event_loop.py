@@ -603,7 +603,7 @@ class TestEventConsumerLoop:
                 AsyncMock(side_effect=RuntimeError("dispatch failed")),
             ),
             patch(
-                "apix.core.event.event_loop.event_pipe_writer.task_done"
+                "apix.core.event.event_loop.EVENT_PIPE.task_done"
             ) as task_done,
         ):
             with pytest.raises(RuntimeError, match="dispatch failed"):

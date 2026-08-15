@@ -25,7 +25,6 @@ from apix.core.event.event_pipe import (
     event_to_payload,
 )
 from apix.core.event.event_registry import ApixEventRegistry
-from apix.core.event.event_writer import EventPipeWriter
 
 from .test_event_pipe import FakeClient, make_event, make_gateway, response
 
@@ -75,15 +74,6 @@ class TestSmallUncoveredContracts:
             await BaseEventChannel.join(channel)
         with pytest.raises(NotImplementedError):
             await BaseEventChannel.close(channel)
-
-    def test_writer_task_done_delegates(self, monkeypatch):
-        task_done = MagicMock()
-        monkeypatch.setattr(
-            "apix.core.event.event_writer.EVENT_PIPE.task_done", task_done
-        )
-        EventPipeWriter().task_done()
-        task_done.assert_called_once_with()
-
 
 class TestBufferedMailboxContract:
     @pytest.mark.asyncio
@@ -608,7 +598,7 @@ class TestEventLoopRemainingBranches:
         get_event = AsyncMock(side_effect=[event, asyncio.CancelledError()])
         dispatch = AsyncMock()
         monkeypatch.setattr(
-            "apix.core.event.event_loop.event_pipe_writer.get_event", get_event
+            "apix.core.event.event_loop.EVENT_PIPE.get", get_event
         )
         monkeypatch.setattr(handler, "_dispatch_event_and_ack", dispatch)
 
@@ -623,7 +613,7 @@ class TestEventLoopRemainingBranches:
         handler = ApixEventLoop(registry)
         initial_value = handler._dispatch_semaphore._value
         monkeypatch.setattr(
-            "apix.core.event.event_loop.event_pipe_writer.get_event",
+            "apix.core.event.event_loop.EVENT_PIPE.get",
             AsyncMock(side_effect=RuntimeError("get failed")),
         )
         with pytest.raises(RuntimeError, match="get failed"):

@@ -9,9 +9,9 @@ from apix.core.graph.context.manager import get_graph_context
 from apix.core.graph.context.graph_context import GraphContext
 from apix.core.event import (
     ApixEvent,
+    EVENT_PIPE,
     EventType,
     apix_event_registry,
-    event_pipe_writer,
 )
 from apix.core.graph.interrupter.base import Block
 
@@ -69,7 +69,7 @@ async def interrupt(
         with_data=data,
         _future=future,
     )
-    await event_pipe_writer.post_event(
+    await EVENT_PIPE.post_event(
         event_type=EventType.WORKFLOW,
         event_name=f"graph_{namespace}_interrupted",
         context=block,

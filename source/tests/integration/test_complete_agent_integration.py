@@ -19,7 +19,7 @@ from apix.agent.sdk.utils.message import (
     ApixUserMessage,
 )
 from apix.core.event.event_loop import apix_event_loop
-from apix.core.event.event_writer import event_pipe_writer
+from apix.core.event import EVENT_PIPE
 from apix.core.graph import (
     AutoMerge,
     Command,
@@ -41,7 +41,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 async def stop_event_runtime_after_module():
     yield
     await apix_event_loop.stop()
-    await event_pipe_writer.clear()
+    await EVENT_PIPE.clear()
 
 
 @dataclass

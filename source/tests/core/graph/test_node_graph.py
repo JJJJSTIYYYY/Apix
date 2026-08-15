@@ -8,7 +8,7 @@ import pytest
 from apix.core.event import (
     apix_event_loop,
     apix_event_registry,
-    event_pipe_writer,
+    EVENT_PIPE,
 )
 from apix.core.utils.exception import EventHandlerAlreadyRegisteredError
 from apix.core.graph import (
@@ -564,7 +564,7 @@ async def test_post_next_failure_needs_no_quiescence_rollback(monkeypatch):
     async def fail_post_event(**kwargs):
         raise RuntimeError("event pipe unavailable")
 
-    monkeypatch.setattr(event_pipe_writer, "post_event", fail_post_event)
+    monkeypatch.setattr(EVENT_PIPE, "post_event", fail_post_event)
 
     with pytest.raises(RuntimeError, match="event pipe unavailable"):
         await graph._post_next(END, context)

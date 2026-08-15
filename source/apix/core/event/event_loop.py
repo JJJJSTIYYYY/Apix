@@ -3,7 +3,7 @@ import traceback
 
 from apix.core.event.base import HandlerEntry, ApixEvent
 from apix.core.event.event_registry import apix_event_registry
-from apix.core.event.event_writer import event_pipe_writer
+from apix.core.event.event_pipe import EVENT_PIPE
 from apix.core.event.event_registry import ApixEventRegistry
 from apix.common.utils.logger import logger
 
@@ -101,7 +101,7 @@ class ApixEventLoop:
                 await self._dispatch_semaphore.acquire()
 
                 try:
-                    event = await event_pipe_writer.get_event()
+                    event = await EVENT_PIPE.get()
                 except BaseException:
                     self._dispatch_semaphore.release()
                     raise
@@ -125,7 +125,7 @@ class ApixEventLoop:
         try:
             return await self._dispatch_event(event)
         finally:
-            event_pipe_writer.task_done()
+            EVENT_PIPE.task_done()
 
     def _create_background_handler_task(
         self,
