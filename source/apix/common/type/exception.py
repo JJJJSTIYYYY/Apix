@@ -12,7 +12,7 @@ class PlatformNotRegisteredError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
 
 
 class InvalidOutputsError(Exception):
@@ -29,7 +29,7 @@ class InvalidOutputsError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
 
 class IdentityError(ValueError):
     """Ambiguous apix identity. Unknow user_uid, platform or conversation_uid"""

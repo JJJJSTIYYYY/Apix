@@ -12,12 +12,12 @@ class EventHandlerNotRegisteredError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
     
 
 class EventHandlerAlreadyRegisteredError(Exception):
     
-    def __init__(self, message="Invalid handler detected", errors=None):
+    def __init__(self, message="Handler already registered.", errors=None):
         """        
         Args:
             message: error message
@@ -29,7 +29,7 @@ class EventHandlerAlreadyRegisteredError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
 
 
 class EventChannelError(RuntimeError):
@@ -58,7 +58,7 @@ class GraphNodeError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
     
 
 class InvalidNodeReturnsError(Exception):
@@ -75,4 +75,4 @@ class InvalidNodeReturnsError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"

@@ -12,7 +12,7 @@ class ProviderNotFoundError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
 
 
 class ProviderTypeMismatchError(Exception):
@@ -29,7 +29,7 @@ class ProviderTypeMismatchError(Exception):
     
     def __str__(self):
         error_details = f"Errors: {self.errors}" if self.errors else ""
-        return f"{self.message}{error_details}"
+        return f"{self.message}; {error_details}"
     
 
 class InvalidToolArgsError(TypeError):

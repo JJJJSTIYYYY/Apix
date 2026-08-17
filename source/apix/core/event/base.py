@@ -41,6 +41,7 @@ EventHandlerFunc = Callable[
     [ApixEvent],
     Awaitable[None]
 ]
+    
 
 class HandlerMeta(TypedDict):
     name: str
@@ -52,12 +53,18 @@ class HandlerMeta(TypedDict):
     time_out: float
     background: bool
 
+
+class Subscribe(TypedDict):
+    event: str
+    type: Literal['include', 'except']
+
+
 @dataclass(slots=True)
 class HandlerEntry:
     id: str
     name: str
-    subscribe: str
-    callback: EventHandlerFunc
+    subscribe: list[Subscribe]
+    callback: EventHandlerFunc | None
     priority: float | None
     register_order: int
     stop_when_error: bool = field(default=True)
