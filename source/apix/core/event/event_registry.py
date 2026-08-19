@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from apix.core.event.base import (
     EventHandlerFunc,
-    HandlerEntry,
+    ApixEventHandler,
     HandlerMeta,
 )
 from apix.core.utils.exception import EventHandlerNotRegisteredError, EventHandlerAlreadyRegisteredError
@@ -23,7 +23,7 @@ class ApixEventRegistry:
         if getattr(self, "_initialized", False):
             return
 
-        self._handlers: dict[str, list[HandlerEntry]] = {}
+        self._handlers: dict[str, list[ApixEventHandler]] = {}
         self._handlers_meta: dict[str, HandlerMeta] = {}
         self._register_order = 0
         self._initialized = True
@@ -31,7 +31,7 @@ class ApixEventRegistry:
     def get_handlers(
         self,
         event_name: str,
-    ) -> list[HandlerEntry]:
+    ) -> list[ApixEventHandler]:
         """
         Get handlers list by event name.
         """
@@ -107,7 +107,7 @@ class ApixEventRegistry:
     def _find_insert_index(
         self,
         event_name: str,
-        handlers: list[HandlerEntry],
+        handlers: list[ApixEventHandler],
         priority: float | None,
         between_handlers: tuple[str | None, str | None] | None = None,
     ) -> int:
@@ -208,7 +208,7 @@ class ApixEventRegistry:
         priority: float | None = None,
         between_handlers: tuple[str | None, str | None] | None = None,
         stop_when_error: bool = True,
-        time_out: float = -1,
+        time_out: float = None,
         background: bool = False,
     ):
         """
@@ -340,7 +340,7 @@ class ApixEventRegistry:
                 an exception.
 
             time_out:
-                Maximum handler execution time in seconds. The default ``-1``
+                Maximum handler execution time in seconds. The default ``None``
                 waits indefinitely. Any value less than or equal to zero
                 disables the timeout.
 
@@ -391,8 +391,8 @@ class ApixEventRegistry:
                 "event_name cannot be empty."
             )
 
-        if time_out <= 0:
-            time_out = -1
+        if time_out is not None and time_out <= 0:
+            time_out = None
 
         if between_handlers is not None:
             if (
@@ -445,7 +445,7 @@ class ApixEventRegistry:
             # indexes before changing registry state. This prevents partial
             # registration when one event fails validation.
             registration_plan: list[
-                tuple[str, int, HandlerEntry]
+                tuple[str, int, ApixEventHandler]
             ] = []
 
             for event_name in normalized_event_names:
@@ -461,7 +461,7 @@ class ApixEventRegistry:
                     between_handlers=between_handlers,
                 )
 
-                entry = HandlerEntry(
+                entry = ApixEventHandler(
                     id=uuid4().hex,
                     name=handler_name,
                     subscribe=event_name,

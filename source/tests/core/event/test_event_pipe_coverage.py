@@ -626,17 +626,17 @@ class TestEventLoopRemainingBranches:
         registry._handlers.clear()
         handler = ApixEventLoop(registry)
         callback = AsyncMock()
-        from apix.core.event.base import HandlerEntry
+        from apix.core.event.base import ApixEventHandler
 
         registry._handlers["test.event"] = [
-            HandlerEntry(
+            ApixEventHandler(
                 id="handler-1",
                 name="handler",
                 subscribe="test.event",
                 callback=callback,
                 priority=1,
                 register_order=0,
-                time_out=-1,
+                time_out=None,
             )
         ]
         event = make_event()

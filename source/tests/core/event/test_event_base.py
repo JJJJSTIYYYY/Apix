@@ -1,6 +1,6 @@
 """Tests for public event values and handler defaults."""
 
-from apix.core.event.base import EventType, HandlerEntry
+from apix.core.event.base import EventType, ApixEventHandler
 
 
 async def _handler(event):
@@ -9,7 +9,7 @@ async def _handler(event):
 
 def test_handler_entry_defaults_to_infinite_wait():
     """A directly constructed handler also defaults to no timeout."""
-    entry = HandlerEntry(
+    entry = ApixEventHandler(
         id="handler-id",
         name="handler",
         subscribe="event",
@@ -18,4 +18,4 @@ def test_handler_entry_defaults_to_infinite_wait():
         register_order=0,
     )
 
-    assert entry.time_out == -1
+    assert entry.time_out is None

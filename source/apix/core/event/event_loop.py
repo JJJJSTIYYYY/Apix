@@ -1,7 +1,7 @@
 import asyncio
 import traceback
 
-from apix.core.event.base import HandlerEntry, ApixEvent
+from apix.core.event.base import ApixEventHandler, ApixEvent
 from apix.core.event.event_registry import apix_event_registry
 from apix.core.event.event_pipe import EVENT_PIPE
 from apix.core.event.event_registry import ApixEventRegistry
@@ -147,7 +147,7 @@ class ApixEventLoop:
 
     async def _run_background_handler(
         self,
-        handler: HandlerEntry,
+        handler: ApixEventHandler,
         event: ApixEvent,
     ):
         """
@@ -156,7 +156,7 @@ class ApixEventLoop:
 
         try:
             async with self._background_handler_semaphore:
-                if handler.time_out == -1:
+                if handler.time_out is None:
                     await handler.callback(event)
                 else:
                     await asyncio.wait_for(
@@ -213,7 +213,7 @@ class ApixEventLoop:
                             event,
                         )
                     else:
-                        if handler.time_out == -1:
+                        if handler.time_out is None:
                             await handler.callback(event)
                         else:
                             await asyncio.wait_for(

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import pytest
 
-from apix.core.event.base import ApixEvent, EventType, HandlerEntry
+from apix.core.event.base import ApixEvent, EventType, ApixEventHandler
 from apix.core.event.event_registry import ApixEventRegistry
 from apix.core.event.event_loop import ApixEventLoop
 
@@ -38,11 +38,11 @@ def _make_handler_entry(
     time_out=30.0,
     background=False,
 ):
-    """Create a HandlerEntry."""
+    """Create a ApixEventHandler."""
     if callback is None:
         callback = AsyncMock()
 
-    return HandlerEntry(
+    return ApixEventHandler(
         id=f"id_{name}",
         name=name,
         subscribe=subscribe,
@@ -438,13 +438,13 @@ class TestRunBackgroundHandler:
 
     @pytest.mark.asyncio
     async def test_background_handler_no_timeout(self):
-        """Background handler with time_out=-1 should run normally."""
+        """Background handler with time_out=None should run normally."""
         registry = ApixEventRegistry()
         _reset_registry(registry)
         handler = ApixEventLoop(registry)
 
         mock_callback = AsyncMock()
-        entry = _make_handler_entry(callback=mock_callback, time_out=-1)
+        entry = _make_handler_entry(callback=mock_callback, time_out=None)
         event = _make_event()
 
         await handler._run_background_handler(entry, event)
@@ -522,7 +522,7 @@ class TestRunBackgroundHandler:
         handler = ApixEventLoop(registry)
 
         mock_callback = AsyncMock()
-        entry = _make_handler_entry(callback=mock_callback, time_out=-1)
+        entry = _make_handler_entry(callback=mock_callback, time_out=None)
         event = _make_event()
 
         await handler._run_background_handler(entry, event)
@@ -547,7 +547,7 @@ class TestCreateBackgroundHandlerTask:
         handler = ApixEventLoop(registry)
 
         mock_callback = AsyncMock()
-        entry = _make_handler_entry(callback=mock_callback, time_out=-1)
+        entry = _make_handler_entry(callback=mock_callback, time_out=None)
         event = _make_event()
 
         initial_count = len(handler._background_handler_tasks)

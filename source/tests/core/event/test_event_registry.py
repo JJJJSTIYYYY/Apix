@@ -7,7 +7,7 @@ error handling, and metadata retrieval.
 
 import pytest
 
-from apix.core.event.base import ApixEvent, HandlerEntry
+from apix.core.event.base import ApixEvent, ApixEventHandler
 from apix.core.utils.exception import EventHandlerNotRegisteredError, EventHandlerAlreadyRegisteredError
 from apix.core.event.event_registry import ApixEventRegistry, apix_event_registry
 
@@ -142,12 +142,12 @@ class TestFindInsertIndex:
     EVENT_NAME = "test.event"
 
     def _make_entries(self, names_and_priorities):
-        """Create HandlerEntry list from (name, priority) pairs."""
+        """Create ApixEventHandler list from (name, priority) pairs."""
         entries = []
 
         for i, (name, priority) in enumerate(names_and_priorities):
             entries.append(
-                HandlerEntry(
+                ApixEventHandler(
                     id=f"id_{name}",
                     name=name,
                     subscribe=self.EVENT_NAME,
@@ -1091,7 +1091,7 @@ class TestOnEventDecorator:
         assert [h.name for h in handlers] == ["first", "second", "third"]
 
     def test_on_event_timeout_zero_becomes_negative_one(self):
-        """time_out <= 0 should be converted to -1 (no timeout)."""
+        """time_out <= 0 should be converted to None (no timeout)."""
         registry = ApixEventRegistry()
         _reset_registry(registry)
 
@@ -1100,7 +1100,7 @@ class TestOnEventDecorator:
 
         registry.subscribe("test.event", time_out=0)(h)
         meta = registry.get_handler_meta("h")
-        assert meta["time_out"] == -1
+        assert meta["time_out"] == None
 
     def test_on_event_timeout_defaults_to_infinite_wait(self):
         """Omitting time_out should store the no-timeout sentinel."""
@@ -1112,10 +1112,10 @@ class TestOnEventDecorator:
 
         registry.subscribe("test.event")(h)
 
-        assert registry.get_handler_meta("h")["time_out"] == -1
+        assert registry.get_handler_meta("h")["time_out"] == None
 
     def test_on_event_timeout_negative_becomes_negative_one(self):
-        """time_out < 0 should be converted to -1."""
+        """time_out < 0 should be converted to None."""
         registry = ApixEventRegistry()
         _reset_registry(registry)
 
@@ -1124,7 +1124,7 @@ class TestOnEventDecorator:
 
         registry.subscribe("test.event", time_out=-5)(h)
         meta = registry.get_handler_meta("h")
-        assert meta["time_out"] == -1
+        assert meta["time_out"] == None
 
     def test_on_event_background_flag(self):
         """background=True should be stored in meta."""
@@ -1244,12 +1244,12 @@ class TestOnEventDecorator:
 
 
 # ============================
-# Tests: HandlerEntry attributes
+# Tests: ApixEventHandler attributes
 # ============================
 
 
 class TestHandlerEntryAttributes:
-    """Verify HandlerEntry has expected attributes after registration."""
+    """Verify ApixEventHandler has expected attributes after registration."""
 
     def test_handler_entry_has_unique_id(self):
         """Each handler entry should have a unique id."""
@@ -1270,7 +1270,7 @@ class TestHandlerEntryAttributes:
         assert handlers[0].id != handlers[1].id
 
     def test_handler_entry_callback_is_original_function(self):
-        """HandlerEntry.callback should be the original async function."""
+        """ApixEventHandler.callback should be the original async function."""
         registry = ApixEventRegistry()
         _reset_registry(registry)
 

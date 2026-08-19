@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Literal, TypedDict
 from datetime import datetime
+from uuid import uuid4
 
 
 class EventType(str, Enum):
@@ -20,6 +21,7 @@ class ApixEvent:
     context: Any
     timestamp: float
     accepted: bool = False
+    _handler_chain_version: int | None = None
 
     def accept(self) -> None:
         '''
@@ -54,21 +56,34 @@ class HandlerMeta(TypedDict):
     background: bool
 
 
-class Subscribe(TypedDict):
-    event: str
-    type: Literal['include', 'except']
+# # Deprecated ApixEventHandler schema.
+# @dataclass(slots=True)
+# class ApixEventHandler:
+#     id: str
+#     name: str
+#     subscribe: list[str]
+#     callback: EventHandlerFunc | None
+#     priority: float | None
+#     register_order: int
+#     stop_when_error: bool = field(default=True)
+#     time_out: float = field(default=-1)
+#     background: bool = field(default=False)
 
 
 @dataclass(slots=True)
-class HandlerEntry:
-    id: str
+class ApixEventHandler:
     name: str
-    subscribe: list[Subscribe]
-    callback: EventHandlerFunc | None
-    priority: float | None
     register_order: int
+    callback: EventHandlerFunc | None
+    id: str = field(default_factory=lambda: "handler-"+uuid4().hex)
+    subscribe: list[str] = field(default_factory=list)
+    filter_event: list[str] = field(default_factory=list)
+    priority: int | None = field(default=None)
+    between_handlers: tuple[str | None, str | None] | None = field(
+        default=None
+    )
     stop_when_error: bool = field(default=True)
-    time_out: float = field(default=-1)
+    time_out: float | None = field(default=None)
     background: bool = field(default=False)
 
 

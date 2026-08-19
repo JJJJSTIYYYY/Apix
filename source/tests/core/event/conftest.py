@@ -9,7 +9,7 @@ import sys
 import typing
 from uuid import uuid4
 
-from apix.core.event.base import ApixEvent, EventType, HandlerEntry, HandlerMeta
+from apix.core.event.base import ApixEvent, EventType, ApixEventHandler, HandlerMeta
 
 try:
     from typing import NotRequired
@@ -91,7 +91,7 @@ def make_handler():
 
 @pytest.fixture
 def handler_entry_factory():
-    """Factory fixture: create a HandlerEntry."""
+    """Factory fixture: create a ApixEventHandler."""
 
     def _make(
         name="test_handler",
@@ -110,7 +110,7 @@ def handler_entry_factory():
 
             callback = default_handler
 
-        return HandlerEntry(
+        return ApixEventHandler(
             id="handler_id_001",
             name=name,
             subscribe=subscribe,
