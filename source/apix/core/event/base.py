@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Literal, TypedDict
+from typing import Any, Awaitable, Callable, Literal
 from datetime import datetime
 from uuid import uuid4
 
@@ -45,31 +45,6 @@ EventHandlerFunc = Callable[
 ]
     
 
-class HandlerMeta(TypedDict):
-    name: str
-    subscribe: list[str]
-    priority: float | None
-    between: tuple[str, str] | None
-    register_order: int
-    stop_when_error: bool
-    time_out: float
-    background: bool
-
-
-# # Deprecated ApixEventHandler schema.
-# @dataclass(slots=True)
-# class ApixEventHandler:
-#     id: str
-#     name: str
-#     subscribe: list[str]
-#     callback: EventHandlerFunc | None
-#     priority: float | None
-#     register_order: int
-#     stop_when_error: bool = field(default=True)
-#     time_out: float = field(default=-1)
-#     background: bool = field(default=False)
-
-
 @dataclass(slots=True)
 class ApixEventHandler:
     name: str
@@ -78,7 +53,7 @@ class ApixEventHandler:
     id: str = field(default_factory=lambda: "handler-"+uuid4().hex)
     subscribe: list[str] = field(default_factory=list)
     filter_event: list[str] = field(default_factory=list)
-    priority: int | None = field(default=None)
+    priority: float | None = field(default=None)
     between_handlers: tuple[str | None, str | None] | None = field(
         default=None
     )

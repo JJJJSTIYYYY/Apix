@@ -12,7 +12,7 @@ def test_handler_entry_defaults_to_infinite_wait():
     entry = ApixEventHandler(
         id="handler-id",
         name="handler",
-        subscribe="event",
+        subscribe=["event"],
         callback=_handler,
         priority=1,
         register_order=0,

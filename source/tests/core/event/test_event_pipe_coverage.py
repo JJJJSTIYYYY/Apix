@@ -24,7 +24,7 @@ from apix.core.event.event_pipe import (
     event_from_payload,
     event_to_payload,
 )
-from apix.core.event.event_registry import ApixEventRegistry
+from apix.core.event.handler_registry import ApixHandlerRegistry
 
 from .test_event_pipe import FakeClient, make_event, make_gateway, response
 
@@ -591,8 +591,10 @@ class TestEventLoopRemainingBranches:
     async def test_real_consumer_loop_dispatches_and_handles_cancellation(
         self, monkeypatch
     ):
-        registry = ApixEventRegistry()
-        registry._handlers.clear()
+        registry = ApixHandlerRegistry()
+        registry.registry.clear()
+        registry.priority_buckets.clear()
+        registry.cached_chain.clear()
         handler = ApixEventLoop(registry)
         event = make_event()
         get_event = AsyncMock(side_effect=[event, asyncio.CancelledError()])
@@ -608,8 +610,10 @@ class TestEventLoopRemainingBranches:
 
     @pytest.mark.asyncio
     async def test_consumer_releases_semaphore_when_get_fails(self, monkeypatch):
-        registry = ApixEventRegistry()
-        registry._handlers.clear()
+        registry = ApixHandlerRegistry()
+        registry.registry.clear()
+        registry.priority_buckets.clear()
+        registry.cached_chain.clear()
         handler = ApixEventLoop(registry)
         initial_value = handler._dispatch_semaphore._value
         monkeypatch.setattr(
@@ -622,23 +626,25 @@ class TestEventLoopRemainingBranches:
 
     @pytest.mark.asyncio
     async def test_dispatch_without_timeout(self):
-        registry = ApixEventRegistry()
-        registry._handlers.clear()
+        registry = ApixHandlerRegistry()
+        registry.registry.clear()
+        registry.priority_buckets.clear()
+        registry.cached_chain.clear()
         handler = ApixEventLoop(registry)
         callback = AsyncMock()
         from apix.core.event.base import ApixEventHandler
 
-        registry._handlers["test.event"] = [
+        registry.register_handler(
             ApixEventHandler(
                 id="handler-1",
                 name="handler",
-                subscribe="test.event",
+                subscribe=["test.event"],
                 callback=callback,
                 priority=1,
                 register_order=0,
                 time_out=None,
             )
-        ]
+        )
         event = make_event()
         await handler._dispatch_event(event)
         callback.assert_awaited_once_with(event)

@@ -9,7 +9,14 @@ from contextlib import suppress
 from functools import partial
 from typing import Any
 
-from apix.core.event import EVENT_PIPE, ApixEvent, EventType, apix_event_loop, apix_event_registry
+from apix.core.event import (
+    EVENT_PIPE,
+    ApixEvent,
+    EventType,
+    apix_event_loop,
+    delete_handler_from_registry,
+    subscribe,
+)
 from apix.core.graph.base import (
     END,
     START,
@@ -137,7 +144,7 @@ class NodeGraph:
                         await self._execute_node(_node_name, context)
 
                 run_node.__name__ = get_node_name_in_namespace(node_name, self._listener_namespace)
-                apix_event_registry.subscribe(
+                subscribe(
                     node_name,
                     exist_ok=False,
                 )(run_node)
@@ -150,7 +157,7 @@ class NodeGraph:
     def _unregister_node_listeners(self) -> None:
         """Remove every event handler successfully registered by this graph."""
         for handler_name in self._listener_handler_names:
-            apix_event_registry.unsubscribe(handler_name)
+            delete_handler_from_registry(handler_name)
         self._listener_handler_names.clear()
 
 

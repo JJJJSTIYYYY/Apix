@@ -9,7 +9,8 @@ import sys
 import typing
 from uuid import uuid4
 
-from apix.core.event.base import ApixEvent, EventType, ApixEventHandler, HandlerMeta
+from apix.core.event.base import ApixEvent, EventType, ApixEventHandler
+from apix.core.event.event_registry import apix_event_registry
 
 try:
     from typing import NotRequired
@@ -26,6 +27,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def reset_event_registry():
+    """Keep observed event names isolated between event-module tests."""
+    apix_event_registry.clear()
+    yield
+    apix_event_registry.clear()
+
+
 # ============================
 # Fixtures: Event & Handler
 # ============================
@@ -35,6 +44,7 @@ import pytest
 def sample_event():
     """Create a basic sample event."""
     return ApixEvent(
+        event_id="event-" + uuid4().hex,
         event_type=EventType.WORKFLOW,
         event_name="test.event",
         context={"key": "value"},
@@ -47,6 +57,7 @@ def sample_event():
 def sample_event_no_name():
     """Create event with empty name."""
     return ApixEvent(
+        event_id="event-" + uuid4().hex,
         event_type=EventType.WORKFLOW,
         event_name="",
         context=None,
@@ -95,7 +106,7 @@ def handler_entry_factory():
 
     def _make(
         name="test_handler",
-        subscribe="test.event",
+        subscribe=None,
         callback=None,
         priority=1.0,
         register_order=0,
@@ -113,7 +124,7 @@ def handler_entry_factory():
         return ApixEventHandler(
             id="handler_id_001",
             name=name,
-            subscribe=subscribe,
+            subscribe=list(subscribe or ["test.event"]),
             callback=callback,
             priority=priority,
             register_order=register_order,

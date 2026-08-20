@@ -10,7 +10,8 @@ from apix.core.event import (
     ApixEvent,
     EventType,
     apix_event_loop,
-    apix_event_registry,
+    apix_handler_registry,
+    delete_handler_from_registry,
     EVENT_PIPE,
 )
 from apix.core.graph import START, GraphManager
@@ -95,7 +96,10 @@ async def test_interrupted_hook_rejects_non_block_event_context():
     assert decorated is invalid_context_hook
 
     try:
-        [handler] = apix_event_registry.get_handlers("graph__interrupted")
+        [handler_name] = apix_handler_registry.get_handlers_chain_for_event(
+            "graph__interrupted"
+        )
+        handler = apix_handler_registry.get_handler(handler_name)
         event = ApixEvent(
             event_id="event-id",
             event_type=EventType.WORKFLOW,
@@ -108,7 +112,7 @@ async def test_interrupted_hook_rejects_non_block_event_context():
             await handler.callback(event)
         assert received == []
     finally:
-        apix_event_registry.unsubscribe(invalid_context_hook.__name__)
+        delete_handler_from_registry(invalid_context_hook.__name__)
 
 
 async def test_graph_pauses_and_resumes_at_multiple_breakpoints():
@@ -153,11 +157,11 @@ async def test_graph_pauses_and_resumes_at_multiple_breakpoints():
     }
 
     assert capture_review_block.__name__ in (
-        apix_event_registry.get_all_handlers_meta()
+        apix_handler_registry.registry
     )
     graph.decompose()
     assert capture_review_block.__name__ not in (
-        apix_event_registry.get_all_handlers_meta()
+        apix_handler_registry.registry
     )
 
     with pytest.raises(RuntimeError, match="NodeGraph has been decomposed"):

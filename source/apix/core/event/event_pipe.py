@@ -45,6 +45,8 @@ from apix.config.base_config import (
     REMOTE_GATEWAY_PIPE_ENDPOINT,
 )
 from apix.core.event.base import ApixEvent, ChannelName, EventType
+from apix.core.event.event_registry import apix_event_registry
+from apix.core.event.handler_registry import apix_handler_registry
 
 
 def event_to_payload(event: ApixEvent) -> dict[str, Any]:
@@ -642,6 +644,20 @@ class ApixEventPipe:
         except KeyError as exc:
             raise ValueError(f"Unknown event channel: {channel!r}") from exc
 
+    @staticmethod
+    def _bind_handler_chain_version(event: Any) -> None:
+        """Freeze the current local handler chain version on an event."""
+        if (
+            isinstance(event, ApixEvent)
+            and event._handler_chain_version is None
+            and event.event_name
+        ):
+            event._handler_chain_version = (
+                apix_handler_registry.get_current_version_for_event(
+                    event.event_name
+                )
+            )
+
     async def put(
         self,
         event: Any,
@@ -651,10 +667,14 @@ class ApixEventPipe:
     ) -> None:
         if channel == "mailbox":
             raise EventChannelPermissionError("mailbox channels are receive-only")
+        target_channel = self.get_channel(channel)
         if channel == "mailtruck":
-            await self.get_channel(channel).put(event, recipient=recipient)
-            return
-        await self.get_channel(channel).put(event)
+            await target_channel.put(event, recipient=recipient)
+        else:
+            self._bind_handler_chain_version(event)
+            await target_channel.put(event)
+        if isinstance(event, ApixEvent) and event.event_name:
+            apix_event_registry.record_event(event)
 
     async def post_event(
         self,
@@ -691,7 +711,12 @@ class ApixEventPipe:
     ) -> None:
         if channel == "mailbox":
             raise EventChannelPermissionError("mailbox channels are receive-only")
-        self.get_channel(channel).put_nowait(event)
+        target_channel = self.get_channel(channel)
+        if channel == "builtin":
+            self._bind_handler_chain_version(event)
+        target_channel.put_nowait(event)
+        if isinstance(event, ApixEvent) and event.event_name:
+            apix_event_registry.record_event(event)
 
     async def get(self, channel: ChannelName = "builtin") -> Any:
         if channel == "mailtruck":
@@ -742,6 +767,7 @@ class ApixEventPipe:
         ):
             raise TypeError("mailtruck channel does not support broadcast()")
         result = await mailtruck.broadcast(event)  # type: ignore[attr-defined]
+        apix_event_registry.record_event(event)
         self._update_nodes(result)
         return result
 
@@ -781,7 +807,10 @@ class ApixEventPipe:
         while True:
             event = await mailbox.get()
             try:
+                self._bind_handler_chain_version(event)
                 await builtin.put(event)
+                if event.event_name:
+                    apix_event_registry.record_event(event)
             finally:
                 mailbox.task_done()
 

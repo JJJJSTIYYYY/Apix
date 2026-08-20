@@ -7,7 +7,9 @@ import pytest
 
 from apix.core.event import (
     apix_event_loop,
-    apix_event_registry,
+    apix_handler_registry,
+    delete_handler_from_registry,
+    subscribe,
     EVENT_PIPE,
 )
 from apix.core.utils.exception import EventHandlerAlreadyRegisteredError
@@ -579,7 +581,7 @@ def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
     async def retained_plugin(event):
         pass
 
-    apix_event_registry.subscribe("node")(retained_plugin)
+    subscribe("node")(retained_plugin)
     graph = NodeGraph(
         {"node": Node(lambda state: {})},
         {START: "node", "node": END},
@@ -593,14 +595,13 @@ def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
     assert graph._decomposed is True
     assert graph._listener_handler_names == []
     assert graph_handler_names.isdisjoint(
-        apix_event_registry.get_all_handlers_meta()
+        apix_handler_registry.registry
     )
-    assert [
-        handler.name
-        for handler in apix_event_registry.get_handlers("node")
-    ] == [retained_plugin.__name__]
+    assert apix_handler_registry.get_handlers_chain_for_event("node") == [
+        retained_plugin.__name__
+    ]
 
-    apix_event_registry.unsubscribe(retained_plugin.__name__)
+    delete_handler_from_registry(retained_plugin.__name__)
 
 
 def test_listener_registration_failure_rolls_back_partial_handlers():
@@ -609,7 +610,7 @@ def test_listener_registration_failure_rolls_back_partial_handlers():
         pass
 
     conflicting_handler.__name__ = "graph_listener_rollback_node"
-    apix_event_registry.subscribe("foreign")(conflicting_handler)
+    subscribe("foreign")(conflicting_handler)
 
     with pytest.raises(EventHandlerAlreadyRegisteredError):
         NodeGraph(
@@ -619,13 +620,13 @@ def test_listener_registration_failure_rolls_back_partial_handlers():
         )
 
     assert "graph_listener_rollback_START" not in (
-        apix_event_registry.get_all_handlers_meta()
+        apix_handler_registry.registry
     )
-    assert apix_event_registry.get_handler_meta(
+    assert apix_handler_registry.get_handler(
         conflicting_handler.__name__
-    )["subscribe"] == ["foreign"]
+    ).subscribe == ["foreign"]
 
-    apix_event_registry.unsubscribe(conflicting_handler.__name__)
+    delete_handler_from_registry(conflicting_handler.__name__)
 
 
 @pytest.mark.asyncio

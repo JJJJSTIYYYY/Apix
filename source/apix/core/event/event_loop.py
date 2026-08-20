@@ -2,9 +2,11 @@ import asyncio
 import traceback
 
 from apix.core.event.base import ApixEventHandler, ApixEvent
-from apix.core.event.event_registry import apix_event_registry
+from apix.core.event.handler_registry import (
+    ApixHandlerRegistry,
+    apix_handler_registry,
+)
 from apix.core.event.event_pipe import EVENT_PIPE
-from apix.core.event.event_registry import ApixEventRegistry
 from apix.common.utils.logger import logger
 
 
@@ -15,7 +17,7 @@ class ApixEventLoop:
 
     def __init__(
         self,
-        registry: ApixEventRegistry,
+        registry: ApixHandlerRegistry,
     ):
         self._registry = registry
 
@@ -85,6 +87,10 @@ class ApixEventLoop:
             )
 
         self._background_handler_tasks.clear()
+        self._registry.shutdown_prewarmer(
+            wait=False,
+            cancel_futures=True,
+        )
 
         logger.info("Worker stopped.")
 
@@ -195,16 +201,28 @@ class ApixEventLoop:
             if not event.event_name:
                 return None
 
-            handlers = self._registry.get_handlers(
-                event.event_name
+            handler_chain = self._registry.get_handlers_chain_for_event(
+                event.event_name,
+                event._handler_chain_version,
             )
 
-            if not handlers:
+            if not handler_chain:
                 return event
 
-            for handler in handlers:
+            for handler_name in handler_chain:
                 if event.accepted:
                     break
+
+                # A permanently deleted entry cannot be resolved. This should
+                # only occur when callers delete a handler while an older event
+                # version is still queued.
+                handler = self._registry.get_handler(handler_name)
+                if handler is None:
+                    logger.warning(
+                        f"Handler missing from registry: {handler_name}, "
+                        f"event={event.event_name}"
+                    )
+                    continue
 
                 try:
                     if handler.background:
@@ -258,4 +276,4 @@ class ApixEventLoop:
             self._dispatch_semaphore.release()
 
 
-apix_event_loop = ApixEventLoop(apix_event_registry)
+apix_event_loop = ApixEventLoop(apix_handler_registry)

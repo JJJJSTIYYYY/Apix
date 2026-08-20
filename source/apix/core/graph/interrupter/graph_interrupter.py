@@ -11,7 +11,7 @@ from apix.core.event import (
     ApixEvent,
     EVENT_PIPE,
     EventType,
-    apix_event_registry,
+    subscribe,
 )
 from apix.core.graph.interrupter.base import Block
 
@@ -126,7 +126,7 @@ def interrupted_hook(
                 )
             await func(block)
 
-        apix_event_registry.subscribe(
+        subscribe(
             event_name,
             exist_ok=exist_ok,
         )(dispatch_block)
