@@ -14,8 +14,6 @@ class ApixHandlerRegistry:
     # Use the list index to distinguish different versions.
     cached_chain: dict[str, list[list[str] | None]] # event name mapped to a list of handler name lists (or None) for different versions.
 
-    _event_handler_map: dict[str, list[str]] # event name to handler names. Index for cache construction.
-
     _instance = None
 
     def __new__(cls):
@@ -30,7 +28,6 @@ class ApixHandlerRegistry:
         self.registry = {}
         self.priority_buckets = {}
         self.cached_chain = {}
-        self._event_handler_map = {}
         self._initialized = True
 
 
