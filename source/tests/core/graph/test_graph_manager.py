@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from apix.core.event import apix_handler_registry
+from apix.core.event import APIX_HANDLER_REGISTRY
 from apix.core.graph import END, START, GraphManager, namespace_set
 from apix.core.graph.base import (
     _acquire_namespace,
@@ -253,8 +253,8 @@ def test_compile_exist_ok_decomposes_and_replaces_original_graph():
         .compile_graph(using_namespace="replaceable")
     )
     first_callbacks = {
-        apix_handler_registry.get_handler(handler_name).callback
-        for handler_name in apix_handler_registry.get_handlers_chain_for_event(
+        APIX_HANDLER_REGISTRY.get_handler(handler_name).callback
+        for handler_name in APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
             "shared"
         )
     }
@@ -269,8 +269,8 @@ def test_compile_exist_ok_decomposes_and_replaces_original_graph():
         )
     )
     replacement_callbacks = {
-        apix_handler_registry.get_handler(handler_name).callback
-        for handler_name in apix_handler_registry.get_handlers_chain_for_event(
+        APIX_HANDLER_REGISTRY.get_handler(handler_name).callback
+        for handler_name in APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
             "shared"
         )
     }

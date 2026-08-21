@@ -8,14 +8,14 @@ import pytest
 from apix.core.event.base import ApixEvent, ApixEventHandler, EventType
 from apix.core.event.event_loop import ApixEventLoop
 from apix.core.event.event_pipe import ApixEventPipe
-from apix.core.event.event_registry import apix_event_registry
-from apix.core.event.handler_registry import apix_handler_registry
+from apix.core.event.event_registry import APIX_EVENT_REGISTRY
+from apix.core.event.handler_registry import APIX_HANDLER_REGISTRY
 
 
 # These workloads are intentionally large enough to exercise real cache and
-# process-pool paths while remaining suitable for a personal computer and CI.
+# wildcard matching paths while remaining suitable for a personal computer.
 MATRIX_EVENT_COUNT = 20_000
-PREWARM_EVENT_COUNT = 30_000
+OBSERVED_EVENT_COUNT = 30_000
 DISPATCH_EVENT_COUNT = 2_400
 
 
@@ -44,7 +44,7 @@ def _make_handler(
 
 def _observe_event(event_name: str, event_index: int) -> None:
     """Record one exact event name without retaining its event object."""
-    apix_event_registry.record_event(
+    APIX_EVENT_REGISTRY.record_event(
         ApixEvent(
             event_id=f"scale-event-{event_index}",
             event_type=EventType.WORKFLOW,
@@ -58,29 +58,19 @@ def _observe_event(event_name: str, event_index: int) -> None:
 @pytest.fixture(autouse=True)
 def reset_event_registries():
     """Isolate the process-global registries around every scale test."""
-    apix_handler_registry.shutdown_prewarmer(
-        wait=True,
-        cancel_futures=True,
-    )
-    apix_handler_registry._prewarm_jobs.clear()
-    apix_handler_registry.registry.clear()
-    apix_handler_registry.priority_buckets.clear()
-    apix_handler_registry.cached_chain.clear()
-    apix_handler_registry._register_order = 0
-    apix_event_registry.clear()
+    APIX_HANDLER_REGISTRY.registry.clear()
+    APIX_HANDLER_REGISTRY.priority_buckets.clear()
+    APIX_HANDLER_REGISTRY.cached_chain.clear()
+    APIX_HANDLER_REGISTRY._register_order = 0
+    APIX_EVENT_REGISTRY.clear()
 
     yield
 
-    apix_handler_registry.shutdown_prewarmer(
-        wait=True,
-        cancel_futures=True,
-    )
-    apix_handler_registry._prewarm_jobs.clear()
-    apix_handler_registry.registry.clear()
-    apix_handler_registry.priority_buckets.clear()
-    apix_handler_registry.cached_chain.clear()
-    apix_handler_registry._register_order = 0
-    apix_event_registry.clear()
+    APIX_HANDLER_REGISTRY.registry.clear()
+    APIX_HANDLER_REGISTRY.priority_buckets.clear()
+    APIX_HANDLER_REGISTRY.cached_chain.clear()
+    APIX_HANDLER_REGISTRY._register_order = 0
+    APIX_EVENT_REGISTRY.clear()
 
 
 def test_twenty_thousand_event_glob_matrix_resolves_exact_ordered_chains():
@@ -119,7 +109,7 @@ def test_twenty_thousand_event_glob_matrix_resolves_exact_ordered_chains():
         for digit in range(10)
     )
     for handler in handlers:
-        apix_handler_registry.register_handler(handler)
+        APIX_HANDLER_REGISTRY.register_handler(handler)
 
     actions = ("build", "deploy", "test", "release", "audit")
     statuses = ("passed", "failed")
@@ -149,7 +139,7 @@ def test_twenty_thousand_event_glob_matrix_resolves_exact_ordered_chains():
                     expected_chain.append(f"tenant_shard_{tenant % 10}")
 
                     chain = (
-                        apix_handler_registry.get_handlers_chain_for_event(
+                        APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
                             event_name
                         )
                     )
@@ -157,8 +147,8 @@ def test_twenty_thousand_event_glob_matrix_resolves_exact_ordered_chains():
                     match_counts.update(chain)
 
     assert event_index == MATRIX_EVENT_COUNT
-    assert len(apix_handler_registry.cached_chain) == MATRIX_EVENT_COUNT
-    assert len(apix_event_registry.get_registered_events()) == MATRIX_EVENT_COUNT
+    assert len(APIX_HANDLER_REGISTRY.cached_chain) == MATRIX_EVENT_COUNT
+    assert len(APIX_EVENT_REGISTRY.get_registered_events()) == MATRIX_EVENT_COUNT
     assert match_counts == Counter(
         {
             "global": 20_000,
@@ -169,18 +159,18 @@ def test_twenty_thousand_event_glob_matrix_resolves_exact_ordered_chains():
             **{f"tenant_shard_{digit}": 2_000 for digit in range(10)},
         }
     )
-    assert apix_handler_registry.get_unmatched_subscriptions("wrong_case") == [
+    assert APIX_HANDLER_REGISTRY.get_unmatched_subscriptions("wrong_case") == [
         "Tenant.*"
     ]
 
 
-def test_thirty_thousand_event_wildcard_registration_uses_real_prewarmer():
-    """Prewarm a large observed-event snapshot through worker processes."""
-    apix_handler_registry.register_handler(
+def test_thirty_thousand_observed_events_keep_handler_chains_lazy():
+    """Build only explicitly queried chains after wildcard registration."""
+    APIX_HANDLER_REGISTRY.register_handler(
         _make_handler("stream_global", ["stream.*"], priority=100)
     )
     for region in "abcdef":
-        apix_handler_registry.register_handler(
+        APIX_HANDLER_REGISTRY.register_handler(
             _make_handler(
                 f"region_{region}",
                 [f"stream.{region}.*"],
@@ -188,14 +178,14 @@ def test_thirty_thousand_event_wildcard_registration_uses_real_prewarmer():
             )
         )
     for digit in range(10):
-        apix_handler_registry.register_handler(
+        APIX_HANDLER_REGISTRY.register_handler(
             _make_handler(
                 f"stream_shard_{digit}",
                 [f"stream.*.????{digit}.orders.*"],
                 priority=10,
             )
         )
-    apix_handler_registry.register_handler(
+    APIX_HANDLER_REGISTRY.register_handler(
         _make_handler("uppercase_only", ["Stream.*"], priority=200)
     )
 
@@ -215,7 +205,7 @@ def test_thirty_thousand_event_wildcard_registration_uses_real_prewarmer():
         )
         event_index += 1
 
-    apix_handler_registry.register_handler(
+    APIX_HANDLER_REGISTRY.register_handler(
         _make_handler(
             "regional_orders_info",
             ["stream.[a-c].?????.orders.*"],
@@ -224,31 +214,32 @@ def test_thirty_thousand_event_wildcard_registration_uses_real_prewarmer():
         )
     )
 
-    assert event_index == PREWARM_EVENT_COUNT + 100
-    assert apix_handler_registry._prewarm_executor is not None
-    assert apix_handler_registry.wait_for_prewarm(timeout=30) is True
-    assert len(apix_handler_registry.cached_chain) == 7_500
+    assert event_index == OBSERVED_EVENT_COUNT + 100
+    assert APIX_HANDLER_REGISTRY.cached_chain == {}
 
     for region in "abc":
         for tenant in range(0, 5_000, 2):
             event_name = f"stream.{region}.{tenant:05d}.orders.info"
-            assert apix_handler_registry.cached_chain[event_name][-1] == [
+            assert APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
+                event_name
+            ) == [
                 "stream_global",
                 f"region_{region}",
                 "regional_orders_info",
                 f"stream_shard_{tenant % 10}",
             ]
 
+    assert len(APIX_HANDLER_REGISTRY.cached_chain) == 7_500
     assert "stream.a.00001.orders.debug" not in (
-        apix_handler_registry.cached_chain
+        APIX_HANDLER_REGISTRY.cached_chain
     )
     assert "stream.d.00000.orders.info" not in (
-        apix_handler_registry.cached_chain
+        APIX_HANDLER_REGISTRY.cached_chain
     )
     assert "Stream.a.00000.orders.info" not in (
-        apix_handler_registry.cached_chain
+        APIX_HANDLER_REGISTRY.cached_chain
     )
-    assert apix_handler_registry.get_unmatched_subscriptions(
+    assert APIX_HANDLER_REGISTRY.get_unmatched_subscriptions(
         "uppercase_only"
     ) == []
 
@@ -293,10 +284,10 @@ async def test_two_thousand_four_hundred_events_dispatch_through_glob_handlers()
         ),
     ]
     for handler in handlers:
-        apix_handler_registry.register_handler(handler)
+        APIX_HANDLER_REGISTRY.register_handler(handler)
 
     pipe = ApixEventPipe(remote_enabled=False)
-    event_loop = ApixEventLoop(apix_handler_registry)
+    event_loop = ApixEventLoop(APIX_HANDLER_REGISTRY)
     variants = (
         ("api.v1.tenant.{tenant}.orders.create.success", [
             "global",
@@ -336,7 +327,7 @@ async def test_two_thousand_four_hundred_events_dispatch_through_glob_handlers()
             "successful_orders": 600,
         }
     )
-    assert len(apix_handler_registry.cached_chain) == DISPATCH_EVENT_COUNT
-    assert len(apix_event_registry.get_registered_events()) == (
+    assert len(APIX_HANDLER_REGISTRY.cached_chain) == DISPATCH_EVENT_COUNT
+    assert len(APIX_EVENT_REGISTRY.get_registered_events()) == (
         DISPATCH_EVENT_COUNT
     )

@@ -655,10 +655,10 @@ class TestConstructor:
 
 
 class TestModuleSingleton:
-    """Tests for the module-level apix_event_loop."""
+    """Tests for the module-level APIX_EVENT_LOOP."""
 
     def test_pipe_event_handler_is_PipeEventHandler_instance(self):
-        """Module-level apix_event_loop should be a ApixEventLoop."""
-        from apix.core.event.event_loop import apix_event_loop
+        """Module-level APIX_EVENT_LOOP should be a ApixEventLoop."""
+        from apix.core.event.event_loop import APIX_EVENT_LOOP
 
-        assert isinstance(apix_event_loop, ApixEventLoop)
+        assert isinstance(APIX_EVENT_LOOP, ApixEventLoop)

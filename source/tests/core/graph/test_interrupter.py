@@ -9,8 +9,8 @@ import pytest_asyncio
 from apix.core.event import (
     ApixEvent,
     EventType,
-    apix_event_loop,
-    apix_handler_registry,
+    APIX_EVENT_LOOP,
+    APIX_HANDLER_REGISTRY,
     delete_handler_from_registry,
     EVENT_PIPE,
 )
@@ -26,7 +26,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 async def stop_event_loop_after_module():
     """Leave the process-global event worker clean for later test modules."""
     yield
-    await apix_event_loop.stop()
+    await APIX_EVENT_LOOP.stop()
     await EVENT_PIPE.clear()
 
 
@@ -96,10 +96,10 @@ async def test_interrupted_hook_rejects_non_block_event_context():
     assert decorated is invalid_context_hook
 
     try:
-        [handler_name] = apix_handler_registry.get_handlers_chain_for_event(
+        [handler_name] = APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
             "graph__interrupted"
         )
-        handler = apix_handler_registry.get_handler(handler_name)
+        handler = APIX_HANDLER_REGISTRY.get_handler(handler_name)
         event = ApixEvent(
             event_id="event-id",
             event_type=EventType.WORKFLOW,
@@ -157,11 +157,11 @@ async def test_graph_pauses_and_resumes_at_multiple_breakpoints():
     }
 
     assert capture_review_block.__name__ in (
-        apix_handler_registry.registry
+        APIX_HANDLER_REGISTRY.registry
     )
     graph.decompose()
     assert capture_review_block.__name__ not in (
-        apix_handler_registry.registry
+        APIX_HANDLER_REGISTRY.registry
     )
 
     with pytest.raises(RuntimeError, match="NodeGraph has been decomposed"):

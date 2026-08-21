@@ -11,7 +11,7 @@ from apix.agent.sdk.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
 )
-from apix.core.event.event_loop import apix_event_loop
+from apix.core.event.event_loop import APIX_EVENT_LOOP
 from apix.core.event import EVENT_PIPE
 from apix.core.graph import (
     AutoMerge,
@@ -34,7 +34,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 async def stop_event_loop_after_module():
     """Stop and clear the shared event runtime after this module."""
     yield
-    await apix_event_loop.stop()
+    await APIX_EVENT_LOOP.stop()
     await EVENT_PIPE.clear()
 
 

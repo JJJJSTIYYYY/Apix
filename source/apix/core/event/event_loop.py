@@ -4,7 +4,7 @@ import traceback
 from apix.core.event.base import ApixEventHandler, ApixEvent
 from apix.core.event.handler_registry import (
     ApixHandlerRegistry,
-    apix_handler_registry,
+    APIX_HANDLER_REGISTRY,
 )
 from apix.core.event.event_pipe import EVENT_PIPE
 from apix.common.utils.logger import logger
@@ -87,10 +87,6 @@ class ApixEventLoop:
             )
 
         self._background_handler_tasks.clear()
-        self._registry.shutdown_prewarmer(
-            wait=False,
-            cancel_futures=True,
-        )
 
         logger.info("Worker stopped.")
 
@@ -276,4 +272,4 @@ class ApixEventLoop:
             self._dispatch_semaphore.release()
 
 
-apix_event_loop = ApixEventLoop(apix_handler_registry)
+APIX_EVENT_LOOP = ApixEventLoop(APIX_HANDLER_REGISTRY)

@@ -9,7 +9,7 @@ from apix.common.utils.version import print_logo
 from apix.config.base_config import BASE_URL, NODE_ID
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
-from apix.core.event import EVENT_PIPE, apix_event_loop
+from apix.core.event import EVENT_PIPE, APIX_EVENT_LOOP
 from apix.common.utils.logger import Logger, logger
 
 
@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
         auto_load_router(app)
 
         await EVENT_PIPE.start()
-        await apix_event_loop.start()
+        await APIX_EVENT_LOOP.start()
         await auto_init.start()
 
         yield
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
                 await auto_init.stop()
             finally:
                 try:
-                    await apix_event_loop.stop()
+                    await APIX_EVENT_LOOP.stop()
                 finally:
                     await Logger.stop()
 

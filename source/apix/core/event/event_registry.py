@@ -11,8 +11,8 @@ class ApixEventRegistry:
     The registry is observational only: it does not own queued events or
     control handler dispatch. Event names are stored instead of
     :class:`ApixEvent` instances because event objects are mutable and
-    unhashable. Exact names can be used for diagnostics, subscription analysis,
-    and wildcard handler-chain cache prewarming.
+    unhashable. Exact names can be used for diagnostics and subscription
+    analysis.
 
     The class is a process-local singleton. All reads and writes are protected
     by a reentrant lock so event publication and handler registration may query
@@ -65,7 +65,7 @@ class ApixEventRegistry:
             self._registered_events.clear()
 
 
-apix_event_registry = ApixEventRegistry()
+APIX_EVENT_REGISTRY = ApixEventRegistry()
 
 
-__all__ = ["ApixEventRegistry", "apix_event_registry"]
+__all__ = ["ApixEventRegistry", "APIX_EVENT_REGISTRY"]

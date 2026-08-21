@@ -2,7 +2,7 @@
 
 import pytest
 
-from apix.core.event import apix_handler_registry
+from apix.core.event import APIX_HANDLER_REGISTRY
 from apix.core.graph.base import _namespace_graphs, namespace_set
 
 
@@ -15,11 +15,11 @@ def _clear_node_graph_listeners() -> None:
 
     handler_names = {
         name
-        for name in apix_handler_registry.registry
+        for name in APIX_HANDLER_REGISTRY.registry
         if name.startswith("graph_listener_")
     }
     for handler_name in handler_names:
-        apix_handler_registry.delete_handler_from_registry(handler_name)
+        APIX_HANDLER_REGISTRY.delete_handler_from_registry(handler_name)
 
 
 @pytest.fixture(autouse=True)

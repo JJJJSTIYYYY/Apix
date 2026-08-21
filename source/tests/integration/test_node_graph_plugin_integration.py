@@ -5,11 +5,11 @@ import pytest_asyncio
 
 from apix.core.event import (
     ApixEvent,
-    apix_handler_registry,
+    APIX_HANDLER_REGISTRY,
     delete_handler_from_registry,
     subscribe,
 )
-from apix.core.event.event_loop import apix_event_loop
+from apix.core.event.event_loop import APIX_EVENT_LOOP
 from apix.core.event import EVENT_PIPE
 from apix.core.graph import START, GraphManager
 
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="session")
 async def stop_event_loop_after_module():
     """Stop and clear the shared event runtime after this module."""
     yield
-    await apix_event_loop.stop()
+    await APIX_EVENT_LOOP.stop()
     await EVENT_PIPE.clear()
 
 
@@ -49,9 +49,9 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
 
     # Compiling NodeGraph registers one event handler for the business node.
     [node_graph_handler_name] = (
-        apix_handler_registry.get_handlers_chain_for_event(node_name)
+        APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(node_name)
     )
-    node_graph_handler = apix_handler_registry.get_handler(
+    node_graph_handler = APIX_HANDLER_REGISTRY.get_handler(
         node_graph_handler_name
     )
 
@@ -75,7 +75,7 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
         state["pipeline"].append("enrichment-plugin")
         state["plugin_value"] = "injected through event plugin"
 
-    handler_names = apix_handler_registry.get_handlers_chain_for_event(
+    handler_names = APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
         node_name
     )
     assert handler_names == [
@@ -84,7 +84,7 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
         node_graph_handler.name,
     ]
 
-    plugin_meta = apix_handler_registry.get_handler(
+    plugin_meta = APIX_HANDLER_REGISTRY.get_handler(
         plugin_demo_enrichment.__name__
     )
     assert plugin_meta.between_handlers == (

@@ -6,7 +6,7 @@ from typing import Annotated, TypedDict
 import pytest
 import pytest_asyncio
 
-from apix.core.event.event_loop import apix_event_loop
+from apix.core.event.event_loop import APIX_EVENT_LOOP
 from apix.core.event import EVENT_PIPE
 from apix.core.graph import AutoMerge, END, START, GraphManager
 from apix.core.graph.context import GraphContext
@@ -29,7 +29,7 @@ class AbortState(TypedDict, total=False):
 async def clean_graph_runtime_after_module():
     """Leave the shared event runtime clean for other integration modules."""
     yield
-    await apix_event_loop.stop()
+    await APIX_EVENT_LOOP.stop()
     await EVENT_PIPE.clear()
 
 

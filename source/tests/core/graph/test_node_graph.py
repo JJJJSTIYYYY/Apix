@@ -6,8 +6,8 @@ from typing import Annotated, TypedDict
 import pytest
 
 from apix.core.event import (
-    apix_event_loop,
-    apix_handler_registry,
+    APIX_EVENT_LOOP,
+    APIX_HANDLER_REGISTRY,
     delete_handler_from_registry,
     subscribe,
     EVENT_PIPE,
@@ -475,7 +475,7 @@ async def test_cancel_before_bind_does_not_abort_pending_context(monkeypatch):
     async def cancel_start():
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(apix_event_loop, "start", cancel_start)
+    monkeypatch.setattr(APIX_EVENT_LOOP, "start", cancel_start)
 
     with pytest.raises(asyncio.CancelledError):
         await graph.invoke({}, context)
@@ -503,7 +503,7 @@ async def test_post_failure_marks_running_context_failed(monkeypatch):
     assert context.completion is not None
     with pytest.raises(RuntimeError, match="post failed"):
         await context.completion
-    await apix_event_loop.stop()
+    await APIX_EVENT_LOOP.stop()
 
 
 @pytest.mark.asyncio
@@ -595,9 +595,9 @@ def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
     assert graph._decomposed is True
     assert graph._listener_handler_names == []
     assert graph_handler_names.isdisjoint(
-        apix_handler_registry.registry
+        APIX_HANDLER_REGISTRY.registry
     )
-    assert apix_handler_registry.get_handlers_chain_for_event("node") == [
+    assert APIX_HANDLER_REGISTRY.get_handlers_chain_for_event("node") == [
         retained_plugin.__name__
     ]
 
@@ -620,9 +620,9 @@ def test_listener_registration_failure_rolls_back_partial_handlers():
         )
 
     assert "graph_listener_rollback_START" not in (
-        apix_handler_registry.registry
+        APIX_HANDLER_REGISTRY.registry
     )
-    assert apix_handler_registry.get_handler(
+    assert APIX_HANDLER_REGISTRY.get_handler(
         conflicting_handler.__name__
     ).subscribe == ["foreign"]
 
@@ -673,4 +673,4 @@ async def test_decompose_rejects_active_invocation():
     release.set()
     assert await invocation == {"finished": True}
     graph.decompose()
-    await apix_event_loop.stop()
+    await APIX_EVENT_LOOP.stop()

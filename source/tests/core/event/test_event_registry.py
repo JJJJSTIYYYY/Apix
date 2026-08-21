@@ -10,7 +10,7 @@ from apix.core.event.base import ApixEvent, EventType
 from apix.core.event.event_pipe import ApixEventPipe
 from apix.core.event.event_registry import (
     ApixEventRegistry,
-    apix_event_registry,
+    APIX_EVENT_REGISTRY,
 )
 
 
@@ -27,47 +27,47 @@ def make_event(event_name: str) -> ApixEvent:
 
 def test_event_registry_class_and_singleton_are_exported():
     assert event_package.ApixEventRegistry is ApixEventRegistry
-    assert event_package.apix_event_registry is apix_event_registry
-    assert ApixEventRegistry() is apix_event_registry
+    assert event_package.APIX_EVENT_REGISTRY is APIX_EVENT_REGISTRY
+    assert ApixEventRegistry() is APIX_EVENT_REGISTRY
     assert not hasattr(event_package, "EVENT_REGISTRY")
     assert not hasattr(event_package, "record_event")
     assert not hasattr(event_package, "get_registered_events")
 
 
 def test_record_event_stores_exact_case_sensitive_names_once():
-    apix_event_registry.record_event(make_event("Graph.Start"))
-    apix_event_registry.record_event(make_event("Graph.Start"))
-    apix_event_registry.record_event(make_event("graph.start"))
+    APIX_EVENT_REGISTRY.record_event(make_event("Graph.Start"))
+    APIX_EVENT_REGISTRY.record_event(make_event("Graph.Start"))
+    APIX_EVENT_REGISTRY.record_event(make_event("graph.start"))
 
-    assert apix_event_registry.get_registered_events() == frozenset(
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset(
         {"Graph.Start", "graph.start"}
     )
 
 
 def test_get_registered_events_returns_immutable_snapshot():
-    apix_event_registry.record_event(make_event("event.one"))
-    snapshot = apix_event_registry.get_registered_events()
-    apix_event_registry.record_event(make_event("event.two"))
+    APIX_EVENT_REGISTRY.record_event(make_event("event.one"))
+    snapshot = APIX_EVENT_REGISTRY.get_registered_events()
+    APIX_EVENT_REGISTRY.record_event(make_event("event.two"))
 
     assert snapshot == frozenset({"event.one"})
-    assert apix_event_registry.get_registered_events() == frozenset(
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset(
         {"event.one", "event.two"}
     )
 
 
 def test_clear_forgets_observed_names():
-    apix_event_registry.record_event(make_event("event.one"))
+    APIX_EVENT_REGISTRY.record_event(make_event("event.one"))
 
-    apix_event_registry.clear()
+    APIX_EVENT_REGISTRY.clear()
 
-    assert apix_event_registry.get_registered_events() == frozenset()
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset()
 
 
 def test_record_event_validates_input():
     with pytest.raises(TypeError, match="ApixEvent"):
-        apix_event_registry.record_event(object())
+        APIX_EVENT_REGISTRY.record_event(object())
     with pytest.raises(ValueError, match="event_name"):
-        apix_event_registry.record_event(make_event(""))
+        APIX_EVENT_REGISTRY.record_event(make_event(""))
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,7 @@ async def test_post_event_records_name_before_builtin_dispatch():
         event_name="runtime.posted",
     )
 
-    assert apix_event_registry.get_registered_events() == frozenset(
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset(
         {"runtime.posted"}
     )
     await pipe.get()
@@ -92,7 +92,7 @@ def test_put_nowait_records_apix_events_but_ignores_other_queue_values():
     pipe.put_nowait(make_event("runtime.nowait"))
     pipe.put_nowait("raw-value")
 
-    assert apix_event_registry.get_registered_events() == frozenset(
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset(
         {"runtime.nowait"}
     )
     assert pipe.get_nowait().event_name == "runtime.nowait"
@@ -113,7 +113,7 @@ async def test_mailtruck_publish_records_name_after_success():
     await pipe.put(event, "mailtruck", recipient="node-two")
 
     mailtruck.put.assert_awaited_once_with(event, recipient="node-two")
-    assert apix_event_registry.get_registered_events() == frozenset(
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset(
         {"runtime.remote"}
     )
 
@@ -134,4 +134,4 @@ async def test_failed_publish_does_not_record_event_name():
             recipient="node-two",
         )
 
-    assert apix_event_registry.get_registered_events() == frozenset()
+    assert APIX_EVENT_REGISTRY.get_registered_events() == frozenset()

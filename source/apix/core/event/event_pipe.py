@@ -45,8 +45,8 @@ from apix.config.base_config import (
     REMOTE_GATEWAY_PIPE_ENDPOINT,
 )
 from apix.core.event.base import ApixEvent, ChannelName, EventType
-from apix.core.event.event_registry import apix_event_registry
-from apix.core.event.handler_registry import apix_handler_registry
+from apix.core.event.event_registry import APIX_EVENT_REGISTRY
+from apix.core.event.handler_registry import APIX_HANDLER_REGISTRY
 
 
 def event_to_payload(event: ApixEvent) -> dict[str, Any]:
@@ -653,7 +653,7 @@ class ApixEventPipe:
             and event.event_name
         ):
             event._handler_chain_version = (
-                apix_handler_registry.get_current_version_for_event(
+                APIX_HANDLER_REGISTRY.get_current_version_for_event(
                     event.event_name
                 )
             )
@@ -674,7 +674,7 @@ class ApixEventPipe:
             self._bind_handler_chain_version(event)
             await target_channel.put(event)
         if isinstance(event, ApixEvent) and event.event_name:
-            apix_event_registry.record_event(event)
+            APIX_EVENT_REGISTRY.record_event(event)
 
     async def post_event(
         self,
@@ -716,7 +716,7 @@ class ApixEventPipe:
             self._bind_handler_chain_version(event)
         target_channel.put_nowait(event)
         if isinstance(event, ApixEvent) and event.event_name:
-            apix_event_registry.record_event(event)
+            APIX_EVENT_REGISTRY.record_event(event)
 
     async def get(self, channel: ChannelName = "builtin") -> Any:
         if channel == "mailtruck":
@@ -767,7 +767,7 @@ class ApixEventPipe:
         ):
             raise TypeError("mailtruck channel does not support broadcast()")
         result = await mailtruck.broadcast(event)  # type: ignore[attr-defined]
-        apix_event_registry.record_event(event)
+        APIX_EVENT_REGISTRY.record_event(event)
         self._update_nodes(result)
         return result
 
@@ -810,7 +810,7 @@ class ApixEventPipe:
                 self._bind_handler_chain_version(event)
                 await builtin.put(event)
                 if event.event_name:
-                    apix_event_registry.record_event(event)
+                    APIX_EVENT_REGISTRY.record_event(event)
             finally:
                 mailbox.task_done()
 

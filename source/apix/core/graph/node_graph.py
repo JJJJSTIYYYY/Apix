@@ -13,7 +13,7 @@ from apix.core.event import (
     EVENT_PIPE,
     ApixEvent,
     EventType,
-    apix_event_loop,
+    APIX_EVENT_LOOP,
     delete_handler_from_registry,
     subscribe,
 )
@@ -337,7 +337,7 @@ class NodeGraph:
         run_id = "graph-"+uuid4().hex
         completion = asyncio.get_running_loop().create_future()
         try:
-            await apix_event_loop.start()
+            await APIX_EVENT_LOOP.start()
             first_node = context._bind(
                 context_namespace=self._listener_namespace,
                 run_id=run_id,

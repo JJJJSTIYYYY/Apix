@@ -3,59 +3,16 @@
 from __future__ import annotations
 
 import math
-import multiprocessing
-import os
 from collections.abc import Iterable, Iterator
-from concurrent.futures import (
-    CancelledError,
-    Future,
-    wait as wait_futures,
-)
 from fnmatch import fnmatchcase
-from glob import has_magic
 
 from apix.common.utils.logger import logger
 from apix.core.event.base import ApixEventHandler, EventHandlerFunc
-from apix.core.event.event_registry import apix_event_registry
+from apix.core.event.event_registry import APIX_EVENT_REGISTRY
 from apix.core.utils.exception import (
     EventHandlerAlreadyRegisteredError,
     EventHandlerNotRegisteredError,
 )
-
-
-# Approximate number of event/handler match evaluations above which process
-# startup is expected to cost less than resolving the full snapshot inline.
-_PREWARM_PROCESS_THRESHOLD = 4096
-_PREWARM_MAX_WORKERS = max(1, min(4, os.cpu_count() or 1))
-
-HandlerPatternSnapshot = tuple[
-    tuple[str, tuple[str, ...], tuple[str, ...]],
-    ...,
-]
-
-
-def _resolve_handler_chains(
-    event_names: tuple[str, ...],
-    handler_patterns: HandlerPatternSnapshot,
-) -> dict[str, list[str]]:
-    """Resolve handler-name chains from a process-safe registry snapshot."""
-    resolved: dict[str, list[str]] = {}
-    for event_name in event_names:
-        chain = []
-        for handler_name, subscriptions, filters in handler_patterns:
-            if not any(
-                fnmatchcase(event_name, pattern)
-                for pattern in subscriptions
-            ):
-                continue
-            if any(
-                fnmatchcase(event_name, pattern)
-                for pattern in filters
-            ):
-                continue
-            chain.append(handler_name)
-        resolved[event_name] = chain
-    return resolved
 
 
 class ApixHandlerRegistry:
@@ -68,13 +25,7 @@ class ApixHandlerRegistry:
     ``cached_chain`` uses the exact event name as its key. Each list index is a
     chain version; ``None`` marks the current version as invalidated but not yet
     rebuilt, while an empty list is a valid chain with no matching handlers.
-
-    Registering a wildcard handler prewarms known matching event names. Small
-    workloads are resolved inline; large workloads use a spawn-based process
-    pool so CPU-bound ``fnmatchcase`` evaluation can run on multiple cores
-    without being serialized by the CPython GIL. Worker results contain only
-    names and patterns, and are committed only if the target cache version is
-    still current.
+    Chains are built lazily when an exact event is published or queried.
     """
 
     registry: dict[str, ApixEventHandler]
@@ -96,8 +47,6 @@ class ApixHandlerRegistry:
         self.priority_buckets = {}
         self.cached_chain = {}
         self._register_order = 0
-        self._prewarm_executor = None
-        self._prewarm_jobs: dict[Future, dict[str, int]] = {}
         self._initialized = True
 
     @staticmethod
@@ -213,154 +162,6 @@ class ApixHandlerRegistry:
             ):
                 continue
             versions.append(None)
-
-    def _handler_pattern_snapshot(self) -> HandlerPatternSnapshot:
-        """Return active handler patterns in current dispatch order."""
-        snapshot = []
-        for handler_name in self._iter_active_handler_names():
-            handler = self.registry.get(handler_name)
-            if handler is None:
-                continue
-            snapshot.append(
-                (
-                    handler_name,
-                    tuple(handler.subscribe),
-                    tuple(handler.filter_event),
-                )
-            )
-        return tuple(snapshot)
-
-    def _apply_prewarmed_chains(
-        self,
-        resolved_chains: dict[str, list[str]],
-        expected_versions: dict[str, int],
-    ) -> None:
-        """Store prewarmed chains only while their target version is current."""
-        for event_name, chain in resolved_chains.items():
-            expected_version = expected_versions.get(event_name)
-            versions = self.cached_chain.get(event_name)
-            if (
-                expected_version is None
-                or versions is None
-                or len(versions) - 1 != expected_version
-                or versions[expected_version] is not None
-            ):
-                continue
-            versions[expected_version] = chain
-
-    def _complete_prewarm_job(self, future: Future) -> None:
-        """Merge one process result and discard its completed job metadata."""
-        expected_versions = self._prewarm_jobs.get(future)
-        if expected_versions is None:
-            return
-        try:
-            resolved_chains = future.result()
-        except CancelledError:
-            self._prewarm_jobs.pop(future, None)
-            return
-        except Exception as exc:
-            logger.error(
-                "Handler-chain prewarming failed: "
-                f"{type(exc).__name__}: {exc}"
-            )
-            self._prewarm_jobs.pop(future, None)
-            return
-        self._apply_prewarmed_chains(
-            resolved_chains,
-            expected_versions,
-        )
-        self._prewarm_jobs.pop(future, None)
-
-    def _get_prewarm_executor(self):
-        """Lazily create the process pool used by large prewarm operations."""
-        if self._prewarm_executor is None:
-            # Import lazily so coverage/instrumentation tools that reload the
-            # standard-library module cannot leave us holding a stale class.
-            from concurrent.futures import ProcessPoolExecutor
-
-            self._prewarm_executor = ProcessPoolExecutor(
-                max_workers=_PREWARM_MAX_WORKERS,
-                mp_context=multiprocessing.get_context("spawn"),
-            )
-        return self._prewarm_executor
-
-    def _prewarm_wildcard_handler(self, handler: ApixEventHandler) -> None:
-        """Prewarm known exact events affected by a wildcard handler."""
-        if not any(has_magic(pattern) for pattern in handler.subscribe):
-            return
-
-        event_names = tuple(
-            sorted(
-                event_name
-                for event_name in apix_event_registry.get_registered_events()
-                if self._matches_handler(handler, event_name)
-            )
-        )
-        if not event_names:
-            return
-
-        expected_versions = {}
-        for event_name in event_names:
-            versions = self.cached_chain.setdefault(event_name, [None])
-            expected_versions[event_name] = len(versions) - 1
-
-        handler_patterns = self._handler_pattern_snapshot()
-        estimated_work = len(event_names) * len(handler_patterns)
-        if (
-            estimated_work < _PREWARM_PROCESS_THRESHOLD
-            or _PREWARM_MAX_WORKERS == 1
-        ):
-            self._apply_prewarmed_chains(
-                _resolve_handler_chains(event_names, handler_patterns),
-                expected_versions,
-            )
-            return
-
-        worker_count = min(_PREWARM_MAX_WORKERS, len(event_names))
-        chunk_size = math.ceil(len(event_names) / worker_count)
-        executor = self._get_prewarm_executor()
-        for start in range(0, len(event_names), chunk_size):
-            chunk = event_names[start : start + chunk_size]
-            chunk_versions = {
-                event_name: expected_versions[event_name]
-                for event_name in chunk
-            }
-            future = executor.submit(
-                _resolve_handler_chains,
-                chunk,
-                handler_patterns,
-            )
-            self._prewarm_jobs[future] = chunk_versions
-            future.add_done_callback(self._complete_prewarm_job)
-
-    def wait_for_prewarm(self, timeout: float | None = None) -> bool:
-        """Wait for current prewarm jobs and return whether all completed."""
-        pending = tuple(self._prewarm_jobs)
-        if not pending:
-            return True
-        done, not_done = wait_futures(pending, timeout=timeout)
-        for future in done:
-            self._complete_prewarm_job(future)
-        return not not_done
-
-    def shutdown_prewarmer(
-        self,
-        *,
-        wait: bool = True,
-        cancel_futures: bool = False,
-    ) -> None:
-        """Release prewarm worker processes without changing cached chains."""
-        executor = self._prewarm_executor
-        if executor is None:
-            return
-        self._prewarm_executor = None
-        executor.shutdown(
-            wait=wait,
-            cancel_futures=cancel_futures,
-        )
-        for future in tuple(self._prewarm_jobs):
-            if future.done():
-                self._complete_prewarm_job(future)
 
     def get_handlers_chain_for_event(
         self,
@@ -484,7 +285,6 @@ class ApixHandlerRegistry:
             f"priority={handler_entry.priority}, "
             f"between_handlers={handler_entry.between_handlers}"
         )
-        self._prewarm_wildcard_handler(handler_entry)
 
     def unregister_handler(
         self,
@@ -576,7 +376,7 @@ class ApixHandlerRegistry:
                 f"Handler `{handler_name}` not registered."
             )
 
-        event_names = apix_event_registry.get_registered_events()
+        event_names = APIX_EVENT_REGISTRY.get_registered_events()
         return [
             subscription
             for subscription in handler.subscribe
@@ -591,7 +391,7 @@ class ApixHandlerRegistry:
         ]
 
 
-apix_handler_registry = ApixHandlerRegistry()
+APIX_HANDLER_REGISTRY = ApixHandlerRegistry()
 
 
 def subscribe(
@@ -610,11 +410,9 @@ def subscribe(
     function itself is returned unchanged.
 
     Event subscription and filtering use case-sensitive
-    :func:`fnmatch.fnmatchcase` semantics. The handler chain is resolved from
-    the active priority buckets when an exact event name is first published for
-    a cache version. Registering a wildcard handler also prewarms matching exact
-    names already present in the runtime event registry; large prewarm workloads
-    are split across worker processes.
+    :func:`fnmatch.fnmatchcase` semantics. The handler chain is resolved lazily
+    from the active priority buckets when an exact event name is first published
+    or queried for a cache version.
 
     Args:
         event_names:
@@ -858,14 +656,14 @@ def subscribe(
 
     def decorator(func: EventHandlerFunc) -> EventHandlerFunc:
         handler_name = func.__name__
-        if handler_name in apix_handler_registry.registry:
+        if handler_name in APIX_HANDLER_REGISTRY.registry:
             if exist_ok:
                 return func
             raise EventHandlerAlreadyRegisteredError(
                 f"Handler `{handler_name}` already registered."
             )
 
-        register_order = apix_handler_registry._register_order
+        register_order = APIX_HANDLER_REGISTRY._register_order
         entry = ApixEventHandler(
             name=handler_name,
             register_order=register_order,
@@ -878,8 +676,8 @@ def subscribe(
             time_out=time_out,
             background=background,
         )
-        apix_handler_registry.register_handler(entry)
-        apix_handler_registry._register_order += 1
+        APIX_HANDLER_REGISTRY.register_handler(entry)
+        APIX_HANDLER_REGISTRY._register_order += 1
         return func
 
     return decorator
@@ -893,7 +691,7 @@ def unsubscribe(
 ) -> None:
     """Unregister a global handler while retaining old-version execution data."""
     try:
-        apix_handler_registry.unregister_handler(handler_name, event_names)
+        APIX_HANDLER_REGISTRY.unregister_handler(handler_name, event_names)
     except EventHandlerNotRegisteredError:
         if not missing_ok:
             raise
@@ -901,7 +699,7 @@ def unsubscribe(
 
 def get_unmatched_subscriptions(handler_name: str) -> list[str]:
     """Return global handler patterns that matched no observed event name."""
-    return apix_handler_registry.get_unmatched_subscriptions(handler_name)
+    return APIX_HANDLER_REGISTRY.get_unmatched_subscriptions(handler_name)
 
 
 def delete_handler_from_registry(
@@ -912,7 +710,7 @@ def delete_handler_from_registry(
 ) -> None:
     """Permanently delete a handler from the process-global registry."""
     try:
-        apix_handler_registry.delete_handler_from_registry(
+        APIX_HANDLER_REGISTRY.delete_handler_from_registry(
             handler_name,
             event_names,
         )
@@ -923,7 +721,7 @@ def delete_handler_from_registry(
 
 __all__ = [
     "ApixHandlerRegistry",
-    "apix_handler_registry",
+    "APIX_HANDLER_REGISTRY",
     "delete_handler_from_registry",
     "get_unmatched_subscriptions",
     "subscribe",
