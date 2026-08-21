@@ -44,7 +44,7 @@ from apix.config.base_config import (
     REMOTE_GATEWAY_ENABLE,
     REMOTE_GATEWAY_PIPE_ENDPOINT,
 )
-from apix.core.event.base import ApixEvent, ChannelName, EventType
+from apix.core.event.base import ApixEvent, ChannelType, EventType
 from apix.core.event.event_registry import APIX_EVENT_REGISTRY
 from apix.core.event.handler_registry import APIX_HANDLER_REGISTRY
 
@@ -587,7 +587,7 @@ class ApixEventPipe:
         self.mq_id = mq_id
         self.node_name = node_name
         self.channel_type = channel_type
-        self._event_pipe: dict[ChannelName, BaseEventChannel] = {
+        self._event_pipe: dict[ChannelType, BaseEventChannel] = {
             "builtin": builtin or BuiltinChannel(maxsize=EVENT_PIPE_MAX_LEN),
             "mailbox": mailbox or self._build_mailbox(channel_type),
             "mailtruck": mailtruck or GatewayChannel(
@@ -638,7 +638,7 @@ class ApixEventPipe:
     def nodes(self) -> dict[str, dict[str, Any]]:
         return {node_id: dict(node) for node_id, node in self._nodes.items()}
 
-    def get_channel(self, channel: ChannelName) -> BaseEventChannel:
+    def get_channel(self, channel: ChannelType) -> BaseEventChannel:
         try:
             return self._event_pipe[channel]
         except KeyError as exc:
@@ -661,7 +661,7 @@ class ApixEventPipe:
     async def put(
         self,
         event: Any,
-        channel: ChannelName = "builtin",
+        channel: ChannelType = "builtin",
         *,
         recipient: str | None = None,
     ) -> None:
@@ -682,7 +682,7 @@ class ApixEventPipe:
         event_type: EventType,
         event_name: str,
         context: Any = None,
-        channel: ChannelName = "builtin",
+        channel: ChannelType = "builtin",
         recipient: str | None = None,
     ) -> None:
         """Create and post an event to the selected channel.
@@ -707,7 +707,7 @@ class ApixEventPipe:
     def put_nowait(
         self,
         event: Any,
-        channel: ChannelName = "builtin",
+        channel: ChannelType = "builtin",
     ) -> None:
         if channel == "mailbox":
             raise EventChannelPermissionError("mailbox channels are receive-only")
@@ -718,32 +718,32 @@ class ApixEventPipe:
         if isinstance(event, ApixEvent) and event.event_name:
             APIX_EVENT_REGISTRY.record_event(event)
 
-    async def get(self, channel: ChannelName = "builtin") -> Any:
+    async def get(self, channel: ChannelType = "builtin") -> Any:
         if channel == "mailtruck":
             raise EventChannelPermissionError("mailtruck channels are write-only")
         return await self.get_channel(channel).get()
 
-    def get_nowait(self, channel: ChannelName = "builtin") -> Any:
+    def get_nowait(self, channel: ChannelType = "builtin") -> Any:
         if channel == "mailtruck":
             raise EventChannelPermissionError("mailtruck channels are write-only")
         return self.get_channel(channel).get_nowait()
 
-    def empty(self, channel: ChannelName = "builtin") -> bool:
+    def empty(self, channel: ChannelType = "builtin") -> bool:
         return self.get_channel(channel).empty()
 
-    def full(self, channel: ChannelName = "builtin") -> bool:
+    def full(self, channel: ChannelType = "builtin") -> bool:
         return self.get_channel(channel).full()
 
-    def qsize(self, channel: ChannelName = "builtin") -> int:
+    def qsize(self, channel: ChannelType = "builtin") -> int:
         return self.get_channel(channel).qsize()
 
-    def task_done(self, channel: ChannelName = "builtin") -> None:
+    def task_done(self, channel: ChannelType = "builtin") -> None:
         self.get_channel(channel).task_done()
 
-    async def join(self, channel: ChannelName = "builtin") -> None:
+    async def join(self, channel: ChannelType = "builtin") -> None:
         await self.get_channel(channel).join()
 
-    async def clear(self, channel: ChannelName = "builtin") -> int:
+    async def clear(self, channel: ChannelType = "builtin") -> int:
         """Remove and acknowledge all currently queued events."""
         count = 0
         while not self.empty(channel):
@@ -882,3 +882,13 @@ class ApixEventPipe:
 
 
 EVENT_PIPE = ApixEventPipe()
+
+__all__ = [
+    'EVENT_PIPE',
+    'ApixEventPipe',
+    'BaseEventChannel',
+    'BuiltinChannel',
+    'GatewayChannel',
+    'KafkaChannel',
+    'RabbitMQChannel',
+]

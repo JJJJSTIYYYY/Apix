@@ -208,6 +208,13 @@ class ApixHandlerRegistry:
         self.get_handlers_chain_for_event(event_name)
         return len(self.cached_chain[event_name]) - 1
 
+    def get_current_version_for_event_without_resolve(self, event_name: str) -> int | None:
+        """Return cache version number."""
+        cached_chain = self.cached_chain.get(event_name)
+        if cached_chain is None:
+            return None
+        return len(cached_chain) - 1
+
     def register_handler(self, handler_entry: ApixEventHandler) -> None:
         """Register one handler entry and invalidate every affected cache."""
         if not isinstance(handler_entry, ApixEventHandler):
@@ -697,6 +704,24 @@ def unsubscribe(
             raise
 
 
+def get_handler_meta(
+    handler_name: str,
+) -> dict | None:
+    handler = APIX_HANDLER_REGISTRY.get_handler(handler_name)
+    return {
+        'id': handler.id,
+        'name': handler.name,
+        'register_order': handler.register_order,
+        'subscribe': handler.subscribe,
+        'filter_event': handler.filter_event,
+        'priority': handler.priority,
+        'between_handlers': handler.between_handlers,
+        'stop_when_error': handler.stop_when_error,
+        'time_out': handler.time_out,
+        'background': handler.background,
+    }
+
+
 def get_unmatched_subscriptions(handler_name: str) -> list[str]:
     """Return global handler patterns that matched no observed event name."""
     return APIX_HANDLER_REGISTRY.get_unmatched_subscriptions(handler_name)
@@ -726,4 +751,5 @@ __all__ = [
     "get_unmatched_subscriptions",
     "subscribe",
     "unsubscribe",
+    "get_handler_meta"
 ]

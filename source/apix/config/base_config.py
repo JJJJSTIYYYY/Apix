@@ -280,6 +280,7 @@ DEBUG_LEVEL: Literal["DEBUG", "INFO", "WARN", "ERROR"] = _get_config(
 ).upper()
 
 TRACE = _get_config("LOG.trace", True)
+SHOW_EVENT_DISPATCH = _get_config("LOG.show_event_dispatch", True)
 MAX_LOG_FILE_SIZE = _get_config("LOG.max_log_file_size", 5 * 1024 * 1024)
 
 

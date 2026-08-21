@@ -62,4 +62,4 @@ class ApixEventHandler:
     background: bool = field(default=False)
 
 
-ChannelName = Literal["builtin", "mailbox", "mailtruck"]
+ChannelType = Literal["builtin", "mailbox", "mailtruck"]

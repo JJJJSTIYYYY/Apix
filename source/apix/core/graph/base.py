@@ -325,4 +325,6 @@ def get_node_name_in_namespace(node_name: str, namespace: str | None) -> str:
         namespace: Namespace to prepend. ``None`` and an empty string select
             the global namespace, which does not modify the node name.
     """
-    return f"graph_listener_{namespace or ""}_{node_name}"
+    if namespace:
+        return f"graph_listener_{namespace}_{node_name}"
+    return f"graph_listener_{node_name}"

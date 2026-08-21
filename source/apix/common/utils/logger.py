@@ -18,6 +18,22 @@ LOG_LEVELS = {
     "ERROR": 3,
 }
 
+def register_log_level(tag: str, priority: int, *, exist_ok: bool = False):
+    """Register a custom log level.
+    """
+    global LOG_LEVELS
+    if tag in LOG_LEVELS and not exist_ok:
+        raise ValueError(f"Log level `{tag}` has been registered.")
+    LOG_LEVELS[tag] = priority
+
+def unregister_log_level(tag: str, *, missing_ok: bool = True):
+    """Unregister a custom log level.
+    """
+    global LOG_LEVELS
+    if tag in LOG_LEVELS and not missing_ok:
+        raise ValueError(f"Log level `{tag}` is not been registered.")
+    LOG_LEVELS.pop(tag)
+
 
 class Logger:
     """

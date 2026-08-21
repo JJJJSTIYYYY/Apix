@@ -25,6 +25,7 @@ PROXY:
 LOG:
   debug_level: "DEBUG"
   trace: true
+  show_event_dispatch: true
   max_log_file_size: 5242880
 
 PIPELINE:

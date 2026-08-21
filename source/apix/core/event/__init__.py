@@ -1,4 +1,4 @@
-from apix.core.event.base import EventType, ApixEvent, EventHandlerFunc, ApixEventHandler
+from apix.core.event.base import EventType, ApixEvent, EventHandlerFunc, ApixEventHandler, ChannelType
 from apix.core.event.event_loop import APIX_EVENT_LOOP, ApixEventLoop
 from apix.core.event.event_pipe import (
     EVENT_PIPE,
@@ -17,6 +17,7 @@ from apix.core.event.handler_registry import (
     get_unmatched_subscriptions,
     subscribe,
     unsubscribe,
+    get_handler_meta
 )
 from apix.core.event.event_registry import (
     ApixEventRegistry,
@@ -25,7 +26,7 @@ from apix.core.event.event_registry import (
 
 
 __all__ = [
-    "EventType", "ApixEvent", "EventHandlerFunc", "ApixEventHandler",
+    "EventType", "ApixEvent", "EventHandlerFunc", "ApixEventHandler", "ChannelType",
     "APIX_EVENT_LOOP", "ApixEventLoop",
     "EVENT_PIPE", "ApixEventPipe", "BaseEventChannel", "BuiltinChannel",
     "GatewayChannel", "KafkaChannel", "RabbitMQChannel",
@@ -35,6 +36,6 @@ __all__ = [
     "GraphNodeError",
     "ApixHandlerRegistry", "APIX_HANDLER_REGISTRY",
     "subscribe", "unsubscribe", "delete_handler_from_registry",
-    "get_unmatched_subscriptions",
+    "get_unmatched_subscriptions", "get_handler_meta",
     "ApixEventRegistry", "APIX_EVENT_REGISTRY"
 ]

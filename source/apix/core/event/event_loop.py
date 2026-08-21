@@ -1,6 +1,8 @@
 import asyncio
+from datetime import datetime
 import traceback
 
+from apix.config.base_config import SHOW_EVENT_DISPATCH
 from apix.core.event.base import ApixEventHandler, ApixEvent
 from apix.core.event.handler_registry import (
     ApixHandlerRegistry,
@@ -103,7 +105,20 @@ class ApixEventLoop:
                 await self._dispatch_semaphore.acquire()
 
                 try:
-                    event = await EVENT_PIPE.get()
+                    event: ApixEvent = await EVENT_PIPE.get()
+                    if SHOW_EVENT_DISPATCH:
+                        event_name_block = event.event_name
+                        handler_chain_version = event._handler_chain_version
+                        current_chain_version = APIX_HANDLER_REGISTRY.get_current_version_for_event_without_resolve(event_name_block)
+                        print(f"\033[38;5;59m{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\033[0m"
+                            f" \033[1;38;5;147m[EVENT LOOP]\033[0m"
+                            f" \033[38;5;59m│\033[0m"
+                            f" \033[38;5;116m{event_name_block}\033[0m"
+                            f" \033[38;5;59m│\033[0m"
+                            f" \033[38;5;152m{handler_chain_version}\033[0m"
+                            f"\033[38;5;240m→\033[0m"
+                            f"\033[48;5;235;38;5;110m {current_chain_version} \033[0m"
+                        )
                 except BaseException:
                     self._dispatch_semaphore.release()
                     raise
@@ -273,3 +288,5 @@ class ApixEventLoop:
 
 
 APIX_EVENT_LOOP = ApixEventLoop(APIX_HANDLER_REGISTRY)
+
+__all__ = ['APIX_EVENT_LOOP', 'ApixEventLoop']
