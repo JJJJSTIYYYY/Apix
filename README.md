@@ -36,6 +36,13 @@ APIX 是一个可拓展的**全栈的 AI Agent 协作平台**。它是一套完�
 - 在APIX 3.0中，向量库与向量检索工具不再作为内置模块提供，而通过插件的形式引入。
 - 沙箱预计沿用2.x的docker沙箱机制，但不再作为强制依赖。
 
+## 📚 使用文档
+
+- [总览](./docs/README.md)
+- [APIX Core Runtime](./docs/core/README.md)
+- [事件系统](./docs/core/event/README.md)
+- [Graph Runtime](./docs/core/graph/README.md)
+
 ---
 
 ## 📄 许可证
