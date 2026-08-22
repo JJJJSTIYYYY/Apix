@@ -220,7 +220,7 @@ async def test_keep_ref_survives_complete_multi_node_graph_invocation():
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_auto_merge_and_keep_ref_work_on_the_same_state_field():
+async def test_auto_increase_and_keep_ref_work_on_the_same_state_field():
     """A shared accumulator is never copied and receives every additive update."""
     accumulator = ReferenceAccumulator(["initial"])
     seen_references: list[ReferenceAccumulator] = []

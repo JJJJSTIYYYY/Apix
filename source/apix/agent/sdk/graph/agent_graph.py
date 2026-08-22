@@ -1,6 +1,8 @@
-from apix.agent.sdk.utils.message import AnyMessage, ApixAiMessage
+from typing import get_type_hints
+
+from apix.agent.sdk.tool.base import ToolFunction
+from apix.agent.sdk.tool.tool_node import Tool, ToolNode
 from apix.core.graph import NodeGraph, GraphManager
-from apix.core.graph.base import END
 
 
 class AgentGraph(NodeGraph):
@@ -28,7 +30,7 @@ class AgentGraphCreator(GraphManager):
 
     def __init__(
         self, 
-        state_schema: type | None = None,
+        state_schema: type,
         messages_key: str = 'messages'
     ):
         """Create an empty graph definition.
@@ -36,40 +38,40 @@ class AgentGraphCreator(GraphManager):
         Args:
             state_schema:
                 Optional annotated state schema. :class:`AgentGraph` uses it to
-                discover fields marked with :class:`AutoMerge`. Omitting it
-                preserves normal dictionary overwrite behaviour.
+                discover fields marked with :class:`AutoMerge` and :class:`KeepRef`. 
+                Omitting it preserves normal dictionary overwrite behaviour.
             messages_key: The key in the state dictionary that contains the message list.
         """
+        if messages_key not in get_type_hints(state_schema):
+            raise KeyError(f"The messages_key `{messages_key}` not found in state_schema.")
         super().__init__(state_schema)
         self.messages_key = messages_key
 
     def compile_agent(self) -> AgentGraph:
         return super().compile_graph()
 
-    def add_prebuilt_tools_router(
-        self, 
-        bot_node_name: str = 'bot', 
-        tool_node_name: str = 'tools', 
-        next_default: str = END,
-    ):
-        """Add a router node between bot node and tool node.
-        Auto bind tools for a bot instance.
+    def add_tools(
+        self,
+        tools: list[ToolFunction | Tool],
+        node_name: str = 'tools'
+    ):  
+        """Add tools for agent. 
         
+        Tools added by this method will be organized as :class:`ToolNode`.
+
         Args:
-            bot_node_name: The bot node's name.
-            tool_node_name: The tool node's name.
-            next_default: The default node to enter when a tool node should not be entered.
+            tools: A list of :data:`ToolFunction` or :class:`Tool`.
+            node_name: Optional tools node name.
 
-        Notes:
-            If a bot node has other routing destinations besides the tool node and a default node, use :data:`add_router` instead.
+        Returns:
+            This creator, allowing fluent graph construction.
         """
-        messages_key = self.messages_key
-        def should_call_tool(state):
-            messages: list[AnyMessage] = state.get(messages_key, []) or []
-            if not messages:
-                return next_default
-            if not isinstance(messages[-1], ApixAiMessage) or not messages[-1].tool_calls:
-                return next_default
-            return tool_node_name
+        parsed_tools = []
+        for tool in tools:
+            if not isinstance(tool, Tool):
+                tool = Tool(tool)
+            parsed_tools.append(tool)
 
-        self.add_router(bot_node_name, [next_default, tool_node_name], should_call_tool)
+        tool_node = ToolNode(parsed_tools, node_name)
+        self.add_node(tool_node)
+        return self

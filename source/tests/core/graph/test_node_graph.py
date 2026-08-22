@@ -196,7 +196,7 @@ def test_apply_command_initializes_missing_auto_increase_field():
     assert state == {"values": [1]}
 
 
-def test_auto_merge_requires_callable_add_method():
+def test_auto_increase_requires_callable_add_method():
     """A marked current value must expose a callable addition protocol."""
     graph = NodeGraph(
         {},
@@ -215,7 +215,7 @@ def test_auto_merge_requires_callable_add_method():
         )
 
 
-def test_auto_merge_rejects_not_implemented_addition():
+def test_auto_increase_rejects_not_implemented_addition():
     """NotImplemented becomes a useful state merge error."""
     graph = NodeGraph(
         {},

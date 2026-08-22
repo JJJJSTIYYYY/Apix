@@ -125,7 +125,7 @@ def _copy_state(
     }
 
 
-def get_auto_merge_keys(
+def get_auto_increase_keys(
     state_schema: type | None,
 ) -> frozenset[str]:
     """Return fields marked with :class:`AutoMerge` in a state schema.

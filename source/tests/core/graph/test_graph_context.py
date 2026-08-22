@@ -3,6 +3,7 @@
 import asyncio
 import json
 from dataclasses import is_dataclass
+import time
 from typing import Annotated, TypedDict
 
 import pytest
@@ -117,6 +118,7 @@ async def test_take_a_snapshot_captures_recoverable_fields_by_reference():
 
     snapshot = context.context_snapshot
     assert snapshot == {
+        "timestamp": time.time(),
         "state": {"nested": [1]},
         "node_name": "retry",
         "steps": 2,

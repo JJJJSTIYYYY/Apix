@@ -5,12 +5,13 @@ from __future__ import annotations
 import copy
 from asyncio import Future
 from dataclasses import InitVar, dataclass, field
+import time
 from typing import Any, Literal, TypeAlias, TypedDict
 
 from apix.core.graph.base import (
     START,
     _copy_state,
-    get_auto_merge_keys,
+    get_auto_increase_keys,
     get_keep_ref_keys,
 )
 from apix.core.graph.context.stream_writer import StreamWriter
@@ -33,6 +34,7 @@ class GraphContextSnapshot(TypedDict):
     with :class:`~apix.core.graph.base.KeepRef`.
     """
 
+    timestamp: float
     state: dict[str, Any]
     node_name: str
     steps: int
@@ -213,7 +215,7 @@ class GraphContext:
     def _set_state_schema(self, state_schema: type | None) -> None:
         """Store a state schema and its derived behavior."""
         self._state_schema = state_schema
-        self._auto_increase_keys = get_auto_merge_keys(state_schema)
+        self._auto_increase_keys = get_auto_increase_keys(state_schema)
         self._keep_ref_keys = get_keep_ref_keys(state_schema)
 
     def _adopt_default_state_schema(self, default: GraphContext) -> None:
@@ -284,11 +286,16 @@ class GraphContext:
                 "A snapshot can only be taken from an active GraphContext."
             )
         self.context_snapshot = {
+            "timestamp": time.time(),
             "state": self.state,
             "node_name": self.node_name,
             "steps": self.steps,
             "namespace": self._context_namespace,
         }
+
+    def get_current_snapshot(self) -> GraphContextSnapshot | None:
+        """Get a deepcopy of the current snapshot in this context, return :class:`GraphContextSnapshot`."""
+        return copy.deepcopy(self.context_snapshot) if self.context_snapshot else None
 
     def _snapshot_state(self) -> dict[str, Any]:
         """Copy the latest committed state using this context's KeepRef policy."""
