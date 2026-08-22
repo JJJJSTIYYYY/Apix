@@ -238,8 +238,7 @@ async def test_snapshot_deep_copies_keep_ref_state():
 
     context.take_a_snapshot()
 
-    snapshot = context.context_snapshot
-    assert snapshot is not None
+    snapshot = context.context_snapshot[-1]
     assert context.state["resource"] is resource
     assert snapshot["state"]["resource"] is not resource
 

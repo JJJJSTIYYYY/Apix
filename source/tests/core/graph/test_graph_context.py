@@ -71,7 +71,7 @@ def test_new_context_is_pending_unbound_and_has_no_snapshot():
     assert context.state == {}
     assert context.node_name == START
     assert context.steps == 0
-    assert context.context_snapshot is None
+    assert context.context_snapshot == []
     assert context.completion is None
     assert context.stream_writer is None
     assert context.is_consumed is False
@@ -91,7 +91,7 @@ async def test_bind_transitions_pending_to_running_without_taking_snapshot():
     assert context.state == state
     assert context.state is not state
     assert context.node_name == START
-    assert context.context_snapshot is None
+    assert context.context_snapshot == []
     assert context.completion is completion
     assert context.is_consumed is True
     assert context.is_bound is True
@@ -118,8 +118,8 @@ async def test_take_a_snapshot_deep_copies_recoverable_state():
     context.take_a_snapshot()
     after_snapshot = time.time()
 
-    snapshot = context.context_snapshot
-    assert snapshot is not None
+    assert len(context.context_snapshot) == 1
+    snapshot = context.context_snapshot[-1]
     assert before_snapshot <= snapshot["timestamp"] <= after_snapshot
     assert {
         key: value
@@ -158,8 +158,8 @@ async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
     context.node_name = "retry"
     context.steps = 3
     context.take_a_snapshot()
-    snapshot = context.context_snapshot
-    assert snapshot is not None
+    snapshot_history = context.context_snapshot
+    snapshot = snapshot_history[-1]
     assert snapshot["state"] is not context.state
     assert snapshot["state"]["values"] is not context.state["values"]
     assert snapshot["state"]["resource"] is not resource
@@ -176,8 +176,10 @@ async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
     assert recovered.steps == 3
     assert recovered._context_namespace == "agent"
     assert recovered._state_schema is ContextState
-    assert recovered.context_snapshot is not snapshot
-    assert recovered.state is recovered.context_snapshot["state"]
+    assert recovered.context_snapshot is not snapshot_history
+    assert len(recovered.context_snapshot) == 1
+    assert recovered.context_snapshot[-1] is not snapshot
+    assert recovered.state is recovered.context_snapshot[-1]["state"]
     assert recovered.state is not snapshot["state"]
     assert recovered.state["values"] is not snapshot["state"]["values"]
     assert recovered.state["resource"] is not snapshot["state"]["resource"]
@@ -192,9 +194,15 @@ def test_from_snapshot_rejects_missing_snapshot(snapshot):
         GraphContext.from_snapshot(snapshot)
 
 
-def test_from_snapshot_rejects_non_mapping():
+def test_from_snapshot_rejects_invalid_container():
     """The public restoration API validates its container contract."""
-    with pytest.raises(TypeError, match="must be a dict"):
+    with pytest.raises(TypeError, match="dict or a list of dicts"):
+        GraphContext.from_snapshot(())
+
+
+def test_from_snapshot_rejects_empty_history():
+    """An empty history contains no recoverable checkpoint."""
+    with pytest.raises(RuntimeError, match="without a snapshot"):
         GraphContext.from_snapshot([])
 
 
@@ -241,6 +249,89 @@ def test_from_snapshot_rejects_negative_steps():
         GraphContext.from_snapshot(snapshot)
 
 
+@pytest.mark.asyncio
+async def test_snapshot_history_restores_latest_version_by_default():
+    """Each checkpoint is retained and default recovery selects the latest."""
+    context = GraphContext()
+    _bind(context, "run-1", {"history": ["first"]}, context_namespace="agent")
+    context.node_name = "first-node"
+    context.steps = 1
+    context.take_a_snapshot()
+
+    context.state = {"history": ["second"]}
+    context.node_name = "second-node"
+    context.steps = 2
+    context.take_a_snapshot()
+
+    recovered = GraphContext.from_snapshot(context.context_snapshot)
+
+    assert len(context.context_snapshot) == 2
+    assert recovered.state == {"history": ["second"]}
+    assert recovered.node_name == "second-node"
+    assert recovered.steps == 2
+    assert len(recovered.context_snapshot) == 2
+    assert recovered.context_snapshot is not context.context_snapshot
+    assert recovered.context_snapshot[-1] is not context.context_snapshot[-1]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_history_restores_selected_version_as_new_branch():
+    """Restoring an older checkpoint drops later versions from the new branch."""
+    context = GraphContext()
+    _bind(context, "run-1", {"value": 1}, context_namespace="agent")
+
+    for version in range(3):
+        context.state = {"value": version}
+        context.node_name = f"node-{version}"
+        context.steps = version
+        context.take_a_snapshot()
+
+    recovered = GraphContext.from_snapshot(context.context_snapshot, version=1)
+    recovered_with_negative_version = GraphContext.from_snapshot(
+        context.context_snapshot,
+        version=-2,
+    )
+
+    assert recovered.state == {"value": 1}
+    assert recovered.node_name == "node-1"
+    assert recovered.steps == 1
+    assert len(recovered.context_snapshot) == 2
+    assert recovered.get_snapshot() == context.context_snapshot[1]
+    assert recovered.get_snapshot(0) == context.context_snapshot[0]
+    assert recovered_with_negative_version.state == recovered.state
+    assert recovered_with_negative_version.context_snapshot == (
+        recovered.context_snapshot
+    )
+
+
+@pytest.mark.parametrize("version", [3, -4])
+def test_from_snapshot_rejects_missing_version(version):
+    """Versions outside the stored history fail explicitly."""
+    snapshot: GraphContextSnapshot = {
+        "state": {},
+        "node_name": "node",
+        "steps": 0,
+        "namespace": "agent",
+    }
+
+    with pytest.raises(IndexError, match="list index out of range"):
+        GraphContext.from_snapshot([snapshot, snapshot, snapshot], version=version)
+
+
+@pytest.mark.parametrize("version", [1.5, "1"])
+def test_from_snapshot_uses_native_list_index_validation(version):
+    """History version validation follows normal list indexing semantics."""
+    snapshot: GraphContextSnapshot = {
+        "state": {},
+        "node_name": "node",
+        "steps": 0,
+        "namespace": "agent",
+    }
+
+    with pytest.raises(TypeError, match="list indices must be integers"):
+        GraphContext.from_snapshot([snapshot], version=version)
+
+
 def test_invalid_status_transition_is_rejected():
     """The transition table rejects paths outside the lifecycle contract."""
     context = GraphContext()
@@ -255,13 +346,13 @@ def test_pending_context_can_abort_or_fail_but_has_no_recovery_snapshot():
     aborted.abort()
     aborted.abort()
     assert aborted.status == "aborted"
-    assert aborted.context_snapshot is None
+    assert aborted.context_snapshot == []
 
     failed = GraphContext()
     failed._fail(RuntimeError("first"))
     failed._fail(RuntimeError("second"))
     assert failed.status == "failed"
-    assert failed.context_snapshot is None
+    assert failed.context_snapshot == []
 
 
 @pytest.mark.asyncio
@@ -278,8 +369,8 @@ async def test_running_abort_resolves_the_saved_snapshot_and_is_idempotent():
 
     result = await completion
     assert result == {"history": ["saved"]}
-    assert result is not context.context_snapshot["state"]
-    assert result["history"] is not context.context_snapshot["state"]["history"]
+    assert result is not context.context_snapshot[-1]["state"]
+    assert result["history"] is not context.context_snapshot[-1]["state"]["history"]
     assert context.status == "aborted"
     assert context.is_active is False
 
@@ -303,7 +394,7 @@ async def test_finish_is_idempotent_and_does_not_replace_snapshot():
     assert await completion == {"value": "finished"}
     assert finished.status == "finished"
     assert finished.context_snapshot is snapshot
-    assert finished.context_snapshot["state"] == {"value": "run-1"}
+    assert finished.context_snapshot[-1]["state"] == {"value": "run-1"}
 
 
 @pytest.mark.asyncio

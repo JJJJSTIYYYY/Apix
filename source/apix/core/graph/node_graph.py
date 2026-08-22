@@ -434,8 +434,7 @@ class NodeGraph:
                 "Node.execute must return a Command or list[Command]."
             )
 
-        steps = context.steps + 1
-        if steps > self._max_steps:
+        if context.steps >= self._max_steps:
             raise RecursionError(
                 f"Graph exceeded its maximum of {self._max_steps} steps."
             )

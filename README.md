@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./docs/image/tittle-bar.jpeg"  width="300" height="200" style="border-radius: 12px; display: block; margin: 0 auto;">
+<img src="./docs/image/tittle-bar.png"  width="310" height="300" style="border-radius: 12px; display: block; margin: 0 auto;">
 
 # APIX — NEXT 3.0
 

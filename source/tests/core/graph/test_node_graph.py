@@ -627,8 +627,8 @@ async def test_execute_node_ignores_error_after_attempt_becomes_stale():
 
     assert await completion == {"saved": True}
     assert context.status == "aborted"
-    assert context.context_snapshot is not None
-    assert context.context_snapshot["node_name"] == START
+    assert context.context_snapshot
+    assert context.context_snapshot[-1]["node_name"] == START
 
 
 @pytest.mark.asyncio

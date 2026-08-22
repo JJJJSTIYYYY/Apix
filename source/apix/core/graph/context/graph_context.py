@@ -76,8 +76,8 @@ class GraphContext:
     state: dict[str, Any] = field(default_factory=dict, init=False)
     node_name: str = field(default=START, init=False)
     steps: int = field(default=0, init=False)
-    context_snapshot: GraphContextSnapshot | None = field(
-        default=None,
+    context_snapshot: list[GraphContextSnapshot] = field(
+        default_factory=list,
         init=False,
     )
     completion: Future[Any] | None = field(
@@ -127,40 +127,70 @@ class GraphContext:
     @classmethod
     def from_snapshot(
         cls,
-        snapshot: GraphContextSnapshot | None,
+        snapshot: GraphContextSnapshot | list[GraphContextSnapshot] | None,
         state_schema: type | None = None,
+        *,
+        version: int = -1,
     ) -> GraphContext:
         """Construct a fresh pending context from a stored checkpoint.
 
-        The entire snapshot is deep-copied without applying ``KeepRef`` rules.
+        A single snapshot is restored directly. When a snapshot history is
+        supplied, ``version`` selects the checkpoint using normal Python list
+        indexing. The selected checkpoint and every earlier checkpoint are
+        deep-copied without applying ``KeepRef`` rules.
+
         Runtime-only fields such as ``run_id``, ``completion``, and
         ``stream_writer`` are initialized afresh.
 
         Args:
-            snapshot: Checkpoint previously created by :meth:`take_a_snapshot`.
+            snapshot: One checkpoint or a checkpoint history created by
+                :meth:`take_a_snapshot`.
             state_schema: Optional schema override. When omitted, the context
                 may adopt the replacement graph's default schema on invocation.
+            version: Zero-based checkpoint index to restore. Negative indexes
+                follow normal Python sequence semantics. Defaults to the latest
+                checkpoint. Ignored when ``snapshot`` is a single checkpoint.
 
         Raises:
-            RuntimeError: If no recoverable snapshot is supplied.
-            TypeError: If the snapshot fields have invalid runtime types.
+            RuntimeError: If no recoverable checkpoint is supplied.
+            TypeError: If the snapshot container or checkpoint fields have
+                invalid runtime types.
+            IndexError: If the requested history version does not exist.
             ValueError: If the snapshot is missing required fields or contains
                 a negative step count.
         """
         if snapshot is None:
             raise RuntimeError("Cannot restore a GraphContext without a snapshot.")
-        if not isinstance(snapshot, dict):
+
+        if isinstance(snapshot, list):
+            if not snapshot:
+                raise RuntimeError(
+                    "Cannot restore a GraphContext without a snapshot."
+                )
+            selected_snapshot = snapshot[version]
+            snapshot_history = snapshot[:version] + [selected_snapshot]
+        elif isinstance(snapshot, dict):
+            snapshot_history = [snapshot]
+        else:
+            raise TypeError(
+                "GraphContext snapshot must be a dict or a list of dicts."
+            )
+
+        restored_history: list[GraphContextSnapshot] = copy.deepcopy(
+            snapshot_history
+        )
+        restored = restored_history[-1]
+        if not isinstance(restored, dict):
             raise TypeError("GraphContext snapshot must be a dict.")
 
         required_fields = {"state", "node_name", "steps", "namespace"}
-        missing_fields = required_fields.difference(snapshot)
+        missing_fields = required_fields.difference(restored)
         if missing_fields:
             missing = ", ".join(sorted(missing_fields))
             raise ValueError(
                 f"GraphContext snapshot is missing required fields: {missing}."
             )
 
-        restored: GraphContextSnapshot = copy.deepcopy(snapshot)
         if not isinstance(restored["state"], dict):
             raise TypeError("GraphContext snapshot state must be a dict.")
         if not isinstance(restored["node_name"], str):
@@ -180,7 +210,7 @@ class GraphContext:
         context.node_name = restored["node_name"]
         context.steps = restored["steps"]
         context._context_namespace = restored["namespace"]
-        context.context_snapshot = restored
+        context.context_snapshot = restored_history
         return context
 
     @property
@@ -260,7 +290,7 @@ class GraphContext:
 
         self._context_namespace = context_namespace
         self._has_started = True
-        if self.context_snapshot is None:
+        if not self.context_snapshot:
             self.node_name = START
             self.steps = 0
 
@@ -285,26 +315,40 @@ class GraphContext:
             raise RuntimeError(
                 "A snapshot can only be taken from an active GraphContext."
             )
-        self.context_snapshot = {
-            "timestamp": time.time(),
-            "state": copy.deepcopy(self.state),
-            "node_name": self.node_name,
-            "steps": self.steps,
-            "namespace": self._context_namespace,
-        }
+        self.context_snapshot.append(
+            {
+                "timestamp": time.time(),
+                "state": copy.deepcopy(self.state),
+                "node_name": self.node_name,
+                "steps": self.steps,
+                "namespace": self._context_namespace,
+            }
+        )
 
-    def get_current_snapshot(self) -> GraphContextSnapshot | None:
-        """Get a deepcopy of the current snapshot in this context, return :class:`GraphContextSnapshot`."""
-        return copy.deepcopy(self.context_snapshot) if self.context_snapshot else None
+    def get_snapshot(
+        self,
+        version: int = -1,
+    ) -> GraphContextSnapshot | None:
+        """Return an isolated copy of the selected checkpoint, if one exists."""
+        if not self.context_snapshot:
+            return None
+        return copy.deepcopy(self.context_snapshot[version])
+
+    def get_all_snapshots(self) -> list[GraphContextSnapshot]:
+        """Return an isolated copy of checkpoints list."""
+        return copy.deepcopy(self.context_snapshot)
 
     def _snapshot_state(self) -> dict[str, Any]:
         """Copy the latest committed state using this context's KeepRef policy."""
         return _copy_state(self.state, self._keep_ref_keys)
 
-    def _recovery_state(self) -> dict[str, Any]:
-        """Copy the recovery checkpoint, falling back to pre-node state."""
-        snapshot = self.context_snapshot
-        state = self.state if snapshot is None else snapshot["state"]
+    def _latest_snapshot_state(self) -> dict[str, Any]:
+        """Copy the latest checkpoint state, falling back to live state."""
+        state = (
+            self.state
+            if not self.context_snapshot
+            else self.context_snapshot[-1]["state"]
+        )
         return _copy_state(state, self._keep_ref_keys)
 
     def _finish(self) -> None:
@@ -341,7 +385,7 @@ class GraphContext:
         completion = self.completion
         result = None
         if completion is not None and not completion.done():
-            result = self._recovery_state()
+            result = self._latest_snapshot_state()
 
         self._transition_to("aborted")
         if completion is not None and not completion.done():
