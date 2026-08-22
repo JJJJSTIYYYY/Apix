@@ -1,11 +1,12 @@
 """Unit tests for graph node result normalisation."""
 
+import asyncio
 from dataclasses import is_dataclass
 
 import pytest
 
 from apix.core.utils.exception import InvalidNodeReturnsError
-from apix.core.graph import BaseNode, Command, Node
+from apix.core.graph import BaseNode, Command, Node, ParallelNode
 
 
 def test_node_requires_a_function():
@@ -148,4 +149,104 @@ async def test_node_rejects_non_string_command_goto():
     node = Node(lambda state: Command(goto=1), "invalid_goto")
 
     with pytest.raises(InvalidNodeReturnsError, match="Command.goto must be a string or None"):
+        await node.execute({})
+
+
+@pytest.mark.parametrize(
+    ("funcs", "error", "message"),
+    [
+        (None, TypeError, "must be a list or tuple"),
+        ([], ValueError, "at least one function"),
+        ([lambda state: {}, None], ValueError, "branch must be callable"),
+    ],
+)
+def test_parallel_node_validates_branch_collection(funcs, error, message):
+    """A parallel node requires a concrete non-empty callable collection."""
+    with pytest.raises(error, match=message):
+        ParallelNode(funcs)
+
+
+@pytest.mark.parametrize("name", ["", None, 1])
+def test_parallel_node_requires_a_non_empty_string_name(name):
+    """Parallel nodes use the same explicit graph naming contract."""
+    with pytest.raises(ValueError, match="requires a name"):
+        ParallelNode([lambda state: {}], name=name)
+
+
+@pytest.mark.asyncio
+async def test_parallel_node_executes_concurrently_and_joins_in_input_order():
+    """Completion order does not affect the deterministic command order."""
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    received_states = []
+
+    async def first(state):
+        received_states.append(state)
+        first_started.set()
+        await release_first.wait()
+        return {"order": ["first"]}
+
+    async def second(state):
+        received_states.append(state)
+        await first_started.wait()
+        release_first.set()
+        return Command(
+            update={"order": ["second"]},
+            goto="joined",
+        )
+
+    node = ParallelNode([first, second], name="parallel_work")
+    state = {"input": "shared"}
+
+    result = await asyncio.wait_for(node.execute(state), timeout=1)
+
+    assert result == [
+        Command(update={"order": ["first"]}),
+        Command(update={"order": ["second"]}, goto="joined"),
+    ]
+    assert received_states == [state, state]
+    assert all(branch_state is state for branch_state in received_states)
+
+
+@pytest.mark.asyncio
+async def test_parallel_node_cancels_and_awaits_siblings_after_failure():
+    """A failed branch cannot leave sibling tasks running in the background."""
+    sibling_started = asyncio.Event()
+    sibling_cancelled = asyncio.Event()
+
+    async def fail_after_sibling_starts(state):
+        await sibling_started.wait()
+        raise RuntimeError("branch failed")
+
+    async def wait_forever(state):
+        sibling_started.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            sibling_cancelled.set()
+            raise
+
+    node = ParallelNode(
+        [fail_after_sibling_starts, wait_forever],
+        name="failing_parallel_work",
+    )
+
+    with pytest.raises(RuntimeError, match="branch failed"):
+        await asyncio.wait_for(node.execute({}), timeout=1)
+
+    assert sibling_cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_parallel_node_rejects_nested_command_lists():
+    """Each parallel branch contributes exactly one command to the join."""
+    node = ParallelNode(
+        [lambda state: [Command(), Command()]],
+        name="nested_commands",
+    )
+
+    with pytest.raises(
+        InvalidNodeReturnsError,
+        match=r"Parallel node branch functions.*not list\[Command\]",
+    ):
         await node.execute({})

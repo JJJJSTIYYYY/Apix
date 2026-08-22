@@ -18,6 +18,7 @@ from apix.core.graph import (
     GraphManager,
     Node,
     NodeGraph,
+    ParallelNode,
     Reset,
 )
 
@@ -138,6 +139,76 @@ async def test_command_list_is_applied_sequentially_in_original_order():
         "messages": ["first", "second", "third"],
         "status": "unchanged",
     }
+
+
+async def test_parallel_node_joins_commands_in_branch_declaration_order():
+    """Parallel completion order cannot change state merge or routing order."""
+    first_started = asyncio.Event()
+    second_finished = asyncio.Event()
+    unused_called = False
+
+    async def first_branch(state):
+        first_started.set()
+        await second_finished.wait()
+        return {
+            "messages": ["first-branch"],
+            "status": "first",
+        }
+
+    async def second_branch(state):
+        await first_started.wait()
+        second_finished.set()
+        return Command(
+            update={
+                "messages": ["second-branch"],
+                "status": "second",
+            },
+            goto="joined",
+        )
+
+    def joined(state):
+        return {
+            "messages": ["joined"],
+            "status": "joined",
+        }
+
+    def unused(state):
+        nonlocal unused_called
+        unused_called = True
+        return {"status": "unused"}
+
+    parallel = ParallelNode(
+        [first_branch, second_branch],
+        name="parallel_work",
+    )
+    graph = (
+        GraphManager(AccumulatingState)
+        .add_nodes([parallel, joined, unused])
+        .add_edge(START, parallel.name)
+        .add_edge(parallel.name, "unused")
+        .compile_graph()
+    )
+
+    result = await asyncio.wait_for(
+        graph.invoke(
+            {
+                "messages": ["initial"],
+                "status": "initial",
+            }
+        ),
+        timeout=1,
+    )
+
+    assert result == {
+        "messages": [
+            "initial",
+            "first-branch",
+            "second-branch",
+            "joined",
+        ],
+        "status": "joined",
+    }
+    assert unused_called is False
 
 
 async def test_empty_command_list_is_a_noop_and_uses_default_route():

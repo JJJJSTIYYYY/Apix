@@ -10,7 +10,7 @@ from apix.core.graph.base import (
     namespace_set,
 )
 from apix.core.graph.graph_manager import GraphManager
-from apix.core.graph.node import Node, BaseNode
+from apix.core.graph.node import Node, BaseNode, ParallelNode
 from apix.core.graph.node_graph import NodeGraph
 
 __all__ = [
@@ -24,6 +24,7 @@ __all__ = [
     "NodeFunction",
     "NodeResult",
     "NodeGraph",
+    "ParallelNode",
     "Reset",
     "START",
     "namespace_set",

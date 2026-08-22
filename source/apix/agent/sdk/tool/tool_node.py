@@ -1108,14 +1108,4 @@ class ToolNode(BaseNode):
             for tool_call in tool_calls
         ]
 
-        try:
-            return list(await asyncio.gather(*tasks))
-        except BaseException:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(
-                *tasks,
-                return_exceptions=True,
-            )
-            raise
+        return await self._gather_tasks_in_order(tasks)
