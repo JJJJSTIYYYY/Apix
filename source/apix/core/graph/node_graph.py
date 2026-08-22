@@ -1,7 +1,6 @@
 """Stateless, event-driven graph runtime."""
 
 import asyncio
-import copy
 import math
 from uuid import uuid4
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -400,26 +399,12 @@ class NodeGraph:
             if not context.is_active:
                 return
 
-            commands = result if isinstance(result, list) else [result]
-            if not commands:
-                commands = [Command()]
+            next_node = self.apply_command(
+                result,
+                node_name,
+                context,
+            )
 
-            state = context.state
-            next_node = self._default_gotos.get(node_name, END)
-            command_context = copy.copy(context)
-
-            for command in commands:
-                command_context.state = state
-                # Every command resolves a route independently. Later
-                # commands overwrite the route selected by earlier commands;
-                # an omitted goto resolves to this node's default route.
-                state, next_node = self.apply_command(
-                    command,
-                    node_name,
-                    command_context,
-                )
-
-            context.state = state
             context.steps += 1
             await self._post_next(next_node, context)
         except Exception as exc:
@@ -427,69 +412,96 @@ class NodeGraph:
                 self._fail(context, exc)
 
 
-    def apply_command(self, command: Command, node_name: str, context: GraphContext) -> tuple[dict, str]:
-        """Return updated state and the target selected by a node command."""
-        if not isinstance(command, Command):
+    def apply_command(
+        self,
+        command: Command | list[Command],
+        node_name: str,
+        context: GraphContext,
+    ) -> str:
+        """Apply one or more commands and return the final selected target.
+
+        Command lists are applied in order. Each command observes the state
+        committed by its predecessor. Every command also resolves routing
+        independently, so the last command determines the returned target.
+        An empty list is equivalent to one empty :class:`Command`.
+        """
+        if isinstance(command, Command):
+            commands = [command]
+        elif isinstance(command, list):
+            commands = command or [Command()]
+        else:
             raise TypeError(
                 "Node.execute must return a Command or list[Command]."
             )
 
-        update = command.update
-        if not isinstance(update, dict):
-            raise TypeError("Command.update must be a dict.")
         steps = context.steps + 1
         if steps > self._max_steps:
-            raise RecursionError(f"Graph exceeded its maximum of {self._max_steps} steps.")
+            raise RecursionError(
+                f"Graph exceeded its maximum of {self._max_steps} steps."
+            )
 
-        state = _copy_state(context.state, context._keep_ref_keys)
-        # Command updates are state transfers too. Preserve a KeepRef value
-        # when a node returns the marked field explicitly (including when it
-        # returns its complete state snapshot).
-        update = _copy_state(update, context._keep_ref_keys)
-
-        for key, value in update.items():
-            if isinstance(value, Reset):
-                state[key] = value.value
-            elif (
-                key in context._auto_increase_keys
-                and key in state
-            ):
-                current_value = state[key]
-                add_method = getattr(
-                    current_value,
-                    "__add__",
-                    None,
+        next_node = self._default_gotos.get(node_name, END)
+        for current_command in commands:
+            if not isinstance(current_command, Command):
+                raise TypeError(
+                    "Node.execute must return a Command or list[Command]."
                 )
 
-                if not callable(add_method):
-                    raise TypeError(
-                        f"State field `{key}` is marked AutoMerge, "
-                        f"but {type(current_value).__name__} does not "
-                        "provide a callable __add__ method."
+            update = current_command.update
+            if not isinstance(update, dict):
+                raise TypeError("Command.update must be a dict.")
+
+            state = _copy_state(context.state, context._keep_ref_keys)
+            # Command updates are state transfers too. Preserve a KeepRef
+            # value when a node returns the marked field explicitly.
+            update = _copy_state(update, context._keep_ref_keys)
+
+            for key, value in update.items():
+                if isinstance(value, Reset):
+                    state[key] = value.value
+                elif (
+                    key in context._auto_increase_keys
+                    and key in state
+                ):
+                    current_value = state[key]
+                    add_method = getattr(
+                        current_value,
+                        "__add__",
+                        None,
                     )
 
-                increased_value = add_method(value)
+                    if not callable(add_method):
+                        raise TypeError(
+                            f"State field `{key}` is marked AutoMerge, "
+                            f"but {type(current_value).__name__} does not "
+                            "provide a callable __add__ method."
+                        )
 
-                if increased_value is NotImplemented:
-                    raise TypeError(
-                        f"State field `{key}` could not add an update "
-                        f"of type {type(value).__name__}."
-                    )
+                    increased_value = add_method(value)
 
-                state[key] = increased_value
-            else:
-                state[key] = value
+                    if increased_value is NotImplemented:
+                        raise TypeError(
+                            f"State field `{key}` could not add an update "
+                            f"of type {type(value).__name__}."
+                        )
 
-        next_node = (
-            command.goto
-            if command.has_goto
-            else self._default_gotos.get(node_name, END)
-        )
-        if next_node is None:
-            next_node = END
-        if not isinstance(next_node, str):
-            raise TypeError("Command.goto must be a string or None.")
-        return state, next_node
+                    state[key] = increased_value
+                else:
+                    state[key] = value
+
+            next_node = (
+                current_command.goto
+                if current_command.has_goto
+                else self._default_gotos.get(node_name, END)
+            )
+            if next_node is None:
+                next_node = END
+            if not isinstance(next_node, str):
+                raise TypeError("Command.goto must be a string or None.")
+
+            context.state = state
+
+        return next_node
 
 
     async def _post_next(self, node_name: str, context: GraphContext) -> None:

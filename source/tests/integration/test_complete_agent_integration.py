@@ -55,7 +55,7 @@ async def stop_event_runtime_after_module():
 
 @dataclass
 class AgentMemory:
-    """Mutable resource deliberately shared by all node state snapshots."""
+    """Mutable resource deliberately shared by live node state copies."""
 
     notes: list[str] = field(default_factory=list)
     call_ids: list[str] = field(default_factory=list)
@@ -78,11 +78,6 @@ class InMemoryMessageStore:
         )
         self.batches.append([message.role for message in messages])
         return self
-
-    def __deepcopy__(self, memo):
-        raise AssertionError(
-            "AutoMerge + KeepRef message store must not be deep-copied"
-        )
 
 
 class CompleteAgentState(TypedDict, total=False):

@@ -29,9 +29,9 @@ GraphContextStatus: TypeAlias = Literal[
 class GraphContextSnapshot(TypedDict):
     """Serializable checkpoint used to construct a new graph context.
 
-    Values are captured by reference when the snapshot is taken. Restoring a
-    snapshot deep-copies the complete mapping, including state fields marked
-    with :class:`~apix.core.graph.base.KeepRef`.
+    State is deep-copied when the snapshot is taken. Restoring a snapshot
+    deep-copies the complete mapping again, including state fields marked with
+    :class:`~apix.core.graph.base.KeepRef`.
     """
 
     timestamp: float
@@ -280,14 +280,14 @@ class GraphContext:
         self.node_name = node_name
 
     def take_a_snapshot(self) -> None:
-        """Capture the current recoverable fields by reference."""
+        """Capture an isolated copy of the current recoverable state."""
         if not self.is_active or self._context_namespace is None:
             raise RuntimeError(
                 "A snapshot can only be taken from an active GraphContext."
             )
         self.context_snapshot = {
             "timestamp": time.time(),
-            "state": self.state,
+            "state": copy.deepcopy(self.state),
             "node_name": self.node_name,
             "steps": self.steps,
             "namespace": self._context_namespace,

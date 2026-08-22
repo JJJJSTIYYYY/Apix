@@ -107,25 +107,37 @@ def test_snapshot_requires_an_active_bound_context():
 
 
 @pytest.mark.asyncio
-async def test_take_a_snapshot_captures_recoverable_fields_by_reference():
-    """Taking a checkpoint performs no eager state copy."""
+async def test_take_a_snapshot_deep_copies_recoverable_state():
+    """Later live-state mutations cannot alter the saved checkpoint."""
     context = GraphContext()
     _bind(context, "run-1", {"nested": [1]}, context_namespace="agent")
     context.node_name = "retry"
     context.steps = 2
 
+    before_snapshot = time.time()
     context.take_a_snapshot()
+    after_snapshot = time.time()
 
     snapshot = context.context_snapshot
-    assert snapshot == {
-        "timestamp": time.time(),
+    assert snapshot is not None
+    assert before_snapshot <= snapshot["timestamp"] <= after_snapshot
+    assert {
+        key: value
+        for key, value in snapshot.items()
+        if key != "timestamp"
+    } == {
         "state": {"nested": [1]},
         "node_name": "retry",
         "steps": 2,
         "namespace": "agent",
     }
-    assert snapshot is not None
-    assert snapshot["state"] is context.state
+    assert snapshot["state"] is not context.state
+    assert snapshot["state"]["nested"] is not context.state["nested"]
+
+    context.state["nested"].append(2)
+    context.state["new"] = "live-only"
+
+    assert snapshot["state"] == {"nested": [1]}
     assert "run_id" not in snapshot
     assert "completion" not in snapshot
     assert "stream_writer" not in snapshot
@@ -148,7 +160,10 @@ async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
     context.take_a_snapshot()
     snapshot = context.context_snapshot
     assert snapshot is not None
-    assert snapshot["state"]["resource"] is resource
+    assert snapshot["state"] is not context.state
+    assert snapshot["state"]["values"] is not context.state["values"]
+    assert snapshot["state"]["resource"] is not resource
+    assert snapshot["state"]["resource"]["items"] is not resource["items"]
 
     recovered = GraphContext.from_snapshot(snapshot, ContextState)
 
@@ -165,6 +180,7 @@ async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
     assert recovered.state is recovered.context_snapshot["state"]
     assert recovered.state is not snapshot["state"]
     assert recovered.state["values"] is not snapshot["state"]["values"]
+    assert recovered.state["resource"] is not snapshot["state"]["resource"]
     assert recovered.state["resource"] is not resource
     assert recovered.state["resource"]["items"] is not resource["items"]
 

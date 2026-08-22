@@ -15,10 +15,11 @@ from apix.core.graph import (
     GraphManager,
     KeepRef,
     NodeGraph,
+    Reset,
     START,
 )
 from apix.core.graph.base import _copy_state, get_keep_ref_keys
-from apix.core.graph.context import GraphContext
+from apix.core.graph.context import GraphContext, noop_stream_writer
 
 
 @pytest_asyncio.fixture(
@@ -32,11 +33,15 @@ async def stop_event_runtime_after_module():
     await EVENT_PIPE.clear()
 
 
-class UncopyableResource:
-    """Mutable runtime resource that intentionally cannot be deep-copied."""
+class MutableResource:
+    """Mutable resource used by full graph invocation tests."""
 
     def __init__(self) -> None:
         self.events: list[str] = []
+
+
+class UncopyableResource(MutableResource):
+    """Mutable runtime resource that intentionally cannot be deep-copied."""
 
     def __deepcopy__(self, memo):
         raise AssertionError("KeepRef value must not be deep-copied")
@@ -54,12 +59,9 @@ class ReferenceAccumulator:
         self.values.extend(values)
         return self
 
-    def __deepcopy__(self, memo):
-        raise AssertionError("AutoMerge + KeepRef value must not be deep-copied")
-
 
 class KeepRefState(TypedDict, total=False):
-    resource: Annotated[UncopyableResource, KeepRef()]
+    resource: Annotated[MutableResource, KeepRef()]
     class_marker: Annotated[list[str], KeepRef]
     messages: Annotated[list[str], AutoMerge(), KeepRef()]
     ordinary: dict[str, Any]
@@ -150,13 +152,15 @@ def test_copy_state_rejects_non_dictionary_input():
         _copy_state([], get_keep_ref_keys(KeepRefState))
 
 
-def test_apply_command_preserves_explicit_keep_ref_update():
-    """Returning a marked field explicitly must not copy its new value."""
+def test_apply_command_commits_explicit_keep_ref_update_to_context():
+    """Applying a command immediately commits its KeepRef-aware state."""
     original_resource = UncopyableResource()
     replacement_resource = UncopyableResource()
     graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
+    original_state = {"resource": original_resource}
+    context = _context(original_state, KeepRefState)
 
-    state, next_node = graph.apply_command(
+    next_node = graph.apply_command(
         Command(
             update={
                 "resource": replacement_resource,
@@ -164,21 +168,94 @@ def test_apply_command_preserves_explicit_keep_ref_update():
             }
         ),
         START,
-        _context(
-            {"resource": original_resource},
-            KeepRefState,
-        ),
+        context,
     )
 
-    assert state["resource"] is replacement_resource
-    assert state["ordinary"] == {"values": []}
+    assert context.state is not original_state
+    assert context.state["resource"] is replacement_resource
+    assert context.state["ordinary"] == {"values": []}
     assert next_node == END
+
+
+def test_command_batch_uses_the_latest_committed_context_state():
+    """Each batched command observes the state committed by its predecessor."""
+    resource = UncopyableResource()
+    context = _context(
+        {
+            "resource": resource,
+            "messages": ["initial"],
+        },
+        KeepRefState,
+    )
+    graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
+
+    next_node = graph.apply_command(
+        [
+            Command(update={"messages": ["first"]}),
+            Command(update={"messages": ["second"]}),
+        ],
+        START,
+        context,
+    )
+
+    assert context.state["resource"] is resource
+    assert context.state["messages"] == ["initial", "first", "second"]
+    assert next_node == END
+
+
+def test_reset_commits_exact_keep_ref_replacement_to_context():
+    """Reset bypasses AutoMerge without copying a KeepRef replacement."""
+    original_resource = UncopyableResource()
+    replacement_resource = UncopyableResource()
+    context = _context(
+        {"resource": original_resource},
+        KeepRefState,
+    )
+    graph = NodeGraph({}, {START: END}, state_schema=KeepRefState)
+
+    graph.apply_command(
+        Command(update={"resource": Reset(replacement_resource)}),
+        START,
+        context,
+    )
+
+    assert context.state["resource"] is replacement_resource
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_snapshot_deep_copies_keep_ref_state():
+    """Recovery checkpoints isolate fields that live state copies keep shared."""
+    resource = MutableResource()
+    context = GraphContext(KeepRefState)
+    completion = asyncio.get_running_loop().create_future()
+    context._bind(
+        context_namespace="keep-ref-snapshot",
+        run_id="snapshot-run",
+        state={"resource": resource},
+        completion=completion,
+        stream_writer=noop_stream_writer(),
+    )
+
+    context.take_a_snapshot()
+
+    snapshot = context.context_snapshot
+    assert snapshot is not None
+    assert context.state["resource"] is resource
+    assert snapshot["state"]["resource"] is not resource
+
+    resource.events.append("live-only")
+
+    assert snapshot["state"]["resource"].events == []
+
+    context.abort()
+    result = await completion
+    assert result["resource"] is snapshot["state"]["resource"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_keep_ref_survives_complete_multi_node_graph_invocation():
     """Nodes can mutate one shared resource while ordinary input stays isolated."""
-    resource = UncopyableResource()
+    resource = MutableResource()
     original = {
         "resource": resource,
         "messages": ["user"],
@@ -221,7 +298,7 @@ async def test_keep_ref_survives_complete_multi_node_graph_invocation():
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_auto_increase_and_keep_ref_work_on_the_same_state_field():
-    """A shared accumulator is never copied and receives every additive update."""
+    """Nodes share one live accumulator and apply every additive update."""
     accumulator = ReferenceAccumulator(["initial"])
     seen_references: list[ReferenceAccumulator] = []
 
@@ -263,14 +340,15 @@ async def test_auto_increase_and_keep_ref_work_on_the_same_state_field():
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_context_abort_uses_the_graph_keep_ref_snapshotter():
-    """Direct abort preserves graph-specific state snapshot semantics."""
-    resource = UncopyableResource()
+async def test_context_abort_uses_deep_copied_keep_ref_snapshot():
+    """A KeepRef mutation inside a node cannot alter the pre-node checkpoint."""
+    resource = MutableResource()
     node_started = asyncio.Event()
     release_node = asyncio.Event()
     node_finished = asyncio.Event()
 
     async def waiting_node(state: dict[str, Any]) -> dict[str, Any]:
+        state["resource"].events.append("node-only")
         node_started.set()
         await release_node.wait()
         node_finished.set()
@@ -297,7 +375,9 @@ async def test_context_abort_uses_the_graph_keep_ref_snapshotter():
     context.abort()
     result = await asyncio.wait_for(invocation, timeout=1)
 
-    assert result["resource"] is resource
+    assert result["resource"] is not resource
+    assert result["resource"].events == []
+    assert resource.events == ["node-only"]
     assert result["ordinary"] == {"nested": [1]}
 
     release_node.set()

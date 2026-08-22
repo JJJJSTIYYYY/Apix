@@ -154,7 +154,7 @@ def test_apply_command_auto_increases_annotated_fields():
         AutoMergeState,
     )
 
-    state, next_node = graph.apply_command(
+    next_node = graph.apply_command(
         Command(
             update={
                 "values": [2, 3],
@@ -166,17 +166,12 @@ def test_apply_command_auto_increases_annotated_fields():
         context,
     )
 
-    assert state == {
+    assert context.state == {
         "values": [1, 2, 3],
         "total": 6,
         "replaced": [2],
     }
     assert next_node == END
-    assert context.state == {
-        "values": [1],
-        "total": 2,
-        "replaced": [1],
-    }
 
 
 def test_apply_command_initializes_missing_auto_increase_field():
@@ -187,13 +182,82 @@ def test_apply_command_initializes_missing_auto_increase_field():
         state_schema=AutoMergeState,
     )
 
-    state, _ = graph.apply_command(
+    context = _graph_context(state_schema=AutoMergeState)
+    graph.apply_command(
         Command(update={"values": [1]}),
         START,
-        _graph_context(state_schema=AutoMergeState),
+        context,
     )
 
-    assert state == {"values": [1]}
+    assert context.state == {"values": [1]}
+
+
+def test_apply_command_applies_command_list_in_order():
+    """A command batch commits each update before applying the next one."""
+    graph = NodeGraph(
+        {},
+        {START: END},
+        state_schema=AutoMergeState,
+    )
+    context = _graph_context(
+        {
+            "values": [1],
+            "total": 0,
+            "replaced": [],
+        },
+        AutoMergeState,
+    )
+
+    next_node = graph.apply_command(
+        [
+            Command(update={"values": [2], "total": 3}),
+            Command(
+                update={"values": [3], "total": 4},
+                goto="batch-target",
+            ),
+        ],
+        START,
+        context,
+    )
+
+    assert context.state == {
+        "values": [1, 2, 3],
+        "total": 7,
+        "replaced": [],
+    }
+    assert next_node == "batch-target"
+
+
+def test_apply_command_uses_default_route_when_last_command_omits_goto():
+    """The last command owns routing even when it selects the default edge."""
+    graph = NodeGraph({}, {START: END})
+    context = _graph_context()
+
+    next_node = graph.apply_command(
+        [
+            Command(goto="overridden-target"),
+            Command(update={"value": 1}),
+        ],
+        START,
+        context,
+    )
+
+    assert context.state == {"value": 1}
+    assert next_node == END
+
+
+def test_apply_command_treats_empty_command_list_as_empty_command():
+    """An empty batch preserves state and follows the default edge."""
+    graph = NodeGraph({}, {START: END})
+    original_state = {"nested": [1]}
+    context = _graph_context(original_state)
+
+    next_node = graph.apply_command([], START, context)
+
+    assert context.state == original_state
+    assert context.state is not original_state
+    assert context.state["nested"] is not original_state["nested"]
+    assert next_node == END
 
 
 def test_auto_increase_requires_callable_add_method():
@@ -249,7 +313,7 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
         AutoMergeState,
     )
 
-    state, _ = graph.apply_command(
+    graph.apply_command(
         Command(
             update={
                 "values": Reset([3]),
@@ -260,13 +324,9 @@ def test_replace_bypasses_auto_increase_and_is_unwrapped():
         context,
     )
 
-    assert state == {
+    assert context.state == {
         "values": [3],
         "replaced": [4],
-    }
-    assert context.state == {
-        "values": [1, 2],
-        "replaced": [1, 2],
     }
 
 
@@ -278,13 +338,27 @@ def test_replace_initializes_missing_auto_increase_field():
         state_schema=AutoMergeState,
     )
 
-    state, _ = graph.apply_command(
-        Command(update={"values": Reset([1])}),
+    context = _graph_context(state_schema=AutoMergeState)
+    graph.apply_command(
+        Command(update={"values": [1]}),
         START,
-        _graph_context(state_schema=AutoMergeState),
+        context,
     )
+    assert context.state == {"values": [1]}
 
-    assert state == {"values": [1]}
+    graph.apply_command(
+        Command(update={"values": [2]}),
+        START,
+        context,
+    )
+    assert context.state == {"values": [1, 2]}
+
+    graph.apply_command(
+        Command(update={"values": Reset([3])}),
+        START,
+        context,
+    )
+    assert context.state == {"values": [3]}
 
 
 def test_node_graph_rejects_non_class_state_schema():
