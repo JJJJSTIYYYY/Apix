@@ -1,6 +1,8 @@
 """Focused tests for invocation-local graph context binding."""
 
 import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -13,6 +15,7 @@ from apix.core.graph.context import (
     get_graph_context,
     get_stream_writer,
 )
+from apix.core.graph.context.stream_writer import _NOOP_STREAM_WRITER
 
 
 def _context_with_writer() -> tuple[GraphContext, StreamWriter]:
@@ -39,12 +42,12 @@ def test_graph_accessors_require_bound_context():
 
 
 def test_apix_graph_context_exposes_context_and_its_writer():
-    """One binding supplies both graph state and the current stream writer."""
+    """One binding supplies both graph state and the current stream writer, an inactive context should return _NOOP_STREAM_WRITER."""
     context, writer = _context_with_writer()
 
     with apix_graph_context(context):
         assert get_graph_context() is context
-        assert get_stream_writer() is writer
+        assert get_stream_writer() is _NOOP_STREAM_WRITER
 
 
 def test_bound_context_without_writer_rejects_stream_access():
@@ -96,12 +99,12 @@ def test_nested_apix_graph_context_restores_outer_context():
 
     with apix_graph_context(outer):
         assert get_graph_context() is outer
-        assert get_stream_writer() is outer_writer
+        assert get_stream_writer() is _NOOP_STREAM_WRITER
         with apix_graph_context(inner):
             assert get_graph_context() is inner
-            assert get_stream_writer() is inner_writer
+            assert get_stream_writer() is _NOOP_STREAM_WRITER
         assert get_graph_context() is outer
-        assert get_stream_writer() is outer_writer
+        assert get_stream_writer() is _NOOP_STREAM_WRITER
 
 
 def test_apix_graph_context_resets_after_exception():
@@ -132,5 +135,5 @@ async def test_apix_graph_context_keeps_concurrent_tasks_isolated():
         observe(right),
     )
 
-    assert observed_left == (left, left_writer)
-    assert observed_right == (right, right_writer)
+    assert observed_left == (left, _NOOP_STREAM_WRITER)
+    assert observed_right == (right, _NOOP_STREAM_WRITER)

@@ -3,7 +3,7 @@ from collections.abc import Generator
 from contextvars import ContextVar
 
 from apix.core.graph.context.graph_context import GraphContext
-from apix.core.graph.context.stream_writer import StreamWriter
+from apix.core.graph.context.stream_writer import _NOOP_STREAM_WRITER, StreamWriter
 
 
 _current_graph_context: ContextVar["GraphContext | None"] = ContextVar(
@@ -79,6 +79,9 @@ def get_stream_writer() -> StreamWriter:
         raise RuntimeError(
             "get_stream_writer() is only available while a graph node is executed."
         )
+
+    if not context.is_active:
+        writer = _NOOP_STREAM_WRITER
     return writer
 
 

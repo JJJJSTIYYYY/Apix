@@ -203,7 +203,7 @@ data_server_manager = DataServerManager(
 auto_init.register(data_server_manager)
 
 
-async def query_store(action: str, payload: dict) -> Any:
+async def query_store(action: str, payload: dict) -> dict:
     """Public api to access store."""
     query_id = await data_server_manager.submit_query(
         action=action,

@@ -551,10 +551,3 @@ class NodeGraph:
         )(afunc)
         self._listener_handler_names.append(afunc.__name__)
         return afunc
-
-
-    def get_node_meta(
-        self,
-        
-    ):
-        pass
