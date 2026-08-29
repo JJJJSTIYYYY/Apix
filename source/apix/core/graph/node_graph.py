@@ -144,7 +144,7 @@ class NodeGraph:
 
                 run_node.__name__ = get_node_name_in_namespace(node_name, self._listener_namespace)
                 subscribe(
-                    node_name,
+                    run_node.__name__,
                     exist_ok=False,
                 )(run_node)
                 self._listener_handler_names.append(run_node.__name__)
@@ -510,7 +510,7 @@ class NodeGraph:
         context._set_next_node(node_name)
         await EVENT_PIPE.post_event(
             event_type=EventType.WORKFLOW,
-            event_name=node_name,
+            event_name=get_node_name_in_namespace(node_name, self._listener_namespace),
             context=context,
         )
 

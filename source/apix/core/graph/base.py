@@ -317,14 +317,19 @@ NodeFunction: TypeAlias = (
 """A synchronous or asynchronous callable that receives graph state."""
 
 
-def get_node_name_in_namespace(node_name: str, namespace: str | None) -> str:
+def get_node_name_in_namespace(node_name: str, namespace: str | None, missing_ok=True) -> str:
     """Return a node name qualified by a namespace.
 
     Args:
         node_name: Node name to qualify.
         namespace: Namespace to prepend. ``None`` and an empty string select
-            the global namespace, which does not modify the node name.
+            the global namespace, which does not modify the node name. ``*``
+            select all namespace.
     """
-    if namespace:
-        return f"graph_listener_{namespace}_{node_name}"
-    return f"graph_listener_{node_name}"
+    if not namespace:
+        return node_name
+
+    if not missing_ok and namespace != '*' and namespace not in namespace_set:
+        raise KeyError(f"Namespace `{namespace}` not found in current namespace set.")
+    
+    return f"{node_name}_{namespace}"

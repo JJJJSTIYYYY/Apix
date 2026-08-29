@@ -37,6 +37,7 @@ from apix.core.graph import (
     KeepRef,
     START,
 )
+from apix.core.graph.base import get_node_name_in_namespace
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -350,7 +351,7 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
     model_event = "complete_agent.plugin.model"
     persist_event = "complete_agent.plugin.persist"
 
-    @subscribe(model_event, priority=20, exist_ok=False)
+    @subscribe(get_node_name_in_namespace(model_event, "complete_agent_plugin_runtime"), priority=20, exist_ok=False)
     async def add_safety_policy(event: ApixEvent) -> None:
         state = event.context.state
         state["model_input"] += " | safety=enabled"
@@ -359,7 +360,7 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
     @subscribe(
         "complete_agent.plugin.*",
         priority=10,
-        filter_event=[persist_event],
+        filter_event=[get_node_name_in_namespace(persist_event, "complete_agent_plugin_runtime")],
         exist_ok=False,
     )
     async def observe_agent_nodes(event: ApixEvent) -> None:

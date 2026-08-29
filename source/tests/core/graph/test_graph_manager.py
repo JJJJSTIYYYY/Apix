@@ -10,6 +10,7 @@ from apix.core.graph.base import (
     _acquire_namespace,
     _namespace_graphs,
     _release_namespace,
+    get_node_name_in_namespace,
 )
 
 
@@ -255,7 +256,7 @@ def test_compile_exist_ok_decomposes_and_replaces_original_graph():
     first_callbacks = {
         APIX_HANDLER_REGISTRY.get_handler(handler_name).callback
         for handler_name in APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
-            "shared"
+            get_node_name_in_namespace("shared", "replaceable")
         )
     }
 
@@ -271,7 +272,7 @@ def test_compile_exist_ok_decomposes_and_replaces_original_graph():
     replacement_callbacks = {
         APIX_HANDLER_REGISTRY.get_handler(handler_name).callback
         for handler_name in APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
-            "shared"
+            get_node_name_in_namespace("shared", "replaceable")
         )
     }
 
