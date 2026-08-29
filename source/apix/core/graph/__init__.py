@@ -7,6 +7,7 @@ from apix.core.graph.base import (
     NodeFunction,
     NodeResult,
     Reset,
+    get_node_name_in_namespace,
     namespace_set,
 )
 from apix.core.graph.graph_manager import GraphManager
@@ -19,6 +20,7 @@ __all__ = [
     "Command",
     "END",
     "GraphManager",
+    "get_node_name_in_namespace",
     "KeepRef",
     "Node",
     "NodeFunction",

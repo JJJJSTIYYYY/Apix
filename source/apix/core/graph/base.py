@@ -317,19 +317,39 @@ NodeFunction: TypeAlias = (
 """A synchronous or asynchronous callable that receives graph state."""
 
 
-def get_node_name_in_namespace(node_name: str, namespace: str | None, missing_ok=True) -> str:
-    """Return a node name qualified by a namespace.
+def get_node_name_in_namespace(
+    node_name: str,
+    namespace: str | None,
+    missing_ok: bool = True,
+) -> str:
+    """Return the event name for a graph node in one namespace.
 
     Args:
         node_name: Node name to qualify.
-        namespace: Namespace to prepend. ``None`` and an empty string select
+        namespace: Namespace to append. ``None`` and an empty string select
             the global namespace, which does not modify the node name. ``*``
-            select all namespace.
+            selects the same node from every non-global namespace when the
+            result is used as an event subscription pattern.
+        missing_ok: If ``False``, require a concrete namespace to be owned by
+            a currently compiled graph. The wildcard namespace is always
+            accepted.
     """
     if not namespace:
         return node_name
 
     if not missing_ok and namespace != '*' and namespace not in namespace_set:
         raise KeyError(f"Namespace `{namespace}` not found in current namespace set.")
-    
+
     return f"{node_name}_{namespace}"
+
+
+def _get_node_listener_name(node_name: str, namespace: str | None) -> str:
+    """Return the process-unique handler name for one graph node listener.
+
+    Listener identity intentionally remains separate from the event name used
+    for dispatch. This preserves the reserved ``graph_listener_`` prefix for
+    lifecycle cleanup and avoids collisions with ordinary user handlers.
+    """
+    if namespace:
+        return f"graph_listener_{namespace}_{node_name}"
+    return f"graph_listener_{node_name}"

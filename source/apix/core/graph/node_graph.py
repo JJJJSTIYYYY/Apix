@@ -23,6 +23,7 @@ from apix.core.graph.base import (
     Reset,
     _copy_state,
     _release_namespace,
+    _get_node_listener_name,
     get_node_name_in_namespace,
 )
 from apix.core.graph.context import GraphContext
@@ -142,9 +143,16 @@ class NodeGraph:
                     else:
                         await self._execute_node(_node_name, context)
 
-                run_node.__name__ = get_node_name_in_namespace(node_name, self._listener_namespace)
+                event_name = get_node_name_in_namespace(
+                    node_name,
+                    self._listener_namespace,
+                )
+                run_node.__name__ = _get_node_listener_name(
+                    node_name,
+                    self._listener_namespace,
+                )
                 subscribe(
-                    run_node.__name__,
+                    event_name,
                     exist_ok=False,
                 )(run_node)
                 self._listener_handler_names.append(run_node.__name__)

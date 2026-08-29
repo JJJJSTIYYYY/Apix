@@ -263,7 +263,7 @@ graph = manager.compile_graph(
 - `exist_ok=True` 会先分解旧图，再创建替代图。
 - 旧图有活跃调用时无法替换，会抛出 `RuntimeError`。
 
-同名节点的事件名本身不会附加命名空间。多个图的节点监听器都可能观察到事件，但只会处理 `GraphContext` 命名空间与自身一致且仍 active 的事件。
+节点事件会使用 `using_namespace` 限定作用域。全局 namespace 保持原节点名；非全局 namespace 的事件名由 `get_node_name_in_namespace()` 生成。不同 namespace 中的同名节点具有不同事件处理链，不会再调度其他图的节点监听器。`GraphContext` 的 namespace 检查仍作为运行时防御。
 
 模块导出的 `namespace_set` 可用于只读诊断当前被占用的 namespace。不要直接增删其中的值；正常释放必须经过 `graph.decompose()`，以同时清理图索引和事件处理器。
 
@@ -330,13 +330,20 @@ manager.add_node(slow_node, timeout=2.5)
 
 ## 插件观察节点事件
 
-图中的 `START`、节点名和 `END` 都是事件名。插件可以通过公共事件 API 在图节点处理器之前执行：
+图中的 `START`、节点名和 `END` 都会发布工作流事件。全局 namespace 直接使用节点名；命名图必须使用 `get_node_name_in_namespace()` 获得实际事件名。插件可以通过公共事件 API 在图节点处理器之前执行：
 
 ```python
 from apix.core.event import ApixEvent, subscribe
+from apix.core.graph import get_node_name_in_namespace
 
 
-@subscribe("model_call", priority=20)
+namespace = "agent-runtime"
+
+
+@subscribe(
+    get_node_name_in_namespace("model_call", namespace),
+    priority=20,
+)
 async def enrich_model_context(event: ApixEvent) -> None:
     context = event.context
     context.state["system_policy"] = "safe"
@@ -344,7 +351,17 @@ async def enrich_model_context(event: ApixEvent) -> None:
 
 图自动注册的节点处理器默认优先级是 `1`，因此更高优先级插件会先执行。也可使用 `between_handlers` 相对指定处理器插入。
 
-插件处理的是进程级同名事件，应检查 `event.context` 类型、命名空间或业务字段，避免错误修改另一个图的事件。Graph Runtime 自身会对不属于当前图的 context 做过滤。
+`event.event_name` 是带 namespace 的事件路由名；原始图节点名保存在 `event.context.node_name`。如果插件要监听指定 namespace 下的一组节点，可以把 glob 节点模式传给辅助函数：
+
+```python
+@subscribe(
+    get_node_name_in_namespace("agent.*", "agent-runtime"),
+)
+async def observe_agent_nodes(event: ApixEvent) -> None:
+    original_node_name = event.context.node_name
+```
+
+传入 `namespace="*"` 可以生成监听所有非全局 namespace 中同名节点的模式。裸节点名或裸 glob 只适合全局事件或明确需要跨 namespace 匹配的插件。
 
 ## 分解图
 

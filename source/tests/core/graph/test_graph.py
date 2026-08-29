@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from apix.core.event.event_loop import APIX_EVENT_LOOP
-from apix.core.event import EVENT_PIPE
+from apix.core.event import APIX_HANDLER_REGISTRY, EVENT_PIPE
 from apix.core.utils.exception import InvalidNodeReturnsError
 from apix.core.graph import (
     AutoMerge,
@@ -20,6 +20,7 @@ from apix.core.graph import (
     NodeGraph,
     ParallelNode,
     Reset,
+    get_node_name_in_namespace,
 )
 
 
@@ -693,6 +694,22 @@ async def test_graphs_with_same_node_name_do_not_handle_each_others_runs():
         .add_edge(START, "shared")
         .compile_graph(using_namespace="graph-b")
     )
+
+    graph_a_event = get_node_name_in_namespace("shared", "graph-a")
+    graph_b_event = get_node_name_in_namespace("shared", "graph-b")
+    graph_a_handlers = APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
+        graph_a_event
+    )
+    graph_b_handlers = APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
+        graph_b_event
+    )
+
+    assert len(graph_a_handlers) == 1
+    assert len(graph_b_handlers) == 1
+    assert graph_a_handlers[0] in graph_a._listener_handler_names
+    assert graph_b_handlers[0] in graph_b._listener_handler_names
+    assert graph_a_handlers[0] not in graph_b._listener_handler_names
+    assert graph_b_handlers[0] not in graph_a._listener_handler_names
 
     results = await asyncio.gather(graph_a.invoke({}), graph_b.invoke({}))
 

@@ -37,7 +37,7 @@ from apix.core.graph import (
     KeepRef,
     START,
 )
-from apix.core.graph.base import get_node_name_in_namespace
+from apix.core.graph import get_node_name_in_namespace
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -347,25 +347,30 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
 
 async def test_agent_plugins_enrich_context_and_observe_node_events():
     """Plugins can extend an Agent run entirely through public core APIs."""
+    namespace = "complete_agent_plugin_runtime"
     prepare_event = "complete_agent.plugin.prepare"
     model_event = "complete_agent.plugin.model"
     persist_event = "complete_agent.plugin.persist"
 
-    @subscribe(get_node_name_in_namespace(model_event, "complete_agent_plugin_runtime"), priority=20, exist_ok=False)
+    @subscribe(
+        get_node_name_in_namespace(model_event, namespace),
+        priority=20,
+        exist_ok=False,
+    )
     async def add_safety_policy(event: ApixEvent) -> None:
         state = event.context.state
         state["model_input"] += " | safety=enabled"
         state["plugin_trace"].append("safety:model")
 
     @subscribe(
-        "complete_agent.plugin.*",
+        get_node_name_in_namespace("complete_agent.plugin.*", namespace),
         priority=10,
-        filter_event=[get_node_name_in_namespace(persist_event, "complete_agent_plugin_runtime")],
+        filter_event=[get_node_name_in_namespace(persist_event, namespace)],
         exist_ok=False,
     )
     async def observe_agent_nodes(event: ApixEvent) -> None:
         event.context.state["plugin_trace"].append(
-            f"observe:{event.event_name.rsplit('.', 1)[-1]}"
+            f"observe:{event.context.node_name.rsplit('.', 1)[-1]}"
         )
 
     def prepare_model_input(state: dict[str, Any]) -> dict[str, Any]:
@@ -394,7 +399,7 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
         .add_edge(START, prepare_event)
         .add_edge(prepare_event, model_event)
         .add_edge(model_event, persist_event)
-        .compile_graph(using_namespace="complete_agent_plugin_runtime")
+        .compile_graph(using_namespace=namespace)
     )
 
     try:
@@ -431,19 +436,35 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
 
 async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
     """A plugin author can inspect coverage and disable selected hooks."""
+    namespace = "complete_agent_extension_runtime"
     prepare_event = "complete_agent.extension.prepare"
     model_event = "complete_agent.extension.model"
-    unseen_pattern = "complete_agent.extension.never.*"
+    extension_pattern = get_node_name_in_namespace(
+        "complete_agent.extension.*",
+        namespace,
+    )
+    unseen_pattern = get_node_name_in_namespace(
+        "complete_agent.extension.never.*",
+        namespace,
+    )
+    qualified_prepare_event = get_node_name_in_namespace(
+        prepare_event,
+        namespace,
+    )
+    qualified_model_event = get_node_name_in_namespace(
+        model_event,
+        namespace,
+    )
     calls: list[str] = []
 
     @subscribe(
-        "complete_agent.extension.*",
+        extension_pattern,
         unseen_pattern,
         priority=5,
         exist_ok=False,
     )
     async def record_extension_event(event: ApixEvent) -> None:
-        calls.append(event.event_name)
+        calls.append(event.context.node_name)
 
     def prepare(state: dict[str, Any]) -> dict[str, Any]:
         return {"prepared": state["prompt"].upper()}
@@ -457,19 +478,19 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
         .add_node(model, model_event)
         .add_edge(START, prepare_event)
         .add_edge(prepare_event, model_event)
-        .compile_graph(using_namespace="complete_agent_extension_runtime")
+        .compile_graph(using_namespace=namespace)
     )
 
     try:
         handler_meta = get_handler_meta(record_extension_event.__name__)
         assert handler_meta is not None
         assert handler_meta["subscribe"] == [
-            "complete_agent.extension.*",
+            extension_pattern,
             unseen_pattern,
         ]
         assert handler_meta["priority"] == 5
         assert get_unmatched_subscriptions(record_extension_event.__name__) == [
-            "complete_agent.extension.*",
+            extension_pattern,
             unseen_pattern,
         ]
 
@@ -479,17 +500,20 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
         assert get_unmatched_subscriptions(record_extension_event.__name__) == [
             unseen_pattern
         ]
-        assert {prepare_event, model_event}.issubset(
+        assert {qualified_prepare_event, qualified_model_event}.issubset(
             APIX_EVENT_REGISTRY.get_registered_events()
         )
 
         calls.clear()
-        unsubscribe(record_extension_event.__name__, [model_event])
+        unsubscribe(
+            record_extension_event.__name__,
+            [qualified_model_event],
+        )
         await graph.invoke({"prompt": "second"})
         assert calls == [prepare_event]
         assert get_handler_meta(record_extension_event.__name__)[
             "filter_event"
-        ] == [model_event]
+        ] == [qualified_model_event]
 
         calls.clear()
         unsubscribe(record_extension_event.__name__)
