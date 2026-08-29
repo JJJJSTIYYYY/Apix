@@ -124,12 +124,12 @@ class MCPToolManager:
 
     async def get_mcp_meta(
         self,
-        client_id: str,
+        user_uid: str,
     ) -> list[McpMetaSchema]:
         try:
             res = await query_store(
                 action="get_enabled_mcp_servers",
-                payload={"client_id": client_id}
+                payload={"user_uid": user_uid}
             )
             return res.get("messages", [])
         except Exception as e:
@@ -276,10 +276,10 @@ class MCPToolManager:
 
     async def load_all_mcp_tools(
         self,
-        client_id: str,
+        user_uid: str,
     ) -> list[BaseTool]:
         logger.trace()
-        mcp_meta_list = await self.get_mcp_meta(client_id)
+        mcp_meta_list = await self.get_mcp_meta(user_uid)
         all_tools: list[BaseTool] = []
         for mcp_meta in mcp_meta_list:
             cached_tools = await self.cache_first(mcp_meta)
