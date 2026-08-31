@@ -467,7 +467,7 @@ class NodeGraph:
                 if isinstance(value, Reset):
                     state[key] = value.value
                 elif (
-                    key in context._auto_increase_keys
+                    key in context._auto_merge_keys
                     and key in state
                 ):
                     current_value = state[key]

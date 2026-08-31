@@ -320,7 +320,7 @@ async def test_auto_increase_and_keep_ref_work_on_the_same_state_field():
 
     context = GraphContext(CombinedMarkerState)
     assert context._keep_ref_keys == frozenset({"accumulator"})
-    assert context._auto_increase_keys == frozenset({"accumulator"})
+    assert context._auto_merge_keys == frozenset({"accumulator"})
 
     result = await graph.invoke({"accumulator": accumulator})
 

@@ -384,10 +384,10 @@ def test_state_schema_metadata_lives_on_graph_context():
     context = graph._context_factory()
 
     assert not hasattr(graph, "_state_schema")
-    assert not hasattr(graph, "_auto_increase_keys")
+    assert not hasattr(graph, "_auto_merge_keys")
     assert not hasattr(graph, "_keep_ref_keys")
     assert context._state_schema is AutoMergeState
-    assert context._auto_increase_keys == frozenset({"values", "total"})
+    assert context._auto_merge_keys == frozenset({"values", "total"})
     assert context._keep_ref_keys == frozenset()
 
 

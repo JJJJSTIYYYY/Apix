@@ -58,7 +58,7 @@ def test_context_owns_schema_derived_state_behavior():
     context = GraphContext(ContextState)
 
     assert context._state_schema is ContextState
-    assert context._auto_increase_keys == frozenset({"values"})
+    assert context._auto_merge_keys == frozenset({"values"})
     assert context._keep_ref_keys == frozenset({"resource"})
 
 

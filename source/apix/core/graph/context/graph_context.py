@@ -11,7 +11,7 @@ from typing import Any, Literal, TypeAlias, TypedDict
 from apix.core.graph.base import (
     START,
     _copy_state,
-    get_auto_increase_keys,
+    get_auto_merge_keys,
     get_keep_ref_keys,
 )
 from apix.core.graph.context.stream_writer import StreamWriter
@@ -95,7 +95,7 @@ class GraphContext:
         init=False,
         repr=False,
     )
-    _auto_increase_keys: frozenset[str] = field(
+    _auto_merge_keys: frozenset[str] = field(
         default_factory=frozenset,
         init=False,
         repr=False,
@@ -245,7 +245,7 @@ class GraphContext:
     def _set_state_schema(self, state_schema: type | None) -> None:
         """Store a state schema and its derived behavior."""
         self._state_schema = state_schema
-        self._auto_increase_keys = get_auto_increase_keys(state_schema)
+        self._auto_merge_keys = get_auto_merge_keys(state_schema)
         self._keep_ref_keys = get_keep_ref_keys(state_schema)
 
     def _adopt_default_state_schema(self, default: GraphContext) -> None:
