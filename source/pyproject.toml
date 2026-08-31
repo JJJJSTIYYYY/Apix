@@ -17,6 +17,7 @@ dependencies = [
     "redis>=8.0.1",
     "uvicorn>=0.51.0",
     "ollama>=0.6.2",
+    "fastmcp-slim[client]==3.4.7",
 ]
 
 [tool.pytest.ini_options]

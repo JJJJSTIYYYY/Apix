@@ -1,316 +1,110 @@
-import asyncio
-from contextlib import _AsyncGeneratorContextManager
-from typing import Any, Literal, TypedDict
+"""Adapt FastMCP tool definitions to APIX tools."""
 
-import httpx
-from apix.agent.store import query_store
-from apix.common.lifespan import auto_init
-from apix.common.utils import logger
-from langchain_mcp_adapters.client import (
-    MultiServerMCPClient,
-    SSEConnection,
-    StdioConnection,
-    StreamableHttpConnection,
-    WebsocketConnection,
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator, Mapping
+from contextlib import asynccontextmanager
+from copy import deepcopy
+from typing import TYPE_CHECKING, Any
+
+from apix.agent.sdk.tool.mcp.base import (
+    MCPLifecycle,
+    McpMetaSchema,
+    _convert_call_tool_result,
+    _get_model_value,
 )
-from langchain_core.tools.base import BaseTool
-from langchain_mcp_adapters.tools import load_mcp_tools
+from apix.agent.sdk.tool.tool_node import Tool
+from apix.agent.sdk.utils.message import ToolCall
 
 
-class McpMetaSchema(TypedDict):
-    mcp_id: str
-    mcp_name: str
-    transport: Literal["stdio", "http", "streamable_http", "websocket", "sse"]
-    endpoint: str # For stdio, it's the command to start the MCP server. For http/websocket/sse, it's the URL to connect.
-    config: dict[str, Any]
+if TYPE_CHECKING:
+    from apix.agent.sdk.tool.mcp.mcp_tool_manager import MCPToolManager
 
-class MCPContextHolder:
+
+class MCPTool(Tool):
+    """Adapt one FastMCP tool definition to APIX's ``Tool`` contract."""
 
     def __init__(
         self,
-        mcp_id: str,
-        mcp_name: str,
-        lifecycle: str,
-        cm: _AsyncGeneratorContextManager,
-    ):
-        self.mcp_id = mcp_id
-        self.mcp_name = mcp_name
+        definition: Any,
+        manager: MCPToolManager,
+        mcp_meta: McpMetaSchema,
+        lifecycle: MCPLifecycle,
+    ) -> None:
+        name = _get_model_value(definition, "name")
+        if not isinstance(name, str) or not name:
+            raise ValueError("An MCP tool requires a non-empty name.")
+
+        description = _get_model_value(definition, "description")
+        if not description:
+            description = _get_model_value(definition, "title", default="")
+
+        input_schema = _get_model_value(
+            definition,
+            "input_schema",
+            "inputSchema",
+            default={},
+        )
+        if not isinstance(input_schema, Mapping):
+            raise TypeError(
+                f"MCP tool {name!r} input schema must be a mapping."
+            )
+
+        self.name = name
+        self.description = str(description or "")
+        self.mcp_id = mcp_meta["mcp_id"]
+        self.mcp_name = mcp_meta["mcp_name"]
         self.lifecycle = lifecycle
-        self.cm = cm
-        self.session = None
-        self.tools: list[BaseTool] | None = None
-        self._queue: asyncio.Queue = asyncio.Queue()
-        self._worker_task: asyncio.Task | None = None
+        self._manager = manager
+        self._mcp_meta = deepcopy(mcp_meta)
+        self.func = self._call
+        self.schema = {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": deepcopy(dict(input_schema)),
+            },
+        }
 
-    async def start(self):
-        if self._worker_task:
-            return
-        loop = asyncio.get_running_loop()
-        ready = loop.create_future()
-        self._worker_task = asyncio.create_task(
-            self._run(ready),
-            name=f"mcp-lifecycle-{self.mcp_name}",
-        )
-        await ready
+    @asynccontextmanager
+    async def tool_call_batch_context(self) -> AsyncGenerator[None]:
+        """Keep the configured client scope active for one ToolNode batch."""
+        async with self._manager.client_scope(
+            self._mcp_meta,
+            self.lifecycle,
+        ):
+            yield
 
-    async def _run(self, ready_future: asyncio.Future):
-        try:
-            self.session = await self.cm.__aenter__()
-            if not ready_future.done():
-                ready_future.set_result(True)
-            while True:
-                action, future = await self._queue.get()
-                if action == "close":
-                    try:
-                        await self.cm.__aexit__(None, None, None)
-                        if not future.done():
-                            future.set_result(True)
-                    except Exception as e:
-                        if not future.done():
-                            future.set_exception(e)
-                    break
-        except Exception as e:
-            if not ready_future.done():
-                ready_future.set_exception(e)
-            raise
-        finally:
-            self.session = None
-            self.tools = None
-
-    async def stop(self):
-        if not self._worker_task:
-            return
-        if self._worker_task.done():
-            try:
-                await self._worker_task
-            except Exception as e:
-                logger.error(f"Worker already failed for '{self.mcp_name}': {e}")
-            finally:
-                self._worker_task = None
-                self.session = None
-                self.tools = None
-            return
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-        await self._queue.put(("close", future))
-        await future
-        try:
-            await self._worker_task
-        finally:
-            self._worker_task = None
-            self.session = None
-            self.tools = None
-
-    async def get_tools(self) -> list[BaseTool]:
-        if self.tools is None:
-            self.tools = await load_mcp_tools(self.session)
-        return self.tools
-
-
-class MCPToolManager:
-
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self):
-        if hasattr(self, "_initialized"):
-            return
-        self._initialized = True
-        self.mcp_client_cm: dict[str, MCPContextHolder] = {}
-
-    async def get_mcp_meta(
-        self,
-        user_uid: str,
-    ) -> list[McpMetaSchema]:
-        try:
-            res = await query_store(
-                action="get_enabled_mcp_servers",
-                payload={"user_uid": user_uid}
+    async def _call(self, **arguments: Any) -> str:
+        async with self._manager.client_scope(
+            self._mcp_meta,
+            self.lifecycle,
+        ) as client:
+            result = await client.call_tool(
+                self.name,
+                arguments,
+                raise_on_error=False,
             )
-            return res.get("messages", [])
-        except Exception as e:
-            logger.warning(f"Failed to fetch MCP meta: {e}")
-            return []
+        return _convert_call_tool_result(result)
 
-    async def create_mcp_client(
+    async def execute(
         self,
-        mcp_meta: McpMetaSchema,
-    ) -> MultiServerMCPClient | None:
-        transport = mcp_meta["transport"]
-        mcp_name = mcp_meta["mcp_name"]
-        config = mcp_meta.get("config", {})
-        try:
-            if transport == "stdio":
-                connection: StdioConnection = {
-                    mcp_name: {
-                        "transport": "stdio",
-                        "command": config.get("command"),
-                        "args": config.get("args", []),
-                        "env": config.get("env", {}),
-                        "cwd": config.get("cwd"),
-                        "encoding": config.get("encoding", "utf-8"),
-                        "session_kwargs": config.get("session_kwargs", {}),
-                    }
-                }
-            elif transport == "streamable_http":
-                connection: StreamableHttpConnection = {
-                    mcp_name: {
-                        "transport": "streamable_http",
-                        "url": config.get("url"),
-                        "headers": config.get("headers", {}),
-                        "timeout": 30,
-                        "sse_read_timeout": 30,
-                        "terminate_on_close": True,
-                        "session_kwargs": config.get("session_kwargs", {}),
-                    }
-                }
-            elif transport == "websocket":
-                connection: WebsocketConnection = {
-                    mcp_name: {
-                        "transport": "websocket",
-                        "url": config.get("url"),
-                        "session_kwargs": config.get("session_kwargs", {}),
-                    }
-                }
-            elif transport == "sse":
-                connection: SSEConnection = {
-                    mcp_name: {
-                        "transport": "sse",
-                        "url": config.get("url"),
-                        "headers": config.get("headers", {}),
-                        "timeout": 30,
-                        "sse_read_timeout": 30,
-                        "session_kwargs": config.get("session_kwargs", {}),
-                    }
-                }
-            else:
-                logger.warning(
-                    f"Unknown transport "
-                    f"'{transport}' for MCP '{mcp_name}'."
-                )
-                return None
-            client = MultiServerMCPClient(connection)
-            logger.info(
-                f"Created MCP client: "
-                f"{mcp_name}"
+        state: dict[str, Any],
+        tool_call: ToolCall,
+    ) -> str:
+        """Call the FastMCP tool with arguments supplied by the model."""
+        if not isinstance(state, dict):
+            raise TypeError("state must be a dictionary.")
+
+        self._validate_tool_call(tool_call)
+        if tool_call["tool_name"] != self.name:
+            raise ValueError(
+                f"ToolCall targets {tool_call['tool_name']!r}, "
+                f"but this tool is {self.name!r}."
             )
-            return client
-        except Exception as e:
-            logger.error(
-                f"Error while creating "
-                f"MCP client: {e}"
-            )
-            return None
 
-    async def get_mcp_tools(
-        self,
-        mcp_meta: McpMetaSchema,
-    ) -> list[BaseTool]:
-        mcp_id = mcp_meta["mcp_id"]
-        mcp_name = mcp_meta["mcp_name"]
-        config = mcp_meta.get("config", {})
-        lifecycle = config.get("lifecycle", "keep_alive") or "keep_alive"
-        try:
-            if lifecycle in ("keep_alive", "agent_loop"):
-                client = await self.create_mcp_client(mcp_meta)
-                if not client:
-                    return []
-                cm = client.session(mcp_name)
-                holder = MCPContextHolder(
-                    mcp_id=mcp_id,
-                    mcp_name=mcp_name,
-                    lifecycle=lifecycle,
-                    cm=cm,
-                )
-                await holder.start()
-                self.mcp_client_cm[mcp_id] = holder
-                tools = await holder.get_tools()
-                logger.info(f"Loaded {len(tools)} MCP tools for '{mcp_name}'")
-                return tools
-            elif lifecycle == "always_close":
-                client = await self.create_mcp_client(mcp_meta)
-                if not client:
-                    return []
-                return await client.get_tools()
-            logger.warning(f"Unknown lifecycle '{lifecycle}' for MCP '{mcp_name}'.")
-            return []
-        except Exception as e:
-            logger.error(f"Error while getting MCP tools: {e}")
-            return []
-
-    async def cache_first(
-        self,
-        mcp_meta: McpMetaSchema,
-    ) -> list[BaseTool] | None:
-        logger.trace()
-        mcp_id = mcp_meta["mcp_id"]
-        lifecycle = (
-            mcp_meta.get("config", {})
-            .get("lifecycle", "keep_alive")
-            or "keep_alive"
-        )
-        try:
-            holder = self.mcp_client_cm.get(mcp_id)
-            if not holder:
-                logger.warning("No holder found in mcp_client_cm")
-                return None
-            if holder.lifecycle != "keep_alive" or holder.lifecycle != lifecycle:
-                logger.info(f"Stop outdated MCP: {mcp_meta.get('mcp_name')}")
-                await holder.stop()
-                self.mcp_client_cm.pop(mcp_id, None)
-                return None
-            logger.info(
-                f"Reusing MCP "
-                f"'{holder.mcp_name}' "
-                f"(ID: {holder.mcp_id}, "
-                f"lifecycle: {holder.lifecycle})"
-            )
-            return await holder.get_tools()
-        except Exception as e:
-            logger.error(f"Error while reusing MCP tools: {e}")
-            return None
-
-    async def load_all_mcp_tools(
-        self,
-        user_uid: str,
-    ) -> list[BaseTool]:
-        logger.trace()
-        mcp_meta_list = await self.get_mcp_meta(user_uid)
-        all_tools: list[BaseTool] = []
-        for mcp_meta in mcp_meta_list:
-            cached_tools = await self.cache_first(mcp_meta)
-            if cached_tools is not None:
-                all_tools.extend(cached_tools)
-                continue
-            tools = await self.get_mcp_tools(mcp_meta)
-            all_tools.extend(tools)
-        return all_tools
-
-    async def cleanup_all(self):
-        holders = list(self.mcp_client_cm.values())
-        self.mcp_client_cm.clear()
-        for holder in holders:
-            try:
-                await holder.stop()
-            except Exception as e:
-                logger.error(
-                    f"Error while "
-                    f"cleaning MCP '{holder.mcp_name}' "
-                    f"(ID: {holder.mcp_id}): {e}"
-                )
-    
-    async def start(self):
-        pass
-
-    async def stop(self):
-        await self.cleanup_all()
+        return await self._call(**(tool_call["args"] or {}))
 
 
-mcp_mgr = MCPToolManager()
-
-
-auto_init.register(mcp_mgr)
+__all__ = ["MCPTool"]

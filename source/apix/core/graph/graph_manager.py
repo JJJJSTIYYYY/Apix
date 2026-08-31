@@ -192,7 +192,7 @@ class GraphManager:
         for node_name in r_nodes:
             self._require_endpoint(node_name)
         if not callable(router):
-            raise TypeError("`router` must be callable.")
+            raise TypeError("`router` must be a NodeFunction.")
 
         router_name = self._generated_node_name("router", l_node, router)
         targets = set(r_nodes)

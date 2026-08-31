@@ -155,7 +155,7 @@ def test_router_must_be_callable():
     """Router definitions reject non-callable selectors."""
     manager = GraphManager().add_nodes([source, target])
 
-    with pytest.raises(TypeError, match="router.*callable"):
+    with pytest.raises(TypeError, match="router.*NodeFunction"):
         manager.add_router("source", ["target"], router="target")
 
 
