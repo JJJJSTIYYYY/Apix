@@ -263,7 +263,7 @@ graph = manager.compile_graph(
 - `exist_ok=True` 会先分解旧图，再创建替代图。
 - 旧图有活跃调用时无法替换，会抛出 `RuntimeError`。
 
-节点事件会使用 `using_namespace` 限定作用域。全局 namespace 保持原节点名；非全局 namespace 的事件名由 `get_node_name_in_namespace()` 生成。不同 namespace 中的同名节点具有不同事件处理链，不会再调度其他图的节点监听器。`GraphContext` 的 namespace 检查仍作为运行时防御。
+图的内部调度事件会使用 `using_namespace` 限定作用域。每个 `NodeGraph` 只注册一个通用 dispatch handler，而不是为 `START`、`END` 和每个业务节点分别注册 handler。路由时，运行时先把目标节点写入 `GraphContext.target_node_name`，再发布 namespace 隔离后的 `GRAPH_DISPATCH` 事件；通用 handler 根据 `target_node_name` 执行对应节点。不同 namespace 因此拥有不同的 dispatch 事件处理链，`GraphContext` 的 namespace 检查仍作为运行时防御。
 
 模块导出的 `namespace_set` 可用于只读诊断当前被占用的 namespace。不要直接增删其中的值；正常释放必须经过 `graph.decompose()`，以同时清理图索引和事件处理器。
 
@@ -328,40 +328,38 @@ manager.add_node(slow_node, timeout=2.5)
 - 节点自身主动抛出的 `TimeoutError` 不会被错误标记为运行时 deadline。
 - `None`、`0` 和负数表示不限制。
 
-## 插件观察节点事件
+## 插件观察图调度事件
 
-图中的 `START`、节点名和 `END` 都会发布工作流事件。全局 namespace 直接使用节点名；命名图必须使用 `get_node_name_in_namespace()` 获得实际事件名。插件可以通过公共事件 API 在图节点处理器之前执行：
+节点名不再作为 Event System 的事件路由键。`START`、普通节点和 `END` 的调度都会发布同一个 `GRAPH_DISPATCH` 事件，实际目标节点保存在 `event.context.target_node_name`。这样 `NodeGraph` 只需要一个通用 handler，节点选择由 `GraphContext` 显式携带。
+
+插件如果需要观察某个图的调度，可以订阅 namespace 化后的 `GRAPH_DISPATCH`：
 
 ```python
 from apix.core.event import ApixEvent, subscribe
-from apix.core.graph import get_node_name_in_namespace
+from apix.core.graph import GRAPH_DISPATCH, get_node_name_in_namespace
 
 
 namespace = "agent-runtime"
+dispatch_event = get_node_name_in_namespace(GRAPH_DISPATCH, namespace)
 
 
-@subscribe(
-    get_node_name_in_namespace("model_call", namespace),
-    priority=20,
-)
-async def enrich_model_context(event: ApixEvent) -> None:
-    context = event.context
-    context.state["system_policy"] = "safe"
+@subscribe(dispatch_event, priority=20)
+async def observe_graph_dispatch(event: ApixEvent) -> None:
+    target_node_name = event.context.target_node_name
+    if target_node_name == "model_call":
+        event.context.state["system_policy"] = "safe"
 ```
 
-图自动注册的节点处理器默认优先级是 `1`，因此更高优先级插件会先执行。也可使用 `between_handlers` 相对指定处理器插入。
+图自身的 dispatch handler 使用默认优先级 `1`，因此更高优先级的插件 handler 会先执行。也可以使用 `between_handlers` 相对指定处理器插入。
 
-`event.event_name` 是带 namespace 的事件路由名；原始图节点名保存在 `event.context.node_name`。如果插件要监听指定 namespace 下的一组节点，可以把 glob 节点模式传给辅助函数：
+这里需要注意：
 
-```python
-@subscribe(
-    get_node_name_in_namespace("agent.*", "agent-runtime"),
-)
-async def observe_agent_nodes(event: ApixEvent) -> None:
-    original_node_name = event.context.node_name
-```
+- `event.event_name` 表示 namespace 隔离后的**通用调度事件名**，不再表示具体节点。
+- `event.context.target_node_name` 表示本次 dispatch 要执行的目标节点，可以是 `START`、`END` 或普通节点名。
+- 如果插件只关心某些节点，应订阅一次 dispatch 事件，再根据 `target_node_name` 过滤，而不是为节点名注册事件订阅。
+- `get_node_name_in_namespace(GRAPH_DISPATCH, "*")` 可用于匹配所有非全局 namespace 的图调度事件；直接订阅 `GRAPH_DISPATCH` 只对应全局 namespace。
 
-传入 `namespace="*"` 可以生成监听所有非全局 namespace 中同名节点的模式。裸节点名或裸 glob 只适合全局事件或明确需要跨 namespace 匹配的插件。
+这种结构将“事件隔离”和“节点路由”拆开：namespace 负责隔离不同图的 dispatch handler，`target_node_name` 负责描述图内部的执行目标。
 
 ## 分解图
 
@@ -371,7 +369,7 @@ graph.decompose()
 
 分解会：
 
-- 注销图节点监听器；
+- 注销图的通用 dispatch listener；
 - 注销通过 `graph.add_interrupted_hook` 注册的钩子；
 - 释放命名空间；
 - 使图拒绝新的 `invoke()`、`stream()`、`abort()` 等业务操作。

@@ -1,6 +1,6 @@
 # GraphContext、快照、恢复与流式上下文
 
-`GraphContext` 表示一次图调用尝试。它持有最新已提交状态、下一节点、step 计数、生命周期、快照历史，以及只在当前 attempt 中有效的 Future 和 stream writer。
+`GraphContext` 表示一次图调用尝试。它持有最新已提交状态、当前调度目标节点、step 计数、生命周期、快照历史，以及只在当前 attempt 中有效的 Future 和 stream writer。
 
 ## 创建与传入
 
@@ -59,7 +59,7 @@ context = GraphContext(MyState)
 | --- | --- |
 | `run_id` | 当前 attempt 的唯一 id，绑定时以 `graph-` 前缀生成 |
 | `state` | 最新已提交状态 |
-| `node_name` | 下一次应执行的节点；快照中表示快照对应的待执行节点 |
+| `target_node_name` | 当前调度目标节点；快照中表示恢复后应重新执行的目标节点 |
 | `steps` | 已完成并提交的节点执行次数 |
 | `context_snapshot` | 按时间顺序保存的快照列表 |
 
@@ -75,7 +75,7 @@ context = GraphContext(MyState)
 class GraphContextSnapshot(TypedDict):
     timestamp: float
     state: dict[str, Any]
-    node_name: str
+    target_node_name: str
     steps: int
     namespace: str
 ```
@@ -83,7 +83,7 @@ class GraphContextSnapshot(TypedDict):
 语义：
 
 - `state` 是待执行节点之前的最后已提交状态。
-- `node_name` 是恢复后应重新执行的节点。
+- `target_node_name` 是恢复后应重新执行的目标节点。
 - `steps` 是此前已经完成的 step 数。
 - `namespace` 限制恢复只能发生在原命名空间。
 - 快照会深拷贝完整 state，包括 `KeepRef` 字段。
@@ -141,7 +141,7 @@ GraphContext.from_snapshot(
 
 - `status == "pending"`；
 - 新的 attempt 尚无 `run_id`、completion 或 writer；
-- state、node、steps 与选中快照一致；
+- state、`target_node_name`、steps 与选中快照一致；
 - 整个保留历史被再次深拷贝；
 - 运行时绑定字段不会从旧 attempt 复制。
 
@@ -191,7 +191,7 @@ recovered = GraphContext.from_snapshot(
 
 - 可以分解旧图，再在相同 namespace 编译替代图并恢复。
 - 不能把 recovered context 传给不同 namespace 的图。
-- 替代图必须仍然包含快照 `node_name` 对应的节点，否则发布恢复入口时抛出 `ValueError`。
+- 替代图必须仍然包含快照 `target_node_name` 对应的节点，否则发布恢复入口时抛出 `ValueError`。
 
 ```python
 old_graph.decompose()

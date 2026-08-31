@@ -215,7 +215,7 @@ async def test_external_block_cancel_aborts_graph_at_saved_snapshot():
     assert block.done is True
     assert block.cancelled is True
     assert context.status == "aborted"
-    assert context.node_name == "wait_for_decision"
+    assert context.target_node_name == "wait_for_decision"
     assert continued.is_set() is False
     assert downstream_called.is_set() is False
 

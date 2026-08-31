@@ -36,7 +36,7 @@ class GraphContextSnapshot(TypedDict):
 
     timestamp: float
     state: dict[str, Any]
-    node_name: str
+    target_node_name: str
     steps: int
     namespace: str
 
@@ -57,8 +57,9 @@ _ALLOWED_STATUS_TRANSITIONS: dict[
 class GraphContext:
     """Mutable state and lifecycle context for one graph invocation attempt.
 
-    ``state`` is the latest committed state, while ``node_name`` identifies the
-    node that should consume it next. A context is single-use. After a failed or
+    ``state`` is the latest committed state, while ``target_node_name`` identifies
+    the node targeted by graph dispatch. Snapshots preserve this target so a
+    recovered invocation resumes from the same node. A context is single-use. After a failed or
     aborted attempt, :meth:`from_snapshot` constructs a new context for retry.
 
     A context belongs to a graph namespace rather than a specific graph
@@ -74,7 +75,7 @@ class GraphContext:
     state_schema: InitVar[type | None] = None
     run_id: str | None = field(default=None, init=False)
     state: dict[str, Any] = field(default_factory=dict, init=False)
-    node_name: str = field(default=START, init=False)
+    target_node_name: str = field(default=START, init=False)
     steps: int = field(default=0, init=False)
     context_snapshot: list[GraphContextSnapshot] = field(
         default_factory=list,
@@ -183,7 +184,7 @@ class GraphContext:
         if not isinstance(restored, dict):
             raise TypeError("GraphContext snapshot must be a dict.")
 
-        required_fields = {"state", "node_name", "steps", "namespace"}
+        required_fields = {"state", "target_node_name", "steps", "namespace"}
         missing_fields = required_fields.difference(restored)
         if missing_fields:
             missing = ", ".join(sorted(missing_fields))
@@ -193,8 +194,8 @@ class GraphContext:
 
         if not isinstance(restored["state"], dict):
             raise TypeError("GraphContext snapshot state must be a dict.")
-        if not isinstance(restored["node_name"], str):
-            raise TypeError("GraphContext snapshot node_name must be a string.")
+        if not isinstance(restored["target_node_name"], str):
+            raise TypeError("GraphContext snapshot target_node_name must be a string.")
         if (
             isinstance(restored["steps"], bool)
             or not isinstance(restored["steps"], int)
@@ -207,7 +208,7 @@ class GraphContext:
 
         context = cls(state_schema)
         context.state = restored["state"]
-        context.node_name = restored["node_name"]
+        context.target_node_name = restored["target_node_name"]
         context.steps = restored["steps"]
         context._context_namespace = restored["namespace"]
         context.context_snapshot = restored_history
@@ -291,7 +292,7 @@ class GraphContext:
         self._context_namespace = context_namespace
         self._has_started = True
         if not self.context_snapshot:
-            self.node_name = START
+            self.target_node_name = START
             self.steps = 0
 
         self.run_id = run_id
@@ -299,15 +300,15 @@ class GraphContext:
         self.completion = completion
         self.stream_writer = stream_writer
         self._transition_to("running")
-        return self.node_name
+        return self.target_node_name
 
     def _belongs_to(self, context_namespace: str) -> bool:
         """Return whether this context belongs to a graph namespace."""
         return self._context_namespace == context_namespace
 
-    def _set_next_node(self, node_name: str) -> None:
-        """Record which node should consume the current state next."""
-        self.node_name = node_name
+    def _set_target_node(self, target_node_name: str) -> None:
+        """Record the node targeted by the next graph dispatch."""
+        self.target_node_name = target_node_name
 
     def take_a_snapshot(self) -> None:
         """Capture an isolated copy of the current recoverable state."""
@@ -319,7 +320,7 @@ class GraphContext:
             {
                 "timestamp": time.time(),
                 "state": copy.deepcopy(self.state),
-                "node_name": self.node_name,
+                "target_node_name": self.target_node_name,
                 "steps": self.steps,
                 "namespace": self._context_namespace,
             }

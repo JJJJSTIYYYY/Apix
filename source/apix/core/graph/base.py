@@ -232,6 +232,10 @@ END = "__end__"
 """Predefined node name that completes every graph invocation."""
 
 
+GRAPH_DISPATCH = "__graph_dispatch__"
+"""Predefined event name used to dispatch a graph context to its target node."""
+
+
 namespace_set: set[str] = set()
 """Namespaces currently owned by compiled graphs."""
 

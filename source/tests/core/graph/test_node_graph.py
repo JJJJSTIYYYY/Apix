@@ -506,7 +506,7 @@ async def test_abort_finishes_active_run_with_saved_snapshot():
     )
     completion = context.completion
     assert completion is not None
-    context.node_name = "retry"
+    context.target_node_name = "retry"
     context.take_a_snapshot()
 
     await graph.abort(context)
@@ -522,7 +522,7 @@ async def test_abort_cannot_finish_same_run_twice():
     """A completed context cannot be aborted through the graph twice."""
     graph = NodeGraph({}, {START: END})
     context = _bound_context(graph, "active-run", {})
-    context.node_name = "retry"
+    context.target_node_name = "retry"
     context.take_a_snapshot()
 
     await graph.abort(context)
@@ -628,7 +628,7 @@ async def test_execute_node_ignores_error_after_attempt_becomes_stale():
     assert await completion == {"saved": True}
     assert context.status == "aborted"
     assert context.context_snapshot
-    assert context.context_snapshot[-1]["node_name"] == START
+    assert context.context_snapshot[-1]["target_node_name"] == START
 
 
 @pytest.mark.asyncio
@@ -645,7 +645,7 @@ async def test_post_next_failure_needs_no_quiescence_rollback(monkeypatch):
     with pytest.raises(RuntimeError, match="event pipe unavailable"):
         await graph._post_next(END, context)
 
-    assert context.node_name == END
+    assert context.target_node_name == END
     assert not hasattr(context, "_pending_events")
     assert not hasattr(context, "_quiescent")
 
@@ -678,12 +678,12 @@ def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
     delete_handler_from_registry(retained_plugin.__name__)
 
 
-def test_listener_registration_failure_rolls_back_partial_handlers():
-    """A constructor collision cannot leak listeners registered before it."""
+def test_dispatch_listener_registration_collision_does_not_leak_handler():
+    """A dispatch-handler collision cannot leak graph listener state."""
     async def conflicting_handler(event):
         pass
 
-    conflicting_handler.__name__ = "graph_listener_rollback_node"
+    conflicting_handler.__name__ = "graph_listener_rollback___graph_dispatch__"
     subscribe("foreign")(conflicting_handler)
 
     with pytest.raises(EventHandlerAlreadyRegisteredError):

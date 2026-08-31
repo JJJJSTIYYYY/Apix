@@ -69,7 +69,7 @@ def test_new_context_is_pending_unbound_and_has_no_snapshot():
     assert context.status == "pending"
     assert context.run_id is None
     assert context.state == {}
-    assert context.node_name == START
+    assert context.target_node_name == START
     assert context.steps == 0
     assert context.context_snapshot == []
     assert context.completion is None
@@ -90,7 +90,7 @@ async def test_bind_transitions_pending_to_running_without_taking_snapshot():
     assert context.run_id == "run-1"
     assert context.state == state
     assert context.state is not state
-    assert context.node_name == START
+    assert context.target_node_name == START
     assert context.context_snapshot == []
     assert context.completion is completion
     assert context.is_consumed is True
@@ -111,7 +111,7 @@ async def test_take_a_snapshot_deep_copies_recoverable_state():
     """Later live-state mutations cannot alter the saved checkpoint."""
     context = GraphContext()
     _bind(context, "run-1", {"nested": [1]}, context_namespace="agent")
-    context.node_name = "retry"
+    context.target_node_name = "retry"
     context.steps = 2
 
     before_snapshot = time.time()
@@ -127,7 +127,7 @@ async def test_take_a_snapshot_deep_copies_recoverable_state():
         if key != "timestamp"
     } == {
         "state": {"nested": [1]},
-        "node_name": "retry",
+        "target_node_name": "retry",
         "steps": 2,
         "namespace": "agent",
     }
@@ -155,7 +155,7 @@ async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
         {"values": [1], "resource": resource},
         context_namespace="agent",
     )
-    context.node_name = "retry"
+    context.target_node_name = "retry"
     context.steps = 3
     context.take_a_snapshot()
     snapshot_history = context.context_snapshot
@@ -172,7 +172,7 @@ async def test_from_snapshot_deep_copies_every_field_including_keep_ref():
     assert recovered.completion is None
     assert recovered.stream_writer is None
     assert recovered.is_consumed is False
-    assert recovered.node_name == "retry"
+    assert recovered.target_node_name == "retry"
     assert recovered.steps == 3
     assert recovered._context_namespace == "agent"
     assert recovered._state_schema is ContextState
@@ -209,14 +209,14 @@ def test_from_snapshot_rejects_empty_history():
 def test_from_snapshot_rejects_missing_fields():
     """Partially persisted checkpoints fail with a useful field list."""
     with pytest.raises(ValueError, match="missing required fields: namespace, steps"):
-        GraphContext.from_snapshot({"state": {}, "node_name": "node"})
+        GraphContext.from_snapshot({"state": {}, "target_node_name": "node"})
 
 
 @pytest.mark.parametrize(
     ("key", "value", "message"),
     [
         ("state", [], "state must be a dict"),
-        ("node_name", 1, "node_name must be a string"),
+        ("target_node_name", 1, "target_node_name must be a string"),
         ("steps", True, "steps must be an int"),
         ("steps", 1.5, "steps must be an int"),
         ("namespace", None, "namespace must be a string"),
@@ -226,7 +226,7 @@ def test_from_snapshot_rejects_invalid_field_types(key, value, message):
     """Stored fields retain explicit runtime contracts."""
     snapshot: GraphContextSnapshot = {
         "state": {},
-        "node_name": "node",
+        "target_node_name": "node",
         "steps": 0,
         "namespace": "agent",
     }
@@ -240,7 +240,7 @@ def test_from_snapshot_rejects_negative_steps():
     """A checkpoint cannot precede the start of graph execution."""
     snapshot: GraphContextSnapshot = {
         "state": {},
-        "node_name": "node",
+        "target_node_name": "node",
         "steps": -1,
         "namespace": "agent",
     }
@@ -254,12 +254,12 @@ async def test_snapshot_history_restores_latest_version_by_default():
     """Each checkpoint is retained and default recovery selects the latest."""
     context = GraphContext()
     _bind(context, "run-1", {"history": ["first"]}, context_namespace="agent")
-    context.node_name = "first-node"
+    context.target_node_name = "first-node"
     context.steps = 1
     context.take_a_snapshot()
 
     context.state = {"history": ["second"]}
-    context.node_name = "second-node"
+    context.target_node_name = "second-node"
     context.steps = 2
     context.take_a_snapshot()
 
@@ -267,7 +267,7 @@ async def test_snapshot_history_restores_latest_version_by_default():
 
     assert len(context.context_snapshot) == 2
     assert recovered.state == {"history": ["second"]}
-    assert recovered.node_name == "second-node"
+    assert recovered.target_node_name == "second-node"
     assert recovered.steps == 2
     assert len(recovered.context_snapshot) == 2
     assert recovered.context_snapshot is not context.context_snapshot
@@ -282,7 +282,7 @@ async def test_snapshot_history_restores_selected_version_as_new_branch():
 
     for version in range(3):
         context.state = {"value": version}
-        context.node_name = f"node-{version}"
+        context.target_node_name = f"node-{version}"
         context.steps = version
         context.take_a_snapshot()
 
@@ -293,7 +293,7 @@ async def test_snapshot_history_restores_selected_version_as_new_branch():
     )
 
     assert recovered.state == {"value": 1}
-    assert recovered.node_name == "node-1"
+    assert recovered.target_node_name == "node-1"
     assert recovered.steps == 1
     assert len(recovered.context_snapshot) == 2
     assert recovered.get_snapshot() == context.context_snapshot[1]
@@ -309,7 +309,7 @@ def test_from_snapshot_rejects_missing_version(version):
     """Versions outside the stored history fail explicitly."""
     snapshot: GraphContextSnapshot = {
         "state": {},
-        "node_name": "node",
+        "target_node_name": "node",
         "steps": 0,
         "namespace": "agent",
     }
@@ -323,7 +323,7 @@ def test_from_snapshot_uses_native_list_index_validation(version):
     """History version validation follows normal list indexing semantics."""
     snapshot: GraphContextSnapshot = {
         "state": {},
-        "node_name": "node",
+        "target_node_name": "node",
         "steps": 0,
         "namespace": "agent",
     }
@@ -360,7 +360,7 @@ async def test_running_abort_resolves_the_saved_snapshot_and_is_idempotent():
     """Abort returns the checkpoint even if newer context state is present."""
     context = GraphContext()
     completion = _bind(context, "run-1", {"history": ["saved"]})
-    context.node_name = "retry"
+    context.target_node_name = "retry"
     context.take_a_snapshot()
     context.state = {"history": ["newer"]}
 
@@ -384,7 +384,7 @@ async def test_finish_is_idempotent_and_does_not_replace_snapshot():
 
     finished = GraphContext()
     completion = _bind(finished, "run-1")
-    finished.node_name = "node"
+    finished.target_node_name = "node"
     finished.take_a_snapshot()
     snapshot = finished.context_snapshot
     finished.state = {"value": "finished"}
@@ -406,7 +406,7 @@ async def test_failed_context_restores_into_a_new_pending_context():
         "run-1",
         {"values": [1], "resource": {}},
     )
-    context.node_name = "retry-node"
+    context.target_node_name = "retry-node"
     context.steps = 3
     context.take_a_snapshot()
     error = RuntimeError("failed")
@@ -418,7 +418,7 @@ async def test_failed_context_restores_into_a_new_pending_context():
 
     assert context.status == "failed"
     assert recovered.status == "pending"
-    assert recovered.node_name == "retry-node"
+    assert recovered.target_node_name == "retry-node"
     assert recovered.steps == 3
     assert recovered._state_schema is None
     assert recovered.run_id is None
@@ -454,7 +454,7 @@ async def test_recovered_context_must_use_its_original_namespace():
     """A checkpoint may move to a replacement graph, but not another namespace."""
     original = GraphContext()
     _bind(original, "run-1", context_namespace="first-graph")
-    original.node_name = "retry"
+    original.target_node_name = "retry"
     original.take_a_snapshot()
     original.abort()
     recovered = GraphContext.from_snapshot(original.context_snapshot)

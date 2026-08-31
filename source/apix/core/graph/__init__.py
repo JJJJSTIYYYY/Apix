@@ -1,5 +1,6 @@
 from apix.core.graph.base import (
     END,
+    GRAPH_DISPATCH,
     START,
     AutoMerge,
     Command,
@@ -20,6 +21,7 @@ __all__ = [
     "Command",
     "END",
     "GraphManager",
+    "GRAPH_DISPATCH",
     "get_node_name_in_namespace",
     "KeepRef",
     "Node",

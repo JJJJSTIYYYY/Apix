@@ -170,7 +170,7 @@ async def test_aborted_snapshot_recovers_while_stale_node_is_still_running():
         "history": ["initial"]
     }
     assert context.status == "aborted"
-    assert context.node_name == "recoverable"
+    assert context.target_node_name == "recoverable"
 
     recovered = GraphContext.from_snapshot(context.context_snapshot)
     result = await graph.invoke(recovered.state, recovered)
@@ -182,7 +182,7 @@ async def test_aborted_snapshot_recovers_while_stale_node_is_still_running():
     assert attempts == 2
     assert context.status == "aborted"
     assert recovered.status == "finished"
-    assert recovered.node_name == END
+    assert recovered.target_node_name == END
     assert recovered.steps == 1
     assert not first_finished.is_set()
 
@@ -214,7 +214,7 @@ async def test_failed_snapshot_recovers_at_failed_node():
         await graph.invoke({"history": ["initial"]}, context)
 
     assert context.status == "failed"
-    assert context.node_name == "flaky"
+    assert context.target_node_name == "flaky"
     assert context.state == {"history": ["initial"]}
 
     recovered = GraphContext.from_snapshot(context.context_snapshot)

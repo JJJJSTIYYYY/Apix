@@ -35,19 +35,19 @@ apix/core/
 
 ## 运行模型
 
-Graph Runtime 并不在 `NodeGraph` 对象中保存每次调用的状态。一次调用的状态由 `GraphContext` 持有，并作为事件上下文在节点监听器之间传递：
+Graph Runtime 并不在 `NodeGraph` 对象中保存每次调用的状态。一次调用的状态由 `GraphContext` 持有，并通过统一的图调度事件驱动执行：
 
-1. `GraphManager` 编译图时，为 `START`、每个节点和 `END` 注册事件处理器。
+1. `GraphManager` 编译图时，为当前 namespace 注册一个通用 `GRAPH_DISPATCH` handler。
 2. `NodeGraph.invoke()` 或 `NodeGraph.stream()` 创建并绑定一次调用的 `GraphContext`。
-3. 图向 `EVENT_PIPE` 发布 `START` 事件。
-4. 全局 `APIX_EVENT_LOOP` 消费事件，并调用当前图命名空间中的节点处理器。
-5. 节点返回 `dict` 或 `Command`；运行时提交状态并发布下一节点事件。
-6. `END` 处理器将最终状态写入完成 Future，调用方得到结果。
+3. 运行时把 `START` 写入 `GraphContext.target_node_name`，并向 `EVENT_PIPE` 发布 namespace 隔离后的 `GRAPH_DISPATCH` 事件。
+4. 全局 `APIX_EVENT_LOOP` 消费事件，通用 dispatch handler 根据 `target_node_name` 选择并执行目标节点。
+5. 节点返回 `dict` 或 `Command`；运行时提交状态、更新下一个 `target_node_name`，再发布同一个 dispatch 事件。
+6. 当目标变为 `END` 时，dispatch handler 将最终状态写入完成 Future，调用方得到结果。
 
 这套模型带来两个重要性质：
 
-- 同一个编译图可以并发执行多次，因为状态由调用级 `GraphContext` 隔离。
-- 普通插件可以订阅节点名事件，在节点执行前观察或修改上下文，而不需要侵入 `NodeGraph` 内部实现。
+- 同一个编译图可以并发执行多次，因为状态和节点路由目标都由调用级 `GraphContext` 隔离。
+- 事件系统只负责图级 dispatch 和 namespace 隔离，不再用具体节点名承担内部路由职责；插件需要观察节点调度时，可订阅 `GRAPH_DISPATCH` 并检查 `event.context.target_node_name`。
 
 ## 最小示例
 
@@ -182,7 +182,7 @@ async def shutdown_core_runtime() -> None:
 
 ### 编译图
 
-每个已编译图会占用一个监听器命名空间。使用完成后调用 `graph.decompose()`，或使用同步上下文管理器：
+每个已编译图会占用一个 dispatch listener 命名空间。使用完成后调用 `graph.decompose()`，或使用同步上下文管理器：
 
 ```python
 with (
@@ -194,7 +194,7 @@ with (
     result = await graph.invoke({})
 ```
 
-正在执行调用的图不能被分解。`decompose()` 成功后会注销图拥有的节点处理器和中断钩子，并释放命名空间；该 `NodeGraph` 不能再次调用。
+正在执行调用的图不能被分解。`decompose()` 成功后会注销图拥有的通用 dispatch handler 和中断钩子，并释放命名空间；该 `NodeGraph` 不能再次调用。
 
 ## 并发边界
 

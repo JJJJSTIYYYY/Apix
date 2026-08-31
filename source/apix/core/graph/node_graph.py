@@ -18,6 +18,7 @@ from apix.core.event import (
 )
 from apix.core.graph.base import (
     END,
+    GRAPH_DISPATCH,
     START,
     Command,
     Reset,
@@ -97,6 +98,10 @@ class NodeGraph:
         self._invocation_count = 0
         self._listener_namespace = using_namespace or ""
         self._listener_handler_names: list[str] = []
+        self._dispatch_event_name = get_node_name_in_namespace(
+            GRAPH_DISPATCH,
+            self._listener_namespace,
+        )
         self._decomposed = False
         self._register_node_listeners()
 
@@ -128,34 +133,31 @@ class NodeGraph:
         return normalised
 
     def _register_node_listeners(self) -> None:
-        """Subscribe handlers for user nodes plus the predefined start/end nodes."""
-        try:
-            for node_name in (START, *self._nodes, END):
-                async def run_node(event: ApixEvent, *, _node_name: str = node_name) -> None:
-                    """Extract context state and execute the event's graph node."""
-                    context = event.context
-                    if not self._is_active_context(context):
-                        return
-                    if _node_name == START:
-                        await self._execute_start(context)
-                    elif _node_name == END:
-                        self._finish(context)
-                    else:
-                        await self._execute_node(_node_name, context)
+        """Subscribe the graph's single namespace-scoped dispatch handler."""
+        async def dispatch_node(event: ApixEvent) -> None:
+            """Dispatch an active context to its currently targeted node."""
+            context = event.context
+            if not self._is_active_context(context):
+                return
 
-                event_name = get_node_name_in_namespace(
-                    node_name,
-                    self._listener_namespace,
-                )
-                run_node.__name__ = _get_node_listener_name(
-                    node_name,
-                    self._listener_namespace,
-                )
-                subscribe(
-                    event_name,
-                    exist_ok=False,
-                )(run_node)
-                self._listener_handler_names.append(run_node.__name__)
+            target_node_name = context.target_node_name
+            if target_node_name == START:
+                await self._execute_start(context)
+            elif target_node_name == END:
+                self._finish(context)
+            else:
+                await self._execute_node(target_node_name, context)
+
+        dispatch_node.__name__ = _get_node_listener_name(
+            GRAPH_DISPATCH,
+            self._listener_namespace,
+        )
+        try:
+            subscribe(
+                self._dispatch_event_name,
+                exist_ok=False,
+            )(dispatch_node)
+            self._listener_handler_names.append(dispatch_node.__name__)
         except BaseException:
             self._unregister_node_listeners()
             raise
@@ -512,13 +514,13 @@ class NodeGraph:
 
 
     async def _post_next(self, node_name: str, context: GraphContext) -> None:
-        """Post a node-name event while retaining the invocation context."""
+        """Target one node and post the graph's generic dispatch event."""
         if node_name not in (START, END) and node_name not in self._nodes:
             raise ValueError(f"Unknown graph node `{node_name}`.")
-        context._set_next_node(node_name)
+        context._set_target_node(node_name)
         await EVENT_PIPE.post_event(
             event_type=EventType.WORKFLOW,
-            event_name=get_node_name_in_namespace(node_name, self._listener_namespace),
+            event_name=self._dispatch_event_name,
             context=context,
         )
 

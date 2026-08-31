@@ -671,7 +671,7 @@ async def test_original_nested_input_is_not_mutated():
 
 
 async def test_graphs_with_same_node_name_do_not_handle_each_others_runs():
-    """Global event listeners filter invocations by their owning graph run ID."""
+    """Namespace-scoped dispatch listeners isolate graphs with shared node names."""
     calls = []
 
     def graph_a_node(state):
@@ -695,8 +695,8 @@ async def test_graphs_with_same_node_name_do_not_handle_each_others_runs():
         .compile_graph(using_namespace="graph-b")
     )
 
-    graph_a_event = get_node_name_in_namespace("shared", "graph-a")
-    graph_b_event = get_node_name_in_namespace("shared", "graph-b")
+    graph_a_event = graph_a._dispatch_event_name
+    graph_b_event = graph_b._dispatch_event_name
     graph_a_handlers = APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
         graph_a_event
     )

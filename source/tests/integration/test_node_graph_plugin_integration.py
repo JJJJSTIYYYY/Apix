@@ -11,7 +11,7 @@ from apix.core.event import (
 )
 from apix.core.event.event_loop import APIX_EVENT_LOOP
 from apix.core.event import EVENT_PIPE
-from apix.core.graph import START, GraphManager
+from apix.core.graph import GRAPH_DISPATCH, START, GraphManager
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -47,9 +47,11 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
         .compile_graph()
     )
 
-    # Compiling NodeGraph registers one event handler for the business node.
+    # Compiling NodeGraph registers one shared dispatch handler. Plugins
+    # observe the dispatch event and inspect target_node_name to decide
+    # whether they should act on a specific graph node.
     [node_graph_handler_name] = (
-        APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(node_name)
+        APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(GRAPH_DISPATCH)
     )
     node_graph_handler = APIX_HANDLER_REGISTRY.get_handler(
         node_graph_handler_name
@@ -57,26 +59,30 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
 
     # A higher priority makes this handler the left boundary of the plugin
     # insertion range; NodeGraph listeners use the default priority of 1.
-    @subscribe(node_name, priority=10)
+    @subscribe(GRAPH_DISPATCH, priority=10)
     async def plugin_demo_authentication(event: ApixEvent) -> None:
+        if event.context.target_node_name != node_name:
+            return
         event.context.state["pipeline"].append("authentication-plugin")
 
     # A plugin is just another event subscriber. Function names identify the
     # two existing handlers between which it should be inserted.
     @subscribe(
-        node_name,
+        GRAPH_DISPATCH,
         between_handlers=(
             plugin_demo_authentication.__name__,
             node_graph_handler.name,
         ),
     )
     async def plugin_demo_enrichment(event: ApixEvent) -> None:
+        if event.context.target_node_name != node_name:
+            return
         state = event.context.state
         state["pipeline"].append("enrichment-plugin")
         state["plugin_value"] = "injected through event plugin"
 
     handler_names = APIX_HANDLER_REGISTRY.get_handlers_chain_for_event(
-        node_name
+        GRAPH_DISPATCH
     )
     assert handler_names == [
         plugin_demo_authentication.__name__,

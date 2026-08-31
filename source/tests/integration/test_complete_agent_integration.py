@@ -33,6 +33,7 @@ from apix.core.graph import (
     AutoMerge,
     Command,
     END,
+    GRAPH_DISPATCH,
     GraphManager,
     KeepRef,
     START,
@@ -352,25 +353,31 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
     model_event = "complete_agent.plugin.model"
     persist_event = "complete_agent.plugin.persist"
 
+    dispatch_event = get_node_name_in_namespace(GRAPH_DISPATCH, namespace)
+
     @subscribe(
-        get_node_name_in_namespace(model_event, namespace),
+        dispatch_event,
         priority=20,
         exist_ok=False,
     )
     async def add_safety_policy(event: ApixEvent) -> None:
+        if event.context.target_node_name != model_event:
+            return
         state = event.context.state
         state["model_input"] += " | safety=enabled"
         state["plugin_trace"].append("safety:model")
 
     @subscribe(
-        get_node_name_in_namespace("complete_agent.plugin.*", namespace),
+        dispatch_event,
         priority=10,
-        filter_event=[get_node_name_in_namespace(persist_event, namespace)],
         exist_ok=False,
     )
     async def observe_agent_nodes(event: ApixEvent) -> None:
+        target_node_name = event.context.target_node_name
+        if target_node_name in (START, persist_event, END):
+            return
         event.context.state["plugin_trace"].append(
-            f"observe:{event.context.node_name.rsplit('.', 1)[-1]}"
+            f"observe:{target_node_name.rsplit('.', 1)[-1]}"
         )
 
     def prepare_model_input(state: dict[str, Any]) -> dict[str, Any]:
@@ -435,36 +442,25 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
 
 
 async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
-    """A plugin author can inspect coverage and disable selected hooks."""
+    """A plugin can observe and unsubscribe from the generic graph dispatch event."""
     namespace = "complete_agent_extension_runtime"
     prepare_event = "complete_agent.extension.prepare"
     model_event = "complete_agent.extension.model"
-    extension_pattern = get_node_name_in_namespace(
-        "complete_agent.extension.*",
-        namespace,
-    )
+    dispatch_event = get_node_name_in_namespace(GRAPH_DISPATCH, namespace)
     unseen_pattern = get_node_name_in_namespace(
         "complete_agent.extension.never.*",
-        namespace,
-    )
-    qualified_prepare_event = get_node_name_in_namespace(
-        prepare_event,
-        namespace,
-    )
-    qualified_model_event = get_node_name_in_namespace(
-        model_event,
         namespace,
     )
     calls: list[str] = []
 
     @subscribe(
-        extension_pattern,
+        dispatch_event,
         unseen_pattern,
         priority=5,
         exist_ok=False,
     )
     async def record_extension_event(event: ApixEvent) -> None:
-        calls.append(event.context.node_name)
+        calls.append(event.context.target_node_name)
 
     def prepare(state: dict[str, Any]) -> dict[str, Any]:
         return {"prepared": state["prompt"].upper()}
@@ -484,41 +480,33 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
     try:
         handler_meta = get_handler_meta(record_extension_event.__name__)
         assert handler_meta is not None
-        assert handler_meta["subscribe"] == [
-            extension_pattern,
-            unseen_pattern,
-        ]
+        assert handler_meta["subscribe"] == [dispatch_event, unseen_pattern]
         assert handler_meta["priority"] == 5
         assert get_unmatched_subscriptions(record_extension_event.__name__) == [
-            extension_pattern,
+            dispatch_event,
             unseen_pattern,
         ]
 
         first_result = await graph.invoke({"prompt": "hello"})
         assert first_result["answer"] == "model:HELLO"
-        assert calls == [prepare_event, model_event]
+        assert calls == [START, prepare_event, model_event, END]
         assert get_unmatched_subscriptions(record_extension_event.__name__) == [
             unseen_pattern
         ]
-        assert {qualified_prepare_event, qualified_model_event}.issubset(
-            APIX_EVENT_REGISTRY.get_registered_events()
-        )
+        assert dispatch_event in APIX_EVENT_REGISTRY.get_registered_events()
 
         calls.clear()
         unsubscribe(
             record_extension_event.__name__,
-            [qualified_model_event],
+            [dispatch_event],
         )
         await graph.invoke({"prompt": "second"})
-        assert calls == [prepare_event]
+        assert calls == []
         assert get_handler_meta(record_extension_event.__name__)[
             "filter_event"
-        ] == [qualified_model_event]
+        ] == [dispatch_event]
 
-        calls.clear()
         unsubscribe(record_extension_event.__name__)
-        await graph.invoke({"prompt": "third"})
-        assert calls == []
     finally:
         graph.decompose()
         delete_handler_from_registry(record_extension_event.__name__)
