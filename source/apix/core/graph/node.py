@@ -62,18 +62,12 @@ class BaseNode(ABC):
 
             if not isinstance(update, Mapping):
                 raise InvalidNodeReturnsError("Command.update must be a dict.")
-            if (
-                result.has_goto
-                and goto is not None
-                and not isinstance(goto, str)
-            ):
+            if goto is not None and not isinstance(goto, str):
                 raise InvalidNodeReturnsError(
                     "Command.goto must be a string or None."
                 )
 
-            if result.has_goto:
-                return Command(update=dict(update), goto=goto)
-            return Command(update=dict(update))
+            return Command(update=dict(update), goto=goto)
 
         if not isinstance(result, Mapping):
             raise InvalidNodeReturnsError(

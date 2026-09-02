@@ -146,7 +146,7 @@ Command(update={"key": "value"})
 
 Command(update={"key": "value"}, goto="next_node")
 
-Command(goto=None)  # Explicitly route to END
+Command(goto=END)  # Explicitly route to END
 ```
 
 空字典是有效更新。普通 `Node` 不接受 `None` 或 `list[Command]`。
@@ -162,8 +162,8 @@ def node(state: dict) -> dict:
 
 ### 默认路由与显式路由
 
-- 未向 `Command` 传入 `goto`：使用 manager 为当前节点定义的默认出边；若没有则进入 `END`。
-- `goto=None`：显式进入 `END`。
+- `goto=None`（默认值）：使用 manager 为当前节点定义的默认出边；若没有则进入 `END`。
+- `goto=END`：显式进入 `END`。
 - `goto="node"`：覆盖默认边。
 - 未知节点名：运行失败并传播 `ValueError`。
 

@@ -500,11 +500,9 @@ class NodeGraph:
 
             next_node = (
                 current_command.goto
-                if current_command.has_goto
+                if current_command.goto is not None
                 else self._default_gotos.get(node_name, END)
             )
-            if next_node is None:
-                next_node = END
             if not isinstance(next_node, str):
                 raise TypeError("Command.goto must be a string or None.")
 

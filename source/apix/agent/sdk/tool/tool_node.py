@@ -959,11 +959,7 @@ class ToolNode(BaseNode):
         if self._is_command(result):
             if not isinstance(result.update, dict):
                 raise TypeError("Command.update must be a dict.")
-            if (
-                result.has_goto
-                and result.goto is not None
-                and not isinstance(result.goto, str)
-            ):
+            if result.goto is not None and not isinstance(result.goto, str):
                 raise TypeError("Command.goto must be a string or None.")
 
             update = dict(result.update)
@@ -995,9 +991,7 @@ class ToolNode(BaseNode):
                 )
             ]
 
-            if result.has_goto:
-                return Command(update=update, goto=result.goto)
-            return Command(update=update)
+            return Command(update=update, goto=result.goto)
 
         if isinstance(result, ApixToolMessage):
             message = self._apply_tool_message_metadata(

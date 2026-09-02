@@ -163,19 +163,17 @@ class State(TypedDict):
 ```python
 Command(
     update: dict[str, Any] = {},
-    goto: str | None = omitted,
+    goto: str | None = None,
 )
 ```
 
-`goto` 有三种不同状态：
+`goto` 有两种语义：
 
 | 写法 | 路由行为 |
 | --- | --- |
-| `Command()` | 使用 manager 默认边；没有默认边时进入 `END` |
-| `Command(goto=None)` | 显式进入 `END` |
+| `Command()` 或 `Command(goto=None)` | 使用 manager 默认边；没有默认边时进入 `END` |
+| `Command(goto=END)` | 显式进入 `END` |
 | `Command(goto="next")` | 显式进入 `next` |
-
-`Command.has_goto` 用于区分“省略 goto”和“显式传入 None”。
 
 ## 多 Command 提交
 

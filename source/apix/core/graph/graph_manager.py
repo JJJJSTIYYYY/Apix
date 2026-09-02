@@ -201,7 +201,7 @@ class GraphManager:
             """Run the router and turn its selected target into a command."""
             result = await self._call(router, state)
             if isinstance(result, Command):
-                result = result.goto if result.has_goto else None
+                result = result.goto
             elif isinstance(result, Mapping) and "goto" in result:
                 result = result["goto"]
             if result not in targets:

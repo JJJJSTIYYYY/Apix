@@ -84,8 +84,8 @@ def test_command_is_a_dataclass_with_independent_update_defaults():
     assert is_dataclass(Command)
     assert first.update == {"value": 1}
     assert second.update == {}
-    assert first.has_goto is False
-    assert Command(goto=None).has_goto is True
+    assert first.goto is None
+    assert Command(goto=None).goto is None
 
 
 def test_is_command_requires_an_actual_command_instance():

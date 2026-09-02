@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import (
     Annotated,
     Any,
@@ -282,15 +281,6 @@ def _release_namespace(graph: NodeGraph) -> None:
         namespace_set.discard(namespace)
 
 
-class _UnsetGoto(Enum):
-    """Sentinel used to distinguish an omitted route from ``goto=None``."""
-
-    VALUE = "unset"
-
-
-_UNSET_GOTO = _UnsetGoto.VALUE
-
-
 @dataclass(slots=True)
 class Command:
     """A node result that updates state and optionally chooses the next node.
@@ -302,17 +292,12 @@ class Command:
             field even when its state annotation contains
             :class:`AutoMerge`.
         goto:
-            The next node name. ``None`` explicitly routes to ``END``;
-            omitting this key permits a manager-defined default transition.
+            The next node name. ``None`` permits a manager-defined default
+            transition. Use :data:`END` to explicitly end the graph.
     """
 
     update: dict[str, Any] = field(default_factory=dict)
-    goto: str | None | _UnsetGoto = _UNSET_GOTO
-
-    @property
-    def has_goto(self) -> bool:
-        """Return whether ``goto`` was explicitly supplied."""
-        return self.goto is not _UNSET_GOTO
+    goto: str | None = None
 
 
 NodeResult: TypeAlias = dict[str, Any] | Command

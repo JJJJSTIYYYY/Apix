@@ -230,7 +230,8 @@ async def test_empty_command_list_is_a_noop_and_uses_default_route():
     [
         ([Command(goto="first"), Command()], "default"),
         ([Command(goto="first"), Command(goto="second")], "second"),
-        ([Command(goto="first"), Command(goto=None)], None),
+        ([Command(goto="first"), Command(goto=None)], "default"),
+        ([Command(goto="first"), Command(goto=END)], None),
         ([Command(), Command(goto="second")], "second"),
     ],
 )
@@ -521,10 +522,10 @@ async def test_node_command_can_override_default_transition():
     assert await graph.invoke({}) == {"selected": True, "reached": True}
 
 
-async def test_explicit_none_goto_routes_to_end():
-    """An explicit None goto terminates the invocation."""
+async def test_explicit_end_goto_routes_to_end():
+    """An explicit END goto terminates the invocation."""
     def source(state):
-        return Command(update={"finished": True}, goto=None)
+        return Command(update={"finished": True}, goto=END)
 
     graph = GraphManager().add_node(source).add_edge(START, "source").compile_graph()
 

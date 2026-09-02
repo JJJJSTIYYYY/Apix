@@ -354,7 +354,7 @@ async def test_command_looking_dict_result_is_still_plain_tool_output():
     assert _message_from(commands[0]).content == (
         "{'update': {'value': 3}, 'goto': 'next'}"
     )
-    assert commands[0].has_goto is False
+    assert commands[0].goto is None
 
 
 @pytest.mark.asyncio
@@ -980,7 +980,6 @@ def test_normalise_valid_command_preserves_updates_and_goto():
         call,
     )
     assert goto_command.goto is None
-    assert goto_command.has_goto is True
 
 
 def test_normalise_tool_result_uses_configured_messages_key():
