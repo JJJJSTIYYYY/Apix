@@ -88,6 +88,8 @@ def get_stream_writer() -> StreamWriter:
 def get_graph_context() -> GraphContext:
     """Return the context bound to the graph currently being invoked.
 
+    **Not recommended since a context should be read-only.**
+
     Raises:
         RuntimeError: If called outside a graph invocation context.
     """

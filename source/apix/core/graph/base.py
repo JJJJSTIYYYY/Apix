@@ -31,6 +31,8 @@ class AutoMerge:
     value's ``__add__`` method with the update value. A field that is not yet
     present in state is initialized directly from the update value.
 
+    Override ``__add__`` to define a custom merge logic.
+
     Example:
         ``messages: Annotated[list, AutoMerge()]``
     """
@@ -57,6 +59,8 @@ class KeepRef:
         Since copied states share the same object reference, concurrent graph
         executions or parallel node operations may access and mutate the same
         object, causing unexpected side effects or race conditions.
+        Additionally, it is also not recommended to update the key marked with
+        ``KeepRef`` via Command. **This may lead to unpredictable behavior.**
 
     Example:
         ``context: Annotated[ContextOrganizer, KeepRef()]``
