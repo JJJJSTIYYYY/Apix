@@ -14,7 +14,7 @@ _current_graph_context: ContextVar["GraphContext | None"] = ContextVar(
 
 @contextmanager
 def apix_graph_context(context: GraphContext) -> Generator[None, None, None]:
-    """Bind a graph context for the duration of one node execution."""
+    """Bind a graph context for one node or concurrent batch execution."""
     token = _current_graph_context.set(context)
     try:
         yield

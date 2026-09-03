@@ -13,7 +13,7 @@
 5. 外部调用 `block.resolve(value)`。
 6. `interrupt()` 返回 value，节点从暂停点继续执行。
 
-如果外部调用 `block.cancel()`，当前图 attempt 会回到节点执行前的最新快照并进入 `aborted`。
+如果外部调用 `block.cancel()`，当前图 attempt 会回到当前节点或并发批次执行前的最新快照并进入 `aborted`。
 
 ## 推荐用法：图拥有的 hook
 
@@ -124,7 +124,7 @@ await interrupt(
 
 节点外省略 `context` 会抛出 `RuntimeError`。即使显式传入 context，它也必须仍处于 active 调用中。
 
-`interrupt()` 本身不创建额外快照。Graph Runtime 已在当前节点执行之前自动保存快照，所以取消中断会回到当前节点之前的状态。
+`interrupt()` 本身不创建额外快照。Graph Runtime 已在当前节点或并发批次执行之前自动保存快照，所以取消中断会回到本次调度之前的状态。
 
 ## Block
 
@@ -191,7 +191,7 @@ block.cancel()
 3. 所属 `GraphContext.abort()` 被调用；
 4. 当前节点立即因 `CancelledError` 停止；
 5. 下游节点不会运行；
-6. `invoke()` 返回当前节点执行前的最新快照状态。
+6. `invoke()` 返回当前节点或并发批次执行前的最新快照状态。
 
 运行时自身取消任务（例如节点 timeout、stream 消费者退出）与外部 `Block.cancel()` 会被区分，不会被误当作一次人工取消。节点 timeout 仍按 `TimeoutError` 向调用方传播。
 

@@ -11,7 +11,7 @@
 | `Node` | 将普通同步或异步函数包装为节点 |
 | `ParallelNode` | 并发执行多个分支，并按声明顺序汇聚命令 |
 | `BaseNode` | 自定义节点基类，允许返回多个 `Command` |
-| `Command` | 提交状态更新并可覆盖下一节点 |
+| `Command` | 提交状态更新并可选择一个或多个下一节点 |
 | `AutoMerge` | 标记字段使用 `__add__` 合并更新 |
 | `Reset` | 为单次更新绕过 `AutoMerge`，直接替换字段 |
 | `KeepRef` | 节点执行前复制状态时保留字段引用 |
@@ -90,7 +90,7 @@ manager.add_node(lambda state: {"ready": True}, "prepare")
 manager.add_edge("prepare", "fetch")
 ```
 
-每个 source 只能由 manager 定义一条默认出边。需要多路选择时使用条件边、router，或让节点返回带 `goto` 的 `Command`。
+每个 source 只能由 manager 定义一条默认出边。需要多路选择时使用 router，或让节点返回 `goto=[...]` 的 `Command`。
 
 ### 添加条件边
 
@@ -114,24 +114,26 @@ manager.add_edge("prepare", "process", condition=has_work)
 ### 添加 router
 
 ```python
-def select_route(state: State) -> str:
-    return "fast" if state["priority"] > 5 else "normal"
+def select_route(state: State) -> str | list[str]:
+    if state["priority"] > 5:
+        return ["fast", "audit"]
+    return "normal"
 
 
 manager.add_router(
     "prepare",
-    ["fast", "normal", END],
+    ["fast", "normal", "audit", END],
     select_route,
 )
 ```
 
 router 可以返回：
 
-- 声明在 `r_nodes` 中的字符串；
-- `Command(goto="...")`；
-- `{"goto": "..."}`。
+- 声明在 `r_nodes` 中的字符串或字符串列表；
+- `Command(goto="...")` 或 `Command(goto=[...])`；
+- `{"goto": "..."}` 或 `{"goto": [...]}`。
 
-返回目标必须已经列入 `r_nodes`。没有显式 `goto` 的 `Command`、不含 `goto` 的 mapping，或未知目标都会导致 `ValueError`。
+每个返回目标都必须已经列入 `r_nodes`。空列表表示不调度后续节点并结束图。没有显式 `goto` 的 `Command`、不含 `goto` 的 mapping，或未知目标都会导致 `ValueError`。
 
 router 自身生成一个内部节点。内部条件和 router 节点也会占用一次执行 step。
 
@@ -145,6 +147,10 @@ router 自身生成一个内部节点。内部条件和 router 节点也会占�
 Command(update={"key": "value"})
 
 Command(update={"key": "value"}, goto="next_node")
+
+Command(goto=["fetch_profile", "fetch_memory"])
+
+Command(goto=[])  # Do not schedule another node; finish the graph
 
 Command(goto=END)  # Explicitly route to END
 ```
@@ -165,7 +171,32 @@ def node(state: dict) -> dict:
 - `goto=None`（默认值）：使用 manager 为当前节点定义的默认出边；若没有则进入 `END`。
 - `goto=END`：显式进入 `END`。
 - `goto="node"`：覆盖默认边。
+- `goto=["a", "b"]`：按列表顺序启动一个图级并发批次。
+- `goto=[]`：不进入任何后续节点，直接结束。
 - 未知节点名：运行失败并传播 `ValueError`。
+
+## 图级并发调度
+
+`Command.goto` 或 router 返回字符串列表时，列表中的节点属于同一个调度批次：
+
+```python
+def fan_out(state: State) -> Command:
+    return Command(goto=["load_profile", "load_memory", "load_policy"])
+```
+
+图级批次遵循以下规则：
+
+1. 节点按 `goto` 列表顺序创建 task，并发执行。
+2. 每个节点接收当前 state 的独立 `_copy_state` 副本；一个节点直接修改输入不会串流到同批其他节点。
+3. 所有节点共享同一个 `GraphContext`。context 在节点执行期间按约定只读，可通过 `get_graph_context()` 获取。
+4. 结果按节点启动顺序收集，与完成顺序无关。节点返回 `list[Command]` 时会在其原位置展平。
+5. 所有节点都成功完成后，运行时按节点顺序、再按节点内部 Command 顺序直接更新 `GraphContext.state`。
+6. 同批不同节点更新同一个普通字段会失败；`AutoMerge` 字段则按上述确定顺序调用 `__add__`。
+7. 任一节点失败或超时，尚未完成的同批 task 会被取消并等待回收，且本批所有 Command 都不会应用。
+
+路由也按相同的 Command 顺序收集。每条 `goto=None` 独立解析为其来源节点的默认边，嵌套的路由列表会被展平，重复目标采用稳定去重。只要仍有普通目标，`END` 就会被过滤；没有普通目标时进入 `END`。
+
+每批执行前只拍摄一次快照，`target_node_name` 保存有序目标列表。一批成功提交后 `steps` 加一。应用 Command 时不创建临时 state：如果后续 Command 因普通键冲突或合并错误而失败，失败 context 的 live state 可能包含较早 Command 的更新；恢复会从批次前快照重新执行整批，因此不会继承这些部分更新。
 
 ## 并行分支与确定性汇聚
 
@@ -216,13 +247,15 @@ graph = (
 2. 每个分支必须返回一个 mapping 或 `Command`，不能返回嵌套的 `list[Command]`。
 3. 所有分支完成后，结果始终按分支声明顺序组成 `list[Command]`，与完成先后无关。
 4. `NodeGraph` 按该顺序逐个提交 command，因此 `AutoMerge` 的累积顺序和普通字段的覆盖结果是确定的。
-5. 多个分支都指定 `goto` 时，声明顺序靠后的分支决定最终 route；未指定时使用节点默认边。
+5. 每个分支的 route 都会按声明顺序收集并展平；未指定时使用 `ParallelNode` 自身的默认边。
 6. 任一分支失败，尚未完成的兄弟任务会被取消并等待回收，然后原始异常传播给图调用方。
 7. 节点 timeout 或外部任务取消同样会清理所有未完成分支。
 
 所有分支接收同一份节点级 state 快照，而不是各自的 deepcopy。分支应把 state 当作只读输入，并通过返回值提交更新。直接并发修改普通嵌套对象会造成分支间干扰；并发修改 `KeepRef` 对象还可能影响调用方持有的共享资源，因此必须由资源自身提供并发控制。
 
-`ParallelNode` 表达的是“一个图节点内部的 fan-out/fan-in”：分支具有并发执行和统一汇聚，但没有各自独立的图边、快照或中断入口。如果每个分支都需要独立路由和生命周期，则仍需要更高层的图拓扑能力。
+`ParallelNode` 表达的是“一个图节点内部的 fan-out/fan-in”：分支具有并发执行和统一汇聚，但没有各自独立的图边、快照或中断入口。图级并发则把多个已注册节点组成批次，每个节点都有独立 state 副本和自己的默认边。
+
+二者可以组合：`goto=["prepare_context", "audit"]` 可以让一个 `ParallelNode` 与普通节点并发。此时 `ParallelNode` 整体接收一个独立于 `audit` 的 state 副本，而它的内部所有分支仍共享该副本。冲突检测以图节点为边界：同一个 `ParallelNode` 返回的多条 Command 可以依次覆盖普通键；若它和同批 `audit` 都更新同一个普通键，则批次失败。
 
 ## 自定义 BaseNode
 
@@ -243,7 +276,7 @@ class BatchNode(BaseNode):
         ]
 ```
 
-命令按原顺序逐个提交；后一条命令看到前一条已经提交的状态，最后一条命令决定最终路由。空列表等价于一个空 `Command`。
+命令按原顺序逐个提交；后一条命令看到前一条已经提交的状态。每条命令的 route 都会按顺序进入下一批路由集合。空列表等价于一个空 `Command`。
 
 ## 编译与命名空间
 
@@ -281,7 +314,7 @@ result = await graph.invoke(initial_state, graph_context=None)
 - 节点异常、超时、非法返回或非法路由会由 await 抛给调用方。
 - 可选 `graph_context` 用于外部 abort 和后续快照恢复。
 
-同一个 `NodeGraph` 可以并发 `invoke()`；每次调用使用独立 `GraphContext` 和完成 Future。
+同一个 `NodeGraph` 可以并发 `invoke()`；每次调用使用独立 `GraphContext`、run id 和完成 Future。一次调用的并发节点共享该调用的 context，但不会看到其他调用的 context 或普通 state。
 
 ## stream()
 
@@ -315,7 +348,7 @@ async def generate(state: dict) -> dict:
 graph.set_max_steps(100)
 ```
 
-每次普通或内部节点成功执行并提交命令后，step 加一。达到上限后再次应用命令会抛出 `RecursionError`。该限制用于阻止未受控循环。
+每个普通、内部或图级并发批次成功提交命令后，step 加一；一个批次无论包含多少节点都只增加一次。达到上限后再次应用命令会抛出 `RecursionError`。该限制用于阻止未受控循环。
 
 ## 超时
 
@@ -346,7 +379,12 @@ dispatch_event = get_node_name_in_namespace(GRAPH_DISPATCH, namespace)
 @subscribe(dispatch_event, priority=20)
 async def observe_graph_dispatch(event: ApixEvent) -> None:
     target_node_name = event.context.target_node_name
-    if target_node_name == "model_call":
+    targets = (
+        target_node_name
+        if isinstance(target_node_name, list)
+        else [target_node_name]
+    )
+    if "model_call" in targets:
         event.context.state["system_policy"] = "safe"
 ```
 
@@ -355,7 +393,7 @@ async def observe_graph_dispatch(event: ApixEvent) -> None:
 这里需要注意：
 
 - `event.event_name` 表示 namespace 隔离后的**通用调度事件名**，不再表示具体节点。
-- `event.context.target_node_name` 表示本次 dispatch 要执行的目标节点，可以是 `START`、`END` 或普通节点名。
+- `event.context.target_node_name` 表示本次 dispatch 要执行的目标，可以是 `START`、`END`、普通节点名或有序节点名列表。
 - 如果插件只关心某些节点，应订阅一次 dispatch 事件，再根据 `target_node_name` 过滤，而不是为节点名注册事件订阅。
 - `get_node_name_in_namespace(GRAPH_DISPATCH, "*")` 可用于匹配所有非全局 namespace 的图调度事件；直接订阅 `GRAPH_DISPATCH` 只对应全局 namespace。
 

@@ -83,12 +83,15 @@ class BaseNode(ABC):
 
             if not isinstance(update, Mapping):
                 raise InvalidNodeReturnsError("Command.update must be a dict.")
-            if goto is not None and not isinstance(goto, str):
+            if not BaseNode._is_valid_goto(goto):
                 raise InvalidNodeReturnsError(
-                    "Command.goto must be a string or None."
+                    "Command.goto must be a string or None, or a list of strings."
                 )
 
-            return Command(update=dict(update), goto=goto)
+            return Command(
+                update=dict(update),
+                goto=list(goto) if isinstance(goto, list) else goto,
+            )
 
         if not isinstance(result, Mapping):
             raise InvalidNodeReturnsError(
@@ -97,6 +100,18 @@ class BaseNode(ABC):
             )
 
         return Command(update=dict(result))
+
+    @staticmethod
+    def _is_valid_goto(value: object) -> bool:
+        """Return whether a command route satisfies the public contract."""
+        return (
+            value is None
+            or isinstance(value, str)
+            or (
+                isinstance(value, list)
+                and all(isinstance(item, str) for item in value)
+            )
+        )
 
     @staticmethod
     async def _gather_tasks_in_order(

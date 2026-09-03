@@ -292,12 +292,14 @@ class Command:
             field even when its state annotation contains
             :class:`AutoMerge`.
         goto:
-            The next node name. ``None`` permits a manager-defined default
-            transition. Use :data:`END` to explicitly end the graph.
+            One or more next node names. A list schedules its nodes in one
+            concurrent batch and also defines their deterministic result
+            application order. ``None`` permits a manager-defined default
+            transition, while an empty list ends the graph immediately.
     """
 
     update: dict[str, Any] = field(default_factory=dict)
-    goto: str | None = None
+    goto: str | list[str] | None = None
 
 
 NodeResult: TypeAlias = dict[str, Any] | Command

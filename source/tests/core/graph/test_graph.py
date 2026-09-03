@@ -22,6 +22,7 @@ from apix.core.graph import (
     Reset,
     get_node_name_in_namespace,
 )
+from apix.core.graph.context import GraphContext
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -151,10 +152,13 @@ async def test_parallel_node_joins_commands_in_branch_declaration_order():
     async def first_branch(state):
         first_started.set()
         await second_finished.wait()
-        return {
-            "messages": ["first-branch"],
-            "status": "first",
-        }
+        return Command(
+            update={
+                "messages": ["first-branch"],
+                "status": "first",
+            },
+            goto=[],
+        )
 
     async def second_branch(state):
         await first_started.wait()
@@ -226,42 +230,27 @@ async def test_empty_command_list_is_a_noop_and_uses_default_route():
 
 
 @pytest.mark.parametrize(
-    ("commands", "expected_route"),
+    ("commands", "expected_routes"),
     [
-        ([Command(goto="first"), Command()], "default"),
-        ([Command(goto="first"), Command(goto="second")], "second"),
-        ([Command(goto="first"), Command(goto=None)], "default"),
-        ([Command(goto="first"), Command(goto=END)], None),
-        ([Command(), Command(goto="second")], "second"),
+        ([Command(goto="first"), Command()], ["first", "default"]),
+        ([Command(goto="first"), Command(goto="second")], ["first", "second"]),
+        ([Command(goto="first"), Command(goto=None)], ["first", "default"]),
+        ([Command(goto="first"), Command(goto=END)], "first"),
+        ([Command(), Command(goto="second")], ["default", "second"]),
     ],
 )
-async def test_later_command_overwrites_previous_goto(
+async def test_command_list_routes_are_flattened_in_order(
     commands,
-    expected_route,
+    expected_routes,
 ):
-    """Every later command replaces the previously resolved route."""
-    command_node = CommandListNode(commands, "command_node")
-
-    def first(state):
-        return {"route": "first"}
-
-    def second(state):
-        return {"route": "second"}
-
-    def default(state):
-        return {"route": "default"}
-
-    graph = (
-        GraphManager()
-        .add_nodes([command_node, first, second, default])
-        .add_edge(START, command_node.name)
-        .add_edge(command_node.name, "default")
-        .compile_graph()
+    """Specialised multi-command nodes contribute every selected route."""
+    graph = NodeGraph(
+        {},
+        {"command_node": "default", START: "command_node"},
     )
+    context = GraphContext()
 
-    result = await graph.invoke({})
-
-    assert result.get("route") == expected_route
+    assert graph.apply_command(commands, "command_node", context) == expected_routes
 
 
 async def test_later_command_overwrites_same_state_key():
@@ -541,6 +530,176 @@ async def test_unknown_command_goto_is_propagated_to_caller():
 
     with pytest.raises(ValueError, match="Unknown graph node `missing`"):
         await graph.invoke({})
+
+
+async def test_router_can_select_concurrent_nodes():
+    """A router list schedules all selected nodes in one batch."""
+    class State(TypedDict):
+        visits: Annotated[list[str], AutoMerge()]
+
+    graph = (
+        GraphManager(State)
+        .add_node(lambda state: {}, "source")
+        .add_node(lambda state: {"visits": ["left"]}, "left")
+        .add_node(lambda state: {"visits": ["right"]}, "right")
+        .add_edge(START, "source")
+        .add_router("source", ["left", "right"], lambda state: ["left", "right"])
+        .compile_graph()
+    )
+
+    assert await graph.invoke({"visits": []}) == {"visits": ["left", "right"]}
+
+
+async def test_concurrent_batch_is_isolated_and_collected_in_route_order():
+    """Completion order cannot affect state visibility or merge order."""
+    class State(TypedDict):
+        history: Annotated[list[str], AutoMerge()]
+
+    c_finished = asyncio.Event()
+    a_finished = asyncio.Event()
+    observed_states = []
+
+    async def a(state):
+        observed_states.append(dict(state))
+        state["private"] = "a"
+        await c_finished.wait()
+        a_finished.set()
+        return Command(update={"history": ["A"]}, goto=[])
+
+    async def b(state):
+        observed_states.append(dict(state))
+        state["private"] = "b"
+        await a_finished.wait()
+        return Command(update={"history": ["B"]}, goto=[])
+
+    async def c(state):
+        observed_states.append(dict(state))
+        state["private"] = "c"
+        c_finished.set()
+        return Command(update={"history": ["C"]}, goto=[])
+
+    graph = (
+        GraphManager(State)
+        .add_node(lambda state: Command(goto=["a", "b", "c"]), "launch")
+        .add_nodes([a, b, c])
+        .add_edge(START, "launch")
+        .compile_graph()
+    )
+
+    result = await graph.invoke({"history": []})
+
+    assert result == {"history": ["A", "B", "C"]}
+    assert all("private" not in state for state in observed_states)
+
+
+async def test_concurrent_non_auto_merge_conflict_uses_retry_snapshot():
+    """Direct writes may be partial while recovery retains the batch boundary."""
+    context = GraphContext()
+    graph = (
+        GraphManager()
+        .add_node(
+            lambda state: Command(update={"ready": True}, goto=["a", "b"]),
+            "launch",
+        )
+        .add_node(lambda state: {"shared": "a", "only_a": True}, "a")
+        .add_node(lambda state: {"shared": "b"}, "b")
+        .add_edge(START, "launch")
+        .compile_graph()
+    )
+
+    with pytest.raises(ValueError, match="non-AutoMerge state field `shared`"):
+        await graph.invoke({}, context)
+
+    assert context.state == {
+        "ready": True,
+        "shared": "a",
+        "only_a": True,
+    }
+    assert context.get_snapshot()["target_node_name"] == ["a", "b"]
+    assert context.get_snapshot()["state"] == {"ready": True}
+
+
+async def test_concurrent_node_failure_cancels_siblings_without_commit():
+    """One branch failure cancels unfinished siblings and rejects all updates."""
+    slow_started = asyncio.Event()
+    slow_cancelled = asyncio.Event()
+    context = GraphContext()
+
+    async def slow(state):
+        slow_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            slow_cancelled.set()
+            raise
+
+    async def fail(state):
+        await slow_started.wait()
+        raise RuntimeError("batch failed")
+
+    graph = (
+        GraphManager()
+        .add_node(lambda state: Command(goto=["slow", "fail"]), "launch")
+        .add_nodes([slow, fail])
+        .add_edge(START, "launch")
+        .compile_graph()
+    )
+
+    with pytest.raises(RuntimeError, match="batch failed"):
+        await graph.invoke({"original": True}, context)
+
+    assert slow_cancelled.is_set()
+    assert context.state == {"original": True}
+    assert context.get_snapshot()["target_node_name"] == ["slow", "fail"]
+
+
+async def test_concurrent_routes_follow_command_order_and_deduplicate():
+    """Defaults, explicit lists, END filtering, and duplicates compose stably."""
+    graph = NodeGraph({}, {"A": "D", START: "A"})
+    context = GraphContext()
+
+    routes = graph.apply_command(
+        [Command(), Command(goto="A"), Command(goto=END), Command(goto=["A", "B"])],
+        ["A", "B", "C", "D"],
+        context,
+    )
+
+    assert routes == ["D", "A", "B"]
+
+
+async def test_concurrent_node_timeout_cancels_siblings_without_commit():
+    """A branch timeout cancels its batch peers and leaves retry state intact."""
+    peer_started = asyncio.Event()
+    peer_cancelled = asyncio.Event()
+    context = GraphContext()
+
+    async def timeout_branch(state):
+        await peer_started.wait()
+        await asyncio.Event().wait()
+
+    async def peer(state):
+        peer_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            peer_cancelled.set()
+            raise
+
+    graph = (
+        GraphManager()
+        .add_node(lambda state: Command(goto=["timeout_branch", "peer"]), "launch")
+        .add_node(timeout_branch, timeout=0.01)
+        .add_node(peer)
+        .add_edge(START, "launch")
+        .compile_graph()
+    )
+
+    with pytest.raises(TimeoutError, match="timed out"):
+        await graph.invoke({"original": True}, context)
+
+    assert peer_cancelled.is_set()
+    assert context.state == {"original": True}
+    assert context.get_snapshot()["target_node_name"] == ["timeout_branch", "peer"]
 
 
 async def test_node_exception_is_propagated_to_caller():

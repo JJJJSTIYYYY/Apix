@@ -36,7 +36,7 @@ class GraphContextSnapshot(TypedDict):
 
     timestamp: float
     state: dict[str, Any]
-    target_node_name: str
+    target_node_name: str | list[str]
     steps: int
     namespace: str
 
@@ -75,7 +75,7 @@ class GraphContext:
     state_schema: InitVar[type | None] = None
     run_id: str | None = field(default=None, init=False)
     state: dict[str, Any] = field(default_factory=dict, init=False)
-    target_node_name: str = field(default=START, init=False)
+    target_node_name: str | list[str] = field(default=START, init=False)
     steps: int = field(default=0, init=False)
     context_snapshot: list[GraphContextSnapshot] = field(
         default_factory=list,
@@ -194,8 +194,18 @@ class GraphContext:
 
         if not isinstance(restored["state"], dict):
             raise TypeError("GraphContext snapshot state must be a dict.")
-        if not isinstance(restored["target_node_name"], str):
-            raise TypeError("GraphContext snapshot target_node_name must be a string.")
+        target_node_name = restored["target_node_name"]
+        if not (
+            isinstance(target_node_name, str)
+            or (
+                isinstance(target_node_name, list)
+                and all(isinstance(item, str) for item in target_node_name)
+            )
+        ):
+            raise TypeError(
+                "GraphContext snapshot target_node_name must be a string "
+                "or list of strings."
+            )
         if (
             isinstance(restored["steps"], bool)
             or not isinstance(restored["steps"], int)
@@ -275,7 +285,7 @@ class GraphContext:
         state: dict[str, Any],
         completion: Future[Any],
         stream_writer: StreamWriter,
-    ) -> str:
+    ) -> str | list[str]:
         """Bind this pending context to its single invocation attempt."""
         if self._status != "pending":
             raise RuntimeError(
@@ -306,9 +316,13 @@ class GraphContext:
         """Return whether this context belongs to a graph namespace."""
         return self._context_namespace == context_namespace
 
-    def _set_target_node(self, target_node_name: str) -> None:
-        """Record the node targeted by the next graph dispatch."""
-        self.target_node_name = target_node_name
+    def _set_target_node(self, target_node_name: str | list[str]) -> None:
+        """Record the node or concurrent batch targeted by dispatch."""
+        self.target_node_name = (
+            list(target_node_name)
+            if isinstance(target_node_name, list)
+            else target_node_name
+        )
 
     def take_a_snapshot(self) -> None:
         """Capture an isolated copy of the current recoverable state."""

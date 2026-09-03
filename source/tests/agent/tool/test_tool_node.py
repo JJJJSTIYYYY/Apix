@@ -981,6 +981,19 @@ def test_normalise_valid_command_preserves_updates_and_goto():
     )
     assert goto_command.goto is None
 
+    batch_command = node._normalise_tool_result(
+        Command(
+            update={
+                "messages": [
+                    ApixToolMessage(content="batch", tool_call_id="old")
+                ]
+            },
+            goto=["a", "b"],
+        ),
+        call,
+    )
+    assert batch_command.goto == ["a", "b"]
+
 
 def test_normalise_tool_result_uses_configured_messages_key():
     node = ToolNode(lambda: None, messages_key="history")

@@ -182,6 +182,14 @@ async def test_node_rejects_non_string_command_goto():
         await node.execute({})
 
 
+@pytest.mark.asyncio
+async def test_node_accepts_ordered_goto_list():
+    """Command.goto may select an ordered concurrent node batch."""
+    node = Node(lambda state: Command(goto=["a", "b"]), "batch")
+
+    assert await node.execute({}) == Command(goto=["a", "b"])
+
+
 @pytest.mark.parametrize(
     ("funcs", "error", "message"),
     [

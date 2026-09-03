@@ -61,7 +61,7 @@ class NodeGraph:
         Args:
             nodes: Nodes keyed by their graph names.
             default_gotos: Manager-defined transitions.
-            max_steps: Maximum number of user-node executions in one run.
+            max_steps: Maximum number of node-dispatch batches in one run.
             state_schema: Default annotated schema for invocation contexts.
                 Fields marked with ``Annotated[..., AutoMerge()]`` are
                 combined through their current value's ``__add__`` method.
@@ -109,6 +109,8 @@ class NodeGraph:
             if target_node_name == START:
                 await self._execute_start(context)
             elif target_node_name == END:
+                self._finish(context)
+            elif target_node_name == []:
                 self._finish(context)
             else:
                 await self._execute_node(target_node_name, context)
@@ -344,30 +346,50 @@ class NodeGraph:
                 self._fail(context, exc)
 
 
-    async def _execute_node(self, node_name: str, context: GraphContext) -> None:
-        """Inject context state into one node and emit its next-node event."""
+    async def _execute_one_node(
+        self,
+        node_name: str,
+        context: GraphContext,
+    ) -> Command | list[Command]:
+        """Execute one batch member with an isolated state copy."""
+        node = self._nodes[node_name]
+        execution = node.execute(
+            _copy_state(context.state, context._keep_ref_keys)
+        )
+        timeout = node.timeout
+        if timeout is None:
+            return await execution
+
+        timeout_scope = asyncio.timeout(timeout)
+        try:
+            async with timeout_scope:
+                return await execution
+        except TimeoutError as exc:
+            if not timeout_scope.expired():
+                raise
+            raise TimeoutError(
+                f"Graph node `{node_name}` timed out after "
+                f"{timeout:g} seconds."
+            ) from exc
+
+    async def _execute_node(
+        self,
+        node_name: str | list[str],
+        context: GraphContext,
+    ) -> None:
+        """Execute one node or one concurrently scheduled node batch."""
+        node_names = self._normalise_targets(node_name)
         context.take_a_snapshot()
         try:
             with apix_graph_context(context):
-                node = self._nodes[node_name]
-                execution = node.execute(
-                    _copy_state(context.state, context._keep_ref_keys)
-                )
-                timeout = node.timeout
-                if timeout is None:
-                    result = await execution
-                else:
-                    timeout_scope = asyncio.timeout(timeout)
-                    try:
-                        async with timeout_scope:
-                            result = await execution
-                    except TimeoutError as exc:
-                        if not timeout_scope.expired():
-                            raise
-                        raise TimeoutError(
-                            f"Graph node `{node_name}` timed out after "
-                            f"{timeout:g} seconds."
-                        ) from exc
+                tasks = [
+                    asyncio.create_task(
+                        self._execute_one_node(current_name, context),
+                        name=f"graph-node-{current_name}-{context.run_id}",
+                    )
+                    for current_name in node_names
+                ]
+                results = await BaseNode._gather_tasks_in_order(tasks)
 
             # An aborted attempt may finish its old node after a caller has
             # already received the saved snapshot. Its result must never
@@ -376,7 +398,7 @@ class NodeGraph:
                 return
 
             next_node = self.apply_command(
-                result,
+                results[0] if isinstance(node_name, str) else results,
                 node_name,
                 context,
             )
@@ -390,97 +412,149 @@ class NodeGraph:
 
     def apply_command(
         self,
-        command: Command | list[Command],
-        node_name: str,
+        command: Command | list[Command] | list[Command | list[Command]],
+        node_name: str | list[str],
         context: GraphContext,
-    ) -> str:
-        """Apply one or more commands and return the final selected target.
+    ) -> str | list[str]:
+        """Apply a completed batch in order and collect its ordered routes.
 
-        Command lists are applied in order. Each command observes the state
-        committed by its predecessor. Every command also resolves routing
-        independently, so the last command determines the returned target.
-        An empty list is equivalent to one empty :class:`Command`.
+        The checkpoint taken before node execution is the rollback boundary.
+        Commands therefore update the live context state directly. If applying
+        a later command fails, recovery starts from that checkpoint rather than
+        rolling the live state back in place.
         """
-        if isinstance(command, Command):
-            commands = [command]
-        elif isinstance(command, list):
-            commands = command or [Command()]
-        else:
-            raise TypeError(
-                "Node.execute must return a Command or list[Command]."
-            )
+        node_names = self._normalise_targets(node_name)
+        command_groups = self._normalise_command_groups(command, node_names)
 
         if context.steps >= self._max_steps:
             raise RecursionError(
                 f"Graph exceeded its maximum of {self._max_steps} steps."
             )
 
-        next_node = self._default_gotos.get(node_name, END)
-        for current_command in commands:
-            if not isinstance(current_command, Command):
+        updated_normal_keys: set[str] = set()
+        routes: list[str] = []
+        for current_node, commands in zip(node_names, command_groups):
+            current_node_normal_keys: set[str] = set()
+            for current_command in commands:
+                if not isinstance(current_command.update, dict):
+                    raise TypeError("Command.update must be a dict.")
+                update = _copy_state(
+                    current_command.update,
+                    context._keep_ref_keys,
+                )
+                for key, value in update.items():
+                    if key not in context._auto_merge_keys:
+                        if (
+                            key in updated_normal_keys
+                            and key not in current_node_normal_keys
+                        ):
+                            raise ValueError(
+                                f"Concurrent node `{current_node}` updates "
+                                f"non-AutoMerge state field `{key}` more than once."
+                            )
+                        updated_normal_keys.add(key)
+                        current_node_normal_keys.add(key)
+
+                    if isinstance(value, Reset):
+                        context.state[key] = value.value
+                    elif key in context._auto_merge_keys and key in context.state:
+                        current_value = context.state[key]
+                        add_method = getattr(current_value, "__add__", None)
+                        if not callable(add_method):
+                            raise TypeError(
+                                f"State field `{key}` is marked AutoMerge, "
+                                f"but {type(current_value).__name__} does not "
+                                "provide a callable __add__ method."
+                            )
+                        increased_value = add_method(value)
+                        if increased_value is NotImplemented:
+                            raise TypeError(
+                                f"State field `{key}` could not add an update "
+                                f"of type {type(value).__name__}."
+                            )
+                        context.state[key] = increased_value
+                    else:
+                        context.state[key] = value
+
+                goto = current_command.goto
+                if goto is None:
+                    goto = self._default_gotos.get(current_node, END)
+                if not BaseNode._is_valid_goto(goto):
+                    raise TypeError(
+                        "Command.goto must be a string or None, or a list of strings."
+                    )
+                routes.extend(goto if isinstance(goto, list) else [goto])
+
+        return self._normalise_routes(routes)
+
+    @staticmethod
+    def _normalise_command_groups(
+        command: Command | list[Command] | list[Command | list[Command]],
+        node_names: list[str],
+    ) -> list[list[Command]]:
+        """Normalise results without losing their source-node boundaries."""
+        if len(node_names) == 1:
+            if isinstance(command, Command):
+                return [[command]]
+            if isinstance(command, list) and all(
+                isinstance(item, Command) for item in command
+            ):
+                return [command or [Command()]]
+            raise TypeError("Node.execute must return a Command or list[Command].")
+
+        if not isinstance(command, list) or len(command) != len(node_names):
+            raise TypeError("A concurrent batch must return one result per node.")
+        groups: list[list[Command]] = []
+        for result in command:
+            if isinstance(result, Command):
+                groups.append([result])
+            elif isinstance(result, list) and all(
+                isinstance(item, Command) for item in result
+            ):
+                groups.append(result or [Command()])
+            else:
                 raise TypeError(
                     "Node.execute must return a Command or list[Command]."
                 )
+        return groups
 
-            update = current_command.update
-            if not isinstance(update, dict):
-                raise TypeError("Command.update must be a dict.")
+    @staticmethod
+    def _normalise_targets(target: str | list[str]) -> list[str]:
+        """Validate a non-empty execution target and return a batch list."""
+        if isinstance(target, str):
+            return [target]
+        if isinstance(target, list) and target and all(
+            isinstance(item, str) for item in target
+        ):
+            return list(target)
+        raise TypeError("Graph target must be a string or non-empty list of strings.")
 
-            state = _copy_state(context.state, context._keep_ref_keys)
-            # Command updates are state transfers too. Preserve a KeepRef
-            # value when a node returns the marked field explicitly.
-            update = _copy_state(update, context._keep_ref_keys)
-
-            for key, value in update.items():
-                if isinstance(value, Reset):
-                    state[key] = value.value
-                elif (
-                    key in context._auto_merge_keys
-                    and key in state
-                ):
-                    current_value = state[key]
-                    add_method = getattr(
-                        current_value,
-                        "__add__",
-                        None,
-                    )
-
-                    if not callable(add_method):
-                        raise TypeError(
-                            f"State field `{key}` is marked AutoMerge, "
-                            f"but {type(current_value).__name__} does not "
-                            "provide a callable __add__ method."
-                        )
-
-                    increased_value = add_method(value)
-
-                    if increased_value is NotImplemented:
-                        raise TypeError(
-                            f"State field `{key}` could not add an update "
-                            f"of type {type(value).__name__}."
-                        )
-
-                    state[key] = increased_value
-                else:
-                    state[key] = value
-
-            next_node = (
-                current_command.goto
-                if current_command.goto is not None
-                else self._default_gotos.get(node_name, END)
-            )
-            if not isinstance(next_node, str):
-                raise TypeError("Command.goto must be a string or None.")
-
-            context.state = state
-
-        return next_node
+    @staticmethod
+    def _normalise_routes(routes: list[str]) -> str | list[str]:
+        """Filter END when work remains and perform stable de-duplication."""
+        if not routes:
+            return []
+        unique = list(dict.fromkeys(routes))
+        runnable = [route for route in unique if route != END]
+        if not runnable:
+            return END
+        return runnable[0] if len(runnable) == 1 else runnable
 
 
-    async def _post_next(self, node_name: str, context: GraphContext) -> None:
-        """Target one node and post the graph's generic dispatch event."""
-        if node_name not in (START, END) and node_name not in self._nodes:
-            raise ValueError(f"Unknown graph node `{node_name}`.")
+    async def _post_next(
+        self,
+        node_name: str | list[str],
+        context: GraphContext,
+    ) -> None:
+        """Target one node or concurrent batch and post one dispatch."""
+        node_names = [node_name] if isinstance(node_name, str) else node_name
+        if not isinstance(node_names, list) or not all(
+            isinstance(item, str) for item in node_names
+        ):
+            raise TypeError("Graph target must be a string or list of strings.")
+        for current_name in node_names:
+            if current_name not in (START, END) and current_name not in self._nodes:
+                raise ValueError(f"Unknown graph node `{current_name}`.")
         context._set_target_node(node_name)
         await EVENT_PIPE.post_event(
             event_type=EventType.WORKFLOW,

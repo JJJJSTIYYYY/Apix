@@ -59,15 +59,15 @@ context = GraphContext(MyState)
 | --- | --- |
 | `run_id` | 当前 attempt 的唯一 id，绑定时以 `graph-` 前缀生成 |
 | `state` | 最新已提交状态 |
-| `target_node_name` | 当前调度目标节点；快照中表示恢复后应重新执行的目标节点 |
-| `steps` | 已完成并提交的节点执行次数 |
+| `target_node_name` | 当前调度目标节点或有序节点列表；快照中表示恢复后应重新执行的完整批次 |
+| `steps` | 已完成并提交的节点调度批次数 |
 | `context_snapshot` | 按时间顺序保存的快照列表 |
 
 `completion`、`stream_writer` 和 `_context_namespace` 是运行时绑定细节。用户通常通过公开属性、访问函数和快照接口使用它们，而不直接修改。
 
 ## 快照时机
 
-`NodeGraph` 在每个普通节点或内部 router/condition 节点执行之前自动调用 `take_a_snapshot()`。`START` 和 `END` 不创建快照。
+`NodeGraph` 在每个普通节点、图级并发批次或内部 router/condition 节点执行之前自动调用一次 `take_a_snapshot()`。`START` 和 `END` 不创建快照。并发批次只产生一份批次级快照，不为其中每个节点分别拍摄。
 
 快照形状：
 
@@ -75,7 +75,7 @@ context = GraphContext(MyState)
 class GraphContextSnapshot(TypedDict):
     timestamp: float
     state: dict[str, Any]
-    target_node_name: str
+    target_node_name: str | list[str]
     steps: int
     namespace: str
 ```
@@ -83,12 +83,13 @@ class GraphContextSnapshot(TypedDict):
 语义：
 
 - `state` 是待执行节点之前的最后已提交状态。
-- `target_node_name` 是恢复后应重新执行的目标节点。
+- `target_node_name` 是恢复后应重新执行的单个目标节点或完整有序批次。
+- 空目标列表表示不再执行节点并完成图。
 - `steps` 是此前已经完成的 step 数。
 - `namespace` 限制恢复只能发生在原命名空间。
 - 快照会深拷贝完整 state，包括 `KeepRef` 字段。
 
-因此，失败节点恢复后会从节点执行前状态重新执行该节点，而不会包含失败节点的未提交修改。
+因此，失败节点或失败批次恢复后会从执行前状态重新执行。节点异常或超时发生在 Command 应用前，本批不会提交更新；如果按序应用 Command 时发生普通键冲突或合并错误，失败 context 的 live state 可能已有部分更新，但恢复快照不包含它们。
 
 ## 手动读取快照
 
@@ -191,7 +192,7 @@ recovered = GraphContext.from_snapshot(
 
 - 可以分解旧图，再在相同 namespace 编译替代图并恢复。
 - 不能把 recovered context 传给不同 namespace 的图。
-- 替代图必须仍然包含快照 `target_node_name` 对应的节点，否则发布恢复入口时抛出 `ValueError`。
+- 替代图必须仍然包含快照 `target_node_name` 对应的单个节点或列表中的全部节点，否则发布恢复入口时抛出 `ValueError`。
 
 ```python
 old_graph.decompose()
@@ -229,7 +230,7 @@ active 调用 abort 后：
 - context 进入 `aborted`；
 - abort 幂等。
 
-因为自动快照在节点执行前创建，abort 返回的是当前节点之前的状态。若还没有快照，则回退到当前 live state。
+因为自动快照在节点或并发批次执行前创建，abort 返回的是当前节点或整批之前的状态。若还没有快照，则回退到当前 live state。
 
 对尚未绑定的 pending context 调用 `abort()` 只把它置为 `aborted`，没有 completion 可返回；此 context 随后不能用于图调用。
 
@@ -261,6 +262,8 @@ async def node(state: dict) -> dict:
 这些函数只能在节点执行上下文中使用：
 
 - 图外调用会抛出 `RuntimeError`。
+- 同一个图级并发批次的所有节点读取到同一个 `GraphContext` 对象；context 在节点执行过程中按约定只读。
+- 同一个 `NodeGraph` 的不同并发调用绑定各自的 context 和 run id，不会串流。
 - `get_stream_writer()` 在 `invoke()` 中返回可复用的 no-op writer，因此节点可以无条件发出 chunk；只有 `stream()` 调用方会收到内容。
 - 由节点创建的 asyncio task 会按照 Python `ContextVar` 规则继承创建时上下文，但任务不应在图 attempt 结束后继续使用 context 或 writer。
 

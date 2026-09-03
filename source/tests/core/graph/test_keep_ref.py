@@ -171,7 +171,7 @@ def test_apply_command_commits_explicit_keep_ref_update_to_context():
         context,
     )
 
-    assert context.state is not original_state
+    assert context.state is original_state
     assert context.state["resource"] is replacement_resource
     assert context.state["ordinary"] == {"values": []}
     assert next_node == END

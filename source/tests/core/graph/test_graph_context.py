@@ -79,6 +79,21 @@ def test_new_context_is_pending_unbound_and_has_no_snapshot():
     assert context.is_active is False
 
 
+def test_snapshot_round_trip_preserves_concurrent_target_list():
+    """Recovery retains the complete ordered batch target."""
+    snapshot = {
+        "timestamp": 1.0,
+        "state": {"value": 1},
+        "target_node_name": ["a", "b"],
+        "steps": 2,
+        "namespace": "batch",
+    }
+
+    recovered = GraphContext.from_snapshot(snapshot)
+
+    assert recovered.target_node_name == ["a", "b"]
+
+
 @pytest.mark.asyncio
 async def test_bind_transitions_pending_to_running_without_taking_snapshot():
     """START binding initializes runtime fields but leaves the snapshot absent."""
@@ -217,6 +232,7 @@ def test_from_snapshot_rejects_missing_fields():
     [
         ("state", [], "state must be a dict"),
         ("target_node_name", 1, "target_node_name must be a string"),
+        ("target_node_name", ["node", 1], "target_node_name must be a string"),
         ("steps", True, "steps must be an int"),
         ("steps", 1.5, "steps must be an int"),
         ("namespace", None, "namespace must be a string"),

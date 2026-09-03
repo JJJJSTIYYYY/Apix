@@ -228,8 +228,8 @@ def test_apply_command_applies_command_list_in_order():
     assert next_node == "batch-target"
 
 
-def test_apply_command_uses_default_route_when_last_command_omits_goto():
-    """The last command owns routing even when it selects the default edge."""
+def test_apply_command_collects_all_command_routes():
+    """Every command contributes a route and END is ignored when work remains."""
     graph = NodeGraph({}, {START: END})
     context = _graph_context()
 
@@ -243,7 +243,7 @@ def test_apply_command_uses_default_route_when_last_command_omits_goto():
     )
 
     assert context.state == {"value": 1}
-    assert next_node == END
+    assert next_node == "overridden-target"
 
 
 def test_apply_command_treats_empty_command_list_as_empty_command():
@@ -255,8 +255,8 @@ def test_apply_command_treats_empty_command_list_as_empty_command():
     next_node = graph.apply_command([], START, context)
 
     assert context.state == original_state
-    assert context.state is not original_state
-    assert context.state["nested"] is not original_state["nested"]
+    assert context.state is original_state
+    assert context.state["nested"] is original_state["nested"]
     assert next_node == END
 
 

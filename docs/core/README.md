@@ -40,13 +40,14 @@ Graph Runtime 并不在 `NodeGraph` 对象中保存每次调用的状态。一�
 1. `GraphManager` 编译图时，为当前 namespace 注册一个通用 `GRAPH_DISPATCH` handler。
 2. `NodeGraph.invoke()` 或 `NodeGraph.stream()` 创建并绑定一次调用的 `GraphContext`。
 3. 运行时把 `START` 写入 `GraphContext.target_node_name`，并向 `EVENT_PIPE` 发布 namespace 隔离后的 `GRAPH_DISPATCH` 事件。
-4. 全局 `APIX_EVENT_LOOP` 消费事件，通用 dispatch handler 根据 `target_node_name` 选择并执行目标节点。
-5. 节点返回 `dict` 或 `Command`；运行时提交状态、更新下一个 `target_node_name`，再发布同一个 dispatch 事件。
+4. 全局 `APIX_EVENT_LOOP` 消费事件，通用 dispatch handler 根据 `target_node_name` 执行单个目标节点或有序并发批次。
+5. 节点返回 `dict` 或 `Command`；批次结果按目标顺序收集和提交，再把一个或多个下一目标写回 `target_node_name` 并发布同一个 dispatch 事件。
 6. 当目标变为 `END` 时，dispatch handler 将最终状态写入完成 Future，调用方得到结果。
 
 这套模型带来两个重要性质：
 
 - 同一个编译图可以并发执行多次，因为状态和节点路由目标都由调用级 `GraphContext` 隔离。
+- 一次调用内部也可通过 `Command(goto=[...])` 并发调度多个图节点；每个节点使用独立 state 副本，但共享该调用的只读 context。
 - 事件系统只负责图级 dispatch 和 namespace 隔离，不再用具体节点名承担内部路由职责；插件需要观察节点调度时，可订阅 `GRAPH_DISPATCH` 并检查 `event.context.target_node_name`。
 
 ## 最小示例
@@ -201,6 +202,8 @@ with (
 - 不同事件实例会由独立分发任务处理，最多同时存在 100 个事件分发任务。
 - 后台事件处理器另有 100 个任务的并发限制。
 - 同一个 `NodeGraph` 可并发调用；普通字段会按深拷贝隔离。
+- 一次调用的图级并发批次按路由列表顺序收集 Command；`AutoMerge` 字段确定性合并，普通字段的跨节点重复更新会使批次失败。
+- `ParallelNode` 是单个图节点内部的并发分支；它可以作为一个成员加入图级并发批次，其内部分支共享该节点自己的 state 副本。
 - `KeepRef` 会刻意破坏字段级深拷贝隔离，因此不推荐在并发调用中共享可变对象。
 - `ContextVar` 绑定在节点执行期间有效。由节点创建的 asyncio task 会继承当前上下文；若任务生命周期超过节点，应避免继续使用已经结束或关闭的运行资源。
 - 编译图的命名空间必须唯一，除非使用 `exist_ok=True` 显式替换一个当前无活跃调用的图。

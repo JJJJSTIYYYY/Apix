@@ -180,9 +180,10 @@ class GraphManager:
     def add_router(self, l_node: str, r_nodes: list[str], router: NodeFunction):
         """Add an internal router node after ``l_node``.
 
-        The router receives the state from the event context and must select a
-        name from ``r_nodes``. A mapping containing ``goto`` is also accepted.
-        :data:`END` may be used as one of the route targets.
+        The router receives the state from the event context and must select
+        one name or a list of names from ``r_nodes``. A mapping containing
+        ``goto`` is also accepted. :data:`END` may be used as a route target;
+        an empty list ends the graph.
         """
         self._require_endpoint(l_node, source=True)
         if not r_nodes:
@@ -202,9 +203,15 @@ class GraphManager:
                 result = result.goto
             elif isinstance(result, Mapping) and "goto" in result:
                 result = result["goto"]
-            if result not in targets:
-                raise ValueError(f"Router for `{l_node}` returned invalid target `{result}`.")
-            return Command(update={}, goto=result)
+            selected = result if isinstance(result, list) else [result]
+            if not all(isinstance(item, str) and item in targets for item in selected):
+                raise ValueError(
+                    f"Router for `{l_node}` returned invalid target `{result}`."
+                )
+            return Command(
+                update={},
+                goto=list(result) if isinstance(result, list) else result,
+            )
 
         self._nodes[router_name] = Node(router_node, router_name)
         self._set_transition(l_node, router_name)

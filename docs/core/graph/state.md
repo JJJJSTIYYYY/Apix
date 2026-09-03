@@ -116,12 +116,12 @@ def use_resource(state: RuntimeState) -> dict:
 
 ### KeepRef 的准确边界
 
-`KeepRef` 不承诺整个调用生命周期始终使用同一个 state 字典，也不让所有后续处理都在原对象上执行。它只保证：
+`KeepRef` 不承诺节点输入与 live state 使用同一个字典。它保证：
 
 1. 节点执行前复制 state 时，该字段不被 deepcopy；
-2. 应用 `Command` 复制旧 state 和显式 update 时，该字段继续保留引用。
+2. 应用 `Command` 复制显式 update 时，该字段继续保留引用。
 
-外层 state mapping、普通字段和每次提交产生的 state mapping 仍可能是新对象。
+`Command` 会直接更新当前 `GraphContext.state`，不会为每条命令复制整个旧 state。普通 update value 仍会被深拷贝，标记为 `KeepRef` 的 update value 则保留引用。
 
 ### 快照例外
 
@@ -163,17 +163,19 @@ class State(TypedDict):
 ```python
 Command(
     update: dict[str, Any] = {},
-    goto: str | None = None,
+    goto: str | list[str] | None = None,
 )
 ```
 
-`goto` 有两种语义：
+`goto` 语义：
 
 | 写法 | 路由行为 |
 | --- | --- |
 | `Command()` 或 `Command(goto=None)` | 使用 manager 默认边；没有默认边时进入 `END` |
 | `Command(goto=END)` | 显式进入 `END` |
 | `Command(goto="next")` | 显式进入 `next` |
+| `Command(goto=["a", "b"])` | 把 `a`、`b` 组成有序并发批次 |
+| `Command(goto=[])` | 不调度后续节点，直接结束 |
 
 ## 多 Command 提交
 
@@ -186,25 +188,33 @@ return [
 ]
 ```
 
-每个 command 的完整流程是：
+所有并发节点执行成功且结果收集完成后，每个 command 的处理流程是：
 
-1. 按 `KeepRef` 规则复制最新已提交 state。
-2. 按 `KeepRef` 规则复制 update。
-3. 逐字段应用 `Reset`、`AutoMerge` 或普通覆盖。
-4. 将新 state 提交到 `GraphContext`。
-5. 解析该 command 的 route。
+1. 按 `KeepRef` 规则复制 update。
+2. 逐字段把 `Reset`、`AutoMerge` 或普通覆盖直接应用到 `GraphContext.state`。
+3. 解析该 command 的 route，并追加到有序路由集合。
 
-后一条 command 看到前一条已经提交的 state。最后一条 command 的 route 成为节点最终 route；如果最后一条省略 `goto`，会重新使用 manager 默认边，而不是继承前一条 command 的显式 route。
+后一条 command 看到前一条已经提交的 state。每条 command 都贡献 route；`goto=None` 使用其来源图节点的默认边。字符串列表和多 Command 产生的路由会按序展平并稳定去重；存在普通目标时忽略 `END`。
 
 空列表按一个空 `Command` 处理。
+
+## 图级并发更新
+
+`goto=["a", "b"]` 调度的每个图节点都接收独立 state 副本，但 Command 会在整批执行成功后按 `a`、`b` 的顺序直接应用：
+
+- 同批不同节点更新相同 `AutoMerge` 字段时，按节点与 Command 顺序调用 `__add__`。
+- 同批不同节点更新相同普通字段时抛出 `ValueError`。
+- 同一节点返回的多条 Command 仍可依次覆盖同一普通字段；`ParallelNode` 的所有内部分支在冲突检测中属于同一个图节点。
+- 节点执行失败或超时时尚未开始应用 Command，因此本批不会产生状态提交。
+- 应用期间发生普通键冲突或合并错误时，较早 Command 可能已经修改 live state。恢复使用批次执行前的快照，不依赖 live state 原地回滚。
 
 ## 输入隔离
 
 对不含 `KeepRef` 的 state：
 
 - `invoke()` 和 `stream()` 绑定初始状态时深拷贝输入；
-- 每个节点收到当前 state 的深拷贝；
-- 每次 command 提交也基于复制后的 state；
+- 单节点或图级并发批次中的每个图节点收到当前 state 的独立深拷贝；
+- command 的 update value 会复制后直接写入调用自己的 `GraphContext.state`；
 - 最终状态与调用方的嵌套输入对象相互隔离。
 
 示例：
