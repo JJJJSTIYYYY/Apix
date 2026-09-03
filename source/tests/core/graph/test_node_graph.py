@@ -391,16 +391,6 @@ def test_state_schema_metadata_lives_on_graph_context():
     assert context._keep_ref_keys == frozenset()
 
 
-def test_node_graph_rejects_timeout_for_unknown_node():
-    """Direct construction validates every timeout target."""
-    with pytest.raises(ValueError, match="unknown nodes: missing"):
-        NodeGraph(
-            {},
-            {START: END},
-            node_timeouts={"missing": 1},
-        )
-
-
 @pytest.mark.asyncio
 async def test_finish_and_fail_do_not_replace_completed_future():
     """Late END or failure events cannot overwrite an invocation result."""

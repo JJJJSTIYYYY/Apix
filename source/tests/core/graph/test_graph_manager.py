@@ -46,10 +46,10 @@ def test_add_node_and_add_nodes_are_fluent():
     ],
 )
 def test_add_node_stores_normalised_timeout(timeout, expected):
-    """Node timeouts are graph-specific and non-positive means unlimited."""
+    """Node owns its timeout and non-positive values mean unlimited."""
     manager = GraphManager().add_node(source, timeout=timeout)
 
-    assert manager._node_timeouts["source"] == expected
+    assert manager._nodes["source"].timeout == expected
 
 
 @pytest.mark.parametrize("timeout", [True, "1", object()])
@@ -165,8 +165,8 @@ def test_compile_requires_start_transition():
         GraphManager().add_node(source).compile_graph()
 
 
-def test_compile_forwards_node_timeouts_to_runtime():
-    """The compiled graph retains the manager's per-node timeout policy."""
+def test_compile_retains_timeout_on_node():
+    """The compiled graph reads timeout policy from its node."""
     graph = (
         GraphManager()
         .add_node(source, timeout=2.5)
@@ -174,7 +174,8 @@ def test_compile_forwards_node_timeouts_to_runtime():
         .compile_graph()
     )
 
-    assert graph._node_timeouts == {"source": 2.5}
+    assert graph._nodes["source"].timeout == 2.5
+    assert not hasattr(graph, "_node_timeouts")
 
 
 @pytest.mark.parametrize(

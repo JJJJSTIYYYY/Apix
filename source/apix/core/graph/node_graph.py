@@ -1,7 +1,6 @@
 """Stateless, event-driven graph runtime."""
 
 import asyncio
-import math
 from uuid import uuid4
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import suppress
@@ -53,7 +52,6 @@ class NodeGraph:
         nodes: dict[str, BaseNode],
         default_gotos: dict[str, str],
         *,
-        node_timeouts: dict[str, float | None] | None = None,
         max_steps: int = 1024,
         state_schema: type | None = None,
         using_namespace: str | None = None,
@@ -63,8 +61,6 @@ class NodeGraph:
         Args:
             nodes: Nodes keyed by their graph names.
             default_gotos: Manager-defined transitions.
-            node_timeouts: Optional per-node execution limits in seconds.
-                ``None`` and non-positive values wait indefinitely.
             max_steps: Maximum number of user-node executions in one run.
             state_schema: Default annotated schema for invocation contexts.
                 Fields marked with ``Annotated[..., AutoMerge()]`` are
@@ -76,20 +72,6 @@ class NodeGraph:
             raise ValueError("Namespace `<global>` is a preserved namespace.")
         self._nodes = dict(nodes)
         self._default_gotos = dict(default_gotos)
-        supplied_timeouts = dict(node_timeouts or {})
-        unknown_timeout_nodes = supplied_timeouts.keys() - self._nodes.keys()
-        if unknown_timeout_nodes:
-            unknown_names = ", ".join(sorted(unknown_timeout_nodes))
-            raise ValueError(
-                "Node timeouts reference unknown nodes: "
-                f"{unknown_names}."
-            )
-        self._node_timeouts = {
-            node_name: self.normalise_timeout(
-                supplied_timeouts.get(node_name)
-            )
-            for node_name in self._nodes
-        }
         self._max_steps = max_steps
         # Validate once at compilation, then create invocation-local contexts
         # carrying all schema-derived state behavior.
@@ -114,23 +96,6 @@ class NodeGraph:
         self.decompose()
         return False
 
-
-    @staticmethod
-    def normalise_timeout(
-        timeout: float | None,
-    ) -> float | None:
-        """Return a validated node timeout or ``None`` for no timeout."""
-        if timeout is None:
-            return None
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
-            raise TypeError("Node timeout must be a number or None.")
-
-        normalised = float(timeout)
-        if not math.isfinite(normalised):
-            raise ValueError("Node timeout must be finite.")
-        if normalised <= 0:
-            return None
-        return normalised
 
     def _register_node_listeners(self) -> None:
         """Subscribe the graph's single namespace-scoped dispatch handler."""
@@ -384,10 +349,11 @@ class NodeGraph:
         context.take_a_snapshot()
         try:
             with apix_graph_context(context):
-                execution = self._nodes[node_name].execute(
+                node = self._nodes[node_name]
+                execution = node.execute(
                     _copy_state(context.state, context._keep_ref_keys)
                 )
-                timeout = self._node_timeouts[node_name]
+                timeout = node.timeout
                 if timeout is None:
                     result = await execution
                 else:

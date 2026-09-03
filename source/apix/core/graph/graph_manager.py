@@ -46,7 +46,6 @@ class GraphManager:
         """
         self._state_schema = state_schema
         self._nodes: dict[str, BaseNode] = {}
-        self._node_timeouts: dict[str, float | None] = {}
         self._default_gotos: dict[str, str] = {}
         self._generated_names: set[str] = set()
 
@@ -90,9 +89,8 @@ class GraphManager:
         if node.name in self._nodes:
             raise ValueError(f"Node `{node.name}` is already registered.")
 
-        normalised_timeout = NodeGraph.normalise_timeout(timeout)
+        node.timeout = timeout
         self._nodes[node.name] = node
-        self._node_timeouts[node.name] = normalised_timeout
         return self
 
 
@@ -243,7 +241,6 @@ class GraphManager:
             lambda: NodeGraph(
                 self._nodes,
                 self._default_gotos,
-                node_timeouts=self._node_timeouts,
                 state_schema=self._state_schema,
                 using_namespace=namespace,
             ),

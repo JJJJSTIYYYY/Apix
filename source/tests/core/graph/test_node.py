@@ -1,12 +1,42 @@
 """Unit tests for graph node result normalisation."""
 
 import asyncio
+import math
 from dataclasses import is_dataclass
 
 import pytest
 
 from apix.core.utils.exception import InvalidNodeReturnsError
 from apix.core.graph import BaseNode, Command, Node, ParallelNode
+
+
+@pytest.mark.parametrize(
+    ("timeout", "expected"),
+    [(None, None), (0, None), (-1, None), (1, 1.0), (1.5, 1.5)],
+)
+def test_base_node_owns_normalised_timeout(timeout, expected):
+    """Every node stores its validated execution timeout itself."""
+    node = Node(lambda state: {})
+
+    node.timeout = timeout
+
+    assert node.timeout == expected
+
+
+@pytest.mark.parametrize("timeout", [True, "1", object()])
+def test_base_node_rejects_non_numeric_timeout(timeout):
+    node = Node(lambda state: {})
+
+    with pytest.raises(TypeError, match="timeout must be a number or None"):
+        node.timeout = timeout
+
+
+@pytest.mark.parametrize("timeout", [math.inf, -math.inf, math.nan])
+def test_base_node_rejects_non_finite_timeout(timeout):
+    node = Node(lambda state: {})
+
+    with pytest.raises(ValueError, match="timeout must be finite"):
+        node.timeout = timeout
 
 
 def test_node_requires_a_function():

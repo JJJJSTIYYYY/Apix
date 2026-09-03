@@ -104,7 +104,6 @@ class AgentGraphCreator(GraphManager):
             lambda: AgentGraph(
                 self._nodes,
                 self._default_gotos,
-                node_timeouts=self._node_timeouts,
                 state_schema=self._state_schema,
                 using_namespace=namespace,
             ),

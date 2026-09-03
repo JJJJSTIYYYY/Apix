@@ -567,7 +567,7 @@ async def test_node_without_timeout_waits_for_normal_completion():
         .compile_graph()
     )
 
-    assert graph._node_timeouts["slow_but_valid"] is None
+    assert graph._nodes["slow_but_valid"].timeout is None
     assert await graph.invoke({}) == {"finished": True}
 
 

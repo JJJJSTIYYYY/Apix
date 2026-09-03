@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import inspect
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, TypeGuard, TypeVar
@@ -16,9 +17,29 @@ class BaseNode(ABC):
 
     name: str
     func: Any
+    _timeout: float | None = None
 
     def __init__(self, *args, **kwargs):
         pass  # pragma: no cover - abstract compatibility hook
+
+    @property
+    def timeout(self) -> float | None:
+        """Maximum execution time in seconds, or ``None`` if unlimited."""
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value: float | None) -> None:
+        """Validate and store this node's execution timeout."""
+        if value is None:
+            self._timeout = None
+            return
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError("Node timeout must be a number or None.")
+
+        normalised = float(value)
+        if not math.isfinite(normalised):
+            raise ValueError("Node timeout must be finite.")
+        self._timeout = normalised if normalised > 0 else None
 
     @abstractmethod
     async def execute(
