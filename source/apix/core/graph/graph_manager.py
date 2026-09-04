@@ -80,7 +80,7 @@ class GraphManager:
             TypeError: If timeout is not a number or ``None``.
         """
         if not isinstance(node_func, BaseNode):
-            node = Node(node_func, node_name)
+            node = Node(node_func, node_name, timeout=timeout)
         else:
             node = node_func
 
@@ -147,6 +147,8 @@ class GraphManager:
         l_node: str,
         r_node: str,
         condition: NodeFunction | None = None,
+        *,
+        timeout: float | None = None,
     ):
         """Add a direct or conditional transition between graph nodes.
 
@@ -172,12 +174,19 @@ class GraphManager:
                 raise TypeError("A condition function must return bool.")
             return Command(update={}, goto=r_node if result else END)
 
-        self._nodes[condition_name] = Node(condition_node, condition_name)
+        self._nodes[condition_name] = Node(condition_node, condition_name, timeout=timeout)
         self._set_transition(l_node, condition_name)
         return self
 
 
-    def add_router(self, l_node: str, r_nodes: list[str], router: NodeFunction):
+    def add_router(
+        self, 
+        l_node: str, 
+        r_nodes: list[str], 
+        router: NodeFunction,
+        *,
+        timeout: float | None = None,
+    ):
         """Add an internal router node after ``l_node``.
 
         The router receives the state from the event context and must select
@@ -213,7 +222,7 @@ class GraphManager:
                 goto=list(result) if isinstance(result, list) else result,
             )
 
-        self._nodes[router_name] = Node(router_node, router_name)
+        self._nodes[router_name] = Node(router_node, router_name, timeout=timeout)
         self._set_transition(l_node, router_name)
         return self
 

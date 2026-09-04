@@ -803,6 +803,7 @@ class ToolNode(BaseNode):
         tool_set: Tool | list[Tool] | ToolFunction | list[ToolFunction],
         name: str = "tools",
         messages_key: str = "messages",
+        timeout: float | None = None
     ) -> None:
         """Create a node.
 
@@ -829,6 +830,7 @@ class ToolNode(BaseNode):
         self.name = name
         self.tool_set = []
         self.messages_key = messages_key
+        self.timeout = timeout
         self._tools_by_name: dict[str, Tool] = {}
 
         for candidate in candidates:

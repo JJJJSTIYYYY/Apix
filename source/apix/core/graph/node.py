@@ -168,7 +168,12 @@ class Node(BaseNode):
     name: str
     func: NodeFunction
 
-    def __init__(self, func: NodeFunction, name: str | None = None):
+    def __init__(
+        self, 
+        func: NodeFunction, 
+        name: str | None = None, 
+        timeout: float | None = None
+    ):
         """Create a node.
 
         Args:
@@ -186,6 +191,7 @@ class Node(BaseNode):
             raise ValueError("A graph node requires a name.")
         
         self.func = self._wrap_func(func)
+        self.timeout = timeout
 
 
     @staticmethod
@@ -239,6 +245,7 @@ class ParallelNode(BaseNode):
         self,
         funcs: list[NodeFunction] | tuple[NodeFunction, ...],
         name: str = "parallel",
+        timeout: float | None = None
     ) -> None:
         """Create a concurrent collection of regular node functions.
 
@@ -268,6 +275,7 @@ class ParallelNode(BaseNode):
             self._wrap_func(func)
             for func in funcs
         )
+        self.timeout = timeout
 
     @staticmethod
     def _normalise_result(
