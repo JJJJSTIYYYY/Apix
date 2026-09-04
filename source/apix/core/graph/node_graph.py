@@ -378,7 +378,7 @@ class NodeGraph:
         context: GraphContext,
     ) -> None:
         """Execute one node or one concurrently scheduled node batch."""
-        node_names = self._normalise_targets(node_name)
+        normalized_node_names = self._normalise_targets(node_name)
         context.take_a_snapshot()
         try:
             with apix_graph_context(context):
@@ -387,7 +387,7 @@ class NodeGraph:
                         self._execute_one_node(current_name, context),
                         name=f"graph-node-{current_name}-{context.run_id}",
                     )
-                    for current_name in node_names
+                    for current_name in normalized_node_names
                 ]
                 results = await BaseNode._gather_tasks_in_order(tasks)
 
@@ -423,8 +423,11 @@ class NodeGraph:
         a later command fails, recovery starts from that checkpoint rather than
         rolling the live state back in place.
         """
-        node_names = self._normalise_targets(node_name)
-        command_groups = self._normalise_command_groups(command, node_names)
+        normalized_node_names = self._normalise_targets(node_name)
+        command_groups = self._normalise_command_groups(
+            command,
+            normalized_node_names,
+        )
 
         if context.steps >= self._max_steps:
             raise RecursionError(
@@ -433,7 +436,7 @@ class NodeGraph:
 
         updated_normal_keys: set[str] = set()
         routes: list[str] = []
-        for current_node, commands in zip(node_names, command_groups):
+        for current_node, commands in zip(normalized_node_names, command_groups):
             current_node_normal_keys: set[str] = set()
             for current_command in commands:
                 if not isinstance(current_command.update, dict):
@@ -466,13 +469,13 @@ class NodeGraph:
                                 f"but {type(current_value).__name__} does not "
                                 "provide a callable __add__ method."
                             )
-                        increased_value = add_method(value)
-                        if increased_value is NotImplemented:
+                        merged_value = add_method(value)
+                        if merged_value is NotImplemented:
                             raise TypeError(
                                 f"State field `{key}` could not add an update "
                                 f"of type {type(value).__name__}."
                             )
-                        context.state[key] = increased_value
+                        context.state[key] = merged_value
                     else:
                         context.state[key] = value
 
@@ -490,10 +493,10 @@ class NodeGraph:
     @staticmethod
     def _normalise_command_groups(
         command: Command | list[Command] | list[Command | list[Command]],
-        node_names: list[str],
+        normalized_node_names: list[str],
     ) -> list[list[Command]]:
         """Normalise results without losing their source-node boundaries."""
-        if len(node_names) == 1:
+        if len(normalized_node_names) == 1:
             if isinstance(command, Command):
                 return [[command]]
             if isinstance(command, list) and all(
@@ -502,7 +505,9 @@ class NodeGraph:
                 return [command or [Command()]]
             raise TypeError("Node.execute must return a Command or list[Command].")
 
-        if not isinstance(command, list) or len(command) != len(node_names):
+        if not isinstance(command, list) or len(command) != len(
+            normalized_node_names
+        ):
             raise TypeError("A concurrent batch must return one result per node.")
         groups: list[list[Command]] = []
         for result in command:
@@ -547,12 +552,14 @@ class NodeGraph:
         context: GraphContext,
     ) -> None:
         """Target one node or concurrent batch and post one dispatch."""
-        node_names = [node_name] if isinstance(node_name, str) else node_name
-        if not isinstance(node_names, list) or not all(
-            isinstance(item, str) for item in node_names
+        normalized_node_names = (
+            [node_name] if isinstance(node_name, str) else node_name
+        )
+        if not isinstance(normalized_node_names, list) or not all(
+            isinstance(item, str) for item in normalized_node_names
         ):
             raise TypeError("Graph target must be a string or list of strings.")
-        for current_name in node_names:
+        for current_name in normalized_node_names:
             if current_name not in (START, END) and current_name not in self._nodes:
                 raise ValueError(f"Unknown graph node `{current_name}`.")
         context._set_target_node(node_name)

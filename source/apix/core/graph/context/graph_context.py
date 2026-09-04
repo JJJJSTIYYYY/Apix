@@ -372,7 +372,8 @@ class GraphContext:
             return
 
         completion = self.completion
-        assert completion is not None
+        if completion is  None:
+            raise RuntimeError("Cannot finish a running context because the completion is None.")
         result = None if completion.done() else self._snapshot_state()
         self._transition_to("finished")
         if not completion.done():

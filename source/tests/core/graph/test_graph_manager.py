@@ -9,7 +9,6 @@ from apix.core.graph import (
     END,
     START,
     GraphManager,
-    get_node_name_in_namespace,
     namespace_set,
 )
 from apix.core.graph.base import (
