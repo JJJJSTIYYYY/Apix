@@ -223,15 +223,15 @@ async def test_subscribe_decorates_callable_handler_and_overrides_options(regist
     assert event.context == "called"
 
 
-async def test_subscribe_duplicate_does_not_modify_registered_instance(registry):
+async def test_subscribe_duplicate_replaces_registered_instance_options(registry):
     async def core(event):
         pass
 
     handler = subscribe("contract.*", background=True)(ApixEventHandler(core))
     subscribe("other.*", background=False)(handler)
-    assert handler.background is True
-    assert handler.subscribe == ["contract.*"]
-    assert registry._register_order == 1
+    assert handler.background is False
+    assert handler.subscribe == ["other.*"]
+    assert registry._register_order == 2
 
 
 async def test_dispatch_notifies_all_later_handlers_after_failure_and_acceptance(registry):
@@ -256,7 +256,10 @@ async def test_dispatch_notifies_all_later_handlers_after_failure_and_acceptance
         handler.name = f"later_{index}"
         subscribe("contract.*")(handler)
     event = make_event()
-    await ApixEventLoop(registry)._dispatch_event(event)
+    await ApixEventLoop(registry)._dispatch_event(
+        event,
+        registry.get_handlers_chain_for_event(event.event_name),
+    )
     assert calls == ["error", "accepted"] * 3
     assert len(event.error_stack) == 1
 
@@ -282,7 +285,7 @@ async def test_background_failure_before_next_core_is_still_log_only(registry):
     loop = ApixEventLoop(registry)
     event = make_event()
     with patch("apix.core.event.base.logger") as logger:
-        await asyncio.wait_for(loop._dispatch_event(event), 1)
+        await asyncio.wait_for(loop._dispatch_event(event, loop._registry.get_handlers_chain_for_event(event.event_name) if event.event_name else []), 1)
         await asyncio.gather(*loop._background_handler_tasks)
     assert core_ran.is_set()
     assert not event.has_error
@@ -303,7 +306,10 @@ async def test_background_handler_checks_acceptance_when_it_starts(registry):
 
     loop = ApixEventLoop(registry)
     event = make_event()
-    await loop._dispatch_event(event)
+    await loop._dispatch_event(
+        event,
+        loop._registry.get_handlers_chain_for_event(event.event_name) if event.event_name else [],
+    )
     await asyncio.gather(*loop._background_handler_tasks)
     core.assert_not_awaited()
     accepted.assert_awaited_once_with(event)
@@ -448,7 +454,7 @@ async def test_subscribe_preserves_on_error_and_later_handler_observes_failure(r
         assert event.error_stack[0].message == "own failure"
 
     subscribe("contract.*")(ApixEventHandler(later_core, on_has_error=upstream_error))
-    await ApixEventLoop(registry)._dispatch_event(make_event())
+    await ApixEventLoop(registry)._dispatch_event(make_event(), registry.get_handlers_chain_for_event("contract.event"))
     assert calls == ["own error", "upstream error"]
 
 

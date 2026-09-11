@@ -8,7 +8,7 @@ import pytest
 from apix.core.event import (
     APIX_EVENT_LOOP,
     APIX_HANDLER_REGISTRY,
-    delete_handler_from_registry,
+    unsubscribe,
     subscribe,
     EVENT_PIPE,
 )
@@ -665,7 +665,7 @@ def test_decompose_unregisters_only_graph_handlers_and_is_idempotent():
         retained_plugin.__name__
     ]
 
-    delete_handler_from_registry(retained_plugin.__name__)
+    unsubscribe(retained_plugin.__name__)
 
 
 def test_dispatch_listener_registration_collision_does_not_leak_handler():
@@ -690,7 +690,7 @@ def test_dispatch_listener_registration_collision_does_not_leak_handler():
         conflicting_handler.__name__
     ).subscribe == ["foreign"]
 
-    delete_handler_from_registry(conflicting_handler.__name__)
+    unsubscribe(conflicting_handler.__name__)
 
 
 @pytest.mark.asyncio

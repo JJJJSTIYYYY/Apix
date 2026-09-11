@@ -11,7 +11,7 @@ from apix.core.event import (
     EventType,
     APIX_EVENT_LOOP,
     APIX_HANDLER_REGISTRY,
-    delete_handler_from_registry,
+    unsubscribe,
     EVENT_PIPE,
 )
 from apix.core.graph import START, GraphManager
@@ -114,7 +114,7 @@ async def test_interrupted_hook_rejects_non_block_event_context():
         assert "must carry a Block" in error.message
         assert received == []
     finally:
-        delete_handler_from_registry(invalid_context_hook.__name__)
+        unsubscribe(invalid_context_hook.__name__)
 
 
 async def test_graph_pauses_and_resumes_at_multiple_breakpoints():

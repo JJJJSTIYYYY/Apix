@@ -2,7 +2,7 @@
 
 `apix.core` 是 APIX 的底层运行时，包含两套相互协作但职责清晰的基础设施：
 
-- `apix.core.event`：异步事件发布、通配符订阅、确定性排序、处理器链版本隔离，以及本地或远程事件通道。
+- `apix.core.event`：异步事件发布、通配符订阅、确定性排序、出队解析当前处理器链，以及本地或远程事件通道。
 - `apix.core.graph`：基于事件系统驱动的状态图，包括节点、路由、状态合并、流式输出、运行上下文、快照恢复与人在环中断。
 
 `apix.core.utils` 目前主要定义 Core Runtime 对外抛出的异常类型。
@@ -123,7 +123,6 @@ from apix.core.event import (
     EVENT_PIPE,
     ApixEvent,
     EventType,
-    delete_handler_from_registry,
     get_handler_meta,
     get_unmatched_subscriptions,
     subscribe,
@@ -200,7 +199,7 @@ with (
 ## 并发边界
 
 - 不同事件实例会由独立分发任务处理，最多同时存在 100 个事件分发任务。
-- 后台事件处理器另有 100 个任务的并发限制。
+- 后台事件处理器另有 1000 个任务的并发限制。
 - 同一个 `NodeGraph` 可并发调用；普通字段会按深拷贝隔离。
 - 一次调用的图级并发批次按路由列表顺序收集 Command；`AutoMerge` 字段确定性合并，普通字段的跨节点重复更新会使批次失败。
 - `ParallelNode` 是单个图节点内部的并发分支；它可以作为一个成员加入图级并发批次，其内部分支共享该节点自己的 state 副本。
@@ -211,7 +210,7 @@ with (
 ## 文档导航
 
 - [事件系统](./event/README.md)
-- [处理器注册、排序与版本隔离](./event/handlers.md)
+- [处理器注册、排序与当前链缓存](./event/handlers.md)
 - [事件通道、序列化与远程传输](./event/channels.md)
 - [Graph Runtime](./graph/README.md)
 - [状态模型、Command 与复制语义](./graph/state.md)

@@ -5,7 +5,7 @@
 - 创建和发布 `ApixEvent`。
 - 按大小写敏感的 glob 模式匹配处理器。
 - 以优先级或显式相邻关系确定处理器顺序。
-- 在事件入队时冻结处理器链版本，隔离后续动态注册或注销。
+- 在事件出队时确定候选 handler 名称和顺序，调用前读取当前对象并重新检查订阅和过滤条件。
 - 使用本地队列分发事件，并可通过网关、Kafka 或 RabbitMQ 在节点之间转发。
 - 记录运行期间已经观察到的精确事件名，支持插件诊断。
 
@@ -18,9 +18,8 @@
 | `EVENT_PIPE` | 默认全局事件管道 |
 | `APIX_EVENT_LOOP` | 默认全局事件消费者与分发器 |
 | `subscribe()` | 注册异步事件处理器 |
-| `unsubscribe()` | 停用处理器的全部或部分订阅 |
-| `delete_handler_from_registry()` | 永久删除处理器元数据 |
-| `APIX_HANDLER_REGISTRY` | 处理器、排序桶和版本化链缓存 |
+| `unsubscribe()` | 立即移除处理器和排序桶记录 |
+| `APIX_HANDLER_REGISTRY` | 处理器、排序桶和单份当前链缓存 |
 | `APIX_EVENT_REGISTRY` | 已观察到的精确事件名集合 |
 
 类型别名：
@@ -38,7 +37,7 @@ from apix.core.event import (
     EVENT_PIPE,
     ApixEvent,
     EventType,
-    delete_handler_from_registry,
+    unsubscribe,
     subscribe,
 )
 
@@ -49,7 +48,6 @@ async def log_created_message(event: ApixEvent) -> None:
 
 
 async def main() -> None:
-    await APIX_EVENT_LOOP.start()
     try:
         await EVENT_PIPE.post_event(
             event_type=EventType.INFO,
@@ -58,7 +56,7 @@ async def main() -> None:
         )
         await EVENT_PIPE.join()
     finally:
-        delete_handler_from_registry(log_created_message.__name__)
+        unsubscribe(log_created_message.__name__)
         await APIX_EVENT_LOOP.stop()
 
 
@@ -96,7 +94,7 @@ class ApixEvent:
 | `datetime` | 将 `timestamp` 转换为本地 `datetime` 的只读属性 |
 | `accept()` | 将 `accepted` 设为 `True` |
 
-`_handler_chain_version` 是运行时内部字段，用于保存事件入队时的处理器链版本。应用代码不应手动修改。
+事件不携带 handler_chain 版本。缓存与分发规则见[当前链缓存](./handlers.md#出队时解析当前链)。
 
 ## 接受事件与后续通知
 
@@ -129,7 +127,7 @@ async def reject_invalid_request(event: ApixEvent) -> None:
 await APIX_EVENT_LOOP.start()
 ```
 
-`start()` 可重复调用。`NodeGraph.invoke()` 和 `NodeGraph.stream()` 会自动启动它。
+`start()` 可重复调用。全局 `EVENT_PIPE` 的本地发布（`post_event()`、`put()`、`put_nowait()`）会自动启动消费者，停止后再次发布也会重启。`put_nowait()` 需要在运行中的 asyncio loop 内调用。独立 `ApixEventPipe` 实例只负责自己的队列，不会启动全局消费者。
 
 ### 停止
 
@@ -137,17 +135,15 @@ await APIX_EVENT_LOOP.start()
 await APIX_EVENT_LOOP.stop()
 ```
 
-停止时会取消：
+`stop()` 只停止事件消费：不清空队列，不取消已经创建的分发任务或后台任务，已开始的调用继续完成。它不负责关闭外部通道，通道关闭仍使用 `EVENT_PIPE.stop()`。
 
-- 事件消费者任务；
-- 尚未结束的事件分发任务；
-- 尚未结束的后台处理器任务。
-
-如果只希望等待当前本地队列中已经取出的事件处理完成，应先执行：
+如需等待本地队列中的事件完成分发，应在停止消费之前执行：
 
 ```python
 await EVENT_PIPE.join()
 ```
+
+分发任务的完成回调统一确认队列项并释放分发额度；正常完成、异常和取消（包括任务尚未开始时取消）均只清理一次。后台任务在创建前取得并发额度，并由完成回调释放；等待额度期间取消不会创建后台任务。
 
 `join()` 只跟踪队列的 `put/get/task_done` 计数。后台处理器由分发器独立调度，因此队列完成不等于所有后台处理器都已结束。
 
@@ -217,6 +213,6 @@ await EVENT_PIPE.stop()
 
 ## 继续阅读
 
-- [处理器注册、排序与版本隔离](./handlers.md)
+- [处理器注册、排序与当前链缓存](./handlers.md)
 - [事件通道、序列化与远程传输](./channels.md)
 - [Core Runtime 总览](../README.md)

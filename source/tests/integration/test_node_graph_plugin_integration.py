@@ -6,7 +6,7 @@ import pytest_asyncio
 from apix.core.event import (
     ApixEvent,
     APIX_HANDLER_REGISTRY,
-    delete_handler_from_registry,
+    unsubscribe,
     subscribe,
 )
 from apix.core.event.event_loop import APIX_EVENT_LOOP
@@ -109,8 +109,8 @@ async def test_subscribe_inserts_plugin_before_node_graph_listener():
         "plugin_value_seen": "injected through event plugin",
     }
     graph.decompose()
-    delete_handler_from_registry(plugin_demo_authentication.__name__)
-    delete_handler_from_registry(plugin_demo_enrichment.__name__)
+    unsubscribe(plugin_demo_authentication.__name__)
+    unsubscribe(plugin_demo_enrichment.__name__)
 
 
 @pytest.mark.parametrize("mode", ["invoke", "stream"])
@@ -181,7 +181,7 @@ async def test_upstream_plugin_termination_completes_graph(mode, action, target)
         if mode == "stream":
             assert chunks == (["business chunk"] if target == "END" else [])
     finally:
-        delete_handler_from_registry(termination_plugin.__name__)
+        unsubscribe(termination_plugin.__name__)
         graph.decompose()
 
 
@@ -249,8 +249,8 @@ async def test_background_plugin_failure_does_not_fail_graph():
             assert await graph.invoke({}, context) == {"completed": True}
         assert context.status == "finished"
     finally:
-        delete_handler_from_registry(background_plugin.__name__)
-        delete_handler_from_registry(wait_for_background_plugin.__name__)
+        unsubscribe(background_plugin.__name__)
+        unsubscribe(wait_for_background_plugin.__name__)
         graph.decompose()
 
 
@@ -309,5 +309,5 @@ async def test_interruption_hook_termination_unblocks_node(action, timeout):
         assert len(blocks) == 1 and blocks[0].done
         assert blocks[0].cancelled is (action == "accept")
     finally:
-        delete_handler_from_registry(interruption_plugin.__name__)
+        unsubscribe(interruption_plugin.__name__)
         graph.decompose()

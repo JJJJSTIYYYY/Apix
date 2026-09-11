@@ -46,7 +46,6 @@ from apix.config.base_config import (
 )
 from apix.core.event.base import ApixEvent, ApixEventError, ChannelType, EventType
 from apix.core.event.event_registry import APIX_EVENT_REGISTRY
-from apix.core.event.handler_registry import APIX_HANDLER_REGISTRY
 
 
 def event_to_payload(event: ApixEvent) -> dict[str, Any]:
@@ -646,19 +645,13 @@ class ApixEventPipe:
         except KeyError as exc:
             raise ValueError(f"Unknown event channel: {channel!r}") from exc
 
-    @staticmethod
-    def _bind_handler_chain_version(event: Any) -> None:
-        """Freeze the current local handler chain version on an event."""
-        if (
-            isinstance(event, ApixEvent)
-            and event._handler_chain_version is None
-            and event.event_name
-        ):
-            event._handler_chain_version = (
-                APIX_HANDLER_REGISTRY.get_current_version_for_event(
-                    event.event_name
-                )
-            )
+    def _ensure_local_consumer(self) -> None:
+        """Auto-start the consumer belonging to the process-global pipe."""
+        if self is EVENT_PIPE:
+            # Import lazily because the loop consumes this module's pipe.
+            from apix.core.event.event_loop import APIX_EVENT_LOOP
+
+            APIX_EVENT_LOOP.start_nowait()
 
     async def put(
         self,
@@ -673,7 +666,7 @@ class ApixEventPipe:
         if channel == "mailtruck":
             await target_channel.put(event, recipient=recipient)
         else:
-            self._bind_handler_chain_version(event)
+            self._ensure_local_consumer()
             await target_channel.put(event)
         if isinstance(event, ApixEvent) and event.event_name:
             APIX_EVENT_REGISTRY.record_event(event)
@@ -715,7 +708,7 @@ class ApixEventPipe:
             raise EventChannelPermissionError("mailbox channels are receive-only")
         target_channel = self.get_channel(channel)
         if channel == "builtin":
-            self._bind_handler_chain_version(event)
+            self._ensure_local_consumer()
         target_channel.put_nowait(event)
         if isinstance(event, ApixEvent) and event.event_name:
             APIX_EVENT_REGISTRY.record_event(event)
@@ -809,7 +802,7 @@ class ApixEventPipe:
         while True:
             event = await mailbox.get()
             try:
-                self._bind_handler_chain_version(event)
+                self._ensure_local_consumer()
                 await builtin.put(event)
                 if event.event_name:
                     APIX_EVENT_REGISTRY.record_event(event)

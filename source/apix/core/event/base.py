@@ -37,7 +37,6 @@ class ApixEvent:
     timestamp: float
     accepted: bool = False
     error_stack: list[ApixEventError] = field(default_factory=list)
-    _handler_chain_version: int | None = None
 
     def accept(self) -> None:
         '''

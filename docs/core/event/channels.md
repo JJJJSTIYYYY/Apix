@@ -46,7 +46,7 @@ await EVENT_PIPE.post_event(
 )
 ```
 
-默认写入 `builtin`。在写入前会为事件冻结当前处理器链版本，并在成功写入后记录精确事件名。
+默认写入 `builtin`。全局管道的本地发布自动启动消费者，成功写入后记录精确事件名；发布端不查询或重建 handler_chain。
 
 如果队列已满，`put()` 会等待容量；`put_nowait()` 会抛出 `asyncio.QueueFull`。
 
@@ -146,7 +146,7 @@ nodes = EVENT_PIPE.nodes
 - `KafkaChannel` 消费 `${topic_prefix}.${mq_id}`，group id 为 `${group_id_prefix}.${mq_id}`。
 - `RabbitMQChannel` 声明 direct exchange，并用当前 `mq_id` 作为 routing key 绑定 `${queue_prefix}.${mq_id}` 队列。
 - broker 消息被反序列化为 `ApixEvent`，进入本地缓冲区。
-- forwarder 将其转发到 `builtin`，同时冻结本节点当前处理器链版本。
+- forwarder 将其转发到 `builtin`；本节点消费者出队时解析当前 handler_chain。
 
 直接向 mailbox 调用 `put()` 或 `put_nowait()` 会抛出 `EventChannelPermissionError`。
 

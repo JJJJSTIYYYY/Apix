@@ -1,4 +1,4 @@
-# 处理器注册、排序与版本隔离
+# 处理器注册、排序与当前链缓存
 
 本页详细说明 `apix.core.event.handler_registry` 的用户级行为。
 
@@ -11,13 +11,13 @@ subscribe(
     priority: float | None = None,
     between_handlers: tuple[str | None, str | None] | None = None,
     filter_event: list[str] | None = None,
-    stop_when_error: bool = True,
+    stop_when_error: bool | None = None,
     time_out: float | None = None,
-    background: bool = False,
+    background: bool | None = None,
 )
 ```
 
-装饰器接受异步函数或 `ApixEventHandler` 实例，并原样返回被装饰对象。`core_func`、`on_has_error` 和 `on_accepted` 接收 `ApixEvent`；`on_error` 接收 `(event, exception)`。所有回调均为异步函数，返回 `None`。
+装饰器接受异步函数或 `ApixEventHandler` 实例，并原样返回被装饰对象。订阅、过滤、优先级和边界校验统一由 `register_handler()` 在装饰器实际应用时完成；单独调用 `subscribe(...)` 只创建装饰器。`core_func`、`on_has_error` 和 `on_accepted` 接收 `ApixEvent`；`on_error` 接收 `(event, exception)`。所有回调均为异步函数，返回 `None`。
 
 ```python
 from apix.core.event import ApixEvent, subscribe
@@ -33,12 +33,12 @@ async def observe_agent_event(event: ApixEvent) -> None:
 | 参数 | 行为 |
 | --- | --- |
 | `event_names` | 一个或多个精确名称或 glob 模式；不能为空 |
-| `exist_ok` | 同名函数已存在时是否忽略本次注册；去重依据仅为函数名 |
+| `exist_ok` | 同名 handler 已存在时是否替换；`False` 时抛出重名错误 |
 | `priority` | 数值越大越先执行；同优先级保持注册顺序；默认 `1` |
 | `between_handlers` | 按已注册函数名将新处理器插入指定边界；不能与 `priority` 同用 |
 | `filter_event` | 在订阅命中后继续排除的 glob 模式 |
 | `stop_when_error` | 事件已有错误时是否跳过当前 handler 的核心函数；不跳过通知 |
-| `time_out` | 每个实际调用的回调分别限时；`None` 或非正数表示无限等待 |
+| `time_out` | 每个回调分别限时；`None` 沿用实例配置（普通函数默认无限），非正数清除限制 |
 | `background` | 是否创建后台任务并立即继续分发 |
 
 ## 带通知的处理器
@@ -79,7 +79,7 @@ request_handler: ApixEventHandler = subscribe("request.*", time_out=5)(
 
 `request_handler` 仍是原实例；`await request_handler(event)` 等价于 `await request_handler.execute(event)`。处理器使用 `core_func.__name__` 作为注册名。
 
-`subscribe()` 的参数（**包括默认值**）覆盖实例中的同名配置，保留通知回调。例如，实例设置 `background=True`，但装饰器传该参数为 `False`，则注册后实例的该值为 `False`。实例设置 `background=True`，但装饰器未传该参数，则注册后该实例值保持为 `True`。重复名称且 `exist_ok=True` 时直接忽略注册，不修改已有实例。
+`subscribe()` 重设订阅、过滤和排序配置，保留通知回调。执行选项 `stop_when_error`、`time_out`、`background` 为 `None` 时沿用传入实例的配置，显式值则覆盖；非正数 `time_out` 清除超时限制。例如，实例设置 `background=True`，但装饰器传该参数为 `False`，则注册后实例的该值为 `False`。实例设置 `background=True`，但装饰器未传该参数，则注册后该实例值保持为 `True`。重复名称且 `exist_ok=True` 时使用本次 handler 和配置替换原注册；先完成校验，失败时保留原注册。替换先完成校验，再调用 `unregister_handler()` 删除旧注册，最后按删除后的桶重新插入。无需修正旧索引，校验失败时原注册保持不变。
 
 执行规则如下：
 
@@ -210,33 +210,28 @@ async def normalize_order(event: ApixEvent) -> None:
 - 边界使用处理器函数名，不是事件名或 handler id。
 - 边界处理器必须仍处于 active 状态。
 - `(None, None)` 无效。
-- 左右边界不能相同。
+- 左右边界不能相同，也不能引用本次注册或替换的 handler 自身。
 - 左边界必须本来就排在右边界之前。
 - `between_handlers` 与显式 `priority` 不能同时提供。
 
-## 发布时版本隔离
+## 出队时解析当前链
 
-处理器链并不是消费事件时才首次决定。事件进入本地 `builtin` 队列时，`ApixEventPipe` 会：
+handler_chain 不再维护版本。发布端只入队并记录精确事件名，不读取 handler 注册表。loop 取出事件后立即同步取得或重建当前链，再交给分发任务。
 
-1. 为该精确事件名解析当前处理器链；
-2. 将链的版本号写入事件；
-3. 再把事件放入队列。
+缓存类型为 `dict[str, list[str] | None]`，每个精确事件名只有一份当前结果：
 
-因此，事件发布之后发生的注册、部分注销或全部注销，不会改变该事件已经冻结的处理器顺序。
+| 状态 | 语义 | 出队时处理 |
+| --- | --- | --- |
+| 键不存在 | 尚未建立缓存 | 重建并保存 |
+| `None` | 缓存失效 | 重建并覆盖 |
+| `[]` | 有效缓存，没有匹配项 | 直接使用 |
+| 非空列表 | 有效的有序 handler 名称列表 | 直接使用 |
 
-```python
-await EVENT_PIPE.post_event(
-    event_type=EventType.INFO,
-    event_name="task.ready",
-)
+必须用 `is None` 判断是否重建，不能把 `[]` 当作失效。注册、替换和退订只将受影响的已有缓存设为 `None`；替换同时考虑旧、新订阅及过滤范围。不会预热、枚举未知事件名或修改已交给分发任务的列表。
 
-# This handler only affects events published after registration.
-@subscribe("task.ready", priority=100)
-async def late_handler(event: ApixEvent) -> None:
-    ...
-```
+本次候选名称和顺序在出队时确定。每次调用前按名称读取当前 handler，并重新检查其订阅模式和 `filter_event`：缺失或不再匹配则直接跳过，不记录错误。因此，同名替换可影响本次尚未开始的调用；新增名称和排序变化由后续出队事件采用。已开始的调用继续完成。
 
-处理器链按精确事件名懒解析和缓存。注册一个宽泛通配符不会预热所有已观察事件，也不会为未知事件枚举名称。
+事件不保存链版本，链查询不接受 `version`，不再提供版本查询接口，也不维护 handler 引用计数或延迟删除状态。
 
 ## 后台处理器
 
@@ -253,51 +248,34 @@ async def write_audit_log(event: ApixEvent) -> None:
 后台处理器的行为：
 
 - 分发器创建任务后立即继续处理下一个 handler。
-- 后台任务之间最多并发 100 个。
+- 后台任务之间最多并发 1000 个。
 - 核心函数和通知函数的未捕获异常、超时只记录日志，不写入事件 `error_stack`。
 - `stop_when_error` 决定当前后台 handler 是否因已存在的前台错误跳过核心函数。
+- 等待并发额度后，再按名称读取当前 handler，并检查当前订阅和过滤条件；只有仍匹配该事件时才调用。
 - 在实际执行时检查 `has_error` 和 `accepted`，不会为已经执行结束的 handler 补发通知。
 - 后续前台处理器调用 `event.accept()` 时，已经开始的后台任务不会被取消。
 
 如果处理器必须在下一个处理器之前完成，不要设置 `background=True`。
 
-## 注销与删除
-
-### 部分注销
-
-```python
-unsubscribe(
-    "observe_agent_event",
-    ["agent.internal.*"],
-)
-```
-
-部分注销会把模式加入处理器的 `filter_event`，处理器仍然 active，并继续接收其他订阅事件。
-
-### 全部注销
+## 退订与过滤
 
 ```python
 unsubscribe("observe_agent_event")
 ```
 
-全部注销会把处理器从 active 排序桶移除，但保留 registry entry。保留 entry 是为了让已经发布、绑定了旧链版本的事件仍能解析到原处理器。
+退订立即删除注册表条目和优先级桶记录，同时使受影响缓存失效。`unsubscribe()` 继续调用 `unregister_handler()`，不再接受 `event_names`。缺失名称默认忽略；严格检查可使用 `missing_ok=False`。
 
-### 永久删除
-
-```python
-delete_handler_from_registry("observe_agent_event")
-```
-
-永久删除会移除处理器 entry 和 active 排序引用。它适合插件卸载或图 `decompose()` 后的最终清理。
-
-注意：如果仍有绑定旧版本的事件在队列中，永久删除可能导致旧链中的处理器名无法解析；分发器会记录警告并跳过该处理器。因此，在可能存在排队事件时优先使用 `unsubscribe()`，待生命周期结束后再永久删除。
-
-两个函数都默认 `missing_ok=True`。需要严格检查时：
+需要排除部分事件时，通过订阅配置过滤：
 
 ```python
-unsubscribe("required_handler", missing_ok=False)
-delete_handler_from_registry("required_handler", missing_ok=False)
+subscribe(
+    "agent.*",
+    filter_event=["agent.internal.*"],
+    exist_ok=True,
+)(observe_agent_event)
 ```
+
+插件卸载和图 `decompose()` 统一使用 `unsubscribe()` 完成清理。
 
 ## 注册诊断
 
@@ -336,7 +314,7 @@ patterns = get_unmatched_subscriptions("observe_agent_event")
 
 ## 低级数据模型与 Registry API
 
-大多数应用应使用模块级 `subscribe()`、`unsubscribe()` 和 `delete_handler_from_registry()`。框架扩展或诊断工具也可以直接使用 `ApixEventHandler` 与 `ApixHandlerRegistry`。
+大多数应用应使用模块级 `subscribe()` 和 `unsubscribe()`。框架扩展或诊断工具也可以直接使用 `ApixEventHandler` 与 `ApixHandlerRegistry`。
 
 ### ApixEventHandler
 
@@ -363,7 +341,7 @@ from apix.core.event import ApixEventHandler
 | `time_out` | 每个实际调用的回调的超时时间 |
 | `background` | 是否后台执行 |
 
-构造函数只接收四个回调、`stop_when_error`、`time_out` 和 `background`；其余注册参数由全局 `subscribe()` 注入。底层 `register_handler(entry)` 要求 entry 已具备完整注册信息，负责验证模式、core_func、priority 和边界，并更新受影响的精确事件链版本。
+构造函数只接收四个回调、`stop_when_error`、`time_out` 和 `background`；其余注册参数由全局 `subscribe()` 注入。底层 `register_handler(entry)` 要求 entry 已具备完整注册信息，负责验证模式、core_func、priority 和边界，并使受影响的精确事件链缓存失效。
 
 ### ApixHandlerRegistry
 
@@ -371,25 +349,20 @@ from apix.core.event import ApixEventHandler
 
 | 方法 | 说明 |
 | --- | --- |
-| `register_handler(entry)` | 注册一个完整 `ApixEventHandler` |
-| `unregister_handler(name, event_names=None)` | 部分或全部停用，保留旧版本 entry |
-| `delete_handler_from_registry(name, event_names=None)` | 永久删除 entry |
+| `register_handler(entry, exist_ok=False)` | 注册完整 handler；允许重名时校验后替换 |
+| `unregister_handler(name)` | 立即删除 entry 和桶记录；缺失时报错 |
 | `get_handler(name)` | 返回 entry 或 `None` |
-| `get_handlers_chain_for_event(event_name, version=None)` | 获取精确事件某版本的处理器名顺序 |
-| `get_current_version_for_event(event_name)` | 解析当前链并返回版本号 |
-| `get_current_version_for_event_without_resolve(event_name)` | 仅查询已有缓存版本；未出现时返回 `None` |
+| `get_handlers_chain_for_event(event_name)` | 获取精确事件当前的有序名称列表 |
 | `get_unmatched_subscriptions(name)` | 返回未覆盖已观察事件的订阅模式 |
 
-`registry`、`priority_buckets` 和 `cached_chain` 是可见的运行时结构，但应用不应直接修改，否则无法同步完成版本失效与旧事件隔离。
+`registry`、`priority_buckets` 和 `cached_chain` 是可见的运行时结构，但应用不应直接修改，否则无法同步完成缓存失效与排序维护。
 
-历史链 version 必须是从 0 开始的有效非负整数。与 GraphContext snapshot version 不同，handler chain API 不接受负索引。
 
 ## 插件清理模板
 
 ```python
 from apix.core.event import (
     ApixEvent,
-    delete_handler_from_registry,
     subscribe,
     unsubscribe,
 )
@@ -403,11 +376,8 @@ class Plugin:
 
         self.handler_name = plugin_agent_observer.__name__
 
-    def disable(self) -> None:
-        unsubscribe(self.handler_name)
-
     def uninstall(self) -> None:
-        delete_handler_from_registry(self.handler_name)
+        unsubscribe(self.handler_name)
 ```
 
 处理器名在进程全局唯一。多个插件若可能定义同名函数，应给函数设置稳定且带插件前缀的 `__name__`，并使用 `exist_ok=False` 及时暴露冲突。

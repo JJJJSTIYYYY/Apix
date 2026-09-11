@@ -602,11 +602,15 @@ class TestEventLoopRemainingBranches:
         monkeypatch.setattr(
             "apix.core.event.event_loop.EVENT_PIPE.get", get_event
         )
-        monkeypatch.setattr(handler, "_dispatch_event_and_ack", dispatch)
+        monkeypatch.setattr(handler, "_dispatch_event", dispatch)
+        acknowledge = MagicMock()
+        monkeypatch.setattr("apix.core.event.event_loop.EVENT_PIPE.task_done", acknowledge)
 
         await handler._event_consumer_loop()
         await asyncio.gather(*handler._dispatch_tasks)
-        dispatch.assert_awaited_once_with(event)
+        dispatch.assert_awaited_once_with(event, [])
+        acknowledge.assert_called_once_with()
+        assert handler._dispatch_semaphore._value == 1000
 
     @pytest.mark.asyncio
     async def test_consumer_releases_semaphore_when_get_fails(self, monkeypatch):
@@ -640,5 +644,8 @@ class TestEventLoopRemainingBranches:
         entry.priority = 1
         registry.register_handler(entry)
         event = make_event()
-        await handler._dispatch_event(event)
+        await handler._dispatch_event(
+            event,
+            handler._registry.get_handlers_chain_for_event(event.event_name) if event.event_name else [],
+        )
         callback.assert_awaited_once_with(event)

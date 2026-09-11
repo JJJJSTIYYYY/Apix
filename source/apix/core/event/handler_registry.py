@@ -1,9 +1,10 @@
-"""Versioned registry for event handlers and resolved handler chains."""
+"""Current handler registry with lazily resolved event-specific chains."""
 
 from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Iterator
+from copy import copy
 from fnmatch import fnmatchcase
 
 from apix.common.utils.logger import logger
@@ -16,21 +17,17 @@ from apix.core.utils.exception import (
 
 
 class ApixHandlerRegistry:
-    """Store handlers once and cache event-specific chains by version.
+    """Store current handlers and one ordered name chain per exact event.
 
-    ``priority_buckets`` is the active ordering structure. Handler entries stay
-    in ``registry`` after unregistration so events that captured an older chain
-    version can still resolve and execute those handlers.
-
-    ``cached_chain`` uses the exact event name as its key. Each list index is a
-    chain version; ``None`` marks the current version as invalidated but not yet
-    rebuilt, while an empty list is a valid chain with no matching handlers.
-    Chains are built lazily when an exact event is published or queried.
+    ``priority_buckets`` determines dispatch order. Missing cache keys and
+    ``None`` require rebuilding; an empty list is a valid cached result.
+    Registration changes invalidate affected entries without modifying lists
+    already held by dispatch tasks. The consumer resolves chains at dequeue.
     """
 
     registry: dict[str, ApixEventHandler]
     priority_buckets: dict[float, list[str]]
-    cached_chain: dict[str, list[list[str] | None]]
+    cached_chain: dict[str, list[str] | None]
 
     _instance = None
 
@@ -56,7 +53,7 @@ class ApixHandlerRegistry:
     def _normalise_patterns(
         patterns: Iterable[str],
         *,
-        argument_name: str,
+        argument_name: str | None = None,
     ) -> list[str]:
         """Validate patterns and remove duplicates without changing order."""
         if isinstance(patterns, str):
@@ -64,13 +61,13 @@ class ApixHandlerRegistry:
 
         supplied = list(patterns)
         if not supplied:
-            raise ValueError(f"{argument_name} cannot be empty.")
+            raise ValueError(f"{argument_name or 'Patterns'} cannot be empty.")
         if any(
             not isinstance(pattern, str) or not pattern
             for pattern in supplied
         ):
             raise ValueError(
-                f"Every pattern in {argument_name} must be a non-empty string."
+                f"Every pattern in {argument_name or 'patterns'} must be a non-empty string."
             )
         return list(dict.fromkeys(supplied))
 
@@ -92,28 +89,78 @@ class ApixHandlerRegistry:
         for priority in sorted(self.priority_buckets, reverse=True):
             yield from self.priority_buckets[priority]
 
-    def _find_handler_position(self, handler_name: str) -> tuple[float, int] | None:
+    def _get_handler_priority(self, handler_name: str) -> float | None:
+        """Return the priority of a registered handler, or None if unknown."""
+        handler = self.registry.get(handler_name)
+        return handler.priority if handler is not None else None
+
+    def _find_handler_position(
+        self,
+        handler_name: str,
+        *,
+        priority: float | None = None,
+    ) -> tuple[float, int] | None:
         """Return the active bucket and index for a handler name."""
-        for priority, bucket in self.priority_buckets.items():
+        if priority is not None:
+            bucket = self.priority_buckets.get(priority)
+            if bucket is None:
+                return None
             try:
                 return priority, bucket.index(handler_name)
             except ValueError:
-                continue
+                return None
+
+        for prio, bucket in self.priority_buckets.items():
+            for index, name in enumerate(bucket):
+                if name == handler_name:
+                    return prio, index
         return None
 
-    def _resolve_between_insertion(
+    def _validate_between_handlers(
         self,
         between_handlers: tuple[str | None, str | None],
-    ) -> tuple[float, int]:
-        """Resolve a boundary-based insertion without mutating registry state."""
+        *,
+        handler_name: str,
+    ) -> float:
+        """Validate boundaries without mutation and return the target priority."""
+        if (
+            not isinstance(between_handlers, tuple)
+            or len(between_handlers) != 2
+        ):
+            raise ValueError(
+                "between_handlers must be a tuple containing exactly two "
+                "handler names."
+            )
         left_name, right_name = between_handlers
+        if left_name is None and right_name is None:
+            raise ValueError("between_handlers cannot be (None, None).")
+        if any(
+            name is not None and (not isinstance(name, str) or not name)
+            for name in between_handlers
+        ):
+            raise ValueError(
+                "Boundary handler names must be non-empty strings or None."
+            )
+        if left_name is not None and left_name == right_name:
+            raise ValueError(
+                "The left and right handlers in between_handlers cannot "
+                "be the same handler."
+            )
+        if handler_name in between_handlers:
+            raise ValueError("A handler cannot use itself as an insertion boundary.")
         left_position = (
-            self._find_handler_position(left_name)
+            self._find_handler_position(
+                left_name,
+                priority=self._get_handler_priority(left_name),
+            )
             if left_name is not None
             else None
         )
         right_position = (
-            self._find_handler_position(right_name)
+            self._find_handler_position(
+                right_name,
+                priority=self._get_handler_priority(right_name),
+            )
             if right_name is not None
             else None
         )
@@ -138,160 +185,121 @@ class ApixHandlerRegistry:
                     f"`{right_name}`."
                 )
 
-            # When a right boundary exists, insertion is immediately before it.
-            return right_priority, right_index
+            # The right boundary determines the target priority bucket.
+            return right_priority
 
         if left_position is not None:
-            priority, index = left_position
-            return priority, index + 1
+            return left_position[0]
 
         assert right_position is not None
-        return right_position
+        return right_position[0]
 
-    def _invalidate_matching_chains(
-        self,
-        handler: ApixEventHandler,
-        *,
-        additional_filters: Iterable[str] = (),
-    ) -> None:
-        """Append an invalid current version for every affected exact event."""
-        filters = tuple(additional_filters)
-        for event_name, versions in self.cached_chain.items():
-            if not self._matches_handler(handler, event_name):
-                continue
-            if filters and not any(
-                fnmatchcase(event_name, pattern)
-                for pattern in filters
-            ):
-                continue
-            versions.append(None)
+    def _invalidate_matching_chains(self, handler: ApixEventHandler) -> None:
+        """Expire existing caches accepted by this handler without rebuilding."""
+        for event_name in self.cached_chain:
+            if self._matches_handler(handler, event_name):
+                self.cached_chain[event_name] = None
 
-    def get_handlers_chain_for_event(
-        self,
-        event_name: str,
-        version: int | None = None,
-    ) -> list[str]:
-        """Return the handler-name chain for an exact event and cache version.
-
-        Omitting ``version`` selects the current version. A missing current
-        cache is resolved from the active priority buckets and stored before it
-        is returned.
-        """
+    def get_handlers_chain_for_event(self, event_name: str) -> list[str]:
+        """Return the current chain, rebuilding only absent or expired entries."""
         if not isinstance(event_name, str) or not event_name:
             raise ValueError("event_name must be a non-empty string.")
 
-        versions = self.cached_chain.setdefault(event_name, [None])
-        selected_version = len(versions) - 1 if version is None else version
-        if (
-            isinstance(selected_version, bool)
-            or not isinstance(selected_version, int)
-            or selected_version < 0
-            or selected_version >= len(versions)
-        ):
-            raise ValueError(
-                f"Handler chain version {selected_version!r} does not exist "
-                f"for event `{event_name}`."
-            )
-
-        chain = versions[selected_version]
-        if chain is not None:
-            return chain
-
-        chain = []
-        for handler_name in self._iter_active_handler_names():
-            handler = self.registry.get(handler_name)
-            if handler is not None and self._matches_handler(handler, event_name):
-                chain.append(handler_name)
-
-        versions[selected_version] = chain
+        chain = self.cached_chain.get(event_name)
+        if chain is None:
+            chain = []
+            for handler_name in self._iter_active_handler_names():
+                handler = self.registry.get(handler_name)
+                if handler is not None and self._matches_handler(handler, event_name):
+                    chain.append(handler_name)
+            self.cached_chain[event_name] = chain
         return chain
 
-    def get_current_version_for_event(self, event_name: str) -> int:
-        """Resolve the current chain and return its cache version number."""
-        self.get_handlers_chain_for_event(event_name)
-        return len(self.cached_chain[event_name]) - 1
+    def _remove_from_bucket(self, handler_name: str) -> None:
+        """Remove a registered name and discard its bucket when empty."""
+        position = self._find_handler_position(
+            handler_name, 
+            priority=self._get_handler_priority(handler_name)
+        )
+        if position is not None:
+            priority, index = position
+            bucket = self.priority_buckets[priority]
+            bucket.pop(index)
+            if not bucket:
+                del self.priority_buckets[priority]
 
-    def get_current_version_for_event_without_resolve(self, event_name: str) -> int | None:
-        """Return cache version number."""
-        cached_chain = self.cached_chain.get(event_name)
-        if cached_chain is None:
-            return None
-        return len(cached_chain) - 1
-
-    def register_handler(self, handler_entry: ApixEventHandler) -> None:
-        """Register one handler entry and invalidate every affected cache."""
+    def register_handler(
+        self, handler_entry: ApixEventHandler, *, exist_ok: bool = False,
+    ) -> None:
+        """Validate, then insert or replace an entry and expire affected caches."""
         if not isinstance(handler_entry, ApixEventHandler):
             raise TypeError("handler_entry must be an ApixEventHandler instance.")
         if not handler_entry.name:
             raise ValueError("Handler name cannot be empty.")
-        if handler_entry.name in self.registry:
+        if handler_entry.name in self.registry and not exist_ok:
             raise EventHandlerAlreadyRegisteredError(
                 f"Handler `{handler_entry.name}` already registered."
             )
         if not callable(handler_entry.core_func):
             raise TypeError("Handler core_func must be callable.")
-        
-        handler_entry._register_order = APIX_HANDLER_REGISTRY._register_order
+        if handler_entry.on_accepted is not None and not callable(handler_entry.on_accepted):
+            raise TypeError("Handler on_accepted must be callable.")
+        if handler_entry.on_has_error is not None and not callable(handler_entry.on_has_error):
+            raise TypeError("Handler on_has_error must be callable.")
+        if handler_entry.on_error is not None and not callable(handler_entry.on_error):
+            raise TypeError("Handler on_error must be callable.")
+        if handler_entry.priority is not None and handler_entry.between_handlers is not None:
+            raise ValueError(
+                "between_handlers and priority cannot be set together."
+            )
 
-        handler_entry.subscribe = self._normalise_patterns(
+        subscriptions = self._normalise_patterns(
             handler_entry.subscribe,
             argument_name="subscribe",
         )
-        if handler_entry.filter_event:
-            handler_entry.filter_event = self._normalise_patterns(
-                handler_entry.filter_event,
-                argument_name="filter_event",
-            )
+        filters = (
+            self._normalise_patterns(handler_entry.filter_event, argument_name="filter_event",)
+            if handler_entry.filter_event else []
+        )
 
         between_handlers = handler_entry.between_handlers
         if between_handlers is not None:
-            if (
-                not isinstance(between_handlers, tuple)
-                or len(between_handlers) != 2
-            ):
-                raise ValueError(
-                    "between_handlers must be a tuple containing exactly two "
-                    "handler names."
-                )
-            left_name, right_name = between_handlers
-            if left_name is None and right_name is None:
-                raise ValueError("between_handlers cannot be (None, None).")
-            if any(
-                name is not None and (not isinstance(name, str) or not name)
-                for name in between_handlers
-            ):
-                raise ValueError(
-                    "Boundary handler names must be non-empty strings or None."
-                )
-            if left_name is not None and left_name == right_name:
-                raise ValueError(
-                    "The left and right handlers in between_handlers cannot "
-                    "be the same handler."
-                )
-            if handler_entry.priority is not None:
-                raise ValueError(
-                    "between_handlers and priority cannot be set together."
-                )
-            bucket_priority, insert_index = self._resolve_between_insertion(
-                between_handlers
+            bucket_priority = self._validate_between_handlers(
+                between_handlers,
+                handler_name=handler_entry.name
             )
         else:
             priority = handler_entry.priority
             if isinstance(priority, bool) or not isinstance(priority, (int, float)):
                 raise TypeError(
-                    "Handler priority must be a number when between_handlers "
-                    "is not set."
+                    "Handler priority must be a number."
                 )
             if not math.isfinite(priority):
                 raise ValueError("Handler priority must be finite.")
             bucket_priority = priority
-            insert_index = len(self.priority_buckets.get(bucket_priority, ()))
 
+        # Validate first so failed replacements preserve the old registration.
+        # Reuse normal unregistration, then insert against the updated bucket.
+        self.unregister_handler(handler_entry.name, missing_ok=True)
+
+        handler_entry.subscribe = subscriptions
+        handler_entry.filter_event = filters
+        handler_entry._register_order = self._register_order
         self.registry[handler_entry.name] = handler_entry
         bucket = self.priority_buckets.setdefault(bucket_priority, [])
-        bucket.insert(insert_index, handler_entry.name)
+        if between_handlers is None:
+            bucket.append(handler_entry.name)
+        else:
+            left_name, right_name = between_handlers
+            if right_name is not None:
+                insert_index = bucket.index(right_name)
+            else:
+                if left_name is None:
+                    raise ValueError("between_handlers cannot be (None, None).")
+                insert_index = bucket.index(left_name) + 1
+            bucket.insert(insert_index, handler_entry.name)
         self._invalidate_matching_chains(handler_entry)
-        APIX_HANDLER_REGISTRY._register_order += 1
+        self._register_order += 1
 
         logger.debug(
             f"Registered handler {handler_entry.name}, "
@@ -299,83 +307,19 @@ class ApixHandlerRegistry:
             f"between_handlers={handler_entry.between_handlers}"
         )
 
-    def unregister_handler(
-        self,
-        handler_name: str,
-        event_names: list[str] | None = None,
-    ) -> None:
-        """Unregister a handler while retaining its registry entry.
-
-        With no ``event_names``, the handler is removed from active priority
-        buckets for every event. When exact names or patterns are supplied,
-        they are added to ``filter_event`` so only those events are removed.
-        """
+    def unregister_handler(self, handler_name: str, *, missing_ok: bool = False) -> None:
+        """Immediately remove an entry and its bucket record, expiring caches."""
         handler = self.registry.get(handler_name)
         if handler is None:
-            raise EventHandlerNotRegisteredError(
-                f"Handler `{handler_name}` not registered."
-            )
-
-        if event_names is not None:
-            filters = self._normalise_patterns(
-                event_names,
-                argument_name="event_names",
-            )
-            new_filters = [
-                pattern
-                for pattern in filters
-                if pattern not in handler.filter_event
-            ]
-            if not new_filters or self._find_handler_position(handler_name) is None:
-                return
-            self._invalidate_matching_chains(
-                handler,
-                additional_filters=new_filters,
-            )
-            handler.filter_event.extend(new_filters)
+            if not missing_ok:
+                raise EventHandlerNotRegisteredError(
+                    f"Handler `{handler_name}` not registered."
+                )
             return
-
-        position = self._find_handler_position(handler_name)
-        if position is None:
-            return
-
         self._invalidate_matching_chains(handler)
-        priority, index = position
-        bucket = self.priority_buckets[priority]
-        bucket.pop(index)
-        if not bucket:
-            del self.priority_buckets[priority]
-
-        logger.debug(f"Unregistered handler {handler_name}.")
-
-    def delete_handler_from_registry(
-        self,
-        handler_name: str,
-        event_names: list[str] | None = None,
-    ) -> None:
-        """Permanently remove a handler entry and all active bucket references.
-
-        ``event_names`` is accepted for API symmetry, but permanent deletion
-        affects all subscriptions so every matching exact-event cache is
-        invalidated.
-        """
-        handler = self.registry.get(handler_name)
-        if handler is None:
-            raise EventHandlerNotRegisteredError(
-                f"Handler `{handler_name}` not registered."
-            )
-
-        position = self._find_handler_position(handler_name)
-        if position is not None:
-            self._invalidate_matching_chains(handler)
-            priority, index = position
-            bucket = self.priority_buckets[priority]
-            bucket.pop(index)
-            if not bucket:
-                del self.priority_buckets[priority]
-
+        self._remove_from_bucket(handler_name)
         del self.registry[handler_name]
-        logger.debug(f"Deleted handler {handler_name} from registry.")
+        logger.debug(f"Unregistered handler {handler_name}.")
 
     def get_handler(self, handler_name: str) -> ApixEventHandler | None:
         """Return a handler entry by name, or ``None`` when it is unknown."""
@@ -420,12 +364,12 @@ def subscribe(
     """Register an async handler for one or more event-name patterns.
 
     Handler names are unique across the process-global registry. The decorated
-    function or ApixEventHandler instance is returned unchanged.
+    function or ApixEventHandler instance is returned unchanged. Validation
+    happens in register_handler when the returned decorator is applied.
 
     Event subscription and filtering use case-sensitive
     :func:`fnmatch.fnmatchcase` semantics. The handler chain is resolved lazily
-    from the active priority buckets when an exact event name is first published
-    or queried for a cache version.
+    from the priority buckets when an event is dequeued or the chain is queried.
 
     Args:
         event_names:
@@ -440,14 +384,13 @@ def subscribe(
             ``"Graph.Start"`` but does not match ``"graph.start"``.
 
         exist_ok:
-            If ``True``, decorating another function with a name that already
-            exists in the registry has no effect, and the new function is
-            returned without replacing the original handler entry.
+            If ``True``, replace an existing same-name entry with this handler
+            and configuration. Validation failures preserve the old registration.
 
             If ``False``, a duplicate function name raises
             :class:`EventHandlerAlreadyRegisteredError`.
 
-            Deduplication is based only on the function name, not on subscribed
+            Uniqueness is based on the handler name, regardless of subscribed
             patterns or callback identity.
 
         priority:
@@ -563,8 +506,9 @@ def subscribe(
 
         time_out:
             Maximum execution time in seconds for each invoked core or
-            notification function. ``None`` waits indefinitely. Values less
-            than or equal to zero are normalized to ``None``.
+            notification function. ``None`` preserves the supplied instance's
+            timeout (unlimited for a plain function). Values less than or equal
+            to zero explicitly disable the timeout.
 
         background:
             If ``True``, schedule the handler as a background task without
@@ -576,14 +520,17 @@ def subscribe(
         3. Handlers in one bucket retain their explicit or registration order.
         4. ``between_handlers`` determines placement when supplied and cannot
            be combined with an explicit priority.
-        5. The exact handler-name chain version is frozen when the event enters
-           the local queue. Later registration or unregistration does not
-           change the chain used by an already published event.
+        5. Candidate names and order are fixed when the event is dequeued.
+           Each invocation looks up the current handler and rechecks its
+           subscription and filters, skipping missing or nonmatching entries.
+           Background tasks check again after waiting for capacity. Calls
+           already started continue to completion.
         6. Events with different exact names may dispatch concurrently.
         7. Calling :meth:`ApixEvent.accept` skips subsequent core functions,
            while applicable error and acceptance notifications still run.
-        8. Options supplied here, including defaults, override an existing
-           ApixEventHandler's settings. Notification functions are preserved.
+        8. Subscription and ordering options replace existing metadata.
+           Execution options set to None preserve a supplied instance's settings;
+           explicit values override them. Notification functions are preserved.
 
     Examples:
         Register handlers by priority::
@@ -607,7 +554,7 @@ def subscribe(
 
     Returns:
         A decorator that returns the supplied function or handler instance
-        unchanged after successful registration or an ``exist_ok`` duplicate.
+        unchanged after successful registration or replacement.
 
     Raises:
         ValueError:
@@ -628,70 +575,33 @@ def subscribe(
             If ``exist_ok`` is ``False`` and the function name already exists
             in the handler registry.
     """
-    normalised_event_names = ApixHandlerRegistry._normalise_patterns(
-        event_names,
-        argument_name="event_names",
-    )
-    normalised_filters = (
-        ApixHandlerRegistry._normalise_patterns(
-            filter_event,
-            argument_name="filter_event",
-        )
-        if filter_event
-        else []
-    )
-
-    if between_handlers is not None:
-        if not isinstance(between_handlers, tuple) or len(between_handlers) != 2:
-            raise ValueError(
-                "between_handlers must be a tuple containing exactly two "
-                "handler names."
-            )
-        left_name, right_name = between_handlers
-        if left_name is None and right_name is None:
-            raise ValueError("between_handlers cannot be (None, None).")
-        if left_name is not None and left_name == right_name:
-            raise ValueError(
-                "The left and right handlers in between_handlers cannot be "
-                "the same handler."
-            )
-        if any(
-            name is not None and (not isinstance(name, str) or not name)
-            for name in between_handlers
-        ):
-            raise ValueError(
-                "Boundary handler names must be non-empty strings or None."
-            )
-        if priority is not None:
-            raise ValueError("between_handlers and priority cannot be set together.")
-    elif priority is None:
-        priority = 1
-
-    if time_out is not None and time_out <= 0:
-        time_out = None
-
     def decorator[HandlerT: EventHandlerFunc | ApixEventHandler](
         func: HandlerT,
     ) -> HandlerT:
         handler_name = func.__name__
-        if handler_name in APIX_HANDLER_REGISTRY.registry:
-            if exist_ok:
-                return func
-            raise EventHandlerAlreadyRegisteredError(
-                f"Handler `{handler_name}` already registered."
-            )
-
-        entry = func if isinstance(func, ApixEventHandler) else ApixEventHandler(func)
+        # Stage instance metadata separately so a failed replacement cannot
+        # mutate an object that is still registered or being executed.
+        entry = (
+            copy(func) if isinstance(func, ApixEventHandler)
+            else ApixEventHandler(func)
+        )
         entry.name = handler_name
-        entry.subscribe = normalised_event_names.copy()
-        entry.filter_event = normalised_filters.copy()
-        entry.priority = priority
+        entry.subscribe = list(event_names)
+        entry.filter_event = filter_event if filter_event is not None else []
+        entry.priority = 1 if priority is None and between_handlers is None else priority
         entry.between_handlers = between_handlers
-        # Decorator options, including defaults, override instance settings.
-        entry.stop_when_error = stop_when_error if stop_when_error is not None else (entry.stop_when_error if entry.stop_when_error is not None else True)
-        entry.time_out = time_out if time_out is not None else entry.time_out
-        entry.background = background if background is not None else (entry.background if entry.background is not None else True)
-        APIX_HANDLER_REGISTRY.register_handler(entry)
+        # Explicit execution options override the supplied instance's settings.
+        # None preserves its setting; non-positive timeouts disable its limit.
+        if stop_when_error is not None:
+            entry.stop_when_error = stop_when_error
+        if time_out is not None:
+            entry.time_out = time_out if time_out > 0 else None
+        if background is not None:
+            entry.background = background
+        APIX_HANDLER_REGISTRY.register_handler(entry, exist_ok=exist_ok)
+        if isinstance(func, ApixEventHandler):
+            func.__dict__.update(entry.__dict__)
+            APIX_HANDLER_REGISTRY.registry[handler_name] = func
         return func
 
     return decorator
@@ -699,21 +609,16 @@ def subscribe(
 
 def unsubscribe(
     handler_name: str,
-    event_names: list[str] | None = None,
     *,
     missing_ok: bool = True,
 ) -> None:
-    """Unregister a global handler while retaining old-version execution data."""
-    try:
-        APIX_HANDLER_REGISTRY.unregister_handler(handler_name, event_names)
-    except EventHandlerNotRegisteredError:
-        if not missing_ok:
-            raise
+    """Immediately remove a global handler; optionally reject unknown names."""
+    APIX_HANDLER_REGISTRY.unregister_handler(handler_name, missing_ok = missing_ok)
 
 
 def get_handler(
     handler_name: str,
-) -> dict | None:
+) -> ApixEventHandler | None:
     return APIX_HANDLER_REGISTRY.get_handler(handler_name)
 
 
@@ -749,27 +654,9 @@ def get_unmatched_subscriptions(handler_name: str) -> list[str]:
     return APIX_HANDLER_REGISTRY.get_unmatched_subscriptions(handler_name)
 
 
-def delete_handler_from_registry(
-    handler_name: str,
-    event_names: list[str] | None = None,
-    *,
-    missing_ok: bool = True,
-) -> None:
-    """Permanently delete a handler from the process-global registry."""
-    try:
-        APIX_HANDLER_REGISTRY.delete_handler_from_registry(
-            handler_name,
-            event_names,
-        )
-    except EventHandlerNotRegisteredError:
-        if not missing_ok:
-            raise
-
-
 __all__ = [
     "ApixHandlerRegistry",
     "APIX_HANDLER_REGISTRY",
-    "delete_handler_from_registry",
     "get_unmatched_subscriptions",
     "subscribe",
     "unsubscribe",

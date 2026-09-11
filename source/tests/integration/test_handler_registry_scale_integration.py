@@ -310,8 +310,10 @@ async def test_two_thousand_four_hundred_events_dispatch_through_glob_handlers()
                 context=[],
             )
             event = await pipe.get()
-            await event_loop._dispatch_semaphore.acquire()
-            result = await event_loop._dispatch_event(event)
+            result = await event_loop._dispatch_event(
+                event,
+                event_loop._registry.get_handlers_chain_for_event(event.event_name) if event.event_name else [],
+            )
             pipe.task_done()
 
             assert result is event

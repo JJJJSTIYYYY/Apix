@@ -1,8 +1,11 @@
 """Shared pytest isolation for process-global runtime registries."""
 
-import pytest
+import asyncio
 
-from apix.core.event import APIX_HANDLER_REGISTRY
+import pytest
+import pytest_asyncio
+
+from apix.core.event import APIX_HANDLER_REGISTRY, APIX_EVENT_LOOP, EVENT_PIPE
 from apix.core.graph.base import _namespace_graphs, namespace_set
 
 
@@ -19,7 +22,7 @@ def _clear_node_graph_listeners() -> None:
         if name.startswith("graph_listener_")
     }
     for handler_name in handler_names:
-        APIX_HANDLER_REGISTRY.delete_handler_from_registry(handler_name)
+        APIX_HANDLER_REGISTRY.unregister_handler(handler_name)
 
 
 @pytest.fixture(autouse=True)
@@ -28,3 +31,16 @@ def isolate_node_graph_listeners():
     _clear_node_graph_listeners()
     yield
     _clear_node_graph_listeners()
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
+async def cleanup_event_runtime(isolate_node_graph_listeners):
+    """Release test-owned tasks explicitly now that stop only halts consumption."""
+    yield
+    await APIX_EVENT_LOOP.stop()
+    tasks = list(APIX_EVENT_LOOP._dispatch_tasks | APIX_EVENT_LOOP._background_handler_tasks)
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    await EVENT_PIPE.clear()

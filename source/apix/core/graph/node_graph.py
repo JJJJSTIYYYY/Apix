@@ -13,7 +13,7 @@ from apix.core.event import (
     ApixEventHandler,
     EventType,
     APIX_EVENT_LOOP,
-    delete_handler_from_registry,
+    unsubscribe,
     subscribe,
 )
 from apix.core.utils.exception import GraphNodeError
@@ -161,7 +161,7 @@ class NodeGraph:
     def _unregister_node_listeners(self) -> None:
         """Remove every event handler successfully registered by this graph."""
         for handler_name in self._listener_handler_names:
-            delete_handler_from_registry(handler_name)
+            unsubscribe(handler_name)
         self._listener_handler_names.clear()
 
 

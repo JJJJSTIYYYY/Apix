@@ -13,7 +13,6 @@ from apix.core.utils.exception import *
 from apix.core.event.handler_registry import (
     ApixHandlerRegistry,
     APIX_HANDLER_REGISTRY,
-    delete_handler_from_registry,
     get_unmatched_subscriptions,
     subscribe,
     unsubscribe,
@@ -37,7 +36,7 @@ __all__ = [
     "EventHandlerAlreadyRegisteredError", "InvalidNodeReturnsError",
     "GraphNodeError",
     "ApixHandlerRegistry", "APIX_HANDLER_REGISTRY",
-    "subscribe", "unsubscribe", "delete_handler_from_registry",
+    "subscribe", "unsubscribe",
     "get_unmatched_subscriptions", "get_handler", "get_handler_meta", "is_registered",
     "ApixEventRegistry", "APIX_EVENT_REGISTRY"
 ]

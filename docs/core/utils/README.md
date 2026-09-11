@@ -11,7 +11,6 @@
 常见来源：
 
 - `unsubscribe(..., missing_ok=False)`；
-- `delete_handler_from_registry(..., missing_ok=False)`；
 - `get_unmatched_subscriptions()` 使用未知名称；
 - 注册时指定不存在的 `between_handlers` 边界。
 
@@ -81,7 +80,7 @@ except TimeoutError:
 
 ```python
 try:
-    delete_handler_from_registry(
+    unsubscribe(
         "required_handler",
         missing_ok=False,
     )

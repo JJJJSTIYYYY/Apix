@@ -6,7 +6,7 @@
 
 - [Core Runtime 总览](./core/README.md)
 - [事件系统](./core/event/README.md)
-  - [处理器注册、排序与版本隔离](./core/event/handlers.md)
+  - [处理器注册、排序与当前链缓存](./core/event/handlers.md)
   - [事件通道、序列化与远程传输](./core/event/channels.md)
 - [Graph Runtime](./core/graph/README.md)
   - [状态模型、Command 与复制语义](./core/graph/state.md)

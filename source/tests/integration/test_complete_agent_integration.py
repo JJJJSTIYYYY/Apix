@@ -22,11 +22,10 @@ from apix.core.event import (
     APIX_EVENT_REGISTRY,
     EVENT_PIPE,
     ApixEvent,
-    delete_handler_from_registry,
+    unsubscribe,
     get_handler_meta,
     get_unmatched_subscriptions,
     subscribe,
-    unsubscribe,
 )
 from apix.core.event.event_loop import APIX_EVENT_LOOP
 from apix.core.graph import (
@@ -437,8 +436,8 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
         ]
     finally:
         graph.decompose()
-        delete_handler_from_registry(add_safety_policy.__name__)
-        delete_handler_from_registry(observe_agent_nodes.__name__)
+        unsubscribe(add_safety_policy.__name__)
+        unsubscribe(observe_agent_nodes.__name__)
 
 
 async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
@@ -496,10 +495,10 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
         assert dispatch_event in APIX_EVENT_REGISTRY.get_registered_events()
 
         calls.clear()
-        unsubscribe(
-            record_extension_event.__name__,
-            [dispatch_event],
-        )
+        subscribe(
+            dispatch_event, unseen_pattern,
+            priority=5, filter_event=[dispatch_event],
+        )(record_extension_event)
         await graph.invoke({"prompt": "second"})
         assert calls == []
         assert get_handler_meta(record_extension_event.__name__)[
@@ -507,6 +506,7 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
         ] == [dispatch_event]
 
         unsubscribe(record_extension_event.__name__)
+        assert get_handler_meta(record_extension_event.__name__) is None
     finally:
         graph.decompose()
-        delete_handler_from_registry(record_extension_event.__name__)
+        unsubscribe(record_extension_event.__name__)

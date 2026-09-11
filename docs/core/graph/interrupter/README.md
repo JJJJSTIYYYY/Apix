@@ -98,9 +98,9 @@ graph__interrupted
 直接注册的 hook 不由图清理。卸载时使用：
 
 ```python
-from apix.core.event import delete_handler_from_registry
+from apix.core.event import unsubscribe
 
-delete_handler_from_registry(on_document_review.__name__)
+unsubscribe(on_document_review.__name__)
 ```
 
 ## interrupt()

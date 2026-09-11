@@ -3,7 +3,7 @@ from datetime import datetime
 import traceback
 
 from apix.config.base_config import SHOW_EVENT_DISPATCH
-from apix.core.event.base import ApixEventHandler, ApixEvent
+from apix.core.event.base import ApixEvent
 from apix.core.event.handler_registry import (
     ApixHandlerRegistry,
     APIX_HANDLER_REGISTRY,
@@ -33,63 +33,34 @@ class ApixEventLoop:
 
         self.started = False
 
-    async def start(self):
-        """
-        Start event consumer worker.
-        Safe to call multiple times.
-        """
-
-        if self._event_consumer_task is None:
+    def start_nowait(self) -> None:
+        """Start the consumer in the running asyncio loop, once."""
+        if self._event_consumer_task is None or self._event_consumer_task.done():
             self._event_consumer_task = asyncio.create_task(
-                self._event_consumer_loop(),
-                name="pipe-event-consumer",
+                self._event_consumer_loop(), name="pipe-event-consumer",
             )
             self.started = True
             logger.info("Worker started.")
 
-    async def stop(self):
-        """
-        Stop event consumer worker.
-        """
+    async def start(self) -> None:
+        """Start event consumption. Safe to call multiple times."""
+        self.start_nowait()
 
+    async def stop(self) -> None:
+        """Stop consumption while queued events and dispatched calls remain.
+
+        A subsequent local publication starts the consumer again. Dispatch and
+        background tasks already scheduled are allowed to finish normally.
+        """
         task = self._event_consumer_task
-
-        if task:
-            self._event_consumer_task = None
-
+        self._event_consumer_task = None
+        self.started = False
+        if task is not None:
             task.cancel()
-
             try:
                 await task
             except asyncio.CancelledError:
                 pass
-
-        dispatch_tasks = list(self._dispatch_tasks)
-
-        for dispatch_task in dispatch_tasks:
-            dispatch_task.cancel()
-
-        if dispatch_tasks:
-            await asyncio.gather(
-                *dispatch_tasks,
-                return_exceptions=True,
-            )
-
-        self._dispatch_tasks.clear()
-
-        background_tasks = list(self._background_handler_tasks)
-
-        for background_task in background_tasks:
-            background_task.cancel()
-
-        if background_tasks:
-            await asyncio.gather(
-                *background_tasks,
-                return_exceptions=True,
-            )
-
-        self._background_handler_tasks.clear()
-
         logger.info("Worker stopped.")
 
     # Consumer
@@ -106,77 +77,106 @@ class ApixEventLoop:
 
                 try:
                     event: ApixEvent = await EVENT_PIPE.get()
-                    if SHOW_EVENT_DISPATCH:
-                        event_name_block = event.event_name
-                        handler_chain_version = event._handler_chain_version
-                        current_chain_version = APIX_HANDLER_REGISTRY.get_current_version_for_event_without_resolve(event_name_block)
-                        print(f"\033[38;5;59m{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\033[0m"
-                            f" \033[1;38;5;147m[EVENT LOOP]\033[0m"
-                            f" \033[38;5;59m│\033[0m"
-                            f" \033[38;5;116m{event_name_block}\033[0m"
-                            f" \033[38;5;59m│\033[0m"
-                            f" \033[38;5;152m{handler_chain_version}\033[0m"
-                            f"\033[38;5;240m→\033[0m"
-                            f"\033[48;5;235;38;5;110m {current_chain_version} \033[0m"
-                        )
                 except BaseException:
                     self._dispatch_semaphore.release()
                     raise
 
+                try:
+                    # Resolve synchronously after dequeue, before any task can
+                    # observe later registration or ordering changes.
+                    handler_chain = (
+                        self._registry.get_handlers_chain_for_event(event.event_name)
+                        if event.event_name else []
+                    )
+                    if SHOW_EVENT_DISPATCH:
+                        event_name_block = event.event_name
+                        print(f"\033[38;5;59m{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\033[0m"
+                            f" \033[1;38;5;147m[EVENT LOOP]\033[0m"
+                            f" \033[38;5;59m│\033[0m"
+                            f" \033[38;5;116m{event_name_block}\033[0m"
+                        )
+                except Exception as exc:
+                    # Resolution moved out of dispatch, so acknowledge failed
+                    # events here and keep consuming subsequent queue items.
+                    logger.error(
+                        f"Handler chain resolution failed: {type(exc).__name__}: "
+                        f"{exc}\n{traceback.format_exc()}"
+                    )
+                    EVENT_PIPE.task_done()
+                    self._dispatch_semaphore.release()
+                    continue
+
                 # Dispatch event to handler without blocking.
                 task = asyncio.create_task(
-                    self._dispatch_event_and_ack(event),
+                    self._dispatch_event(event, handler_chain),
                 )
 
                 self._dispatch_tasks.add(task)
 
                 task.add_done_callback(
-                    self._dispatch_tasks.discard
+                    self._on_dispatch_done
                 )
 
         except asyncio.CancelledError:
             logger.info("Event loop cancelled.")
 
-    async def _dispatch_event_and_ack(self, event: ApixEvent) -> ApixEvent | None:
-        """Dispatch one event and complete the builtin queue task."""
+    def _on_dispatch_done(self, task: asyncio.Task) -> None:
+        """Release queue ownership even when cancelled before coroutine entry."""
+        self._dispatch_tasks.discard(task)
         try:
-            return await self._dispatch_event(event)
-        finally:
             EVENT_PIPE.task_done()
+        finally:
+            self._dispatch_semaphore.release()
 
-    def _create_background_handler_task(
+        if not task.cancelled():
+            error = task.exception()
+            if error is not None:
+                logger.error(
+                    f"Dispatch task failed: {type(error).__name__}: {error}"
+                )
+
+    async def _create_background_handler_task(
         self,
-        handler: ApixEventHandler,
+        handler_name: str,
         event: ApixEvent,
     ):
-        task = asyncio.create_task(
-            self._run_background_handler(
-                handler,
-                event,
-            )
-        )
+        await self._background_handler_semaphore.acquire()
+
+        coroutine = self._run_background_handler(handler_name, event)
+        try:
+            task = asyncio.create_task(coroutine)
+        except BaseException:
+            # Release capacity if task creation fails.
+            coroutine.close()
+            self._background_handler_semaphore.release()
+            raise
 
         self._background_handler_tasks.add(task)
-
-        task.add_done_callback(
-            self._background_handler_tasks.discard
-        )
+        task.add_done_callback(self._on_background_handler_done)
 
     async def _run_background_handler(
         self,
-        handler: ApixEventHandler,
+        handler_name: str,
         event: ApixEvent,
     ):
         """
         Execute background handler safely.
         """
-
-        async with self._background_handler_semaphore:
+        # Capacity may have required a wait. Resolve the current entry only
+        # now and recheck its current subscription and exclusions.
+        handler = self._registry.get_handler(handler_name)
+        if handler is not None and self._registry._matches_handler(handler, event.event_name):
             await handler.execute(event)
+
+    def _on_background_handler_done(self, task: asyncio.Task) -> None:
+        # Also runs when the task is cancelled before its coroutine starts.
+        self._background_handler_tasks.discard(task)
+        self._background_handler_semaphore.release()
 
     async def _dispatch_event(
         self,
         event: ApixEvent,
+        handler_chain: list[str],
     ) -> ApixEvent | None:
         """
         Dispatch event to registered handlers.
@@ -186,28 +186,17 @@ class ApixEventLoop:
             if not event.event_name:
                 return None
 
-            handler_chain = self._registry.get_handlers_chain_for_event(
-                event.event_name,
-                event._handler_chain_version,
-            )
-
             if not handler_chain:
                 return event
 
             for handler_name in handler_chain:
-                # A permanently deleted entry cannot be resolved. This should
-                # only occur when callers delete a handler while an older event
-                # version is still queued.
+                # Earlier handlers may await while subscriptions change.
                 handler = self._registry.get_handler(handler_name)
-                if handler is None:
-                    logger.warning(
-                        f"Handler missing from registry: {handler_name}, "
-                        f"event={event.event_name}"
-                    )
+                if handler is None or not self._registry._matches_handler(handler, event.event_name):
                     continue
 
                 if handler.background:
-                    self._create_background_handler_task(handler, event)
+                    await self._create_background_handler_task(handler_name, event)
                 else:
                     await handler.execute(event)
 
@@ -219,9 +208,6 @@ class ApixEventLoop:
                 f"{type(e).__name__}: {e}\n"
                 f"{traceback.format_exc()}"
             )
-
-        finally:
-            self._dispatch_semaphore.release()
 
 
 APIX_EVENT_LOOP = ApixEventLoop(APIX_HANDLER_REGISTRY)
