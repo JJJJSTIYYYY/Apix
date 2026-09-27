@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 import pkgutil
 import importlib
 from urllib.parse import urlparse
@@ -9,7 +11,7 @@ from apix.common.utils.version import print_logo
 from apix.config.base_config import BASE_URL, NODE_ID
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
-from apix.core.event import EVENT_PIPE, APIX_EVENT_LOOP
+from apixis.core.event import get_event_pipe, get_event_loop, start_core
 from apix.common.utils.logger import Logger, logger
 
 
@@ -29,13 +31,16 @@ def auto_load_router(app: FastAPI):
                 logger.success(f"✔ Router register: {full_name}.{attr}")
 
 
+@asynccontextmanager
 async def lifespan(app: FastAPI):
+    event_pipe = event_loop = None
     await Logger.start()
     try:
         auto_load_router(app)
 
-        await EVENT_PIPE.start()
-        await APIX_EVENT_LOOP.start()
+        event_pipe = get_event_pipe()
+        event_loop = get_event_loop()
+        await start_core()
         await auto_init.start()
 
         yield
@@ -43,13 +48,15 @@ async def lifespan(app: FastAPI):
         # The gateway must learn that this node is unavailable before the
         # remaining services and event dispatcher are torn down.
         try:
-            await EVENT_PIPE.stop()
+            if event_pipe is not None:
+                await event_pipe.stop()
         finally:
             try:
                 await auto_init.stop()
             finally:
                 try:
-                    await APIX_EVENT_LOOP.stop()
+                    if event_loop is not None:
+                        await event_loop.stop()
                 finally:
                     await Logger.stop()
 

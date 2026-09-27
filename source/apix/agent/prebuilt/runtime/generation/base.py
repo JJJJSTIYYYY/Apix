@@ -6,7 +6,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from apix.agent.sdk.utils.message import ApixAiMessageChunk
+from apix.agent.core.utils.message import ApixAiMessageChunk
 from apix.common.type import ApixIdentity
 
 

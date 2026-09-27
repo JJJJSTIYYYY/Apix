@@ -36,12 +36,22 @@ APIX 是一个可拓展的**全栈的 AI Agent 协作平台**。它是一套完�
 - 在APIX 3.0中，向量库与向量检索工具不再作为内置模块提供，而通过插件的形式引入。
 - 沙箱预计沿用2.x的docker沙箱机制，但不再作为强制依赖。
 
+## 后端开发
+
+```bash
+cd source
+uv sync --locked
+uv run pytest
+uv run python -m apix.server
+```
+
+事件与图调度通过 PyPI 依赖 `apixis` 提供；Apix 保留 Agent SDK、工具、存储与服务层。
+
 ## 📚 使用文档
 
 - [总览](./docs/README.md)
-- [APIX Core Runtime](./docs/core/README.md)
-- [事件系统](./docs/core/event/README.md)
-- [Graph Runtime](./docs/core/graph/README.md)
+- [Apixis 接入与迁移指南](./docs/apixis-integration.md)
+- [Apixis 事件与图接口](https://github.com/JJJJSTIYYYY/Apixis/tree/master/docs)
 - Apix Core 已迁移到新的仓库 **[Apixis(apache协议开源)](https://github.com/JJJJSTIYYYY/Apixis.git)**
 
 ---

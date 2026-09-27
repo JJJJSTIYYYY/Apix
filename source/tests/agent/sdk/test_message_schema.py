@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 from apix.agent.prebuilt.adapter.store import store_adapter as store_adapter_module
 from apix.agent.prebuilt.adapter.context.context_adapter import AIContextAdapter
 from apix.agent.prebuilt.adapter.store.store_adapter import AIStoreAdapter
-from apix.agent.sdk.utils.funcs import (
+from apix.agent.core.utils.funcs import (
     convert_generation_id_to_message_node_id,
 )
-from apix.agent.sdk.utils.message import ApixAiMessage, ApixToolMessage
+from apix.agent.core.utils.message import ApixAiMessage, ApixToolMessage
 
 
 def test_message_object_keeps_only_application_owned_fields():

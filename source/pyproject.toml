@@ -5,9 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aio-pika>=9.5.8",
     "aiomysql>=0.3.2",
-    "aiokafka>=0.12.0",
     "fastapi>=0.139.2",
     "httpx[socks]>=0.28.1",
     "inflect>=7.5.0",
@@ -18,6 +16,7 @@ dependencies = [
     "uvicorn>=0.51.0",
     "ollama>=0.6.2",
     "fastmcp-slim[client]==3.4.7",
+    "apixis>=1.0.0",
 ]
 
 [tool.pytest.ini_options]

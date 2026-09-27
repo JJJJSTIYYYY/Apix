@@ -1,9 +1,9 @@
 from typing import Annotated, Literal, NotRequired, TypedDict
 
-from apix.agent.sdk.utils.message import AnyMessage, ToolCall
+from apix.agent.core.utils.message import AnyMessage, ToolCall
 from apix.common.type import ApixIdentity
-from apix.core.graph.base import AutoMerge
-from apix.agent.sdk.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo, RoleSchema
+from apixis.core.graph.base import AutoMerge
+from apix.agent.core.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo, RoleSchema
 
 
 class LLMConfig(TypedDict):

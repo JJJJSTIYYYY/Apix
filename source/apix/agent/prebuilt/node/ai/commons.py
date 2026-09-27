@@ -3,7 +3,7 @@
 #     self, 
 #     bot_node_name: str = 'bot', 
 #     tool_node_name: str = 'tools', 
-#     next_default: str = END,
+#     next_default: str | None = None,
 # ):
 #     """Add a router node between bot node and tool node.
 #     Auto bind tools for a bot instance.

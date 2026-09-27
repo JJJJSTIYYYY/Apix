@@ -143,14 +143,7 @@ def test_remote_mode_accepts_mysql_and_redis():
     )
 
 
-def test_remote_node_id_is_uuid4_hex():
-    node_id = base_config._create_node_id(True)
-    assert len(node_id) == 32
-    assert int(node_id, 16) >= 0
-    assert base_config._create_node_id(False) == "apix_service"
+def test_service_identity_matches_apixis_transport():
+    from apixis.core.config.core_config import NODE_ID
 
-
-def test_external_channel_defaults_are_available():
-    assert base_config.EVENT_CHANNEL_TYPE in {"kafka", "rabbitmq"}
-    assert base_config.KAFKA_BOOTSTRAP_SERVERS
-    assert base_config.RABBITMQ_URL.startswith("amqp")
+    assert base_config.NODE_ID == NODE_ID

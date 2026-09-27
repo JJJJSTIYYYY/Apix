@@ -11,8 +11,8 @@ from apix.agent.prebuilt.runtime.generation.base import get_generation_id
 from apix.agent.prebuilt.runtime.stream.base import AgentStreamChunkType, MinimalChunkData, AgentStreamChunk
 from apix.common.type import ApixIdentity
 from apix.common.utils.logger import logger
-from apix.core.graph.context import get_stream_writer
-from apix.core.event import ApixEvent
+from apixis.core.graph.context import get_stream_writer
+from apixis.core.event.base import suspend_process
 
 
 class AgentStreamWriter:
@@ -143,10 +143,11 @@ class AgentStreamWriter:
         )
 
         try:
-            if timeout:
-                result = await asyncio.wait_for(future, timeout)
-            else:
-                result = await future
+            async with suspend_process():
+                if timeout:
+                    result = await asyncio.wait_for(future, timeout)
+                else:
+                    result = await future
 
             logger.success(
                 f"Get result. "

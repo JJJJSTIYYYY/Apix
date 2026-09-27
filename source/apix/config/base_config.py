@@ -1,11 +1,12 @@
 import os
 import platform
-from uuid import uuid4
 from collections.abc import Mapping
 from typing import Any, Literal
 
 import httpx
 import yaml
+
+from apixis.core.config.core_config import NODE_ID
 
 
 # Global configuration settings for Apix.
@@ -218,32 +219,6 @@ def _validate_config_compatibility(config: Mapping[str, Any]) -> None:
 _validate_config_compatibility(_config)
 
 
-# Remote gateway and node identity
-REMOTE_GATEWAY_ENABLE = _get_config("REMOTE_GATEWAY.enable", False) is True
-REMOTE_GATEWAY_BASE_URL = _get_config(
-    "REMOTE_GATEWAY.base_url", "http://localhost:8080"
-)
-REMOTE_GATEWAY_CONFIG_ENDPOINT = _get_config(
-    "REMOTE_GATEWAY.config_endpoint", "/api/config"
-)
-REMOTE_GATEWAY_PIPE_ENDPOINT = _get_config(
-    "REMOTE_GATEWAY.pipe_endpoint", "/api/pipe"
-)
-GATEWAY_MAX_RETRY = _get_config("REMOTE_GATEWAY.max_retry", 5)
-GATEWAY_RETRY_INITIAL_DELAY = _get_config(
-    "REMOTE_GATEWAY.retry_initial_delay", 1.0
-)
-GATEWAY_TIMEOUT = _get_config("REMOTE_GATEWAY.timeout", 10.0)
-
-
-def _create_node_id(remote_enabled: bool) -> str:
-    """Create a globally unique MQ id only for remote node mode."""
-    return uuid4().hex if remote_enabled else "apix_service"
-
-
-NODE_ID = _create_node_id(REMOTE_GATEWAY_ENABLE)
-
-
 # Server
 BASE_URL = _get_config("SERVER.base_url", "http://localhost:2712")
 BASE_DIR = _get_config("SERVER.base_dir", "./.apix_data/")
@@ -280,49 +255,11 @@ DEBUG_LEVEL: Literal["DEBUG", "INFO", "WARN", "ERROR"] = _get_config(
 ).upper()
 
 TRACE = _get_config("LOG.trace", True)
-SHOW_EVENT_DISPATCH = _get_config("LOG.show_event_dispatch", True)
 MAX_LOG_FILE_SIZE = _get_config("LOG.max_log_file_size", 5 * 1024 * 1024)
 
 
-# Pipeline
-EVENT_PIPE_MAX_LEN = _get_config("PIPELINE.event_pipe_max_len", 1024)
-# Deprecated compatibility setting. Event handlers now wait indefinitely
-# unless ``time_out`` is passed explicitly to the registry subscription.
-EVENT_HANDLER_DEFAULT_TIME_OUT = _get_config(
-    "PIPELINE.event_handler_default_time_out",
-    300,
-)
+# Agent message buffering
 MESSAGE_PIPE_MAX_LEN = _get_config("PIPELINE.message_pipe_max_len", 4096)
-
-
-# External event mailbox
-EVENT_CHANNEL_CONFIG = _get_config(
-    "EVENT_CHANNEL", {}
-)
-EVENT_CHANNEL_TYPE: Literal["kafka", "rabbitmq"] = _get_config(
-    "EVENT_CHANNEL.type", "kafka"
-)
-KAFKA_BOOTSTRAP_SERVERS = _get_config(
-    "EVENT_CHANNEL.kafka.bootstrap_servers", ["localhost:9092"]
-)
-KAFKA_TOPIC_PREFIX = _get_config(
-    "EVENT_CHANNEL.kafka.topic_prefix", "apix.mailbox"
-)
-KAFKA_GROUP_ID_PREFIX = _get_config(
-    "EVENT_CHANNEL.kafka.group_id_prefix", "apix.node"
-)
-RABBITMQ_URL = _get_config(
-    "EVENT_CHANNEL.rabbitmq.url", "amqp://guest:guest@localhost/"
-)
-RABBITMQ_EXCHANGE = _get_config(
-    "EVENT_CHANNEL.rabbitmq.exchange", "apix.events"
-)
-RABBITMQ_QUEUE_PREFIX = _get_config(
-    "EVENT_CHANNEL.rabbitmq.queue_prefix", "apix.mailbox"
-)
-RABBITMQ_PREFETCH_COUNT = _get_config(
-    "EVENT_CHANNEL.rabbitmq.prefetch_count", 100
-)
 
 
 # Runtime

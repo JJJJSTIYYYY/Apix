@@ -22,20 +22,20 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel
 
-import apix.agent.sdk.tool.tool_node as tool_node_module
-from apix.agent.sdk.tool import (
+import apix.agent.core.tool.tool_node as tool_node_module
+from apix.agent.core.tool import (
     AutoInjection,
     Tool,
     ToolInjectionContext,
     ToolNode,
     tool,
 )
-from apix.agent.sdk.utils.message import (
+from apix.agent.core.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
 )
-from apix.agent.sdk.utils.exception import InvalidToolArgsError
-from apix.core.graph import Command, GraphManager
+from apix.agent.core.utils.exception import InvalidToolArgsError
+from apixis.core.graph import Command, GraphManager
 
 
 class TextUnit(Enum):

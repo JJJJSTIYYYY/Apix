@@ -5,7 +5,7 @@ from markdownify import markdownify as md
 from readability import Document
 import re
 
-from apix.agent.sdk.utils.message import ApixSystemMessage, ApixUserMessage
+from apix.agent.core.utils.message import ApixSystemMessage, ApixUserMessage
 from apix.agent.prebuilt.state import AgentConfigSchema
 from apix.agent.prebuilt.node.tools.web_search.base import UrlResultItem, ContentResultItem
 from apix.common.utils.logger import logger

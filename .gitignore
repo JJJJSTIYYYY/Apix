@@ -59,3 +59,7 @@ temp/
 # Extra
 *.sqlite3
 *.db
+
+uv.lock
+config.yaml
+.python-version

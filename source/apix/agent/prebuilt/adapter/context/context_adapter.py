@@ -3,14 +3,14 @@ import json
 from typing import Any
 from xml.sax.saxutils import escape
 
-from apix.agent.sdk.utils.message import ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
-from apix.agent.sdk.utils.funcs import convert_generation_id_to_message_node_id
-from apix.agent.sdk.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo
+from apix.agent.core.utils.message import ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
+from apix.agent.core.utils.funcs import convert_generation_id_to_message_node_id
+from apix.agent.core.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo
 from apix.common.utils.logger import logger
 
 
 class AIContextAdapter:
-    """Context adapter for agent sdk.
+    """Context adapter for agent core.
     """
 
     _MISSING_TOOL_OUTPUT = (

@@ -4,18 +4,14 @@ import asyncio
 from typing import Annotated, Any, TypedDict
 
 import pytest
-import pytest_asyncio
 
-from apix.agent.sdk.tool import ToolNode, tool
-from apix.agent.sdk.utils.message import (
+from apix.agent.core.tool import ToolNode, tool
+from apix.agent.core.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
 )
-from apix.core.event.event_loop import APIX_EVENT_LOOP
-from apix.core.event import EVENT_PIPE
-from apix.core.graph import (
+from apixis.core.graph import (
     AutoMerge,
-    START,
     Command,
     GraphManager,
     Node,
@@ -26,16 +22,6 @@ from apix.core.graph import (
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-@pytest_asyncio.fixture(
-    autouse=True,
-    scope="module",
-    loop_scope="session",
-)
-async def stop_event_loop_after_module():
-    """Stop and clear the shared event runtime after this module."""
-    yield
-    await APIX_EVENT_LOOP.stop()
-    await EVENT_PIPE.clear()
 
 
 class AgentState(TypedDict, total=False):
@@ -70,7 +56,7 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
         await second_started.wait()
         await asyncio.sleep(0.01)
         completion_order.append("first")
-        return Command(
+        return Command(goto="observe", 
             update={
                 "messages": [
                     ApixToolMessage(
@@ -87,7 +73,7 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
     async def second(value: str) -> Command:
         second_started.set()
         completion_order.append("second")
-        return Command(
+        return Command(goto="observe", 
             update={
                 "messages": [
                     ApixToolMessage(
@@ -101,7 +87,7 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
         )
 
     def emit_tool_calls(state: dict) -> Command:
-        return Command(
+        return Command(goto="tools", 
             update={
                 "messages": [
                     ApixAiMessage(
@@ -153,10 +139,7 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
             tool_node,
             observe_node,
         ])
-        .add_edge(START, emit_node.name)
-        .add_edge(emit_node.name, tool_node.name)
-        .add_edge(tool_node.name, observe_node.name)
-        .compile_graph()
+        .compile_graph(emit_node.name)
     )
 
     assert isinstance(graph, NodeGraph)
@@ -187,7 +170,7 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
     )
 
 
-async def test_tool_command_goto_overrides_manager_default_edge():
+async def test_tool_command_goto_selects_next_node():
     """A Tool-produced route is honored after ToolNode returns its list."""
     @tool
     def choose_route() -> Command:
@@ -204,7 +187,7 @@ async def test_tool_command_goto_overrides_manager_default_edge():
         )
 
     def emit_tool_call(state: dict) -> dict:
-        return {
+        return Command(update={
             "messages": [
                 ApixAiMessage(
                     tool_calls=[
@@ -215,7 +198,7 @@ async def test_tool_command_goto_overrides_manager_default_edge():
                     ]
                 )
             ]
-        }
+        }, goto="tools")
 
     def fallback(state: dict) -> dict:
         return {"route": "fallback"}
@@ -232,10 +215,7 @@ async def test_tool_command_goto_overrides_manager_default_edge():
             fallback,
             selected,
         ])
-        .add_edge(START, "emit_tool_call")
-        .add_edge("emit_tool_call", tool_node.name)
-        .add_edge(tool_node.name, "fallback")
-        .compile_graph()
+        .compile_graph("emit_tool_call")
     )
 
     result = await graph.invoke({"messages": []})
@@ -245,14 +225,14 @@ async def test_tool_command_goto_overrides_manager_default_edge():
     assert result["messages"][-1].content == "selected"
 
 
-async def test_empty_tool_call_list_continues_along_default_edge():
-    """ToolNode's empty Command list acts as a graph no-op."""
+async def test_empty_tool_call_list_finishes_graph():
+    """An empty Command list finishes the graph without running other nodes."""
     def emit_without_tool_calls(state: dict) -> dict:
-        return {
+        return Command(update={
             "messages": [
                 ApixAiMessage(tool_calls=[]),
             ]
-        }
+        }, goto="tools")
 
     def unused_tool() -> str:
         raise AssertionError("unused tool must not execute")
@@ -268,15 +248,12 @@ async def test_empty_tool_call_list_continues_along_default_edge():
             tool_node,
             after_tools,
         ])
-        .add_edge(START, "emit_without_tool_calls")
-        .add_edge("emit_without_tool_calls", tool_node.name)
-        .add_edge(tool_node.name, "after_tools")
-        .compile_graph()
+        .compile_graph("emit_without_tool_calls")
     )
 
     result = await graph.invoke({"messages": []})
 
-    assert result["route"] == "after-tools"
+    assert "route" not in result
     assert len(result["messages"]) == 1
     assert isinstance(result["messages"][0], ApixAiMessage)
 
@@ -291,7 +268,7 @@ async def test_tool_exception_propagates_and_stops_downstream_node():
         raise RuntimeError("tool exploded")
 
     def emit_tool_call(state: dict) -> dict:
-        return {
+        return Command(update={
             "messages": [
                 ApixAiMessage(
                     tool_calls=[
@@ -302,7 +279,7 @@ async def test_tool_exception_propagates_and_stops_downstream_node():
                     ]
                 )
             ]
-        }
+        }, goto="tools")
 
     def downstream(state: dict) -> dict:
         downstream_calls.append("called")
@@ -316,10 +293,7 @@ async def test_tool_exception_propagates_and_stops_downstream_node():
             tool_node,
             downstream,
         ])
-        .add_edge(START, "emit_tool_call")
-        .add_edge("emit_tool_call", tool_node.name)
-        .add_edge(tool_node.name, "downstream")
-        .compile_graph()
+        .compile_graph("emit_tool_call")
     )
 
     with pytest.raises(RuntimeError, match="tool exploded"):
@@ -344,8 +318,7 @@ async def test_graph_timeout_cancels_running_tool_node():
     graph = (
         GraphManager(AgentState)
         .add_node(tool_node, timeout=0.02)
-        .add_edge(START, tool_node.name)
-        .compile_graph()
+        .compile_graph(tool_node.name)
     )
     state = {
         "messages": [

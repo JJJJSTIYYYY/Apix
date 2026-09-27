@@ -1,4 +1,4 @@
-from apix.agent.sdk.utils.context import RoleSchema
+from apix.agent.core.utils.context import RoleSchema
 
 default_agent_role = RoleSchema(
     name="Apix",

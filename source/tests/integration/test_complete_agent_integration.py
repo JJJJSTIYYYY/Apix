@@ -5,53 +5,39 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any, TypedDict
 
 import pytest
-import pytest_asyncio
 
-from apix.agent.sdk.tool import (
+from apix.agent.core.tool import (
     AutoInjection,
     ToolInjectionContext,
     ToolNode,
     tool,
 )
-from apix.agent.sdk.utils.message import (
+from apix.agent.core.utils.message import (
     ApixAiMessage,
     ApixToolMessage,
     ApixUserMessage,
 )
-from apix.core.event import (
-    APIX_EVENT_REGISTRY,
-    EVENT_PIPE,
+from apixis.core.event import (
+    get_event_registry,
     ApixEvent,
     unsubscribe,
     get_handler_meta,
     get_unmatched_subscriptions,
     subscribe,
 )
-from apix.core.event.event_loop import APIX_EVENT_LOOP
-from apix.core.graph import (
+from apixis.core.graph import (
     AutoMerge,
     Command,
-    END,
-    GRAPH_DISPATCH,
     GraphManager,
     KeepRef,
-    START,
 )
-from apix.core.graph import get_node_name_in_namespace
+from apixis.core.graph import get_graph_dispatch_name
+from apix.agent.core.graph import AgentGraphCreator
 
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-@pytest_asyncio.fixture(
-    autouse=True,
-    scope="module",
-    loop_scope="session",
-)
-async def stop_event_runtime_after_module():
-    yield
-    await APIX_EVENT_LOOP.stop()
-    await EVENT_PIPE.clear()
 
 
 @dataclass
@@ -155,11 +141,14 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     completion_order: list[str] = []
 
     @tool(description="Look up current weather for a city.")
-    async def lookup_weather(city: str) -> str:
+    async def lookup_weather(city: str) -> Command:
         await remember_started.wait()
         await asyncio.sleep(0.01)
         completion_order.append("lookup_weather")
-        return f"weather:{city}:sunny"
+        return Command(
+            update={"messages": [ApixToolMessage(content=f"weather:{city}:sunny", tool_call_id="placeholder")]},
+            goto="persist_messages",
+        )
 
     @tool(description="Add two integers.")
     async def add(left: int, right: int) -> Command:
@@ -176,19 +165,23 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
                 ],
                 "audit": [f"calculated:{left}+{right}"],
                 "calculation": total,
-            }
+            },
+            goto="persist_messages",
         )
 
     @tool(description="Remember one note for the current Agent run.")
     async def remember(
         note: str,
         runtime: Annotated[ToolInjectionContext, AutoInjection()],
-    ) -> str:
+    ) -> Command:
         remember_started.set()
         runtime.state["memory"].notes.append(note)
         runtime.state["memory"].call_ids.append(runtime.tool_call_id)
         completion_order.append("remember")
-        return "stored"
+        return Command(
+            update={"messages": [ApixToolMessage(content="stored", tool_call_id="placeholder")]},
+            goto="persist_messages",
+        )
 
     tool_node = ToolNode([lookup_weather, add, remember])
     bot = ScriptedBot().bind_tools(tool_node)
@@ -196,7 +189,7 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     def prepare_context(state: dict[str, Any]) -> Command:
         """Build the exact message snapshot supplied to the next model call."""
         preparation_number = state.get("context_preparations", 0) + 1
-        return Command(
+        return Command(goto="model", 
             update={
                 "prepared_context": list(state["messages"]),
                 "context_preparations": 1,
@@ -206,7 +199,7 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
 
     async def call_model(state: dict[str, Any]) -> Command:
         response = await bot.invoke(state["prepared_context"])
-        return Command(
+        return Command(goto="persist_messages", 
             update={
                 "messages": [response],
                 "model_calls": 1,
@@ -224,7 +217,7 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
         ]
         latest = state["messages"][-1]
         if isinstance(latest, ApixAiMessage):
-            next_node = tool_node.name if latest.tool_calls else END
+            next_node = tool_node.name if latest.tool_calls else None
         else:
             next_node = "prepare_context"
 
@@ -239,16 +232,12 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
         )
 
     graph = (
-        GraphManager(CompleteAgentState)
+        AgentGraphCreator(CompleteAgentState)
         .add_node(prepare_context)
         .add_node(call_model, "model")
         .add_node(tool_node)
         .add_node(persist_messages)
-        .add_edge(START, "prepare_context")
-        .add_edge("prepare_context", "model")
-        .add_edge("model", "persist_messages")
-        .add_edge(tool_node.name, "persist_messages")
-        .compile_graph()
+        .compile_agent("prepare_context")
     )
 
     memory = AgentMemory()
@@ -352,7 +341,7 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
     model_event = "complete_agent.plugin.model"
     persist_event = "complete_agent.plugin.persist"
 
-    dispatch_event = get_node_name_in_namespace(GRAPH_DISPATCH, namespace)
+    dispatch_event = get_graph_dispatch_name(namespace)
 
     @subscribe(
         dispatch_event,
@@ -373,23 +362,23 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
     )
     async def observe_agent_nodes(event: ApixEvent) -> None:
         target_node_name = event.context.target_node_name
-        if target_node_name in (START, persist_event, END):
+        if target_node_name not in (prepare_event, model_event):
             return
         event.context.state["plugin_trace"].append(
             f"observe:{target_node_name.rsplit('.', 1)[-1]}"
         )
 
     def prepare_model_input(state: dict[str, Any]) -> dict[str, Any]:
-        return {
+        return Command(update={
             "model_input": f"{state['prompt']} | locale={state['locale']}",
             "agent_trace": [*state["agent_trace"], "prepare"],
-        }
+        }, goto=model_event)
 
     def call_model(state: dict[str, Any]) -> dict[str, Any]:
-        return {
+        return Command(update={
             "answer": f"answer({state['model_input']})",
             "agent_trace": [*state["agent_trace"], "model"],
-        }
+        }, goto=persist_event)
 
     def persist_answer(state: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -402,10 +391,7 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
         .add_node(prepare_model_input, prepare_event)
         .add_node(call_model, model_event)
         .add_node(persist_answer, persist_event)
-        .add_edge(START, prepare_event)
-        .add_edge(prepare_event, model_event)
-        .add_edge(model_event, persist_event)
-        .compile_graph(using_namespace=namespace)
+        .compile_graph(prepare_event, using_namespace=namespace)
     )
 
     try:
@@ -445,11 +431,8 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
     namespace = "complete_agent_extension_runtime"
     prepare_event = "complete_agent.extension.prepare"
     model_event = "complete_agent.extension.model"
-    dispatch_event = get_node_name_in_namespace(GRAPH_DISPATCH, namespace)
-    unseen_pattern = get_node_name_in_namespace(
-        "complete_agent.extension.never.*",
-        namespace,
-    )
+    dispatch_event = get_graph_dispatch_name(namespace)
+    unseen_pattern = f"complete_agent.extension.never.{namespace}.*"
     calls: list[str] = []
 
     @subscribe(
@@ -459,10 +442,11 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
         exist_ok=False,
     )
     async def record_extension_event(event: ApixEvent) -> None:
-        calls.append(event.context.target_node_name)
+        if event.context.target_node_name in (prepare_event, model_event):
+            calls.append(event.context.target_node_name)
 
     def prepare(state: dict[str, Any]) -> dict[str, Any]:
-        return {"prepared": state["prompt"].upper()}
+        return Command(update={"prepared": state["prompt"].upper()}, goto=model_event)
 
     def model(state: dict[str, Any]) -> dict[str, Any]:
         return {"answer": f"model:{state['prepared']}"}
@@ -471,9 +455,7 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
         GraphManager()
         .add_node(prepare, prepare_event)
         .add_node(model, model_event)
-        .add_edge(START, prepare_event)
-        .add_edge(prepare_event, model_event)
-        .compile_graph(using_namespace=namespace)
+        .compile_graph(prepare_event, using_namespace=namespace)
     )
 
     try:
@@ -488,11 +470,11 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
 
         first_result = await graph.invoke({"prompt": "hello"})
         assert first_result["answer"] == "model:HELLO"
-        assert calls == [START, prepare_event, model_event, END]
+        assert calls == [prepare_event, model_event]
         assert get_unmatched_subscriptions(record_extension_event.__name__) == [
             unseen_pattern
         ]
-        assert dispatch_event in APIX_EVENT_REGISTRY.get_registered_events()
+        assert dispatch_event in get_event_registry().get_registered_events()
 
         calls.clear()
         subscribe(
