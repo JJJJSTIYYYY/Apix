@@ -10,7 +10,8 @@ from apix.agent.store.core.server.cache_store.cache_server_base import CacheServ
 from apix.agent.store.core.server.cache_store.utils import cache_store_handler
 from apix.common.lifespan.auto_init import auto_init
 from apix.common.utils.logger import logger
-from apix.config.base_config import BASE_DIR, HOT_CACHE_DEFAULT_EXPIRE_SECONDS, STATIC_CACHE_DEFAULT_EXPIRE_SECONDS
+from apix.config.base_config import HOT_CACHE_DEFAULT_EXPIRE_SECONDS, STATIC_CACHE_DEFAULT_EXPIRE_SECONDS
+from apix.config.base_config import APIX_BASE_DIR
 
 
 class BuiltinService(CacheServerBase):
@@ -19,7 +20,7 @@ class BuiltinService(CacheServerBase):
     def __init__(self, persistence_path: Optional[str | Path] = None):
         self._persistence_path = Path(
             persistence_path
-            or (Path(BASE_DIR) / "builtin_cache_store.json").expanduser().resolve()
+            or (Path(APIX_BASE_DIR) / "builtin_cache_store.json").expanduser().resolve()
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()

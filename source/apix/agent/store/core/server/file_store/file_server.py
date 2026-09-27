@@ -7,7 +7,7 @@ import zipfile
 import yaml
 
 from apix.common.utils.logger import logger
-from apix.config.base_config import BASE_DIR
+from apix.config.base_config import APIX_BASE_DIR
 
 
 class FileService:
@@ -142,7 +142,7 @@ class FileService:
             source_paths: list[str] = payload["file_path"]
 
             skills_dir = (
-                Path(BASE_DIR) / user_uid / "apix_skills"
+                Path(APIX_BASE_DIR) / user_uid / "apix_skills"
             ).expanduser().resolve()
             skills_dir.mkdir(parents=True, exist_ok=True)
 
@@ -164,7 +164,7 @@ class FileService:
                     skills_dir, source.name
                 )
 
-                # Move the selected zip into BASE_DIR/apix_skills.
+                # Move the selected zip into APIX_BASE_DIR/apix_skills.
                 await asyncio.to_thread(shutil.move, str(source), str(package_path))
 
                 try:

@@ -8,7 +8,8 @@ import uvicorn
 from fastapi.responses import JSONResponse
 
 from apix.common.utils.version import print_logo
-from apix.config.base_config import BASE_URL, NODE_ID
+from apix.config.base_config import BASE_URL
+from apixis.core.config.core_config import NODE_ID
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
 from apixis.core.event import get_event_pipe, get_event_loop, start_core

@@ -71,7 +71,7 @@ async def test_save_file_reports_invalid_payloads(tmp_path, payload_factory):
 async def test_handle_skill_package_moves_valid_zip_and_extracts_metadata(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(file_module, "APIX_BASE_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(
         "apix.agent.store.core.server.file_store.file_server.uuid4",
         lambda: SimpleNamespace(hex="fixedid")
@@ -107,7 +107,7 @@ async def test_handle_skill_package_moves_valid_zip_and_extracts_metadata(
 
 @pytest.mark.asyncio
 async def test_handle_skill_package_uses_default_version(monkeypatch, tmp_path):
-    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(file_module, "APIX_BASE_DIR", str(tmp_path))
     source = make_skill_zip(
         tmp_path / "skill.zip",
         "---\nname: demo\ndescription: Demo skill\n---\nbody\n",
@@ -126,7 +126,7 @@ async def test_handle_skill_package_uses_default_version(monkeypatch, tmp_path):
 async def test_handle_skill_package_adds_incrementing_index_on_name_conflict(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(file_module, "APIX_BASE_DIR", str(tmp_path / "data"))
     skills_dir = tmp_path / "data" / "user-1" / "apix_skills"
     skills_dir.mkdir(parents=True)
     existing = skills_dir / "skill.zip"
@@ -154,7 +154,7 @@ async def test_handle_skill_package_adds_incrementing_index_on_name_conflict(
 
 @pytest.mark.asyncio
 async def test_same_package_name_is_isolated_by_user(monkeypatch, tmp_path):
-    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(file_module, "APIX_BASE_DIR", str(tmp_path / "data"))
     frontmatter = "---\nname: demo\ndescription: Demo skill\n---\nbody\n"
     first = make_skill_zip(tmp_path / "first" / "skill.zip", frontmatter)
     second = make_skill_zip(tmp_path / "second" / "skill.zip", frontmatter)
@@ -189,7 +189,7 @@ async def test_same_package_name_is_isolated_by_user(monkeypatch, tmp_path):
 async def test_invalid_skill_package_is_deleted(
     monkeypatch, tmp_path, frontmatter, error_text
 ):
-    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(file_module, "APIX_BASE_DIR", str(tmp_path))
     skills_dir = tmp_path / "user-1" / "apix_skills"
     source = make_skill_zip(tmp_path / "invalid.zip", frontmatter)
 
@@ -207,7 +207,7 @@ async def test_invalid_skill_package_is_deleted(
 async def test_handle_skill_package_rejects_non_zip_without_moving_it(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setattr(file_module, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(file_module, "APIX_BASE_DIR", str(tmp_path))
     source = tmp_path / "skill.txt"
     source.write_text("not a zip", encoding="utf-8")
 

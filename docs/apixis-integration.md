@@ -117,7 +117,7 @@ AgentGraph 在正常完成、异常、取消及流关闭后清理本次调用的
 
 ## 配置与生命周期
 
-从 `source` 目录运行时，Apix 和 Apixis 均读取 `./config.yaml`。Agent、LLM、缓存及数据存储设置由 Apix 使用；事件通道与事件背压设置由 Apixis 使用。
+从 `source` 目录运行时，Apix 复用 Apixis 对 `./config.yaml` 的加载结果。Agent、LLM、缓存及数据存储设置由 Apix 使用；远程节点、事件通道、事件背压、日志及 `SERVER.base_dir` 由 Apixis 读取。`SERVER.base_dir` 默认为 `./.apix/`：Apix 将其作为 `APIX_BASE_DIR`，SQLite 默认数据库、文件存储及内置缓存使用此目录；Apixis 将 `APIXIS_BASE_DIR` 设为该目录下的 `apixis` 子目录，用于自身日志。
 
 - `PIPELINE.event_loop_backpressure` 是有效键名，旧的 `event_loop_back_pressure` 已更正。
 - `PIPELINE.event_handler_default_time_out` 已删除；处理器超时通过订阅的 `time_out` 设置。

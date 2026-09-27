@@ -1,188 +1,14 @@
+"""Apix application settings backed by Apixis configuration."""
+
 import os
-import platform
 from collections.abc import Mapping
 from typing import Any, Literal
 
-import httpx
-import yaml
-
-from apixis.core.config.core_config import NODE_ID
+from apixis.core.config.base import _config, _get_config
+from apixis.core.config.core_config import BASE_DIR
 
 
-# Global configuration settings for Apix.
 VERSION = "3.0.0"
-
-# These sections describe resources owned by one concrete node.  They must
-# never be inherited from the gateway, otherwise several nodes may consume the
-# same mailbox configuration and lose destination isolation.
-_NODE_LOCAL_CONFIG_SECTIONS = frozenset({"EVENT_CHANNEL"})
-
-
-def _load_from_yaml(path: str) -> dict[str, Any]:
-    """Load configuration from a local YAML file."""
-    if not os.path.exists(path):
-        return {}
-
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
-
-    if data is None:
-        return {}
-
-    if not isinstance(data, dict):
-        raise ValueError(
-            f"Config file must contain a YAML mapping, got {type(data).__name__}."
-        )
-
-    return data
-
-
-def _load_from_remote(
-    base_url: str,
-    endpoint: str,
-) -> dict[str, Any]:
-    """Load configuration from the remote config center."""
-    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
-
-    response = httpx.get(url, timeout=10)
-    response.raise_for_status()
-
-    data = response.json()
-    if not isinstance(data, dict):
-        raise ValueError(
-            "Remote config center must return a JSON object, "
-            f"got {type(data).__name__}."
-        )
-
-    return data
-
-
-def _merge_config(
-    remote: Mapping[str, Any],
-    local: Mapping[str, Any],
-) -> dict[str, Any]:
-    """
-    Recursively merge configuration mappings.
-
-    Local values always take precedence over remote values. Nested mappings
-    are merged recursively, so a local partial section does not discard other
-    remote values in that section.
-    """
-    merged = dict(remote)
-
-    for key, local_value in local.items():
-        remote_value = merged.get(key)
-
-        if (
-            isinstance(remote_value, Mapping)
-            and isinstance(local_value, Mapping)
-        ):
-            merged[key] = _merge_config(remote_value, local_value)
-        else:
-            merged[key] = local_value
-
-    return merged
-
-
-def _filter_remote_config(remote: Mapping[str, Any]) -> dict[str, Any]:
-    """Remove node-local sections from gateway-provided configuration.
-
-    The returned mapping is a new shallow copy; the gateway response itself is
-    left untouched.  A local section is subsequently merged as usual, but no
-    missing nested value can be backfilled by the remote configuration.
-    """
-    return {
-        key: value
-        for key, value in remote.items()
-        if key not in _NODE_LOCAL_CONFIG_SECTIONS
-    }
-
-
-def _load_config(path: str) -> dict[str, Any]:
-    """
-    Load the effective configuration.
-
-    Loading order:
-        1. Read local YAML.
-        2. Discover REMOTE_GATEWAY from the local YAML.
-        3. Load remote configuration when configured.
-        4. Remove node-local sections such as EVENT_CHANNEL from remote data.
-        5. Merge local configuration over the filtered remote configuration.
-    """
-    local_config = _load_from_yaml(path)
-
-    remote_center = local_config.get("REMOTE_GATEWAY")
-    if remote_center is None:
-        return local_config
-
-    if not isinstance(remote_center, Mapping):
-        raise ValueError("REMOTE_GATEWAY must be a mapping.")
-
-    enable = remote_center.get("enable", False)
-    if not isinstance(enable, bool):
-        raise ValueError("REMOTE_GATEWAY.enable must be a boolean.")
-    if enable is not True:
-        return local_config
-
-    center_base_url = remote_center.get("base_url")
-    config_endpoint = remote_center.get("config_endpoint")
-
-    if not isinstance(center_base_url, str) or not center_base_url.strip():
-        raise ValueError(
-            "REMOTE_GATEWAY.base_url must be a non-empty string."
-        )
-
-    if not isinstance(config_endpoint, str) or not config_endpoint.strip():
-        raise ValueError(
-            "REMOTE_GATEWAY.config_endpoint must be a non-empty string."
-        )
-
-    remote_config = _load_from_remote(
-        base_url=center_base_url,
-        endpoint=config_endpoint,
-    )
-
-    return _merge_config(
-        remote=_filter_remote_config(remote_config),
-        local=local_config,
-    )
-
-
-def _get_config(path: str, default=None):
-    value = _config
-
-    for key in path.split("."):
-        if not isinstance(value, Mapping):
-            return default
-
-        if key not in value:
-            return default
-
-        value = value[key]
-
-    return default if value is None else value
-
-
-OPERATION_SYSTEM = platform.system().lower()
-
-_DEFAULT_PROXY_ENV = {
-    "HTTP_PROXY": os.environ.get("HTTP_PROXY"),
-    "HTTPS_PROXY": os.environ.get("HTTPS_PROXY"),
-    "NO_PROXY": os.environ.get("NO_PROXY"),
-}
-
-_PROVIDER_BASE_URL = {
-    "ollama:local": "http://localhost:11434",
-    "ollama": "https://ollama.com",
-    "openai": "https://api.openai.com/v1",
-    "qwen": "https://dashscope.aliyuncs.com/v1",
-    "deepseek": "https://api.deepseek.com/v1",
-    "moonshot": "https://api.moonshot.cn/v1",
-    "xiaomimimo": "https://api.xiaomimimo.com/v1",
-    "minimax": "https://api.minimaxi.com/v1"
-}
-
-_config = _load_config("./config.yaml")
 
 
 def _validate_config_compatibility(config: Mapping[str, Any]) -> None:
@@ -220,47 +46,21 @@ _validate_config_compatibility(_config)
 
 
 # Server
+APIX_BASE_DIR = BASE_DIR
 BASE_URL = _get_config("SERVER.base_url", "http://localhost:2712")
-BASE_DIR = _get_config("SERVER.base_dir", "./.apix_data/")
 WORKER_COUNT = _get_config("SERVER.worker_count", 4)
-NODE_NAME = _get_config("SERVER.node_name", "apix_service")
 
 
-# Proxy
-_proxy_env_config = _get_config("PROXY.original_proxy_env", {})
-
-if not isinstance(_proxy_env_config, Mapping):
-    raise ValueError("PROXY.original_proxy_env must be a mapping.")
-
-ORIGINAL_PROXY_ENV = {
-    "HTTP_PROXY": _proxy_env_config.get(
-        "http_proxy",
-        _DEFAULT_PROXY_ENV["HTTP_PROXY"],
-    ),
-    "HTTPS_PROXY": _proxy_env_config.get(
-        "https_proxy",
-        _DEFAULT_PROXY_ENV["HTTPS_PROXY"],
-    ),
-    "NO_PROXY": _proxy_env_config.get(
-        "no_proxy",
-        _DEFAULT_PROXY_ENV["NO_PROXY"],
-    ),
+_PROVIDER_BASE_URL = {
+    "ollama:local": "http://localhost:11434",
+    "ollama": "https://ollama.com",
+    "openai": "https://api.openai.com/v1",
+    "qwen": "https://dashscope.aliyuncs.com/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "xiaomimimo": "https://api.xiaomimimo.com/v1",
+    "minimax": "https://api.minimaxi.com/v1"
 }
-
-
-# Log
-DEBUG_LEVEL: Literal["DEBUG", "INFO", "WARN", "ERROR"] = _get_config(
-    "LOG.debug_level",
-    "DEBUG",
-).upper()
-
-TRACE = _get_config("LOG.trace", True)
-MAX_LOG_FILE_SIZE = _get_config("LOG.max_log_file_size", 5 * 1024 * 1024)
-
-
-# Agent message buffering
-MESSAGE_PIPE_MAX_LEN = _get_config("PIPELINE.message_pipe_max_len", 4096)
-
 
 # Runtime
 TOOLS_MAX_OUTPUT_LENGTH = _get_config(
@@ -303,7 +103,7 @@ DATA_STORE_TYPE: Literal["sqlite", "mysql"] = _get_config(
 
 SQLITE_DATABASE = _get_config(
     "DATA_STORE.sqlite.database",
-    os.path.join(BASE_DIR, "sqlite", "apix.sqlite3"),
+    os.path.join(APIX_BASE_DIR, "sqlite", "apix.sqlite3"),
 )
 
 MYSQL_BASE_URL = _get_config("DATA_STORE.mysql.base_url", "localhost")
