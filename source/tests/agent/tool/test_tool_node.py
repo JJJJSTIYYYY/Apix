@@ -7,6 +7,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from enum import Enum
 import inspect
+import importlib
 from pathlib import Path
 import typing
 from typing import (
@@ -22,7 +23,6 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel
 
-import apix.agent.core.tool.tool_node as tool_node_module
 from apix.agent.core.tool import (
     AutoInjection,
     Tool,
@@ -36,6 +36,8 @@ from apix.agent.core.utils.message import (
 )
 from apix.agent.core.utils.exception import InvalidToolArgsError
 from apixis.core.graph import Command, GraphManager
+
+tool_module = importlib.import_module("apix.agent.core.tool.tool")
 
 
 class TextUnit(Enum):
@@ -118,6 +120,7 @@ def _message_from(command: Command) -> ApixToolMessage:
 
 def test_tool_decorator_preserves_function_name_and_metadata():
     """Both decorator forms create named Tool objects."""
+
     @tool
     def direct(value: int) -> str:
         """Direct tool."""
@@ -140,6 +143,7 @@ def test_tool_decorator_preserves_function_name_and_metadata():
 
 def test_tool_builds_openai_function_calling_schema():
     """Tool annotations become a native Chat Completions tool definition."""
+
     @tool(description="Get the weather forecast.")
     def weather(
         location: Annotated[str, "City and country."],
@@ -189,14 +193,13 @@ def test_tool_builds_openai_function_calling_schema():
             },
         },
     }
-    assert "runtime" not in (
-        weather.schema["function"]["parameters"]["properties"]
-    )
+    assert "runtime" not in (weather.schema["function"]["parameters"]["properties"])
     assert not hasattr(weather, "prompt")
 
 
 def test_tool_schema_accessors_return_independent_copies_in_order():
     """Callers can safely pass and mutate schemas without changing tools."""
+
     @tool
     def first(value: str) -> str:
         return value
@@ -210,13 +213,13 @@ def test_tool_schema_accessors_return_independent_copies_in_order():
 
     assert first.schema["function"]["name"] == "first"
     assert [
-        item["function"]["name"]
-        for item in ToolNode([first, second]).get_schemas()
+        item["function"]["name"] for item in ToolNode([first, second]).get_schemas()
     ] == ["first", "second"]
 
 
 def test_tool_rejects_variadic_parameters_not_supported_by_json_schema():
     """Function Calling requires explicitly named model arguments."""
+
     def variadic(*values: str) -> str:
         return ",".join(values)
 
@@ -226,7 +229,7 @@ def test_tool_rejects_variadic_parameters_not_supported_by_json_schema():
 
 @pytest.mark.asyncio
 async def test_tool_node_executes_concurrently_but_returns_call_order():
-    """A later tool can finish first without reordering its command."""
+    """A later tool can finish first without reordering the combined update."""
     second_started = asyncio.Event()
     completion_order = []
 
@@ -243,8 +246,8 @@ async def test_tool_node_executes_concurrently_but_returns_call_order():
         completion_order.append("second")
         return f"second:{value}"
 
-    node = ToolNode([first, second])
-    commands = await asyncio.wait_for(
+    node = ToolNode([first, second], bind_llm_node="model")
+    command = await asyncio.wait_for(
         node.execute(
             _state_with_calls(
                 _tool_call("first", "call-1", {"value": "a"}),
@@ -255,31 +258,27 @@ async def test_tool_node_executes_concurrently_but_returns_call_order():
     )
 
     assert completion_order == ["second", "first"]
-    assert len(commands) == 2
-    assert [
-        _message_from(command).content
-        for command in commands
-    ] == ["first:a", "second:b"]
-    assert [
-        _message_from(command).tool_call_id
-        for command in commands
-    ] == ["call-1", "call-2"]
+    assert isinstance(command, Command)
+    assert command.goto == "model"
+    assert [m.content for m in command.update["messages"]] == ["first:a", "second:b"]
+    assert [m.tool_call_id for m in command.update["messages"]] == ["call-1", "call-2"]
 
 
 @pytest.mark.asyncio
 async def test_plain_dict_result_is_stringified_into_tool_message():
     """A plain dict is normal tool output."""
+
     def payload() -> dict:
         return {"answer": 42}
 
     node = ToolNode(payload)
-    commands = await node.execute(
+    command = await node.execute(
         _state_with_calls(
             _tool_call("payload", "call-payload"),
         )
     )
 
-    message = _message_from(commands[0])
+    message = _message_from(command)
     assert message.content == "{'answer': 42}"
     assert message.name == "payload"
     assert message.tool_call_id == "call-payload"
@@ -288,18 +287,19 @@ async def test_plain_dict_result_is_stringified_into_tool_message():
 @pytest.mark.asyncio
 async def test_string_result_creates_tool_message_with_runtime_metadata():
     """A string result becomes one fully attributed tool message."""
+
     def text() -> str:
         return "finished"
 
     node = ToolNode(text)
-    commands = await node.execute(
+    command = await node.execute(
         _state_with_calls(
             _tool_call("text", "call-text"),
         )
     )
 
-    assert len(commands) == 1
-    message = _message_from(commands[0])
+    assert isinstance(command, Command)
+    message = _message_from(command)
     assert message.content == "finished"
     assert message.name == "text"
     assert message.tool_call_id == "call-text"
@@ -308,36 +308,39 @@ async def test_string_result_creates_tool_message_with_runtime_metadata():
 
 
 @pytest.mark.asyncio
-async def test_tool_message_result_has_runtime_metadata_overwritten():
-    """A returned ApixToolMessage is reused with current call metadata."""
+async def test_tool_message_result_is_stringified_without_mutation():
+    """Returned message objects are plain values, with no special treatment."""
     returned_message = ApixToolMessage(
         content="finished",
         name="stale-name",
         metadata={"stale": True},
         tool_call_id="stale-call",
     )
+    expected = str(returned_message)
 
     def message() -> ApixToolMessage:
         return returned_message
 
-    node = ToolNode(message)
-    commands = await node.execute(
+    command = await ToolNode(message).execute(
         _state_with_calls(
             _tool_call("message", "call-message"),
         )
     )
-
-    normalised_message = _message_from(commands[0])
-    assert normalised_message is returned_message
-    assert normalised_message.name == "message"
-    assert normalised_message.tool_call_id == "call-message"
-    assert normalised_message.metadata["duration"] >= 0
-    assert "stale" not in normalised_message.metadata
+    output = _message_from(command)
+    assert output is not returned_message
+    assert output.content == expected
+    assert output.name == "message"
+    assert output.tool_call_id == "call-message"
+    assert output.metadata["duration"] >= 0
+    assert returned_message.name == "stale-name"
+    assert returned_message.tool_call_id == "stale-call"
+    assert returned_message.metadata == {"stale": True}
 
 
 @pytest.mark.asyncio
 async def test_command_looking_dict_result_is_still_plain_tool_output():
-    """Only Command instances receive command routing semantics."""
+    """A dictionary is plain output, regardless of its field names."""
+
     def payload() -> dict:
         return {
             "update": {"value": 3},
@@ -345,71 +348,55 @@ async def test_command_looking_dict_result_is_still_plain_tool_output():
         }
 
     node = ToolNode(payload)
-    commands = await node.execute(
+    command = await node.execute(
         _state_with_calls(
             _tool_call("payload", "call-payload"),
         )
     )
 
-    assert _message_from(commands[0]).content == (
+    assert _message_from(command).content == (
         "{'update': {'value': 3}, 'goto': 'next'}"
     )
-    assert commands[0].goto is None
+    assert command.goto is None
 
 
 @pytest.mark.asyncio
-async def test_command_result_is_preserved_and_message_metadata_is_overwritten():
-    """Valid Command updates and routing survive ToolNode normalisation."""
-    returned_message = ApixToolMessage(
-        content="finished",
-        name="stale-name",
-        metadata={"stale": True},
-        tool_call_id="stale-call",
-    )
+async def test_command_result_is_text_and_cannot_update_state_or_route():
+    """Even a Command result cannot override the ToolNode's bound target."""
+    returned = Command(update={"value": 3}, goto="wrong-node")
 
     @tool
     def update_state() -> Command:
-        return Command(
-            update={
-                "messages": [returned_message],
-                "value": 3,
-            },
-            goto="next",
-        )
+        return returned
 
-    node = ToolNode(update_state)
-    commands = await node.execute(
+    node = ToolNode(update_state, bind_llm_node="model")
+    command = await node.execute(
         _state_with_calls(
             _tool_call("update_state", "call-update"),
         )
     )
-
-    assert len(commands) == 1
-    assert commands[0].goto == "next"
-    assert commands[0].update["value"] == 3
-    message = _message_from(commands[0])
-    assert message is returned_message
-    assert message.content == "finished"
-    assert message.name == "update_state"
-    assert message.tool_call_id == "call-update"
-    assert message.metadata["duration"] >= 0
-    assert "stale" not in message.metadata
+    assert command.goto == "model"
+    assert set(command.update) == {"messages"}
+    assert _message_from(command).content == str(returned)
+    assert returned.update == {"value": 3}
+    assert returned.goto == "wrong-node"
 
 
 @pytest.mark.asyncio
 async def test_invalid_command_shape_is_stringified():
     """A dict with invalid Command field types is ordinary output."""
+
     def invalid_shape() -> dict:
         return {"update": []}
 
     node = ToolNode(invalid_shape)
-    commands = await node.execute(
+    command = await node.execute(
         _state_with_calls(
             _tool_call("invalid_shape", "call-invalid"),
         )
     )
 
-    assert _message_from(commands[0]).content == "{'update': []}"
+    assert _message_from(command).content == "{'update': []}"
 
 
 @pytest.mark.asyncio
@@ -644,9 +631,7 @@ def test_json_type_for_literal_values(value, expected):
 
 
 def test_annotated_metadata_object_supplies_parameter_description():
-    schema = Tool._annotation_to_json_schema(
-        Annotated[str, DescriptionMetadata()]
-    )
+    schema = Tool._annotation_to_json_schema(Annotated[str, DescriptionMetadata()])
 
     assert schema == {
         "type": "string",
@@ -655,22 +640,23 @@ def test_annotated_metadata_object_supplies_parameter_description():
 
 
 def test_annotated_without_description_preserves_underlying_schema():
-    assert Tool._annotation_to_json_schema(
-        Annotated[int, object()]
-    ) == {"type": "integer"}
+    assert Tool._annotation_to_json_schema(Annotated[int, object()]) == {
+        "type": "integer"
+    }
     assert Tool._metadata_description((object(),)) is None
 
 
 def test_heterogeneous_literal_and_recursive_guard_are_unconstrained():
-    assert Tool._annotation_to_json_schema(
-        Literal["name", 1]
-    ) == {
+    assert Tool._annotation_to_json_schema(Literal["name", 1]) == {
         "enum": ["name", 1],
     }
-    assert Tool._annotation_to_json_schema(
-        str,
-        seen=frozenset({id(str)}),
-    ) == {}
+    assert (
+        Tool._annotation_to_json_schema(
+            str,
+            seen=frozenset({id(str)}),
+        )
+        == {}
+    )
 
 
 def test_non_json_default_is_omitted_from_schema():
@@ -680,9 +666,7 @@ def test_non_json_default_is_omitted_from_schema():
         return value
 
     wrapped = Tool(opaque)
-    value_schema = (
-        wrapped.schema["function"]["parameters"]["properties"]["value"]
-    )
+    value_schema = wrapped.schema["function"]["parameters"]["properties"]["value"]
 
     assert value_schema == {}
     assert Tool._json_default(sentinel) is inspect.Signature.empty
@@ -710,10 +694,7 @@ def test_unresolved_forward_reference_falls_back_to_unconstrained_schema():
     wrapped = Tool(unresolved)
 
     assert wrapped._type_hints == {}
-    assert (
-        wrapped.schema["function"]["parameters"]["properties"]["value"]
-        == {}
-    )
+    assert wrapped.schema["function"]["parameters"]["properties"]["value"] == {}
 
 
 def test_auto_injection_rejects_unsupported_value_type():
@@ -727,25 +708,21 @@ def test_auto_injection_rejects_unsupported_value_type():
 def test_parse_injection_handles_malformed_annotated_metadata(monkeypatch):
     """A defensive empty-args branch remains safe for malformed metadata."""
     malformed = object()
-    original_get_origin = tool_node_module.get_origin
-    original_get_args = tool_node_module.get_args
+    original_get_origin = tool_module.get_origin
+    original_get_args = tool_module.get_args
 
     monkeypatch.setattr(
-        tool_node_module,
+        tool_module,
         "get_origin",
         lambda annotation: (
-            Annotated
-            if annotation is malformed
-            else original_get_origin(annotation)
+            Annotated if annotation is malformed else original_get_origin(annotation)
         ),
     )
     monkeypatch.setattr(
-        tool_node_module,
+        tool_module,
         "get_args",
         lambda annotation: (
-            ()
-            if annotation is malformed
-            else original_get_args(annotation)
+            () if annotation is malformed else original_get_args(annotation)
         ),
     )
 
@@ -911,193 +888,37 @@ def test_tool_node_rejects_invalid_and_duplicate_tools():
         ToolNode([duplicate, duplicate])
 
 
-@pytest.mark.parametrize(
-    "value",
-    [
-        None,
-        {},
-        {"call_id": "id", "tool_name": "tool"},
-        {"call_id": "", "tool_name": "tool", "args": {}},
-        {"call_id": 1, "tool_name": "tool", "args": {}},
-        {"call_id": "id", "tool_name": "", "args": {}},
-        {"call_id": "id", "tool_name": 1, "args": {}},
-        {"call_id": "id", "tool_name": "tool", "args": []},
-    ],
-)
-def test_tool_node_tool_call_type_guard_rejects_invalid_values(value):
-    assert ToolNode._is_tool_call(value) is False
-
-
-def test_tool_node_tool_call_list_guard_checks_container_and_items():
-    valid = _tool_call("tool", "call")
-
-    assert ToolNode._is_tool_call(valid) is True
-    assert ToolNode._is_tool_call_list("not a list") is False
-    assert ToolNode._is_tool_call_list([valid, {}]) is False
-    assert ToolNode._is_tool_call_list([valid]) is True
-
-
-def test_normalise_valid_command_preserves_updates_and_goto():
-    node = ToolNode(lambda: None)
-    call = _tool_call("<lambda>", "call-normalise")
-    existing_message = ApixToolMessage(
-        content="existing",
-        name="old-name",
-        metadata={"old": True},
-        tool_call_id="existing-call",
-    )
-
-    command = node._normalise_tool_result(
-        Command(update={"messages": [existing_message], "value": 1}),
-        call,
-        duration=123
-    )
-
-    assert command == Command(
-        update={
-            "messages": [existing_message],
-            "value": 1,
+@pytest.mark.asyncio
+async def test_tool_output_uses_configured_messages_key():
+    node = ToolNode(lambda: "finished", messages_key="history", bind_llm_node="model")
+    command = await node.execute(
+        {
+            "history": [
+                ApixAiMessage(
+                    tool_calls=[
+                        _tool_call("<lambda>", "call-history"),
+                    ]
+                )
+            ]
         }
     )
-    assert existing_message.name == "<lambda>"
-    assert existing_message.tool_call_id == "call-normalise"
-    assert existing_message.metadata == {
-        "duration": 123,
-    }
-
-    goto_command = node._normalise_tool_result(
-        Command(
-            update={
-                "messages": [
-                    ApixToolMessage(
-                        content="done",
-                        tool_call_id="old",
-                    )
-                ]
-            },
-            goto=None,
-        ),
-        call,
-    )
-    assert goto_command.goto is None
-
-    batch_command = node._normalise_tool_result(
-        Command(
-            update={
-                "messages": [
-                    ApixToolMessage(content="batch", tool_call_id="old")
-                ]
-            },
-            goto=["a", "b"],
-        ),
-        call,
-    )
-    assert batch_command.goto == ["a", "b"]
-
-
-def test_normalise_tool_result_uses_configured_messages_key():
-    node = ToolNode(lambda: None, messages_key="history")
-    call = _tool_call("<lambda>", "call-history")
-
-    command = node._normalise_tool_result("finished", call)
-
     assert set(command.update) == {"history"}
-    assert len(command.update["history"]) == 1
+    assert command.goto == "model"
     message = command.update["history"][0]
     assert isinstance(message, ApixToolMessage)
     assert message.content == "finished"
     assert message.tool_call_id == "call-history"
 
 
-@pytest.mark.parametrize(
-    ("message_update", "error_type", "message"),
-    [
-        (
-            None,
-            TypeError,
-            r"Command\.update\['messages'\] must be a list",
-        ),
-        (
-            "finished",
-            TypeError,
-            r"Command\.update\['messages'\] must be a list",
-        ),
-        (
-            [],
-            ValueError,
-            r"must contain exactly one ApixToolMessage",
-        ),
-        (
-            [
-                ApixToolMessage(content="first", tool_call_id="first"),
-                ApixToolMessage(content="second", tool_call_id="second"),
-            ],
-            ValueError,
-            r"must contain exactly one ApixToolMessage",
-        ),
-        (
-            ["not a message"],
-            TypeError,
-            r"Command\.update\['messages'\] must be a list",
-        ),
-    ],
-)
-def test_normalise_command_requires_exactly_one_tool_message(
-    message_update,
-    error_type,
-    message,
-):
-    node = ToolNode(lambda: None)
-    call = _tool_call("<lambda>", "call-normalise")
-    update = (
-        {}
-        if message_update is None
-        else {"messages": message_update}
-    )
-
-    with pytest.raises(error_type, match=message):
-        node._normalise_tool_result(
-            Command(update=update),
-            call,
-        )
-
-
-@pytest.mark.parametrize(
-    ("command", "message"),
-    [
-        (Command(update=[]), "Command.update must be a dict"),
-        (Command(goto=1), "Command.goto must be a string or None"),
-    ],
-)
-def test_normalise_tool_result_rejects_invalid_command_fields(
-    command,
-    message,
-):
-    node = ToolNode(lambda: None)
-    call = _tool_call("<lambda>", "call-normalise")
-
-    with pytest.raises(TypeError, match=message):
-        node._normalise_tool_result(command, call)
-
-
 @pytest.mark.asyncio
 async def test_tool_node_execute_rejects_invalid_state_and_messages():
     node = ToolNode(lambda: None)
-
     with pytest.raises(TypeError, match="state must be"):
         await node.execute([])
-
     with pytest.raises(ValueError, match="must be a message list"):
         await node.execute({"messages": "invalid"})
-
-    with pytest.raises(TypeError, match="must be a list of valid"):
-        await node.execute(
-            {
-                "messages": [
-                    ApixAiMessage(tool_calls=[{}]),
-                ]
-            }
-        )
+    with pytest.raises(ValueError, match="missing required fields"):
+        await node.execute({"messages": [ApixAiMessage(tool_calls=[{}])]})
 
 
 @pytest.mark.asyncio
@@ -1135,3 +956,97 @@ async def test_tool_node_cancels_sibling_tasks_after_failure():
         )
 
     assert blocker_cancelled.is_set()
+
+
+@pytest.mark.parametrize("binding", ["", 1, True, [], object()])
+def test_tool_node_rejects_invalid_llm_binding(binding):
+    with pytest.raises(ValueError, match="LLM binding"):
+        ToolNode(lambda: None, bind_llm_node=binding)
+
+
+@pytest.mark.asyncio
+async def test_llm_node_can_be_bound_replaced_and_cleared():
+    from apixis.core.graph import Node
+
+    node = ToolNode(lambda: 42)
+    state = _state_with_calls(_tool_call("<lambda>", "call-bind"))
+    assert (await node.execute(state)).goto is None
+    model = Node(lambda state: {}, name="model")
+    assert node.bind_llm_node(model) is node
+    assert (await node.execute(state)).goto == "model"
+    node.bind_llm_node("replacement")
+    assert (await node.execute(state)).goto == "replacement"
+    node.bind_llm_node(None)
+    assert (await node.execute(state)).goto is None
+    assert (
+        await ToolNode(lambda: None, bind_llm_node=model).execute(state)
+    ).goto == "model"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "value", [None, 0, False, [1, "two"], b"bytes", Command(update=[], goto=1)]
+)
+async def test_every_tool_result_is_stringified(value):
+    def output():
+        return value
+
+    command = await ToolNode(output).execute(
+        _state_with_calls(
+            _tool_call("output", "call-output"),
+        )
+    )
+    assert _message_from(command).content == str(value)
+    assert isinstance(_message_from(command).content, str)
+    assert command.goto is None
+
+
+def test_all_tool_import_paths_share_one_class_and_decorator():
+    from apix.agent.core.tool.tool_node import Tool as node_tool, tool as node_decorator
+    from apix.agent.core.tool.mcp import MCPTool
+
+    assert Tool is tool_module.Tool is node_tool
+    assert tool is tool_module.tool is node_decorator
+    assert issubclass(MCPTool, Tool)
+
+
+@pytest.mark.asyncio
+async def test_invalid_later_call_prevents_execution_of_entire_batch():
+    executed = []
+
+    def valid():
+        executed.append(True)
+        return "done"
+
+    node = ToolNode(valid)
+    with pytest.raises(ValueError, match="missing required fields"):
+        await node.execute(_state_with_calls(_tool_call("valid", "valid-call"), {}))
+    assert executed == []
+
+
+@pytest.mark.asyncio
+async def test_caller_cancellation_waits_for_all_running_tools():
+    started = asyncio.Event()
+    cancelled = []
+
+    async def wait():
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.append(True)
+
+    node = ToolNode(wait)
+    task = asyncio.create_task(
+        node.execute(
+            _state_with_calls(
+                _tool_call("wait", "first"),
+                _tool_call("wait", "second"),
+            )
+        )
+    )
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert cancelled == [True, True]

@@ -1,18 +1,17 @@
-from collections.abc import Awaitable, Mapping, Sequence
+import functools
+import inspect
+import json
+import types
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import MISSING, fields, is_dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
 from enum import Enum
-import functools
-import inspect
-import json
 from pathlib import Path
-import types
 from typing import (
     Annotated,
     Any,
-    Callable,
     Literal,
     NotRequired,
     Required,
@@ -25,9 +24,9 @@ from typing import (
 )
 from uuid import UUID
 
-from apix.agent.core.utils.exception import InvalidToolArgsError
 from apix.agent.core.tool.base import ToolFunction
-from apix.agent.core.tool.tool_context import ToolInjectionContext, AutoInjection
+from apix.agent.core.tool.tool_context import AutoInjection, ToolInjectionContext
+from apix.agent.core.utils.exception import InvalidToolArgsError
 from apix.agent.core.utils.message import ToolCall
 
 
@@ -53,11 +52,10 @@ class Tool:
         func: ToolFunction,
         description: str | None = None,
     ) -> None:
-        """Create a tool.
+        """Create a tool named after ``func.__name__``.
 
         Args:
             func: Function invoked when this tool is called.
-            name: Tool name. Defaults to ``func.__name__``.
             description: Tool description. Defaults to the function docstring.
 
         Raises:
@@ -74,18 +72,13 @@ class Tool:
             raise ValueError("A tool requires a non-empty name.")
 
         self.description = (
-            description
-            if description is not None
-            else inspect.getdoc(func) or ""
+            description if description is not None else inspect.getdoc(func) or ""
         ).strip()
 
-        self._raw_func = func
         self._signature = inspect.signature(func)
         self._type_hints = self._resolve_type_hints(func)
 
-        self._injection_parameter = (
-            self._find_injection_parameter()
-        )
+        self._injection_parameter = self._find_injection_parameter()
 
         self._validate_signature()
 
@@ -139,8 +132,7 @@ class Tool:
         value_type, *metadata = annotation_args
 
         has_auto_injection = any(
-            marker is AutoInjection
-            or isinstance(marker, AutoInjection)
+            marker is AutoInjection or isinstance(marker, AutoInjection)
             for marker in metadata
         )
 
@@ -149,7 +141,7 @@ class Tool:
 
         if value_type is not ToolInjectionContext:
             raise TypeError(
-                "Tool node only supports ToolInjectionContext."f"got {value_type.__name__}"
+                f"Tool injection only supports ToolInjectionContext, got {value_type!r}."
             )
 
         return value_type
@@ -159,14 +151,9 @@ class Tool:
         parameter: inspect.Parameter,
     ) -> bool:
         """Return whether a parameter is runtime-injected."""
-        annotation = self._get_parameter_annotation(
-            parameter
-        )
+        annotation = self._get_parameter_annotation(parameter)
 
-        return (
-            self._parse_injection_annotation(annotation)
-            is ToolInjectionContext
-        )
+        return self._parse_injection_annotation(annotation) is ToolInjectionContext
 
     def _find_injection_parameter(
         self,
@@ -184,8 +171,7 @@ class Tool:
 
         if len(injection_parameters) > 1:
             parameter_names = ", ".join(
-                parameter.name
-                for parameter in injection_parameters
+                parameter.name for parameter in injection_parameters
             )
 
             raise ValueError(
@@ -304,10 +290,7 @@ class Tool:
         if origin is Literal:
             values = list(get_args(annotation))
             schema: dict[str, Any] = {"enum": values}
-            value_types = {
-                cls._json_type_for_value(value)
-                for value in values
-            }
+            value_types = {cls._json_type_for_value(value) for value in values}
             value_types.discard(None)
             if len(value_types) == 1:
                 schema["type"] = value_types.pop()
@@ -338,10 +321,7 @@ class Tool:
             if not item_args:
                 return {"type": "array"}
 
-            if (
-                len(item_args) == 2
-                and item_args[1] is Ellipsis
-            ):
+            if len(item_args) == 2 and item_args[1] is Ellipsis:
                 return {
                     "type": "array",
                     "items": cls._annotation_to_json_schema(
@@ -365,11 +345,7 @@ class Tool:
 
         if origin in {dict, Mapping}:
             mapping_args = get_args(annotation)
-            value_annotation = (
-                mapping_args[1]
-                if len(mapping_args) == 2
-                else Any
-            )
+            value_annotation = mapping_args[1] if len(mapping_args) == 2 else Any
             value_schema = cls._annotation_to_json_schema(
                 value_annotation,
                 seen=nested_seen,
@@ -419,16 +395,10 @@ class Tool:
         if annotation is Decimal:
             return {"type": "number"}
 
-        if (
-            inspect.isclass(annotation)
-            and issubclass(annotation, Enum)
-        ):
+        if inspect.isclass(annotation) and issubclass(annotation, Enum):
             values = [member.value for member in annotation]
             schema = {"enum": values}
-            value_types = {
-                cls._json_type_for_value(value)
-                for value in values
-            }
+            value_types = {cls._json_type_for_value(value) for value in values}
             value_types.discard(None)
             if len(value_types) == 1:
                 schema["type"] = value_types.pop()
@@ -439,9 +409,7 @@ class Tool:
                 annotation,
                 include_extras=True,
             )
-            required_keys = set(
-                getattr(annotation, "__required_keys__", ())
-            )
+            required_keys = set(getattr(annotation, "__required_keys__", ()))
             properties: dict[str, Any] = {}
 
             for name, value_type in type_hints.items():
@@ -460,9 +428,7 @@ class Tool:
             }
             if required_keys:
                 schema["required"] = [
-                    name
-                    for name in properties
-                    if name in required_keys
+                    name for name in properties if name in required_keys
                 ]
             return schema
 
@@ -479,11 +445,9 @@ class Tool:
                     data_field.name,
                     data_field.type,
                 )
-                properties[data_field.name] = (
-                    cls._annotation_to_json_schema(
-                        value_type,
-                        seen=nested_seen,
-                    )
+                properties[data_field.name] = cls._annotation_to_json_schema(
+                    value_type,
+                    seen=nested_seen,
                 )
                 if (
                     data_field.default is MISSING
@@ -531,15 +495,12 @@ class Tool:
         for parameter in self._signature.parameters.values():
             if (
                 self._injection_parameter is not None
-                and parameter.name
-                == self._injection_parameter.name
+                and parameter.name == self._injection_parameter.name
             ):
                 continue
 
             annotation = self._get_parameter_annotation(parameter)
-            parameter_schema = self._annotation_to_json_schema(
-                annotation
-            )
+            parameter_schema = self._annotation_to_json_schema(annotation)
 
             if parameter.default is inspect.Signature.empty:
                 required.append(parameter.name)
@@ -581,9 +542,7 @@ class Tool:
     ) -> None:
         """Validate the basic runtime structure of a tool call."""
         if not isinstance(tool_call, dict):
-            raise TypeError(
-                "tool_call must be a ToolCall-compatible dictionary."
-            )
+            raise TypeError("tool_call must be a ToolCall-compatible dictionary.")
 
         required_keys = {
             "call_id",
@@ -595,28 +554,20 @@ class Tool:
 
         if missing_keys:
             missing = ", ".join(sorted(missing_keys))
-            raise ValueError(
-                f"ToolCall is missing required fields: {missing}."
-            )
+            raise ValueError(f"ToolCall is missing required fields: {missing}.")
 
         call_id = tool_call["call_id"]
         tool_name = tool_call["tool_name"]
         args = tool_call["args"]
 
         if not isinstance(call_id, str) or not call_id:
-            raise TypeError(
-                "ToolCall.call_id must be a non-empty string."
-            )
+            raise TypeError("ToolCall.call_id must be a non-empty string.")
 
         if not isinstance(tool_name, str) or not tool_name:
-            raise TypeError(
-                "ToolCall.tool_name must be a non-empty string."
-            )
+            raise TypeError("ToolCall.tool_name must be a non-empty string.")
 
         if args is not None and not isinstance(args, dict):
-            raise TypeError(
-                "ToolCall.args must be a dictionary or None."
-            )
+            raise TypeError("ToolCall.args must be a dictionary or None.")
 
     def _build_arguments(
         self,
@@ -626,11 +577,7 @@ class Tool:
         """Build function keyword arguments for a tool call."""
         tool_call_args = tool_call["args"]
 
-        arguments = (
-            {}
-            if tool_call_args is None
-            else dict(tool_call_args)
-        )
+        arguments = {} if tool_call_args is None else dict(tool_call_args)
 
         injection_parameter = self._injection_parameter
 
@@ -661,7 +608,7 @@ class Tool:
         try:
             bound_arguments = self._signature.bind(
                 **arguments
-            ) # Cheak required arguments.
+            )  # Check required arguments.
         except TypeError as exc:
             raise InvalidToolArgsError(
                 f"Invalid arguments for tool {self.name!r}: {exc}"
@@ -696,7 +643,6 @@ class Tool:
             return result
 
         return wrapped
-        
 
     async def execute(
         self,
@@ -710,12 +656,21 @@ class Tool:
             tool_call: Tool call generated by the model.
 
         Returns:
-            The raw tool result.
+            The raw tool result. ToolNode converts it to message text after
+            the complete batch finishes.
 
         Raises:
             ValueError: If the tool call targets another tool.
             TypeError: If arguments do not match the function signature.
         """
+        self._validate_call(state, tool_call)
+
+        arguments = self._build_arguments(state=state, tool_call=tool_call)
+        bound_arguments = self._bind_arguments(arguments)
+        return await self.func(*bound_arguments.args, **bound_arguments.kwargs)
+
+    def _validate_call(self, state: dict[str, Any], tool_call: ToolCall) -> None:
+        """Validate the shared local and MCP execution contract."""
         if not isinstance(state, dict):
             raise TypeError("state must be a dictionary.")
 
@@ -729,26 +684,13 @@ class Tool:
                 f"but this tool is {self.name!r}."
             )
 
-        arguments = self._build_arguments(
-            state=state,
-            tool_call=tool_call,
-        )
-
-        bound_arguments = self._bind_arguments(arguments)
-
-        return await self.func(
-            *bound_arguments.args,
-            **bound_arguments.kwargs,
-        )
-    
 
 @overload
 def tool(
     func: ToolFunction,
     *,
     description: str | None = None,
-) -> Tool:
-    ...
+) -> Tool: ...
 
 
 @overload
@@ -756,8 +698,7 @@ def tool(
     func: None = None,
     *,
     description: str | None = None,
-) -> Callable[[ToolFunction], Tool]:
-    ...
+) -> Callable[[ToolFunction], Tool]: ...
 
 
 def tool(

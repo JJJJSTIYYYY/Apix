@@ -3,8 +3,8 @@ from contextlib import aclosing, asynccontextmanager
 from typing import Any, get_type_hints
 
 from apix.agent.core.tool.base import ToolFunction
-from apix.agent.core.tool.tool_node import Tool, ToolNode
-from apixis.core.graph import GraphManager, NodeGraph
+from apix.agent.core.tool import Tool, ToolNode
+from apixis.core.graph import BaseNode, GraphManager, NodeGraph
 from apixis.core.graph.context import GraphContext
 
 
@@ -85,11 +85,7 @@ class AgentGraphCreator(GraphManager):
         ```
     """
 
-    def __init__(
-        self, 
-        state_schema: type,
-        messages_key: str = 'messages'
-    ):
+    def __init__(self, state_schema: type, messages_key: str = "messages"):
         """Create an empty graph definition.
 
         Args:
@@ -99,7 +95,9 @@ class AgentGraphCreator(GraphManager):
             messages_key: The key in the state dictionary that contains the message list.
         """
         if messages_key not in get_type_hints(state_schema):
-            raise KeyError(f"The messages_key `{messages_key}` not found in state_schema.")
+            raise KeyError(
+                f"The messages_key `{messages_key}` not found in state_schema."
+            )
         super().__init__(state_schema)
         self.messages_key = messages_key
 
@@ -134,18 +132,28 @@ class AgentGraphCreator(GraphManager):
     def add_tools(
         self,
         tools: list[ToolFunction | Tool],
-        node_name: str = 'tools'
-    ):  
-        """Add tools for agent. 
-        
+        node_name: str = "tools",
+        *,
+        bind_llm_node: str | BaseNode | None = None,
+    ):
+        """Add tools for agent.
+
         Tools added by this method will be organized as :class:`ToolNode`.
 
         Args:
             tools: A list of :data:`ToolFunction` or :class:`Tool`.
             node_name: Optional tools node name.
+            bind_llm_node: Optional LLM node name or node object to run next.
 
         Returns:
             This creator, allowing fluent graph construction.
         """
-        self.add_node(ToolNode(tools, node_name, messages_key=self.messages_key))
+        self.add_node(
+            ToolNode(
+                tools,
+                node_name,
+                messages_key=self.messages_key,
+                bind_llm_node=bind_llm_node,
+            )
+        )
         return self

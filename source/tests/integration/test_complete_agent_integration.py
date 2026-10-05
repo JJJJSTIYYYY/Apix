@@ -38,8 +38,6 @@ from apix.agent.core.graph import AgentGraphCreator
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-
-
 @dataclass
 class AgentMemory:
     """Mutable resource deliberately shared by live node state copies."""
@@ -59,10 +57,7 @@ class InMemoryMessageStore:
     def __add__(self, messages: list[Any]) -> "InMemoryMessageStore":
         """Persist one AutoMerge update without replacing the store object."""
         self.messages.extend(messages)
-        self.message_uids.update(
-            message.message_uid
-            for message in messages
-        )
+        self.message_uids.update(message.message_uid for message in messages)
         self.batches.append([message.role for message in messages])
         return self
 
@@ -107,9 +102,7 @@ class ScriptedBot:
         await asyncio.sleep(0)
 
         tool_messages = [
-            message
-            for message in messages
-            if isinstance(message, ApixToolMessage)
+            message for message in messages if isinstance(message, ApixToolMessage)
         ]
         if not tool_messages:
             return ApixAiMessage(
@@ -141,70 +134,55 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     completion_order: list[str] = []
 
     @tool(description="Look up current weather for a city.")
-    async def lookup_weather(city: str) -> Command:
+    async def lookup_weather(city: str) -> str:
         await remember_started.wait()
         await asyncio.sleep(0.01)
         completion_order.append("lookup_weather")
-        return Command(
-            update={"messages": [ApixToolMessage(content=f"weather:{city}:sunny", tool_call_id="placeholder")]},
-            goto="persist_messages",
-        )
+        return f"weather:{city}:sunny"
 
     @tool(description="Add two integers.")
-    async def add(left: int, right: int) -> Command:
+    async def add(left: int, right: int) -> int:
         await asyncio.sleep(0)
         completion_order.append("add")
-        total = left + right
-        return Command(
-            update={
-                "messages": [
-                    ApixToolMessage(
-                        content=str(total),
-                        tool_call_id="runtime-overwrites-this",
-                    )
-                ],
-                "audit": [f"calculated:{left}+{right}"],
-                "calculation": total,
-            },
-            goto="persist_messages",
-        )
+        return left + right
 
     @tool(description="Remember one note for the current Agent run.")
     async def remember(
         note: str,
         runtime: Annotated[ToolInjectionContext, AutoInjection()],
-    ) -> Command:
+    ) -> str:
         remember_started.set()
         runtime.state["memory"].notes.append(note)
         runtime.state["memory"].call_ids.append(runtime.tool_call_id)
         completion_order.append("remember")
-        return Command(
-            update={"messages": [ApixToolMessage(content="stored", tool_call_id="placeholder")]},
-            goto="persist_messages",
-        )
+        return "stored"
 
-    tool_node = ToolNode([lookup_weather, add, remember])
+    tool_node = ToolNode(
+        [lookup_weather, add, remember], bind_llm_node="persist_messages"
+    )
     bot = ScriptedBot().bind_tools(tool_node)
 
     def prepare_context(state: dict[str, Any]) -> Command:
         """Build the exact message snapshot supplied to the next model call."""
         preparation_number = state.get("context_preparations", 0) + 1
-        return Command(goto="model", 
+        return Command(
+            goto="model",
             update={
                 "prepared_context": list(state["messages"]),
                 "context_preparations": 1,
                 "lifecycle": [f"prepare_context:{preparation_number}"],
-            }
+            },
         )
 
     async def call_model(state: dict[str, Any]) -> Command:
         response = await bot.invoke(state["prepared_context"])
-        return Command(goto="persist_messages", 
+        return Command(
+            goto="persist_messages",
             update={
                 "messages": [response],
                 "model_calls": 1,
                 "lifecycle": ["model"],
-            }
+            },
         )
 
     def persist_messages(state: dict[str, Any]) -> Command:
@@ -221,15 +199,15 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
         else:
             next_node = "prepare_context"
 
-        return Command(
-            update={
-                "message_store": pending_messages,
-                "lifecycle": [
-                    f"persist:{latest.role}:{len(pending_messages)}"
-                ]
-            },
-            goto=next_node,
-        )
+        update = {
+            "message_store": pending_messages,
+            "lifecycle": [f"persist:{latest.role}:{len(pending_messages)}"],
+        }
+        for message in pending_messages:
+            if isinstance(message, ApixToolMessage) and message.name == "add":
+                update["calculation"] = int(message.content)
+                update["audit"] = ["calculated:19+23"]
+        return Command(update=update, goto=next_node)
 
     graph = (
         AgentGraphCreator(CompleteAgentState)
@@ -269,10 +247,7 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     assert len(bot.requests) == 2
     assert [len(request) for request in bot.requests] == [1, 5]
     assert isinstance(bot.requests[0][0], ApixUserMessage)
-    assert all(
-        isinstance(message, ApixToolMessage)
-        for message in bot.requests[1][-3:]
-    )
+    assert all(isinstance(message, ApixToolMessage) for message in bot.requests[1][-3:])
     assert result["model_calls"] == 2
     assert result["context_preparations"] == 2
     assert result["calculation"] == 42
@@ -323,9 +298,7 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     assert all(message.metadata["duration"] >= 0 for message in messages[2:5])
     assert isinstance(messages[-1], ApixAiMessage)
     assert messages[-1].tool_calls == []
-    assert messages[-1].content == (
-        "weather:Tokyo:sunny; sum=42; memory=stored"
-    )
+    assert messages[-1].content == ("weather:Tokyo:sunny; sum=42; memory=stored")
 
     # Ordinary input was isolated, while the explicitly marked resource was
     # intentionally shared back to its caller.
@@ -369,16 +342,22 @@ async def test_agent_plugins_enrich_context_and_observe_node_events():
         )
 
     def prepare_model_input(state: dict[str, Any]) -> dict[str, Any]:
-        return Command(update={
-            "model_input": f"{state['prompt']} | locale={state['locale']}",
-            "agent_trace": [*state["agent_trace"], "prepare"],
-        }, goto=model_event)
+        return Command(
+            update={
+                "model_input": f"{state['prompt']} | locale={state['locale']}",
+                "agent_trace": [*state["agent_trace"], "prepare"],
+            },
+            goto=model_event,
+        )
 
     def call_model(state: dict[str, Any]) -> dict[str, Any]:
-        return Command(update={
-            "answer": f"answer({state['model_input']})",
-            "agent_trace": [*state["agent_trace"], "model"],
-        }, goto=persist_event)
+        return Command(
+            update={
+                "answer": f"answer({state['model_input']})",
+                "agent_trace": [*state["agent_trace"], "model"],
+            },
+            goto=persist_event,
+        )
 
     def persist_answer(state: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -478,14 +457,16 @@ async def test_plugin_diagnostics_and_unsubscribe_follow_public_lifecycle():
 
         calls.clear()
         subscribe(
-            dispatch_event, unseen_pattern,
-            priority=5, filter_event=[dispatch_event],
+            dispatch_event,
+            unseen_pattern,
+            priority=5,
+            filter_event=[dispatch_event],
         )(record_extension_event)
         await graph.invoke({"prompt": "second"})
         assert calls == []
-        assert get_handler_meta(record_extension_event.__name__)[
-            "filter_event"
-        ] == [dispatch_event]
+        assert get_handler_meta(record_extension_event.__name__)["filter_event"] == [
+            dispatch_event
+        ]
 
         unsubscribe(record_extension_event.__name__)
         assert get_handler_meta(record_extension_event.__name__) is None

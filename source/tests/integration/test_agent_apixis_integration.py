@@ -12,7 +12,10 @@ from apix.agent.core.graph import AgentGraph, AgentGraphCreator
 from apix.agent.core.tool.mcp import mcp_mgr
 from apix.agent.core.utils.message import ApixAiMessage, ApixToolMessage
 from apixis.core.graph import (
-    AutoMerge, Command, get_current_run_id, get_stream_writer,
+    AutoMerge,
+    Command,
+    get_current_run_id,
+    get_stream_writer,
 )
 from apixis.core.utils.exception import InvalidContextError
 
@@ -50,7 +53,9 @@ async def test_prepared_and_restored_contexts_close_their_own_scope(closed_scope
     assert closed_scopes.await_count == 2
 
 
-@pytest.mark.parametrize("error", [RuntimeError("node failed"), asyncio.CancelledError()])
+@pytest.mark.parametrize(
+    "error", [RuntimeError("node failed"), asyncio.CancelledError()]
+)
 async def test_failure_and_node_cancellation_close_scope(closed_scopes, error):
     async def fail(state):
         raise error
@@ -126,9 +131,17 @@ async def test_custom_messages_key_reaches_tool_node(closed_scopes):
         .add_tools([hello])
         .compile_agent("tools")
     )
-    result = await graph.invoke({"conversation": [ApixAiMessage(tool_calls=[
-        {"call_id": "hello-1", "tool_name": "hello", "args": {}}
-    ])]})
+    result = await graph.invoke(
+        {
+            "conversation": [
+                ApixAiMessage(
+                    tool_calls=[
+                        {"call_id": "hello-1", "tool_name": "hello", "args": {}}
+                    ]
+                )
+            ]
+        }
+    )
     assert isinstance(result["conversation"][-1], ApixToolMessage)
     assert result["conversation"][-1].content == "hello"
 
@@ -155,8 +168,42 @@ async def test_server_lifespan_can_restart_and_reports_transport_identity(monkey
                     event_type=EventType.WORKFLOW, event_name="apix.migration.health"
                 )
                 await asyncio.wait_for(received.wait(), 1)
-                async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+                async with AsyncClient(
+                    transport=ASGITransport(app), base_url="http://test"
+                ) as client:
                     response = await client.get("/health")
                 assert response.json() == {"status": "ok", "service": NODE_ID}
         finally:
             unsubscribe("receive")
+
+
+async def test_add_tools_forwards_llm_binding_with_custom_messages_key(closed_scopes):
+    class CustomState(TypedDict, total=False):
+        conversation: Annotated[list, AutoMerge()]
+        observed: str
+
+    def hello():
+        return "hello"
+
+    def model(state):
+        assert len(state["conversation"]) == 2
+        return {"observed": state["conversation"][-1].content}
+
+    graph = (
+        AgentGraphCreator(CustomState, messages_key="conversation")
+        .add_tools([hello], bind_llm_node="model")
+        .add_node(model)
+        .compile_agent("tools")
+    )
+    result = await graph.invoke(
+        {
+            "conversation": [
+                ApixAiMessage(
+                    tool_calls=[
+                        {"call_id": "hello-1", "tool_name": "hello", "args": {}}
+                    ]
+                )
+            ]
+        }
+    )
+    assert result["observed"] == "hello"

@@ -1,6 +1,5 @@
-from collections.abc import Awaitable
-from typing import Any, Callable, TypedDict
-
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 ToolFunction = Callable[..., Any] | Callable[..., Awaitable[Any]]
-"""A synchronous or asynchronous callable that receives graph state and tool args."""
+"""A sync or async callable receiving model arguments and optional injection."""

@@ -1,6 +1,7 @@
 """Context for tools."""
-from dataclasses import dataclass, field
-from typing import Any, Mapping
+
+from dataclasses import dataclass
+from typing import Any
 
 from apix.agent.core.utils.message import ToolCall
 
@@ -28,7 +29,7 @@ class ToolInjectionContext:
     @property
     def tool_call_id(self) -> str:
         return self.tool_call["call_id"]
-    
+
 
 # Examples:
 # injection: Annotated[ToolInjectionContext, AutoInjection()]

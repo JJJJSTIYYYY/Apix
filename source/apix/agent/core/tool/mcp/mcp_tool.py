@@ -13,9 +13,8 @@ from apix.agent.core.tool.mcp.base import (
     _convert_call_tool_result,
     _get_model_value,
 )
-from apix.agent.core.tool.tool_node import Tool
+from apix.agent.core.tool.tool import Tool
 from apix.agent.core.utils.message import ToolCall
-
 
 if TYPE_CHECKING:
     from apix.agent.core.tool.mcp.mcp_tool_manager import MCPToolManager
@@ -46,9 +45,7 @@ class MCPTool(Tool):
             default={},
         )
         if not isinstance(input_schema, Mapping):
-            raise TypeError(
-                f"MCP tool {name!r} input schema must be a mapping."
-            )
+            raise TypeError(f"MCP tool {name!r} input schema must be a mapping.")
 
         self.name = name
         self.description = str(description or "")
@@ -94,15 +91,7 @@ class MCPTool(Tool):
         tool_call: ToolCall,
     ) -> str:
         """Call the FastMCP tool with arguments supplied by the model."""
-        if not isinstance(state, dict):
-            raise TypeError("state must be a dictionary.")
-
-        self._validate_tool_call(tool_call)
-        if tool_call["tool_name"] != self.name:
-            raise ValueError(
-                f"ToolCall targets {tool_call['tool_name']!r}, "
-                f"but this tool is {self.name!r}."
-            )
+        self._validate_call(state, tool_call)
 
         return await self._call(**(tool_call["args"] or {}))
 

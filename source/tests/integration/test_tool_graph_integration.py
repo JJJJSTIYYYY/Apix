@@ -22,14 +22,10 @@ from apixis.core.graph import (
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-
-
 class AgentState(TypedDict, total=False):
     """State schema used by the complete agent-tool graph."""
 
     messages: Annotated[list[Any], AutoMerge()]
-    audit: Annotated[list[str], AutoMerge()]
-    winner: str
     observed: dict[str, Any]
     route: str
 
@@ -52,42 +48,21 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
     completion_order: list[str] = []
 
     @tool
-    async def first(value: str) -> Command:
+    async def first(value: str) -> str:
         await second_started.wait()
         await asyncio.sleep(0.01)
         completion_order.append("first")
-        return Command(goto="observe", 
-            update={
-                "messages": [
-                    ApixToolMessage(
-                        content=f"first:{value}",
-                        tool_call_id="placeholder",
-                    )
-                ],
-                "audit": ["first"],
-                "winner": "first",
-            }
-        )
+        return f"first:{value}"
 
     @tool
-    async def second(value: str) -> Command:
+    async def second(value: str) -> str:
         second_started.set()
         completion_order.append("second")
-        return Command(goto="observe", 
-            update={
-                "messages": [
-                    ApixToolMessage(
-                        content=f"second:{value}",
-                        tool_call_id="placeholder",
-                    )
-                ],
-                "audit": ["second"],
-                "winner": "second",
-            }
-        )
+        return f"second:{value}"
 
     def emit_tool_calls(state: dict) -> Command:
-        return Command(goto="tools", 
+        return Command(
+            goto="tools",
             update={
                 "messages": [
                     ApixAiMessage(
@@ -105,7 +80,7 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
                         ]
                     )
                 ]
-            }
+            },
         )
 
     def observe(state: dict) -> dict:
@@ -116,29 +91,24 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
         ]
         return {
             "observed": {
-                "contents": [
-                    message.content
-                    for message in tool_messages
-                ],
-                "call_ids": [
-                    message.tool_call_id
-                    for message in tool_messages
-                ],
-                "winner": state["winner"],
+                "contents": [message.content for message in tool_messages],
+                "call_ids": [message.tool_call_id for message in tool_messages],
             }
         }
 
     emit_node = Node(emit_tool_calls)
-    tool_node = ToolNode([first, second])
+    tool_node = ToolNode([first, second], bind_llm_node="observe")
     observe_node = Node(observe)
 
     graph = (
         GraphManager(AgentState)
-        .add_nodes([
-            emit_node,
-            tool_node,
-            observe_node,
-        ])
+        .add_nodes(
+            [
+                emit_node,
+                tool_node,
+                observe_node,
+            ]
+        )
         .compile_graph(emit_node.name)
     )
 
@@ -148,91 +118,84 @@ async def test_concurrent_tools_are_applied_in_tool_call_order():
         graph.invoke(
             {
                 "messages": [],
-                "audit": [],
-                "winner": "initial",
             }
         ),
         timeout=1,
     )
 
     assert completion_order == ["second", "first"]
-    assert result["audit"] == ["first", "second"]
-    assert result["winner"] == "second"
     assert result["observed"] == {
         "contents": ["first:a", "second:b"],
         "call_ids": ["call-first", "call-second"],
-        "winner": "second",
     }
     assert isinstance(result["messages"][0], ApixAiMessage)
     assert all(
-        isinstance(message, ApixToolMessage)
-        for message in result["messages"][1:]
+        isinstance(message, ApixToolMessage) for message in result["messages"][1:]
     )
 
 
-async def test_tool_command_goto_selects_next_node():
-    """A Tool-produced route is honored after ToolNode returns its list."""
+@pytest.mark.parametrize("bind_later", [False, True])
+async def test_tool_node_binding_selects_next_node_once(bind_later):
+    """Only the node binding controls routing after the full tool batch."""
+    llm_calls = []
+    returned = Command(update={"route": "wrong"}, goto="fallback")
+
     @tool
     def choose_route() -> Command:
+        return returned
+
+    def emit_tool_call(state: dict) -> Command:
         return Command(
             update={
                 "messages": [
-                    ApixToolMessage(
-                        content="selected",
-                        tool_call_id="placeholder",
+                    ApixAiMessage(
+                        tool_calls=[
+                            _tool_call("choose_route", "call-1"),
+                            _tool_call("choose_route", "call-2"),
+                        ]
                     )
                 ]
             },
-            goto="selected",
+            goto="tools",
         )
 
-    def emit_tool_call(state: dict) -> dict:
-        return Command(update={
-            "messages": [
-                ApixAiMessage(
-                    tool_calls=[
-                        _tool_call(
-                            "choose_route",
-                            "call-route",
-                        )
-                    ]
-                )
-            ]
-        }, goto="tools")
-
     def fallback(state: dict) -> dict:
-        return {"route": "fallback"}
+        raise AssertionError("The tool result cannot select a route")
 
     def selected(state: dict) -> dict:
+        llm_calls.append(True)
+        assert [m.content for m in state["messages"][1:]] == [str(returned)] * 2
         return {"route": "selected"}
 
-    tool_node = ToolNode(choose_route)
+    selected_node = Node(selected)
+    tool_node = ToolNode(
+        choose_route, bind_llm_node=None if bind_later else selected_node
+    )
+    if bind_later:
+        tool_node.bind_llm_node(selected_node)
     graph = (
         GraphManager(AgentState)
-        .add_nodes([
-            emit_tool_call,
-            tool_node,
-            fallback,
-            selected,
-        ])
+        .add_nodes([emit_tool_call, tool_node, fallback, selected_node])
         .compile_graph("emit_tool_call")
     )
-
     result = await graph.invoke({"messages": []})
-
     assert result["route"] == "selected"
-    assert isinstance(result["messages"][-1], ApixToolMessage)
-    assert result["messages"][-1].content == "selected"
+    assert llm_calls == [True]
+    assert [m.tool_call_id for m in result["messages"][1:]] == ["call-1", "call-2"]
 
 
 async def test_empty_tool_call_list_finishes_graph():
     """An empty Command list finishes the graph without running other nodes."""
+
     def emit_without_tool_calls(state: dict) -> dict:
-        return Command(update={
-            "messages": [
-                ApixAiMessage(tool_calls=[]),
-            ]
-        }, goto="tools")
+        return Command(
+            update={
+                "messages": [
+                    ApixAiMessage(tool_calls=[]),
+                ]
+            },
+            goto="tools",
+        )
 
     def unused_tool() -> str:
         raise AssertionError("unused tool must not execute")
@@ -243,11 +206,13 @@ async def test_empty_tool_call_list_finishes_graph():
     tool_node = ToolNode(unused_tool)
     graph = (
         GraphManager(AgentState)
-        .add_nodes([
-            emit_without_tool_calls,
-            tool_node,
-            after_tools,
-        ])
+        .add_nodes(
+            [
+                emit_without_tool_calls,
+                tool_node,
+                after_tools,
+            ]
+        )
         .compile_graph("emit_without_tool_calls")
     )
 
@@ -268,31 +233,36 @@ async def test_tool_exception_propagates_and_stops_downstream_node():
         raise RuntimeError("tool exploded")
 
     def emit_tool_call(state: dict) -> dict:
-        return Command(update={
-            "messages": [
-                ApixAiMessage(
-                    tool_calls=[
-                        _tool_call(
-                            "explode",
-                            "call-explode",
-                        )
-                    ]
-                )
-            ]
-        }, goto="tools")
+        return Command(
+            update={
+                "messages": [
+                    ApixAiMessage(
+                        tool_calls=[
+                            _tool_call(
+                                "explode",
+                                "call-explode",
+                            )
+                        ]
+                    )
+                ]
+            },
+            goto="tools",
+        )
 
     def downstream(state: dict) -> dict:
         downstream_calls.append("called")
         return {"route": "downstream"}
 
-    tool_node = ToolNode(explode)
+    tool_node = ToolNode(explode, bind_llm_node="downstream")
     graph = (
         GraphManager(AgentState)
-        .add_nodes([
-            emit_tool_call,
-            tool_node,
-            downstream,
-        ])
+        .add_nodes(
+            [
+                emit_tool_call,
+                tool_node,
+                downstream,
+            ]
+        )
         .compile_graph("emit_tool_call")
     )
 
@@ -321,13 +291,7 @@ async def test_graph_timeout_cancels_running_tool_node():
         .compile_graph(tool_node.name)
     )
     state = {
-        "messages": [
-            ApixAiMessage(
-                tool_calls=[
-                    _tool_call("slow_tool", "call-slow")
-                ]
-            )
-        ]
+        "messages": [ApixAiMessage(tool_calls=[_tool_call("slow_tool", "call-slow")])]
     }
 
     with pytest.raises(
