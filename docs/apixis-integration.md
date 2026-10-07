@@ -2,7 +2,7 @@
 
 ## 安装与启动
 
-后端要求 Python 3.12 或更高版本。项目已执行 `uv add apixis`，依赖声明为 `apixis>=1.0.0`，`source/uv.lock` 锁定验证使用的版本 `1.0.0`。
+后端要求 Python 3.12 或更高版本。项目已执行 `uv add apixis`，依赖声明为 `apixis>=1.0.2`，`source/uv.lock` 锁定验证使用的版本 `1.0.2`。
 
 ```bash
 cd source
@@ -68,28 +68,38 @@ graph = (
 
 ## 工具节点
 
-`ToolNode` 直接继承 Apixis 的 `BaseNode`。它并发调用工具，按照调用列表顺序返回 `Command` 列表。
-
-工具返回普通字符串或 `ApixToolMessage` 时，生成的 Command 没有下一跳。若工具完成后需要继续调用模型，应明确返回带 `goto` 的 Command：
+`ToolNode` 直接继承 Apixis 的 `BaseNode`。工具只返回业务结果；节点并发执行整批工具，等待全部完成后，将每个结果通过 `str()` 转成字符串，按调用顺序生成 `ApixToolMessage`，并返回一个包含全部消息更新的 `Command`。
 
 ```python
-from apix.agent.core.tool import tool
-from apix.agent.core.utils.message import ApixToolMessage
-from apixis.core.graph import Command
+from apix.agent.core.tool import ToolNode, tool
 
 @tool
-async def calculate(left: int, right: int) -> Command:
-    return Command(
-        update={"messages": [ApixToolMessage(
-            content=str(left + right), tool_call_id="placeholder"
-        )]},
-        goto="model",
-    )
+async def calculate(left: int, right: int) -> int:
+    return left + right
+
+# Bind at construction, using a node name or an Apixis BaseNode instance.
+tools = ToolNode([calculate], bind_llm_node="model")
+
+# Bind, replace, or clear the target after construction.
+tools.bind_llm_node("model")
+# tools.bind_llm_node(model_node)
+# tools.bind_llm_node(None)
 ```
 
-`ToolNode` 会填入真实的工具调用 ID、工具名和执行耗时。多个工具返回同一个下一跳时，Apixis 合并为一个执行目标。没有工具调用时返回空列表，图结束。完整的模型→工具→模型流程可参考 `source/tests/integration/test_complete_agent_integration.py`。
+| 接口 / 行为 | 说明 |
+| --- | --- |
+| `ToolNode(tool_set, name="tools", messages_key="messages", timeout=None, *, bind_llm_node=None)` | 注册工具，并可绑定工具执行后的 LLM 节点 |
+| `bind_llm_node(llm_node)` | 接受非空节点名或 Apixis 节点对象，替换绑定并返回自身；`None` 清除绑定 |
+| `get_schemas(filter_names=None)` | 按注册顺序返回工具 schema 副本，可按名称过滤 |
+| 有工具调用 | 返回 `Command(update={messages_key: tool_messages}, goto=绑定节点名)`，下一节点只执行一次 |
+| 未绑定 LLM 节点 | 工具照常执行，返回的 `Command.goto` 为 `None`，当前分支结束 |
+| 没有工具调用 | 返回空列表，当前分支结束，即使已经绑定 LLM 节点 |
 
-`AgentGraphCreator(State, messages_key="conversation").add_tools([...])` 会将自定义消息字段传给 ToolNode。工具返回 Command 时也需在同名字段中提供消息更新。
+所有返回类型均作为普通结果转成字符串，包括 `None`、字典、`ApixToolMessage` 和 `Command`。工具返回的 `Command.update`、`Command.goto` 不再用于更新图状态或路由；需要业务状态更新时，可由图中的其他节点处理工具消息，或通过注入上下文操作共享业务对象。
+
+节点会为每条新消息填入真实的工具调用 ID、工具名和执行耗时，不修改工具返回的对象。任一工具失败或节点被取消时，节点取消并等待其他未完成工具，然后向外传播异常。MCP 工具的 `tool_calls` 生命周期覆盖完整批次，批次结束后释放资源。
+
+`AgentGraphCreator(State, messages_key="conversation").add_tools([...], bind_llm_node="model")` 会将自定义消息字段与绑定目标传给 ToolNode。完整的模型→工具→模型流程可参考 `source/tests/integration/test_complete_agent_integration.py`。
 
 ## 上下文、快照与流式调用
 

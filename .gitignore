@@ -1,5 +1,6 @@
 imagination.md
 todo.md
+RELEASE_NOTES.md
 
 # MacOS
 .DS_Store
@@ -12,9 +13,13 @@ __pycache__/
 *.pyo
 *.pyd
 *.so
+*.egg-info/
+.coverage
+htmlcov/
 
 # virtual env
 .venv/
+.package-venv/
 venv/
 env/
 
@@ -48,6 +53,7 @@ pnpm-debug.log*
 # Runtime / Data
 .apix_data
 source/config.yaml
+config.yaml
 
 # logs
 logs/
@@ -59,7 +65,15 @@ temp/
 # Extra
 *.sqlite3
 *.db
+test-results
 
-uv.lock
-config.yaml
-.python-version
+# logs
+logs/
+*.log
+cache/
+tmp/
+temp/
+
+# Extra
+*.sqlite3
+*.db
