@@ -1,6 +1,6 @@
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
     RequestConfig,
 )

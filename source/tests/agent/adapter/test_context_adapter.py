@@ -77,7 +77,7 @@ def test_build_user_context_uses_fallbacks_and_ignores_invalid_sections():
 
 def testensure_tool_messages_reorders_deduplicates_and_fills_missing():
     adapter = AIContextAdapter()
-    ai = ApixAiMessage(
+    assistant = ApixAiMessage(
         tool_calls=[
             {"call_id": "a", "tool_name": "first", "args": None},
             {"call_id": "b", "tool_name": "second", "args": {}},
@@ -87,13 +87,13 @@ def testensure_tool_messages_reorders_deduplicates_and_fills_missing():
     duplicate_b = tool_message("b", "duplicate")
     unmatched = tool_message("other", "other")
     following = ApixUserMessage(content="next")
-    messages = [ai, first_b, duplicate_b, unmatched, following]
+    messages = [assistant, first_b, duplicate_b, unmatched, following]
     identity = id(messages)
 
     adapter.ensure_tool_message(messages)
 
     assert id(messages) == identity
-    assert messages[0] is ai
+    assert messages[0] is assistant
     assert messages[1].tool_call_id == "a"
     assert messages[1].name == "first"
     assert messages[1].content == adapter._MISSING_TOOL_OUTPUT
@@ -146,7 +146,7 @@ def test_convert_persisted_messages_handles_todo_context_abort_and_json():
                 },
             },
             {
-                "role": "ai",
+                "role": "assistant",
                 "name": "Alice",
                 "content": "answer<conversation_abort>",
                 "metadata": '{"provider":"test"}',
@@ -182,9 +182,9 @@ def test_convert_persisted_messages_covers_all_roles_defaults_and_skips():
                 "name": "Alice",
                 "content": "question",
             },
-            {"role": "ai", "content": ""},
+            {"role": "assistant", "content": ""},
             {
-                "role": "ai",
+                "role": "assistant",
                 "content": "",
                 "extensions": {
                     "tool_calls": [
@@ -221,7 +221,7 @@ def test_convert_persisted_messages_covers_all_roles_defaults_and_skips():
     assert todo is None
     assert [message.role for message in messages] == [
         "user",
-        "ai",
+        "assistant",
         "tool",
         "system",
     ]
@@ -236,7 +236,7 @@ def test_convert_persisted_messages_strict_mode_fills_missing_tool_output():
     messages, _ = AIContextAdapter().convert_to_apix_messages(
         [
             {
-                "role": "ai",
+                "role": "assistant",
                 "extensions": {
                     "tool_calls": [
                         {
@@ -268,7 +268,7 @@ def test_convert_to_dict_message_filter_and_decode_helpers():
         "generation",
         filter=True,
     ) == {
-        "role": "ai",
+        "role": "assistant",
         "content": "answer",
         "extensions": {"reasoning": "why"},
     }
@@ -427,7 +427,7 @@ def test_split_messages_auto_mode_uses_latest_user_or_keeps_everything():
 
 def test_split_messages_handles_complete_and_orphan_tool_blocks():
     adapter = AIContextAdapter()
-    ai = ApixAiMessage(
+    assistant = ApixAiMessage(
         tool_calls=[
             {"call_id": "a", "tool_name": "tool", "args": {}},
             {"call_id": "b", "tool_name": "tool", "args": {}},
@@ -438,18 +438,18 @@ def test_split_messages_handles_complete_and_orphan_tool_blocks():
     tail = ApixUserMessage(content="tail")
 
     summarized, recent = adapter.split_messages(
-        [ai, first_tool, second_tool, tail],
+        [assistant, first_tool, second_tool, tail],
         keep_recent=2,
     )
     assert summarized == []
-    assert recent == [ai, first_tool, second_tool, tail]
+    assert recent == [assistant, first_tool, second_tool, tail]
 
     summarized, recent = adapter.split_messages(
-        [ai, first_tool, second_tool, tail],
+        [assistant, first_tool, second_tool, tail],
         keep_recent=3,
     )
     assert summarized == []
-    assert recent == [ai, first_tool, second_tool, tail]
+    assert recent == [assistant, first_tool, second_tool, tail]
 
     orphan_prefix = ApixUserMessage(content="prefix")
     summarized, recent = adapter.split_messages(
@@ -486,15 +486,15 @@ def test_filter_apix_messages_handles_chunks_and_ignores_empty_ai_messages():
 
 
 def test_filter_apix_messages_can_drop_reasoning_and_keep_ai_content():
-    ai = ApixAiMessage(
-        message_uid="ai-id",
+    assistant = ApixAiMessage(
+        message_uid="assistant-id",
         content="answer",
         reasoning="private reasoning",
         name="Alice",
     )
 
     systems, messages, index = AIContextAdapter().filter_apix_messages(
-        [ai],
+        [assistant],
         keep_reasoning=False,
     )
 
@@ -502,4 +502,4 @@ def test_filter_apix_messages_can_drop_reasoning_and_keep_ai_content():
     assert len(messages) == 1
     assert messages[0].content == "answer"
     assert messages[0].name == "Alice"
-    assert index == "ai-id"
+    assert index == "assistant-id"

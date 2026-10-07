@@ -110,7 +110,7 @@ class AIStoreAdapter:
             "role": "info",
             "name": name,
             "content": "",
-            "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
+            "node_id": convert_generation_id_to_message_node_id(generation_id, 'assistant'),
             "parent_id": parent_id,
             "metadata": metadata or {},
             "extensions": extensions or {},

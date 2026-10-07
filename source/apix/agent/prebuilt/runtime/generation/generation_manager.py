@@ -152,7 +152,7 @@ class GenerationManager:
             # Stream lifecycle start
             if action == "node_stream_start":
                 gen.cached_tokens = {
-                    "role": "ai",
+                    "role": "assistant",
                     "content": "",
                     "think": "",
                     "extra": {},

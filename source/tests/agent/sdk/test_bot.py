@@ -11,7 +11,7 @@ from apix.agent.core.bot import (
     DeepSeekBot,
     MessageConfig,
     MiniMaxBot,
-    ModelCapabilities,
+    ProviderProfile,
     OllamaBot,
     OpenAIBot,
     ReasoningConfig,
@@ -102,8 +102,8 @@ def chat_response(*, content="answer", reasoning=None, tool_calls=None):
 
 
 def test_capability_defaults_are_isolated_and_hierarchy_is_correct():
-    first = ModelCapabilities()
-    second = ModelCapabilities()
+    first = ProviderProfile()
+    second = ProviderProfile()
 
     assert first.message_config.supported_roles == ()
     assert second.message_config.supported_roles == ()
@@ -292,9 +292,9 @@ def test_bind_tools_replaces_and_copies_schemas():
 
 
 def test_chat_serialization_and_argument_validation_edge_cases():
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         message_config=MessageConfig(
-            supported_roles=("user", "ai", "tool"),
+            supported_roles=("user", "assistant", "tool"),
             include_name=True,
         ),
         reasoning_config=ReasoningConfig(
@@ -689,7 +689,7 @@ def test_openai_responses_manual_serialization_multimodal_and_no_reasoning_model
         OpenAIBot.capabilities,
         message_config=replace(
             OpenAIBot.capabilities.message_config,
-            supported_roles=("user", "ai", "tool"),
+            supported_roles=("user", "assistant", "tool"),
         ),
         reasoning_config=replace(
             OpenAIBot.capabilities.reasoning_config,
@@ -990,7 +990,7 @@ def test_provider_classes_only_declare_provider_endpoint_and_capabilities():
 
 
 def test_constructor_capability_and_endpoint_validation():
-    with pytest.raises(TypeError, match="ModelCapabilities"):
+    with pytest.raises(TypeError, match="ProviderProfile"):
         OllamaBot(
             model="qwen3",
             client=object(),

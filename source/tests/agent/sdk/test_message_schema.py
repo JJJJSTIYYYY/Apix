@@ -80,12 +80,12 @@ def test_message_storage_conversion_uses_the_new_schema():
     assert stored == {
         "message_uid": "message-3",
         "generation_id": generation_id,
-        "role": "ai",
+        "role": "assistant",
         "name": "assistant",
         "content": "answer",
         "node_id": convert_generation_id_to_message_node_id(
             generation_id,
-            "ai",
+            "assistant",
         ),
         "parent_id": "parent-node",
         "metadata": {"provider": "openai"},

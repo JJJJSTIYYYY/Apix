@@ -270,7 +270,7 @@ class AIContextAdapter:
                 )
                 messages.append(msg)
 
-            elif role == "ai":
+            elif role == "assistant":
                 name = name or "assistant"
                 suffix = "<conversation_abort>"
                 reasoning = str(extensions.get("reasoning", "") or "")
@@ -383,7 +383,7 @@ class AIContextAdapter:
         content = str(message.content or "")
 
         if isinstance(message, ApixAiMessage):
-            role = "ai"
+            role = "assistant"
         else:
             role = "tool"
 

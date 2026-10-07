@@ -25,7 +25,7 @@ async def test_append_message_skips_empty_and_sub_conversation(monkeypatch, iden
 
     await adapter.append_message_to_store(None, identity, "generation")
     await adapter.append_message_to_store(
-        {"role": "ai"},
+        {"role": "assistant"},
         {**identity, "conversation_uid": "sub_worker"},
         "generation",
     )
@@ -38,7 +38,7 @@ async def test_append_dict_message_and_info_payloads(monkeypatch, identity):
     query = AsyncMock(return_value={"success": True})
     monkeypatch.setattr(store_module, "query_store", query)
     adapter = AIStoreAdapter()
-    message = {"message_uid": "message-1", "role": "ai"}
+    message = {"message_uid": "message-1", "role": "assistant"}
 
     await adapter.append_message_to_store(message, identity, "generation")
     assert query.await_args.kwargs == {

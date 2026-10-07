@@ -32,7 +32,7 @@ def get_date_natural_language() -> str:
 
 def convert_generation_id_to_message_node_id(
     generation_id: str | list[str] | set[str],
-    role: Literal['user', 'ai', 'assistant', 'system', 'tool', 'info']
+    role: Literal['user', 'assistant', 'assistant', 'system', 'tool', 'info']
 ) -> str | list[str] | set[str]:
     '''Convert generation id to message node id.
     '''

@@ -1,6 +1,6 @@
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
     StreamConfig,
 )
@@ -13,9 +13,9 @@ class DeepSeekBot(BaseOpenAIBot):
 
     provider = "deepseek"
     default_endpoint = PROVIDER_BASE_URL["deepseek"]
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         message_config=MessageConfig(
-            supported_roles=("system", "user", "ai", "tool"),
+            supported_roles=("system", "user", "assistant", "tool"),
             include_name=True,
         ),
         reasoning_config=ReasoningConfig(

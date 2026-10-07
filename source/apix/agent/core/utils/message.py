@@ -7,7 +7,7 @@ following application-owned values::
     {
         "message_uid": str,
         "generation_id": str,
-        "role": Literal["system", "user", "ai", "tool", "info"],
+        "role": Literal["system", "user", "assistant", "tool", "info"],
         "name": str | None,
         "content": str | list | None,
         "node_id": str,
@@ -39,11 +39,11 @@ dictionary directly.
 
 For role `info`
 - What is it?
-> It is a branch of ai message which contains no think and no content.
+> It is a branch of assistant message which contains no think and no content.
 > It just defines a dictionary struct, not a subclass of ApixMessageBase.
 - When to use it?
-> Use when you want to append some message information in append-only-database, but you can not modify an existing ai message.
-> An ai message without think and content is not recommanded.
+> Use when you want to append some message information in append-only-database, but you can not modify an existing assistant message.
+> An assistant message without think and content is not recommanded.
 > Such as: use when a todo list is written, a web search tool is called by assistant and some website is visited.
 info message does not provided a class, use ai_context_adapter.append_to_store(...) to store.
 """
@@ -67,7 +67,7 @@ MessageRole = Literal[
     "developer",
     "system",
     "user",
-    "ai",
+    "assistant",
     "tool",
 ]
 
@@ -189,7 +189,7 @@ class ApixMessageBase:
 
 class ApixAiMessage(ApixMessageBase):
     __slots__ = ()
-    role: ClassVar[Literal["ai"]] = "ai"
+    role: ClassVar[Literal["assistant"]] = "assistant"
 
     def __init__(
         self,
@@ -505,7 +505,7 @@ class ApixAiMessageChunk:
     Neither chunk1 nor chunk2 is modified.
     """
 
-    role: ClassVar[Literal["ai"]] = "ai"
+    role: ClassVar[Literal["assistant"]] = "assistant"
 
     content_delta: str = ""
     reasoning_delta: str = ""

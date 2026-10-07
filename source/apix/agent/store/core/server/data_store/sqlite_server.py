@@ -437,7 +437,7 @@ class SqliteService(DataServerBase):
             FROM messages AS m
             JOIN conversations AS c ON c.id = m.conversation_id
             WHERE c.user_uid = ? AND c.is_deleted = 0
-              AND m.is_deleted = 0 AND m.role IN ('user', 'ai')
+              AND m.is_deleted = 0 AND m.role IN ('user', 'assistant')
               AND m.content LIKE ?
             ORDER BY c.last_active_at DESC, m.id DESC
             LIMIT 300

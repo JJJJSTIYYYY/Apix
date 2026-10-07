@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
     ReasoningEffort,
 )
@@ -35,9 +35,9 @@ class OllamaBot(BaseBot):
     """Adapter for Ollama's native ``/api/chat`` protocol."""
 
     provider = "ollama"
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         message_config=MessageConfig(
-            supported_roles=("system", "user", "ai", "tool"),
+            supported_roles=("system", "user", "assistant", "tool"),
         ),
         reasoning_config=ReasoningConfig(
             effort_path=None,
@@ -56,7 +56,7 @@ class OllamaBot(BaseBot):
         model: str,
         endpoint: str | None = None,
         api_key: str = "",
-        capabilities: ModelCapabilities | None = None,
+        capabilities: ProviderProfile | None = None,
         role_schema: RoleSchema | None = None,
         client: Any | None = None,
     ) -> None:
@@ -106,7 +106,7 @@ class OllamaBot(BaseBot):
                 result["tool_name"] = message.name
             return result
 
-        role = "assistant" if message.role == "ai" else message.role
+        role = "assistant" if message.role == "assistant" else message.role
         result: dict[str, Any] = {
             "role": role,
             "content": message.content or "",

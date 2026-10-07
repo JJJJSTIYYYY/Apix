@@ -51,7 +51,7 @@ async def test_message_cache_workflow_is_copy_safe(tmp_path, payload):
             **payload,
             "message": {
                 "message_uid": "message-2",
-                "role": "ai",
+                "role": "assistant",
                 "content": "world",
                 "metadata": {"model": "test"},
                 "extensions": {"reasoning": "because"},

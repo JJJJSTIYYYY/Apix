@@ -219,7 +219,7 @@ class StreamEventHandler(EventHandler):
                 "session_id": session_id,
                 "conversation_uid": conversation_uid,
                 "target": target,
-                "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
+                "node_id": convert_generation_id_to_message_node_id(generation_id, 'assistant'),
                 "generation_id": generation_id,
                 "config": config,
                 "timestamp": timestamp,
@@ -264,7 +264,7 @@ class StreamEventHandler(EventHandler):
                         data={
                             "event_name": "msg_stream_start",
                             "content": {
-                                "node_id": convert_generation_id_to_message_node_id(generation_id, 'ai'),
+                                "node_id": convert_generation_id_to_message_node_id(generation_id, 'assistant'),
                                 "parent_id": content
                             }
                         },

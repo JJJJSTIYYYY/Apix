@@ -199,7 +199,7 @@ async def test_users_conversations_and_messages(db, monkeypatch):
             "conversation_uid": "conv-1",
             "message": {
                 "message_uid": "message-2",
-                "role": "ai",
+                "role": "assistant",
                 "name": "assistant",
                 "content": "hello back",
                 "generation_id": "gen-1",

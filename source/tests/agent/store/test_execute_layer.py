@@ -569,7 +569,7 @@ def test_build_visible_messages_parses_filters_and_reports_branches():
             "node-a",
             "-",
             2,
-            "ai",
+            "assistant",
             extensions="invalid-json",
             metadata='{"score": 1}',
         ),
@@ -583,7 +583,7 @@ def test_build_visible_messages_parses_filters_and_reports_branches():
     parsed, branches, node_chain = executor._build_visible_messages(
         rows,
         "node-a",
-        ("user", "ai", "tool"),
+        ("user", "assistant", "tool"),
     )
 
     assert [message["msg_cursor"] for message in parsed] == [1, 2, 5]
@@ -605,7 +605,7 @@ def test_build_visible_messages_parses_filters_and_reports_branches():
 def test_build_visible_messages_strict_path_and_deleted_fallback():
     rows = [
         _row("parent", "-", 1, "user"),
-        _row("deleted", "parent", 2, "ai", deleted=True),
+        _row("deleted", "parent", 2, "assistant", deleted=True),
         _row("future", "parent", 3, "user"),
     ]
     executor = _executor()
@@ -613,7 +613,7 @@ def test_build_visible_messages_strict_path_and_deleted_fallback():
     parsed, branches, node_chain = executor._build_visible_messages(
         rows,
         "deleted",
-        ("user", "ai"),
+        ("user", "assistant"),
         guess_children=False,
     )
 
@@ -624,7 +624,7 @@ def test_build_visible_messages_strict_path_and_deleted_fallback():
     parsed, _, _ = executor._build_visible_messages(
         deepcopy(rows),
         "missing",
-        ("user", "ai"),
+        ("user", "assistant"),
         guess_children=False,
     )
     assert [message["node_id"] for message in parsed] == [
@@ -711,10 +711,10 @@ def test_build_visible_messages_skips_duplicate_branch_parents(monkeypatch):
     [
         (
             "get_messages",
-            ("user", "ai", "system", "tool", "info"),
+            ("user", "assistant", "system", "tool", "info"),
             False,
         ),
-        ("get_messages_for_user", ("user", "ai", "info", "tool"), True),
+        ("get_messages_for_user", ("user", "assistant", "info", "tool"), True),
     ],
 )
 async def test_get_messages_uses_cached_chain_and_recent_messages(

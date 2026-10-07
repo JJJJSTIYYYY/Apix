@@ -128,11 +128,11 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id BIGINT NOT NULL COMMENT 'id in table conversations, to make table joins more efficient.',
 
     conversation_uid VARCHAR(64) NOT NULL COMMENT 'The conversation uid that exposes to user, it will be used to query messages.',
-    generation_id VARCHAR(64) NOT NULL COMMENT 'Generation id to identify different llm''s generation task, include user message enter and all ai message triggered by this input.',
+    generation_id VARCHAR(64) NOT NULL COMMENT 'Generation id to identify different llm''s generation task, include user message enter and all assistant message triggered by this input.',
     node_id VARCHAR(32) NOT NULL COMMENT 'Unique identifier of the message node.',
     parent_id VARCHAR(32) NOT NULL COMMENT 'Reference to the parent node (previous message in the conversation tree).',
 
-    role ENUM('user', 'ai', 'system', 'tool', 'info') NOT NULL,
+    role ENUM('user', 'assistant', 'system', 'tool', 'info') NOT NULL,
     name VARCHAR(255) DEFAULT NULL COMMENT 'Assistant, user, or tool name',
     content LONGTEXT,
     metadata JSON DEFAULT NULL COMMENT 'Usage, model provider, duration, and similar metadata',
@@ -668,7 +668,7 @@ CREATE PROCEDURE append_message (
     IN p_user_uid VARCHAR(64),
     IN p_conversation_uid VARCHAR(64),
     IN p_message_uid VARCHAR(64),
-    IN p_role ENUM('user', 'ai', 'system', 'tool', 'info'),
+    IN p_role ENUM('user', 'assistant', 'system', 'tool', 'info'),
     IN p_name VARCHAR(255),
     IN p_content LONGTEXT,
     IN p_metadata JSON,
@@ -773,7 +773,7 @@ CREATE PROCEDURE delete_messages (
     IN p_user_uid VARCHAR(64),
     IN p_conversation_uid VARCHAR(64),
     IN p_generation_id VARCHAR(64),
-    IN p_role ENUM('user', 'ai')
+    IN p_role ENUM('user', 'assistant')
 )
 BEGIN
     START TRANSACTION;
@@ -792,7 +792,7 @@ BEGIN
       AND generation_id = p_generation_id
       AND (
             (p_role = 'user' AND role = 'user')
-         OR (p_role = 'ai' AND role <> 'user')
+         OR (p_role = 'assistant' AND role <> 'user')
       )
     FOR UPDATE; -- lock rows to avoid concurrent modification
 
@@ -920,7 +920,7 @@ BEGIN
     ) c
         ON c.id = m.conversation_id
     WHERE m.is_deleted = FALSE
-        AND m.role IN ('user', 'ai')
+        AND m.role IN ('user', 'assistant')
         AND m.content LIKE CONCAT('%', p_keyword, '%')
     ORDER BY
         c.last_active_at DESC,

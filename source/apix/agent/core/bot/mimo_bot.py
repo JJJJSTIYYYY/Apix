@@ -1,6 +1,6 @@
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
 )
 from apix.agent.core.bot.base_bot import BaseOpenAIBot
@@ -12,9 +12,9 @@ class XiaomiMIMOBot(BaseOpenAIBot):
 
     provider = "xiaomimimo"
     default_endpoint = PROVIDER_BASE_URL["xiaomimimo"]
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         message_config=MessageConfig(
-            supported_roles=("system", "user", "ai", "tool"),
+            supported_roles=("system", "user", "assistant", "tool"),
         ),
         reasoning_config=ReasoningConfig(
             effort_path=None,

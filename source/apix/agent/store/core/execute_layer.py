@@ -526,7 +526,7 @@ class DataExecutors:
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
-                allow_roles=('user', 'ai', 'system', 'tool', 'info'),
+                allow_roles=('user', 'assistant', 'system', 'tool', 'info'),
                 guess_children=False
             )
 
@@ -566,7 +566,7 @@ class DataExecutors:
         parsed_messages, branches, node_id_chain = self._build_visible_messages(
             messages,
             current_node_id,
-            allow_roles=('user', 'ai', 'system', 'tool', 'info'),
+            allow_roles=('user', 'assistant', 'system', 'tool', 'info'),
             guess_children=False
         )
 
@@ -606,7 +606,7 @@ class DataExecutors:
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
-                allow_roles=('user', 'ai', 'info', 'tool')
+                allow_roles=('user', 'assistant', 'info', 'tool')
             )
 
             payload["node_id_chain"] = node_id_chain
@@ -642,7 +642,7 @@ class DataExecutors:
         parsed_messages, branches, node_id_chain = self._build_visible_messages(
             messages,
             current_node_id,
-            allow_roles=('user', 'ai', 'info', 'tool')
+            allow_roles=('user', 'assistant', 'info', 'tool')
         )
 
         # 5. cache current node chain

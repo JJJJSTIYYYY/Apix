@@ -234,7 +234,7 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
     call.return_value = [{"msg_cursor": 3, "timestamp": "now"}]
     message = {
         "message_uid": "message-1",
-        "role": "ai",
+        "role": "assistant",
         "name": "assistant",
         "content": "answer",
         "metadata": None,
@@ -256,7 +256,7 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
         "u-1",
         "conv-1",
         "message-1",
-        "ai",
+        "assistant",
         "assistant",
         "answer",
     )

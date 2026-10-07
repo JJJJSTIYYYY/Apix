@@ -1,6 +1,6 @@
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
     RequestConfig,
 )
@@ -13,7 +13,7 @@ class OpenAIBot(BaseOpenAIBot):
 
     provider = "openai"
     default_endpoint = PROVIDER_BASE_URL["openai"]
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         request_config=RequestConfig(
             api_style="responses",
             request_defaults={"store": False},
@@ -23,7 +23,7 @@ class OpenAIBot(BaseOpenAIBot):
                 "developer",
                 "system",
                 "user",
-                "ai",
+                "assistant",
                 "tool",
             ),
         ),

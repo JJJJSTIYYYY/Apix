@@ -255,11 +255,11 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     assert result["lifecycle"] == [
         "prepare_context:1",
         "model",
-        "persist:ai:2",
+        "persist:assistant:2",
         "persist:tool:3",
         "prepare_context:2",
         "model",
-        "persist:ai:1",
+        "persist:assistant:1",
     ]
 
     assert result["memory"] is memory
@@ -267,17 +267,17 @@ async def test_full_agent_model_tool_model_loop_with_shared_runtime_state():
     assert memory.call_ids == ["call-memory"]
     assert result["message_store"] is message_store
     assert message_store.batches == [
-        ["user", "ai"],
+        ["user", "assistant"],
         ["tool", "tool", "tool"],
-        ["ai"],
+        ["assistant"],
     ]
     assert [message.role for message in message_store.messages] == [
         "user",
-        "ai",
+        "assistant",
         "tool",
         "tool",
         "tool",
-        "ai",
+        "assistant",
     ]
     assert len(message_store.message_uids) == 6
 

@@ -1,6 +1,6 @@
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
     StreamConfig,
 )
@@ -13,9 +13,9 @@ class MiniMaxBot(BaseOpenAIBot):
 
     provider = "minimax"
     default_endpoint = PROVIDER_BASE_URL["minimax"]
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         message_config=MessageConfig(
-            supported_roles=("system", "user", "ai", "tool"),
+            supported_roles=("system", "user", "assistant", "tool"),
         ),
         reasoning_config=ReasoningConfig(
             effort_path=None,

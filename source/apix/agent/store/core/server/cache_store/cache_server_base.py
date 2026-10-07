@@ -125,7 +125,7 @@ class CacheServerBase(ABC):
                 "message": {
                     "message_uid": unique message id,
                     "generation_id": str,
-                    "role": 'user', 'ai', 'system', 'tool', 'info',
+                    "role": 'user', 'assistant', 'system', 'tool', 'info',
                     "name": "assistant / user / tool name",
                     "content": "message content",
                     "metadata": {...},

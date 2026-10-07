@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from apix.agent.core.bot.base import (
     MessageConfig,
-    ModelCapabilities,
+    ProviderProfile,
     ReasoningConfig,
     ReasoningEffort,
 )
@@ -112,7 +112,7 @@ class BaseBot(ABC):
     """
 
     provider = "base"
-    capabilities = ModelCapabilities()
+    capabilities = ProviderProfile()
 
     def __init__(
         self,
@@ -120,7 +120,7 @@ class BaseBot(ABC):
         model: str,
         endpoint: str,
         api_key: str,
-        capabilities: ModelCapabilities | None = None,
+        capabilities: ProviderProfile | None = None,
         role_schema: RoleSchema | None = None,
     ) -> None:
         if not isinstance(model, str) or not model.strip():
@@ -130,9 +130,9 @@ class BaseBot(ABC):
         if not isinstance(api_key, str):
             raise TypeError("api_key must be a string")
         if capabilities is not None and not isinstance(
-            capabilities, ModelCapabilities
+            capabilities, ProviderProfile
         ):
-            raise TypeError("capabilities must be a ModelCapabilities object")
+            raise TypeError("capabilities must be a ProviderProfile object")
 
         self.model = model.strip()
         self.endpoint = endpoint.rstrip("/")
@@ -257,7 +257,7 @@ class BaseBot(ABC):
         if not self._supports_role(message.role):
             return None
 
-        api_role = "assistant" if message.role == "ai" else message.role
+        api_role = message.role
         content = message.content
         if api_role in {"assistant", "tool"} and content is None:
             content = ""
@@ -498,9 +498,9 @@ class BaseOpenAIBot(BaseBot):
     """Shared adapter for APIs implemented through the OpenAI Python SDK."""
 
     default_endpoint: str | None = None
-    capabilities = ModelCapabilities(
+    capabilities = ProviderProfile(
         message_config=MessageConfig(
-            supported_roles=("developer", "system", "user", "ai", "tool"),
+            supported_roles=("developer", "system", "user", "assistant", "tool"),
         ),
         reasoning_config=ReasoningConfig(
             supported_efforts=("none", "low", "medium", "high"),
@@ -519,7 +519,7 @@ class BaseOpenAIBot(BaseBot):
         model: str,
         endpoint: str | None = None,
         api_key: str,
-        capabilities: ModelCapabilities | None = None,
+        capabilities: ProviderProfile | None = None,
         role_schema: RoleSchema | None = None,
         client: Any | None = None,
     ) -> None:

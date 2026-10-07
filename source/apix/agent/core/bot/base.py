@@ -102,7 +102,7 @@ class StreamConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class ModelCapabilities:
+class ProviderProfile:
     """Grouped declarative differences between model provider protocols.
 
     OpenAI-compatible provider classes should normally only choose an
