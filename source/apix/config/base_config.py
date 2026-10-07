@@ -1,48 +1,12 @@
 """Apix application settings backed by Apixis configuration."""
 
 import os
-from collections.abc import Mapping
-from typing import Any, Literal
+from typing import Literal
 
-from apixis.core.config.base import _config, _get_config
+from apixis.core.config.base import _get_config
 from apixis.core.config.core_config import BASE_DIR
 
-
 VERSION = "3.0.0"
-
-
-def _validate_config_compatibility(config: Mapping[str, Any]) -> None:
-    """Reject storage backends that cannot be shared by remote nodes."""
-    remote = config.get("REMOTE_GATEWAY")
-    if not isinstance(remote, Mapping) or remote.get("enable") is not True:
-        return
-
-    data_store = config.get("DATA_STORE", {})
-    cache = config.get("CACHE", {})
-    data_store_type = (
-        data_store.get("type", "sqlite")
-        if isinstance(data_store, Mapping)
-        else "sqlite"
-    )
-    cache_store_type = (
-        cache.get("store_type", "builtin")
-        if isinstance(cache, Mapping)
-        else "builtin"
-    )
-    conflicts: list[str] = []
-    if data_store_type == "sqlite":
-        conflicts.append("DATA_STORE.type=sqlite")
-    if cache_store_type == "builtin":
-        conflicts.append("CACHE.store_type=builtin")
-    if conflicts:
-        raise ValueError(
-            "REMOTE_GATEWAY requires distributed storage backends; "
-            + ", ".join(conflicts)
-            + " cannot be used in remote node mode."
-        )
-
-
-_validate_config_compatibility(_config)
 
 
 # Server

@@ -51,7 +51,9 @@ pnpm-debug.log*
 .VSCodeCounter/
 
 # Runtime / Data
+.apix
 .apix_data
+.ruff_cache
 source/config.yaml
 config.yaml
 

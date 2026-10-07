@@ -2,7 +2,7 @@
 
 ## 安装与启动
 
-后端要求 Python 3.12 或更高版本。项目已执行 `uv add apixis`，依赖声明为 `apixis>=1.0.2`，`source/uv.lock` 锁定验证使用的版本 `1.0.2`。
+后端要求 Python 3.12 或更高版本。依赖声明为 `apixis>=1.0.0`，`source/uv.lock` 锁定验证使用的版本 `1.1.0`。当前接入使用 1.1.0 的本地事件运行时，不依赖旧版远程通道。
 
 ```bash
 cd source
@@ -127,14 +127,15 @@ AgentGraph 在正常完成、异常、取消及流关闭后清理本次调用的
 
 ## 配置与生命周期
 
-从 `source` 目录运行时，Apix 复用 Apixis 对 `./config.yaml` 的加载结果。Agent、LLM、缓存及数据存储设置由 Apix 使用；远程节点、事件通道、事件背压、日志及 `SERVER.base_dir` 由 Apixis 读取。`SERVER.base_dir` 默认为 `./.apix/`：Apix 将其作为 `APIX_BASE_DIR`，SQLite 默认数据库、文件存储及内置缓存使用此目录；Apixis 将 `APIXIS_BASE_DIR` 设为该目录下的 `apixis` 子目录，用于自身日志。
+从 `source` 目录运行时，Apix 复用 Apixis 对 `./config.yaml` 的加载结果。Agent、LLM、缓存及数据存储设置由 Apix 使用；本地事件队列容量、事件背压、日志及 `SERVER.base_dir` 由 Apixis 读取。`SERVER.base_dir` 默认为 `./.apix/`：Apix 将其作为 `APIX_BASE_DIR`，SQLite 默认数据库、文件存储及内置缓存使用此目录；Apixis 将 `APIXIS_BASE_DIR` 设为该目录下的 `apixis` 子目录，用于自身日志。
 
 - `PIPELINE.event_loop_backpressure` 是有效键名，旧的 `event_loop_back_pressure` 已更正。
 - `PIPELINE.event_handler_default_time_out` 已删除；处理器超时通过订阅的 `time_out` 设置。
-- `REMOTE_GATEWAY` 和 `EVENT_CHANNEL` 保留，供 Apixis 远程通道读取；现有 mailbox 前缀保持不变。
-- HTTP 健康检查使用 Apixis 的 `NODE_ID`，与事件传输身份一致。
+- 事件仅通过有界的进程内 `BuiltinChannel` 队列传递，容量由 `PIPELINE.event_pipe_max_len` 设置，不再支持 Kafka、RabbitMQ 或 HTTP 远程事件传输。
+- `REMOTE_GATEWAY`、`EVENT_CHANNEL` 和远程节点身份配置已失效；遗留配置不会启用远程模式，也不会限制 SQLite 或内置缓存的使用。
+- HTTP 健康检查返回 `{"status": "ok", "service": "apix"}`，不再导入已删除的 `NODE_ID`。
 - Apix 日志使用 Apixis 的 Logger；服务生命周期统一启动和关闭日志。
 
 HTTP 服务显式等待 `start_core()`，关闭时依次停止事件管道、应用服务、事件消费者和日志。独立脚本调用 Apixis 的 getter 会自动唤起核心运行时；显式管理服务生命周期时，应保留组件引用后调用它们的 `stop()`。
 
-运行环境：asyncio。测试不需要模型 API、外部 MCP、MySQL、Redis、Kafka 或 RabbitMQ；这些外部服务的在线连通性需在部署环境验证。
+运行环境：asyncio。默认测试不需要模型 API、外部 MCP、MySQL 或 Redis；这些外部服务的在线连通性需在部署环境验证。Apixis 事件集成测试验证本地队列、服务生命周期重启和健康检查，不再验证远程传输身份。Apix 自身仍使用 `httpx` 调用模型及测试 ASGI 接口，这与已删除的 Apixis 远程传输无关。

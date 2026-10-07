@@ -6,11 +6,6 @@ from typing import Annotated, TypedDict
 from unittest.mock import AsyncMock
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
-from apix.agent.core.graph import AgentGraph, AgentGraphCreator
-from apix.agent.core.tool.mcp import mcp_mgr
-from apix.agent.core.utils.message import ApixAiMessage, ApixToolMessage
 from apixis.core.graph import (
     AutoMerge,
     Command,
@@ -18,6 +13,11 @@ from apixis.core.graph import (
     get_stream_writer,
 )
 from apixis.core.utils.exception import InvalidContextError
+from httpx import ASGITransport, AsyncClient
+
+from apix.agent.core.graph import AgentGraph, AgentGraphCreator
+from apix.agent.core.tool.mcp import mcp_mgr
+from apix.agent.core.utils.message import ApixAiMessage, ApixToolMessage
 
 
 class State(TypedDict, total=False):
@@ -146,25 +146,38 @@ async def test_custom_messages_key_reaches_tool_node(closed_scopes):
     assert result["conversation"][-1].content == "hello"
 
 
-async def test_server_lifespan_can_restart_and_reports_transport_identity(monkeypatch):
+async def test_server_lifespan_can_restart_with_local_events_and_health_check(
+    monkeypatch,
+):
+    from apixis.core.event import (
+        BuiltinChannel,
+        EventType,
+        get_event_pipe,
+        subscribe,
+        unsubscribe,
+    )
+
     from apix.server import create_app
-    from apixis.core.config.core_config import NODE_ID
-    from apixis.core.event import EventType, get_event_pipe, subscribe, unsubscribe
 
     # Exercise the real event runtime without opening unrelated storage services.
-    monkeypatch.setattr("apix.server.auto_init.start", AsyncMock())
-    monkeypatch.setattr("apix.server.auto_init.stop", AsyncMock())
+    start, stop = AsyncMock(), AsyncMock()
+    monkeypatch.setattr("apix.server.auto_init.start", start)
+    monkeypatch.setattr("apix.server.auto_init.stop", stop)
     app = create_app()
     for _ in range(2):
         received = asyncio.Event()
 
         @subscribe("apix.migration.health")
-        async def receive(event):
+        async def receive(event, received=received):
             received.set()
 
         try:
             async with app.router.lifespan_context(app):
-                await get_event_pipe().post_event(
+                pipe = get_event_pipe()
+                assert pipe.is_running
+                assert isinstance(pipe.get_channel(), BuiltinChannel)
+                assert pipe.maxsize > 0
+                await pipe.post_event(
                     event_type=EventType.WORKFLOW, event_name="apix.migration.health"
                 )
                 await asyncio.wait_for(received.wait(), 1)
@@ -172,9 +185,13 @@ async def test_server_lifespan_can_restart_and_reports_transport_identity(monkey
                     transport=ASGITransport(app), base_url="http://test"
                 ) as client:
                     response = await client.get("/health")
-                assert response.json() == {"status": "ok", "service": NODE_ID}
+                assert response.status_code == 200
+                assert response.json() == {"status": "ok", "service": "apix"}
+            assert not pipe.is_running
         finally:
             unsubscribe("receive")
+    assert start.await_count == 2
+    assert stop.await_count == 2
 
 
 async def test_add_tools_forwards_llm_binding_with_custom_messages_key(closed_scopes):

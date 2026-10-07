@@ -1,19 +1,18 @@
-from contextlib import asynccontextmanager
-
-import pkgutil
 import importlib
+import pkgutil
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
-from fastapi import FastAPI, APIRouter
+
 import uvicorn
+from apixis.core.event import get_event_loop, get_event_pipe, start_core
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 
-from apix.common.utils.version import print_logo
-from apix.config.base_config import BASE_URL
-from apixis.core.config.core_config import NODE_ID
 import apix.router as routers_pkg
 from apix.common.lifespan.auto_init import auto_init
-from apixis.core.event import get_event_pipe, get_event_loop, start_core
 from apix.common.utils.logger import Logger, logger
+from apix.common.utils.version import print_logo
+from apix.config.base_config import BASE_URL
 
 
 def auto_load_router(app: FastAPI):
@@ -46,8 +45,7 @@ async def lifespan(app: FastAPI):
 
         yield
     finally:
-        # The gateway must learn that this node is unavailable before the
-        # remaining services and event dispatcher are torn down.
+        # Stop event publication before application services and the dispatcher.
         try:
             if event_pipe is not None:
                 await event_pipe.stop()
@@ -67,7 +65,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health_check():
-        return JSONResponse({"status": "ok", "service": str(NODE_ID)})
+        return JSONResponse({"status": "ok", "service": "apix"})
 
     return app
 
