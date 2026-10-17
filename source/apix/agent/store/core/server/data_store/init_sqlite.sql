@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS messages (
     generation_id TEXT NOT NULL DEFAULT '',
     node_id TEXT NOT NULL DEFAULT '',
     parent_id TEXT NOT NULL DEFAULT '',
-    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'developer', 'tool', 'info')),
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool', 'info')),
     name TEXT,
     content TEXT CHECK (content IS NULL OR json_valid(content)),
     tool_calls TEXT CHECK (tool_calls IS NULL OR json_type(tool_calls) = 'array'),

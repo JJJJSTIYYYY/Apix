@@ -74,7 +74,7 @@ SDK 错误及库的 `StreamError`、`IncompleteStreamError` 等异常直接向�
 
 ## 消息
 
-`ApixUserMessage`、`ApixSystemMessage`、`ApixDeveloperMessage`、`ApixAiMessage`、
+`ApixUserMessage`、`ApixSystemMessage`、`ApixAiMessage`、
 `ApixToolMessage` 保留业务属性访问方式。`to_chat()` 返回发送给模型的字段，
 `to_dict()` 还包含 `message_uid`、`metadata` 和 `extensions`，返回值均独立复制。
 工具消息的 `name` 保留在应用/存储中，不作为 Chat tool 消息字段发送。
@@ -89,7 +89,7 @@ SDK 错误及库的 `StreamError`、`IncompleteStreamError` 等异常直接向�
 
 ## 数据库
 
-SQLite 和 MySQL 的 messages 表同步增加协议列，并接受 `developer` 角色。
+SQLite 和 MySQL 的 messages 表同步增加协议列，但不接受 `developer` 角色。
 `content` 使用 JSON 编码存储，读取时恢复原值。SQLite 的 JSON 列为带校验的 TEXT，
 MySQL 使用 JSON 列。初始化 SQL 将数据库默认排序规则统一为 `utf8mb4_unicode_ci`，
 使存储过程参数与表字段保持一致。游标、消息标识、树分支、软删除和业务扩展保持原有语义。

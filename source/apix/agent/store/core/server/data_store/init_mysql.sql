@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS messages (
     node_id VARCHAR(32) NOT NULL COMMENT 'Unique identifier of the message node.',
     parent_id VARCHAR(32) NOT NULL COMMENT 'Reference to the parent node (previous message in the conversation tree).',
 
-    role ENUM('user', 'assistant', 'system', 'developer', 'tool', 'info') NOT NULL,
+    role ENUM('user', 'assistant', 'system', 'tool', 'info') NOT NULL,
     name VARCHAR(255) DEFAULT NULL COMMENT 'Assistant, user, or tool name',
     content JSON,
     tool_calls JSON DEFAULT NULL,
@@ -679,7 +679,7 @@ CREATE PROCEDURE append_message (
     IN p_user_uid VARCHAR(64),
     IN p_conversation_uid VARCHAR(64),
     IN p_message_uid VARCHAR(64),
-    IN p_role ENUM('user', 'assistant', 'system', 'developer', 'tool', 'info'),
+    IN p_role ENUM('user', 'assistant', 'system', 'tool', 'info'),
     IN p_name VARCHAR(255),
     IN p_content JSON,
     IN p_tool_calls JSON,

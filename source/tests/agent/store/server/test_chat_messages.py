@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from apix.agent.core.utils.message import ApixAiMessage, ApixDeveloperMessage, ApixToolMessage, ApixUserMessage
+from apix.agent.core.utils.message import ApixAiMessage, ApixSystemMessage, ApixToolMessage, ApixUserMessage
 from apix.agent.prebuilt.adapter.context.context_adapter import AIContextAdapter
 from apix.agent.store.core.server.data_store.sqlite_server import SqliteService
 from tests.agent.store.server.test_sqlite_server import create_user_and_conversation
@@ -45,19 +45,11 @@ async def test_sqlite_content_and_protocol_fields_round_trip(tmp_path, monkeypat
 async def test_context_preserves_multimodal_user_and_developer():
     parts = [{"type": "image_url", "image_url": {"url": "https://example.test/a.png"}}]
     messages, _ = AIContextAdapter().convert_to_apix_messages([
-        {"role": "developer", "content": "rules"},
+        {"role": "system", "content": "rules"},
         {"role": "user", "content": parts, "extensions": {"active_file": "notes.md"}},
     ])
-    assert isinstance(messages[0], ApixDeveloperMessage)
+    assert isinstance(messages[0], ApixSystemMessage)
     assert messages[1].content[-1] == parts[0]
     assert "<active_file>" in messages[1].content[0]["text"]
     assert parts == [{"type": "image_url", "image_url": {"url": "https://example.test/a.png"}}]
 
-
-
-def test_context_summary_keeps_developer_instructions():
-    developer = ApixDeveloperMessage(content="application rules")
-    systems, messages, _ = AIContextAdapter().filter_apix_messages([
-        developer, ApixUserMessage(content="hello")])
-    assert systems == [developer]
-    assert messages[0].content == "hello"

@@ -14,7 +14,7 @@ from uuid import uuid4
 from openai.types.chat import ChatCompletionMessageFunctionToolCallParam
 
 ToolCall: TypeAlias = ChatCompletionMessageFunctionToolCallParam
-MessageRole = Literal["system", "developer", "user", "assistant", "tool"]
+MessageRole = Literal["system", "user", "assistant", "tool"]
 ContentPart: TypeAlias = dict[str, Any]
 MessageContent: TypeAlias = str | list[ContentPart] | None
 
@@ -135,12 +135,6 @@ class ApixSystemMessage(ApixMessageBase):
 
 
 @dataclass(slots=True, kw_only=True)
-class ApixDeveloperMessage(ApixMessageBase):
-    role: ClassVar[Literal["developer"]] = "developer"
-    content: str | list[ContentPart] = ""
-
-
-@dataclass(slots=True, kw_only=True)
 class ApixToolMessage(ApixMessageBase):
     role: ClassVar[Literal["tool"]] = "tool"
     tool_call_id: str
@@ -159,6 +153,6 @@ class ApixUserMessage(ApixMessageBase):
 
 CompleteMessage: TypeAlias = (
     ApixUserMessage | ApixAiMessage | ApixToolMessage
-    | ApixSystemMessage | ApixDeveloperMessage
+    | ApixSystemMessage
 )
 AnyMessage: TypeAlias = CompleteMessage

@@ -3,7 +3,7 @@ import json
 from typing import Any
 from xml.sax.saxutils import escape
 
-from apix.agent.core.utils.message import ApixSystemMessage, ApixDeveloperMessage, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
+from apix.agent.core.utils.message import ApixSystemMessage, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
 from apix.agent.core.utils.funcs import convert_generation_id_to_message_node_id
 from apix.agent.core.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo
 from apix.common.utils.logger import logger
@@ -270,11 +270,10 @@ class AIContextAdapter:
                 if not content and not any(fields.values()):
                     continue
                 messages.append(ApixAiMessage(**kwargs, content=content, name=name, **fields))
-            elif role in ("system", "developer"):
+            elif role == "system":
                 if not content:
                     continue
-                cls = ApixSystemMessage if role == "system" else ApixDeveloperMessage
-                messages.append(cls(**kwargs, content=content or "", name=name))
+                messages.append(ApixSystemMessage(**kwargs, content=content or "", name=name))
             elif role == "tool":
                 messages.append(ApixToolMessage(
                     **kwargs, content=content if content is not None else "",
@@ -572,7 +571,7 @@ class AIContextAdapter:
                 if content:
                     messages.append(ApixAiMessage(content=content, name=name))
 
-            elif isinstance(input_msg, (ApixSystemMessage, ApixDeveloperMessage)):
+            elif isinstance(input_msg, ApixSystemMessage):
                 system_msgs.append(copy.copy(input_msg))
 
         logger.info(f"The latest message id is {index}")
