@@ -1,4 +1,5 @@
 """Tests for agent tool wrapping and ToolNode execution."""
+import json
 
 import asyncio
 from collections.abc import Mapping, Sequence
@@ -94,11 +95,7 @@ def _tool_call(
     call_id: str,
     args: dict | None = None,
 ) -> dict:
-    return {
-        "call_id": call_id,
-        "tool_name": tool_name,
-        "args": args,
-    }
+    return {"id": call_id, "type": "function", "function": {"name": tool_name, "arguments": json.dumps(args if args is not None else {})}}
 
 
 def _state_with_calls(*calls: dict) -> dict:
@@ -304,7 +301,8 @@ async def test_string_result_creates_tool_message_with_runtime_metadata():
     assert message.name == "text"
     assert message.tool_call_id == "call-text"
     assert message.metadata["duration"] >= 0
-    assert message.extensions["tool_call_id"] == "call-text"
+    assert message.tool_call_id == "call-text"
+    assert "tool_call_id" not in message.extensions
 
 
 @pytest.mark.asyncio
@@ -833,29 +831,29 @@ async def test_tool_execute_validates_state_name_and_bound_arguments():
         ([], TypeError, "compatible dictionary"),
         ({}, ValueError, "missing required fields"),
         (
-            {"call_id": "", "tool_name": "tool", "args": {}},
+            {"id": "", "type": "function", "function": {"name": "tool", "arguments": '{}'}},
             TypeError,
-            "call_id",
+            "id",
         ),
         (
-            {"call_id": 1, "tool_name": "tool", "args": {}},
+            {"id": 1, "type": "function", "function": {"name": "tool", "arguments": '{}'}},
             TypeError,
-            "call_id",
+            "id",
         ),
         (
-            {"call_id": "id", "tool_name": "", "args": {}},
+            {"id": "id", "type": "function", "function": {"name": "", "arguments": '{}'}},
             TypeError,
-            "tool_name",
+            "name",
         ),
         (
-            {"call_id": "id", "tool_name": 1, "args": {}},
+            {"id": "id", "type": "function", "function": {"name": 1, "arguments": '{}'}},
             TypeError,
-            "tool_name",
+            "name",
         ),
         (
-            {"call_id": "id", "tool_name": "tool", "args": []},
+            {"id": "id", "type": "function", "function": {"name": "tool", "arguments": '[]'}},
             TypeError,
-            "args",
+            "arguments",
         ),
     ],
 )

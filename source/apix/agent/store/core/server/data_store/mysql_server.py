@@ -13,6 +13,7 @@ except ImportError as exc:
     ) from exc
 from fastapi.encoders import jsonable_encoder
 
+from apix.agent.store.core.server.data_store.message_fields import decode_message_row, encode_content, encode_optional
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
 from apix.agent.store.core.server.data_store.utils import data_store_handler
 from apix.common.lifespan.auto_init import auto_init
@@ -270,7 +271,7 @@ class MysqlService(DataServerBase):
         message_uid = message["message_uid"]
         role = message["role"]
         name = message.get("name")
-        content = message["content"]
+        content = encode_content(message.get("content"))
         metadata = message.get("metadata", {})
         extensions = message.get("extensions", {})
         generation_id = message.get("generation_id", "")
@@ -296,6 +297,13 @@ class MysqlService(DataServerBase):
                 role,
                 name,
                 content,
+                encode_optional(message.get("tool_calls")),
+                message.get("tool_call_id"),
+                message.get("refusal"),
+                message.get("reasoning_content"),
+                encode_optional(message.get("audio")),
+                encode_optional(message.get("annotations")),
+                encode_optional(message.get("function_call")),
                 metadata,
                 extensions,
                 generation_id,
@@ -348,6 +356,7 @@ class MysqlService(DataServerBase):
         after_cursor = max(int(after_cursor), 0)
         limit = payload.get("limit", 65535)
         rows = await self._call_procedure("fetch_messages_after_cursor", (user_uid, conversation_uid, after_cursor, limit))
+        rows = [decode_message_row(row, content_json=True) for row in rows]
         next_cursor = rows[-1].get('msg_cursor') + 1 if rows else after_cursor
         return {
             "success": True,
@@ -376,7 +385,7 @@ class MysqlService(DataServerBase):
 
         return {
             "success": True,
-            "messages": rows,
+            "messages": [decode_message_row(row, content_json=True) for row in rows],
         }
 
         

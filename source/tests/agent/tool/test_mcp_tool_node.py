@@ -1,4 +1,5 @@
 """Exercise MCP adaptation and batch lifetimes without external servers."""
+import json
 
 import asyncio
 from copy import deepcopy
@@ -36,7 +37,7 @@ def _state(*names):
         "messages": [
             ApixAiMessage(
                 tool_calls=[
-                    {"tool_name": name, "call_id": f"call-{index}", "args": {}}
+                    {"id": f"call-{index}", "type": "function", "function": {"name": name, "arguments": '{}'}}
                     for index, name in enumerate(names)
                 ]
             )

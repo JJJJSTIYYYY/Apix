@@ -1,4 +1,5 @@
 """Application contracts at the Apixis runtime boundary."""
+import json
 
 import asyncio
 from contextlib import aclosing
@@ -136,7 +137,7 @@ async def test_custom_messages_key_reaches_tool_node(closed_scopes):
             "conversation": [
                 ApixAiMessage(
                     tool_calls=[
-                        {"call_id": "hello-1", "tool_name": "hello", "args": {}}
+                        {"id": "hello-1", "type": "function", "function": {"name": "hello", "arguments": '{}'}}
                     ]
                 )
             ]
@@ -217,7 +218,7 @@ async def test_add_tools_forwards_llm_binding_with_custom_messages_key(closed_sc
             "conversation": [
                 ApixAiMessage(
                     tool_calls=[
-                        {"call_id": "hello-1", "tool_name": "hello", "args": {}}
+                        {"id": "hello-1", "type": "function", "function": {"name": "hello", "arguments": '{}'}}
                     ]
                 )
             ]

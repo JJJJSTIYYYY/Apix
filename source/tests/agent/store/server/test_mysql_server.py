@@ -258,11 +258,11 @@ async def test_user_conversation_and_message_wrappers(monkeypatch):
         "message-1",
         "assistant",
         "assistant",
-        "answer",
+        json.dumps("answer"),
     )
-    assert json.loads(params[6]) == {}
-    assert json.loads(params[7]) == {"reasoning": "thought", "x": "你好"}
-    assert params[8:] == ("g-1", "n-1", "root")
+    assert json.loads(params[13]) == {}
+    assert json.loads(params[14]) == {"reasoning": "thought", "x": "你好"}
+    assert params[15:] == ("g-1", "n-1", "root")
     assert (await service.append_message(
         {"user_uid": "u-1", "conversation_uid": "conv-1", "message": {}}
     ))["success"] is False
@@ -319,7 +319,7 @@ async def test_message_delete_fetch_and_search(monkeypatch):
         {"user_uid": "u-1", "conversation_uid": "c-1", "cursor": 8}
     ))["next_cursor"] == 8
 
-    call.return_value = [{"content": "match"}]
+    call.return_value = [{"content": json.dumps("match")}]
     searched = await service.search_messages_by_keyword(
         {"user_uid": "u-1", "keyword": "  foo__bar\\baz  "}
     )

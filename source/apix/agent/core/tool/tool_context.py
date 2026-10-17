@@ -28,7 +28,7 @@ class ToolInjectionContext:
 
     @property
     def tool_call_id(self) -> str:
-        return self.tool_call["call_id"]
+        return self.tool_call["id"]
 
 
 # Examples:

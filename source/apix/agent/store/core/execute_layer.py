@@ -6,6 +6,7 @@ from typing import Any, Awaitable, Callable, TypeVar, cast
 from uuid import uuid4
 from datetime import datetime
 
+from apix.agent.store.core.server.data_store.message_fields import decode_message_row
 from apix.agent.store.utils.message_node_helper import MessageNodeHelper
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
 from apix.agent.store.core.server.cache_store.cache_server_base import CacheServerBase
@@ -450,6 +451,7 @@ class DataExecutors:
             if msg.get("role") not in allow_roles:
                 continue
 
+            decode_message_row(msg)
             msg["metadata"] = self._decode_json_object(msg.get("metadata"))
             msg["extensions"] = self._decode_json_object(msg.get("extensions"))
 
@@ -526,7 +528,7 @@ class DataExecutors:
             parsed_messages, branches, node_id_chain = self._build_visible_messages(
                 messages,
                 current_node_id,
-                allow_roles=('user', 'assistant', 'system', 'tool', 'info'),
+                allow_roles=('user', 'assistant', 'system', 'developer', 'tool', 'info'),
                 guess_children=False
             )
 
@@ -566,7 +568,7 @@ class DataExecutors:
         parsed_messages, branches, node_id_chain = self._build_visible_messages(
             messages,
             current_node_id,
-            allow_roles=('user', 'assistant', 'system', 'tool', 'info'),
+            allow_roles=('user', 'assistant', 'system', 'developer', 'tool', 'info'),
             guess_children=False
         )
 

@@ -16,21 +16,14 @@ def test_message_object_keeps_only_application_owned_fields():
         name="assistant",
         content="answer",
         metadata={"model": "gpt-test", "usage": {"input_tokens": 2}},
-        extensions={
-            "reasoning": "because",
-            "tool_calls": [
-                {
-                    "call_id": "call-1",
-                    "tool_name": "search",
-                    "args": {"query": "apix"},
-                }
-            ],
-            "uploaded_files": ["brief.pdf"],
-        },
+        reasoning_content="because",
+        tool_calls=[{"id": "call-1", "type": "function", "function": {
+            "name": "search", "arguments": '{"query":"apix"}'}}],
+        extensions={"uploaded_files": ["brief.pdf"]},
     )
 
-    assert message.reasoning == "because"
-    assert message.tool_calls[0]["call_id"] == "call-1"
+    assert message.reasoning_content == "because"
+    assert message.tool_calls[0]["id"] == "call-1"
     assert message.uploaded_files == ["brief.pdf"]
     assert not hasattr(message, "id")
     assert not hasattr(message, "timestamp")
@@ -51,7 +44,6 @@ def test_extension_properties_update_the_underlying_dictionary():
     message.system_instruction = ["cite sources"]
 
     assert message.extensions == {
-        "tool_call_id": "call-1",
         "active_file": "notes.md",
         "referenced_message": {"role": "user", "content": "find this"},
         "task": {"type": "automated_task", "prompt": "summarize"},
@@ -68,7 +60,7 @@ def test_message_storage_conversion_uses_the_new_schema():
         name="assistant",
         content="answer",
         metadata={"provider": "openai"},
-        reasoning="internal",
+        reasoning_content="internal",
     )
 
     stored = adapter.convert_to_dict_message(
@@ -78,6 +70,7 @@ def test_message_storage_conversion_uses_the_new_schema():
     )
 
     assert stored == {
+        **message.to_dict(),
         "message_uid": "message-3",
         "generation_id": generation_id,
         "role": "assistant",
@@ -89,7 +82,7 @@ def test_message_storage_conversion_uses_the_new_schema():
         ),
         "parent_id": "parent-node",
         "metadata": {"provider": "openai"},
-        "extensions": {"reasoning": "internal"},
+        "extensions": {},
     }
     assert {"id", "timestamp", "think", "extra", "info"}.isdisjoint(stored)
 
@@ -104,7 +97,8 @@ def test_database_row_conversion_ignores_database_generated_timestamp():
                 "name": "search",
                 "content": "result",
                 "metadata": '{"duration": 0.5}',
-                "extensions": '{"tool_call_id": "call-4"}',
+                "extensions": '{}',
+                "tool_call_id": "call-4",
                 "timestamp": "2026-07-28T00:00:00",
             }
         ]
@@ -126,7 +120,7 @@ def test_store_adapter_sends_the_canonical_message_payload():
         message = ApixAiMessage(
             message_uid="message-5",
             content="answer",
-            reasoning="because",
+            reasoning_content="because",
         )
         asyncio.run(
             AIStoreAdapter().append_message_to_store(
@@ -144,8 +138,9 @@ def test_store_adapter_sends_the_canonical_message_payload():
 
     payload = query_store.await_args.kwargs["payload"]
     assert query_store.await_args.kwargs["action"] == "append_message"
-    assert payload["messages"]["message_uid"] == "message-5"
-    assert payload["messages"]["extensions"] == {"reasoning": "because"}
+    assert payload["message"]["message_uid"] == "message-5"
+    assert payload["message"]["extensions"] == {}
+    assert payload["message"]["reasoning_content"] == "because"
     assert {"id", "timestamp", "think", "extra", "info"}.isdisjoint(
-        payload["messages"]
+        payload["message"]
     )

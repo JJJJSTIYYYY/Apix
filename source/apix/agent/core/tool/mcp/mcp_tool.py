@@ -93,7 +93,7 @@ class MCPTool(Tool):
         """Call the FastMCP tool with arguments supplied by the model."""
         self._validate_call(state, tool_call)
 
-        return await self._call(**(tool_call["args"] or {}))
+        return await self._call(**self._tool_arguments(tool_call))
 
 
 __all__ = ["MCPTool"]

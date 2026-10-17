@@ -1,4 +1,5 @@
 """End-to-end tests for ToolNode inside the compiled graph runtime."""
+import json
 
 import asyncio
 from typing import Annotated, Any, TypedDict
@@ -35,11 +36,7 @@ def _tool_call(
     call_id: str,
     args: dict | None = None,
 ) -> dict:
-    return {
-        "call_id": call_id,
-        "tool_name": tool_name,
-        "args": args,
-    }
+    return {"id": call_id, "type": "function", "function": {"name": tool_name, "arguments": json.dumps(args if args is not None else {})}}
 
 
 async def test_concurrent_tools_are_applied_in_tool_call_order():

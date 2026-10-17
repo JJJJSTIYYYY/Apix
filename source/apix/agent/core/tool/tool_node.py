@@ -118,9 +118,9 @@ class ToolNode(BaseNode):
             )
         for tool_call in tool_calls:
             Tool._validate_tool_call(tool_call)
-            if tool_call["tool_name"] not in self._tools_by_name:
+            if tool_call["function"]["name"] not in self._tools_by_name:
                 raise ValueError(
-                    f"Tool {tool_call['tool_name']!r} is not registered "
+                    f"Tool {tool_call['function']['name']!r} is not registered "
                     f"in node {self.name!r}."
                 )
         return tool_calls
@@ -132,11 +132,11 @@ class ToolNode(BaseNode):
         with timer(
             name="ToolExecution",
             callback=lambda elapsed: logger.info(
-                f"Tool {tool_call['tool_name']} (id={tool_call['call_id']}) "
+                f"Tool {tool_call['function']['name']} (id={tool_call['id']}) "
                 f"executed in {elapsed * 1000:.2f} ms"
             ),
         ) as start:
-            result = await self._tools_by_name[tool_call["tool_name"]].execute(
+            result = await self._tools_by_name[tool_call["function"]["name"]].execute(
                 state, tool_call
             )
             return result, perf_counter() - start
@@ -153,7 +153,7 @@ class ToolNode(BaseNode):
 
         # Batch resources must outlive every task, including cancellation cleanup.
         async with AsyncExitStack() as stack:
-            for tool_name in dict.fromkeys(call["tool_name"] for call in tool_calls):
+            for tool_name in dict.fromkeys(call["function"]["name"] for call in tool_calls):
                 batch_context = getattr(
                     self._tools_by_name[tool_name], "tool_call_batch_context", None
                 )
@@ -162,7 +162,7 @@ class ToolNode(BaseNode):
             tasks = [
                 asyncio.create_task(
                     self._execute_tool_call(state, call),
-                    name=f"tool-{call['tool_name']}-{call['call_id']}",
+                    name=f"tool-{call['function']['name']}-{call['id']}",
                 )
                 for call in tool_calls
             ]
@@ -171,8 +171,8 @@ class ToolNode(BaseNode):
         messages = [
             ApixToolMessage(
                 content=str(result),
-                name=call["tool_name"],
-                tool_call_id=call["call_id"],
+                name=call["function"]["name"],
+                tool_call_id=call["id"],
                 metadata={"duration": duration},
             )
             for call, (result, duration) in zip(tool_calls, results, strict=True)

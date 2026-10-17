@@ -33,13 +33,13 @@ from apix.agent.core.utils.message import ToolCall
 class Tool:
     """An executable tool with an OpenAI Function Calling schema.
 
-    Tool functions receive arguments from ``ToolCall.args``. A function may
+    Tool functions receive arguments from ``ToolCall.function.arguments``. A function may
     declare at most one runtime-injected argument:
 
         injection: Annotated[ToolInjectionContext, AutoInjection()]
 
     The injected argument is excluded from the model-facing schema and cannot be
-    supplied through ``ToolCall.args``.
+    supplied through ``ToolCall.function.arguments``.
     """
 
     name: str
@@ -544,30 +544,28 @@ class Tool:
         if not isinstance(tool_call, dict):
             raise TypeError("tool_call must be a ToolCall-compatible dictionary.")
 
-        required_keys = {
-            "call_id",
-            "tool_name",
-            "args",
-        }
+        if not {"id", "type", "function"} <= tool_call.keys():
+            raise ValueError("ToolCall is missing required fields: id, type, function")
+        if tool_call.get("type") != "function":
+            raise ValueError("ToolCall.type must be function")
+        if not isinstance(tool_call.get("id"), str) or not tool_call["id"]:
+            raise TypeError("ToolCall.id must be a non-empty string")
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            raise TypeError("ToolCall.function must be a dictionary")
+        if not isinstance(function.get("name"), str) or not function["name"]:
+            raise TypeError("ToolCall.function.name must be a non-empty string")
+        Tool._tool_arguments(tool_call)
 
-        missing_keys = required_keys.difference(tool_call)
-
-        if missing_keys:
-            missing = ", ".join(sorted(missing_keys))
-            raise ValueError(f"ToolCall is missing required fields: {missing}.")
-
-        call_id = tool_call["call_id"]
-        tool_name = tool_call["tool_name"]
-        args = tool_call["args"]
-
-        if not isinstance(call_id, str) or not call_id:
-            raise TypeError("ToolCall.call_id must be a non-empty string.")
-
-        if not isinstance(tool_name, str) or not tool_name:
-            raise TypeError("ToolCall.tool_name must be a non-empty string.")
-
-        if args is not None and not isinstance(args, dict):
-            raise TypeError("ToolCall.args must be a dictionary or None.")
+    @staticmethod
+    def _tool_arguments(tool_call: ToolCall) -> dict[str, Any]:
+        raw = tool_call["function"].get("arguments")
+        if not isinstance(raw, str):
+            raise TypeError("ToolCall.function.arguments must be a JSON string")
+        arguments = json.loads(raw)
+        if not isinstance(arguments, dict):
+            raise TypeError("ToolCall.function.arguments must decode to an object")
+        return arguments
 
     def _build_arguments(
         self,
@@ -575,9 +573,7 @@ class Tool:
         tool_call: ToolCall,
     ) -> dict[str, Any]:
         """Build function keyword arguments for a tool call."""
-        tool_call_args = tool_call["args"]
-
-        arguments = {} if tool_call_args is None else dict(tool_call_args)
+        arguments = self._tool_arguments(tool_call)
 
         injection_parameter = self._injection_parameter
 
@@ -590,7 +586,7 @@ class Tool:
             raise TypeError(
                 f"Argument {injection_name!r} of tool "
                 f"{self.name!r} is automatically injected and "
-                "must not be supplied through ToolCall.args."
+                "must not be supplied through ToolCall.function.arguments."
             )
 
         arguments[injection_name] = ToolInjectionContext(
@@ -676,7 +672,7 @@ class Tool:
 
         self._validate_tool_call(tool_call)
 
-        called_tool_name = tool_call["tool_name"]
+        called_tool_name = tool_call["function"]["name"]
 
         if called_tool_name != self.name:
             raise ValueError(

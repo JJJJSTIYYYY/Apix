@@ -1,4 +1,5 @@
 """Complex graph/tool integration tests that simulate a full Agent turn."""
+import json
 
 import asyncio
 from dataclasses import dataclass, field
@@ -79,11 +80,7 @@ class CompleteAgentState(TypedDict, total=False):
 
 
 def _call(tool_name: str, call_id: str, args: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "call_id": call_id,
-        "tool_name": tool_name,
-        "args": args,
-    }
+    return {"id": call_id, "type": "function", "function": {"name": tool_name, "arguments": json.dumps(args if args is not None else {})}}
 
 
 class ScriptedBot:
@@ -108,7 +105,7 @@ class ScriptedBot:
             return ApixAiMessage(
                 name="Alice",
                 content="",
-                finish_reason="tool_calls",
+
                 tool_calls=[
                     _call("lookup_weather", "call-weather", {"city": "Tokyo"}),
                     _call("add", "call-add", {"left": 19, "right": 23}),
@@ -124,7 +121,7 @@ class ScriptedBot:
                 f"sum={outputs['add']}; "
                 f"memory={outputs['remember']}"
             ),
-            finish_reason="stop",
+
         )
 
 

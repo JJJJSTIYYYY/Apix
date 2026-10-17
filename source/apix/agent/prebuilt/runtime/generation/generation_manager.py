@@ -4,6 +4,7 @@ import time
 from typing import Dict, Literal, Optional
 from uuid import uuid4
 
+from apix.agent.core.utils.message import ApixAiMessage
 from apix.agent.prebuilt.runtime.stream.agent_stream_writer import AgentStreamWriter
 from apix.agent.prebuilt.runtime.generation.base import Generation
 from apix.common.lifespan.resource_cleaner import resource_cleaner
@@ -154,17 +155,15 @@ class GenerationManager:
                 gen.cached_tokens = {
                     "role": "assistant",
                     "content": "",
-                    "think": "",
-                    "extra": {},
-                    "info": {},
-                    "generation_id": gen.generation_id,
-                    "timestamp": time.time()
+                    "reasoning_content": "",
+                    "extensions": {},
+                    "metadata": {},
                 }
 
             # Persist finished: reset buffer
             elif action == "messages_persist_end":
                 gen.cached_tokens["content"] = ""
-                gen.cached_tokens["think"] = ""
+                gen.cached_tokens["reasoning_content"] = ""
 
             # Content streaming
             elif action == "content_chunk_rtn":
@@ -174,12 +173,12 @@ class GenerationManager:
             # Think streaming
             elif action == "think_chunk_rtn":
                 if content:
-                    gen.cached_tokens["think"] += content
+                    gen.cached_tokens["reasoning_content"] += content
 
             # Tool execution: clear buffers
             elif action == "tool_exec_chunk_rtn":
                 gen.cached_tokens["content"] = ""
-                gen.cached_tokens["think"] = ""
+                gen.cached_tokens["reasoning_content"] = ""
 
 
     async def persist_cached_tokens(self, gen: Generation):
@@ -187,27 +186,25 @@ class GenerationManager:
             interrupted_msg = copy.deepcopy(gen.cached_tokens)
 
         if interrupted_msg:
-            ts = int(time.time() * 1000)
-
             content = self._ensure_code_block(interrupted_msg.get("content", ""))
-            think = self._ensure_code_block(interrupted_msg.get("think", ""))
+            think = self._ensure_code_block(interrupted_msg.get("reasoning_content", ""))
 
             think_endswith = "[Conversation Abort]" if think and not content else ""
             content_endswith = "[Conversation Abort]" if content or not think_endswith else ""
 
-            interrupted_msg.update({
-                "content": content + content_endswith,
-                "think": think + think_endswith,
-                "generation_id": gen.generation_id,
-                "timestamp": ts,
-            })
+            message = ApixAiMessage(
+                content=content + content_endswith,
+                reasoning_content=think + think_endswith or None,
+                metadata=interrupted_msg.get("metadata", {}),
+                extensions=interrupted_msg.get("extensions", {}),
+            )
 
             parent_node_id = gen.parent_node_id
             if parent_node_id and parent_node_id != '-':
                 await ai_store_adapter.append_message_to_store(
-                    gen.user_uid,
-                    gen.conversation_uid,
-                    interrupted_msg,
+                    message,
+                    gen.target,
+                    gen.generation_id,
                     parent_node_id
                 )
 

@@ -74,7 +74,7 @@ class AIStoreAdapter:
         payload = {
             "user_uid": user_uid,
             "conversation_uid": conversation_uid,
-            "messages": message,
+            "message": message,
         }
 
         await query_store(action="append_message", payload=payload)

@@ -9,14 +9,14 @@ dependencies = [
     "fastapi>=0.139.2",
     "httpx[socks]>=0.28.1",
     "inflect>=7.5.0",
-    "openai>=2.48.0",
     "pysqlite3>=0.6.0",
     "pyyaml>=6.0.3",
     "redis>=8.0.1",
     "uvicorn>=0.51.0",
-    "ollama>=0.6.2",
     "fastmcp-slim[client]==3.4.7",
     "apixis>=1.0.0",
+    "pydantic>=2.12",
+    "my-llm-py==1.0.1",
 ]
 
 [tool.pytest.ini_options]

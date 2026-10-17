@@ -1,15 +1,14 @@
 from __future__ import annotations
+import json
 
 import pytest
 
 from apix.agent.prebuilt.adapter.context.context_adapter import AIContextAdapter
 from apix.agent.core.utils.message import (
     ApixAiMessage,
-    ApixAiMessageChunk,
     ApixSystemMessage,
     ApixToolMessage,
     ApixUserMessage,
-    ToolCallDelta,
 )
 
 
@@ -79,8 +78,8 @@ def testensure_tool_messages_reorders_deduplicates_and_fills_missing():
     adapter = AIContextAdapter()
     assistant = ApixAiMessage(
         tool_calls=[
-            {"call_id": "a", "tool_name": "first", "args": None},
-            {"call_id": "b", "tool_name": "second", "args": {}},
+            {"id": "a", "type": "function", "function": {"name": "first", "arguments": '{}'}},
+            {"id": "b", "type": "function", "function": {"name": "second", "arguments": '{}'}},
         ]
     )
     first_b = tool_message("b", "B")
@@ -118,10 +117,10 @@ def test_ensure_tool_message_handles_empty_and_non_tool_call_messages():
     "tool_calls",
     [
         [{"tool_name": "x", "args": {}}],
-        [{"call_id": "", "tool_name": "x", "args": {}}],
+        [{"id": "", "type": "function", "function": {"name": "x", "arguments": '{}'}}],
         [
-            {"call_id": "same", "tool_name": "x", "args": {}},
-            {"call_id": "same", "tool_name": "y", "args": {}},
+            {"id": "same", "type": "function", "function": {"name": "x", "arguments": '{}'}},
+            {"id": "same", "type": "function", "function": {"name": "y", "arguments": '{}'}},
         ],
     ],
 )
@@ -150,10 +149,8 @@ def test_convert_persisted_messages_handles_todo_context_abort_and_json():
                 "name": "Alice",
                 "content": "answer<conversation_abort>",
                 "metadata": '{"provider":"test"}',
-                "extensions": (
-                    '{"reasoning":"why<conversation_abort>",'
-                    '"tool_calls":[]}'
-                ),
+                "reasoning_content": "why<conversation_abort>",
+                "tool_calls": [],
             },
             {
                 "role": "user",
@@ -166,7 +163,7 @@ def test_convert_persisted_messages_handles_todo_context_abort_and_json():
 
     assert todo == [{"content": "finish", "status": "in_progress"}]
     assert messages[0].content == "answer"
-    assert messages[0].reasoning == "why"
+    assert messages[0].reasoning_content == "why"
     assert messages[0].metadata == {"provider": "test"}
     assert "<active_file>main.py</active_file>" in messages[1].content
 
@@ -186,22 +183,15 @@ def test_convert_persisted_messages_covers_all_roles_defaults_and_skips():
             {
                 "role": "assistant",
                 "content": "",
-                "extensions": {
-                    "tool_calls": [
-                        {
-                            "call_id": "call-1",
-                            "tool_name": "search",
-                            "args": {},
-                        }
-                    ]
-                },
+                "tool_calls": [
+                        {"id": "call-1", "type": "function", "function": {"name": "search", "arguments": '{}'}}
+                    ],
             },
-            {"role": "tool", "content": ""},
             {
                 "role": "tool",
                 "name": "search",
                 "content": "result",
-                "extensions": {"tool_call_id": "call-1"},
+                "tool_call_id": "call-1",
             },
             {"role": "system", "content": ""},
             {"role": "system", "content": "rules"},
@@ -227,9 +217,9 @@ def test_convert_persisted_messages_covers_all_roles_defaults_and_skips():
     ]
     assert messages[0].message_uid == "user-id"
     assert messages[0].name == "Alice"
-    assert messages[1].name == "assistant"
+    assert messages[1].name is None
     assert messages[2].tool_call_id == "call-1"
-    assert messages[3].name == "system"
+    assert messages[3].name is None
 
 
 def test_convert_persisted_messages_strict_mode_fills_missing_tool_output():
@@ -237,15 +227,9 @@ def test_convert_persisted_messages_strict_mode_fills_missing_tool_output():
         [
             {
                 "role": "assistant",
-                "extensions": {
-                    "tool_calls": [
-                        {
-                            "call_id": "missing",
-                            "tool_name": "search",
-                            "args": None,
-                        }
-                    ]
-                },
+                "tool_calls": [
+                        {"id": "missing", "type": "function", "function": {"name": "search", "arguments": '{}'}}
+                    ],
             }
         ]
     )
@@ -260,7 +244,7 @@ def test_convert_to_dict_message_filter_and_decode_helpers():
     message = ApixAiMessage(
         message_uid="message-1",
         content="answer",
-        reasoning="why",
+        reasoning_content="why",
     )
 
     assert adapter.convert_to_dict_message(
@@ -270,7 +254,8 @@ def test_convert_to_dict_message_filter_and_decode_helpers():
     ) == {
         "role": "assistant",
         "content": "answer",
-        "extensions": {"reasoning": "why"},
+        "reasoning_content": "why",
+        "tool_calls": [],
     }
     assert adapter._decode_json_object('{"a":1}') == {"a": 1}
     assert adapter._decode_json_object("[]") == {}
@@ -309,10 +294,8 @@ def test_convert_tool_message_to_full_dict_uses_independent_payloads():
         "node_id": "eneration-id-apix",
         "parent_id": "parent-id",
         "metadata": {"duration": 1},
-        "extensions": {
-            "custom": {"value": 1},
-            "tool_call_id": "call-1",
-        },
+        "extensions": {"custom": {"value": 1}},
+        "tool_call_id": "call-1",
     }
     result["metadata"]["duration"] = 2
     result["extensions"]["custom"]["value"] = 2
@@ -327,7 +310,7 @@ def test_convert_tool_message_to_full_dict_uses_independent_payloads():
     assert filtered == {
         "role": "tool",
         "content": "",
-        "extensions": {"tool_call_id": "call-2"},
+        "tool_call_id": "call-2",
     }
 
 
@@ -336,7 +319,7 @@ def test_drop_tool_messages_supports_complete_and_streamed_write_todos_calls():
     before = tool_message("before")
     writer = ApixAiMessage(
         tool_calls=[
-            {"call_id": "todo", "tool_name": "write_todos", "args": {}}
+            {"id": "todo", "type": "function", "function": {"name": "write_todos", "arguments": '{}'}}
         ]
     )
     after = tool_message("after")
@@ -348,17 +331,6 @@ def test_drop_tool_messages_supports_complete_and_streamed_write_todos_calls():
     assert dropped[0].content == "[outdated]"
     assert dropped[2].content == "result"
     assert before.content == "result"
-
-    streamed_writer = ApixAiMessageChunk(
-        tool_call_deltas=(
-            ToolCallDelta(index=0, tool_name_delta="write_todos"),
-        )
-    )
-    dropped = adapter.drop_tool_messages(
-        [before, streamed_writer, after],
-        min_keep=0,
-    )
-    assert dropped[0].content == "[outdated]"
 
     generic = adapter.drop_tool_messages(
         [before],
@@ -394,7 +366,7 @@ def test_split_messages_keeps_ai_tool_chain_together():
         ApixUserMessage(content="old"),
         ApixAiMessage(
             tool_calls=[
-                {"call_id": "a", "tool_name": "tool", "args": {}}
+                {"id": "a", "type": "function", "function": {"name": "tool", "arguments": '{}'}}
             ]
         ),
         tool_message("a"),
@@ -429,8 +401,8 @@ def test_split_messages_handles_complete_and_orphan_tool_blocks():
     adapter = AIContextAdapter()
     assistant = ApixAiMessage(
         tool_calls=[
-            {"call_id": "a", "tool_name": "tool", "args": {}},
-            {"call_id": "b", "tool_name": "tool", "args": {}},
+            {"id": "a", "type": "function", "function": {"name": "tool", "arguments": '{}'}},
+            {"id": "b", "type": "function", "function": {"name": "tool", "arguments": '{}'}},
         ]
     )
     first_tool = tool_message("a")
@@ -463,16 +435,16 @@ def test_split_messages_handles_complete_and_orphan_tool_blocks():
 def test_filter_apix_messages_handles_chunks_and_ignores_empty_ai_messages():
     adapter = AIContextAdapter()
     system = ApixSystemMessage(content="system")
-    chunk = ApixAiMessageChunk(
+    chunk = ApixAiMessage(
         message_uid="chunk-id",
-        reasoning_delta="why",
-        content_delta="answer",
+        reasoning_content="why",
+        content="answer",
     )
     systems, messages, index = adapter.filter_apix_messages(
         [
             system,
             ApixUserMessage(content="question", name="user"),
-            ApixAiMessage(content=None, reasoning=None),
+            ApixAiMessage(content=None, reasoning_content=None),
             chunk,
             tool_message("ignored"),
         ]
@@ -489,7 +461,7 @@ def test_filter_apix_messages_can_drop_reasoning_and_keep_ai_content():
     assistant = ApixAiMessage(
         message_uid="assistant-id",
         content="answer",
-        reasoning="private reasoning",
+        reasoning_content="private reasoning",
         name="Alice",
     )
 

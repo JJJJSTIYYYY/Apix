@@ -6,7 +6,6 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from apix.agent.core.utils.message import ApixAiMessageChunk
 from apix.common.type import ApixIdentity
 
 
@@ -34,7 +33,7 @@ class Generation:
     # running / finished / aborted
     status: Literal["running", "finished", "aborted"] = "running"
 
-    cached_tokens: ApixAiMessageChunk = field(default_factory=lambda: ApixAiMessageChunk())
+    cached_tokens: dict = field(default_factory=dict)
     parent_node_id: str = field(default='-')
 
     created_at: float = field(default_factory=time.time)

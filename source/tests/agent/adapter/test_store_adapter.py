@@ -46,7 +46,7 @@ async def test_append_dict_message_and_info_payloads(monkeypatch, identity):
         "payload": {
             "user_uid": "user-1",
             "conversation_uid": "conversation-1",
-            "messages": message,
+            "message": message,
         },
     }
 
@@ -59,7 +59,7 @@ async def test_append_dict_message_and_info_payloads(monkeypatch, identity):
         parent_id="parent",
         name="todo",
     )
-    stored = query.await_args.kwargs["payload"]["messages"]
+    stored = query.await_args.kwargs["payload"]["message"]
     assert query.await_args.kwargs["action"] == "append_message"
     assert stored["role"] == "info"
     assert stored["name"] == "todo"

@@ -3,10 +3,11 @@ import json
 from typing import Any
 from xml.sax.saxutils import escape
 
-from apix.agent.core.utils.message import ApixSystemMessage, ApixAiMessageChunk, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
+from apix.agent.core.utils.message import ApixSystemMessage, ApixDeveloperMessage, ApixUserMessage, ApixToolMessage, ApixAiMessage, AnyMessage
 from apix.agent.core.utils.funcs import convert_generation_id_to_message_node_id
 from apix.agent.core.utils.context import LongtermMemory, ShorttermMemory, Skill, Todo
 from apix.common.utils.logger import logger
+from apix.agent.store.core.server.data_store.message_fields import CHAT_OPTIONAL_FIELDS, decode_message_row
 
 
 class AIContextAdapter:
@@ -157,8 +158,8 @@ class AIContextAdapter:
                 current_message.tool_calls
             ):
                 try:
-                    tool_call_id = tool_call["call_id"]
-                    tool_name = tool_call["tool_name"]
+                    tool_call_id = tool_call["id"]
+                    tool_name = tool_call["function"]["name"]
                 except (KeyError, TypeError) as exc:
                     raise ValueError(
                         "Invalid tool call structure: "
@@ -238,94 +239,53 @@ class AIContextAdapter:
         messages = []
         todo: list[Todo] = None
 
-        index = 0
-        for msg_dict in dict_messages:
-            index = index + 1
+        for row in dict_messages:
+            msg_dict = decode_message_row(copy.deepcopy(row))
             role = msg_dict.get("role")
-            content = str(msg_dict.get("content", "") or "")
+            content = msg_dict.get("content")
             metadata = self._decode_json_object(msg_dict.get("metadata"))
             extensions = self._decode_json_object(msg_dict.get("extensions"))
             name = msg_dict.get("name")
-            message_uid = msg_dict.get("message_uid")
-            message_kwargs = {
-                "metadata": metadata,
-                "extensions": extensions,
-            }
-            if message_uid:
-                message_kwargs["message_uid"] = message_uid
+            kwargs = {"metadata": metadata, "extensions": extensions}
+            if msg_dict.get("message_uid"):
+                kwargs["message_uid"] = msg_dict["message_uid"]
 
             if role == "user":
-                name = name or "user"
-                content = self._build_user_context(
-                    extensions,
-                ) + (content or "")
-
+                prefix = self._build_user_context(extensions)
+                if isinstance(content, list):
+                    content = ([{"type": "text", "text": prefix}] if prefix else []) + content
+                else:
+                    content = prefix + (content or "")
                 if not content:
                     continue
-
-                msg = ApixUserMessage(
-                    **message_kwargs,
-                    content=content,
-                    name=name,
-                )
-                messages.append(msg)
-
+                messages.append(ApixUserMessage(**kwargs, content=content, name=name))
             elif role == "assistant":
-                name = name or "assistant"
+                fields = {key: msg_dict[key] for key in CHAT_OPTIONAL_FIELDS
+                          if key in msg_dict and msg_dict[key] is not None}
                 suffix = "<conversation_abort>"
-                reasoning = str(extensions.get("reasoning", "") or "")
-                if content.endswith(suffix):
-                    content = content[:-len(suffix)]
-                if reasoning.endswith(suffix):
-                    reasoning = reasoning[:-len(suffix)]
-                    extensions["reasoning"] = reasoning
-                tool_calls = extensions.get("tool_calls")
-                if not content and not reasoning and not tool_calls:
-                    continue  # Skip empty AI message
-
-                msg = ApixAiMessage(
-                    **message_kwargs,
-                    content=content,
-                    name=name,
-                )
-
-                messages.append(msg)
-
-            elif role == "system":
+                if isinstance(content, str):
+                    content = content.removesuffix(suffix)
+                if isinstance(fields.get("reasoning_content"), str):
+                    fields["reasoning_content"] = fields["reasoning_content"].removesuffix(suffix)
+                if not content and not any(fields.values()):
+                    continue
+                messages.append(ApixAiMessage(**kwargs, content=content, name=name, **fields))
+            elif role in ("system", "developer"):
                 if not content:
                     continue
-
-                msg = ApixSystemMessage(
-                    **message_kwargs,
-                    content=content,
-                    name=name or "system",
-                )
-                messages.append(msg)
-
+                cls = ApixSystemMessage if role == "system" else ApixDeveloperMessage
+                messages.append(cls(**kwargs, content=content or "", name=name))
             elif role == "tool":
-                if not content:
-                    continue
-
-                msg = ApixToolMessage(
-                    **message_kwargs,
-                    content=content,
-                    name=name,
-                    tool_call_id=extensions.get("tool_call_id"),
-                )
-                messages.append(msg)
-
+                messages.append(ApixToolMessage(
+                    **kwargs, content=content if content is not None else "",
+                    name=name, tool_call_id=msg_dict.get("tool_call_id"),
+                ))
             elif role == "info":
                 if name == "todo":
-                    todo_list = extensions.get("todo_list") or []
-                    todo = (
-                        todo_list
-                        if todo_list
-                        and todo_list[-1].get("status") != "completed"
-                        else None
-                    )
-
+                    items = extensions.get("todo_list") or []
+                    todo = items if items and items[-1].get("status") != "completed" else None
             else:
-                logger.warning(f"Unknown role or empty content ignored: {role}")
+                logger.warning(f"Unknown role ignored: {role}")
 
         if strict: self.ensure_tool_message(messages)
         return messages, todo
@@ -367,8 +327,8 @@ class AIContextAdapter:
         Raises:
             TypeError: If message is not an ApixAiMessage or ApixToolMessage.
             
-            When ``filter=True``, the returned dict contains ``role``,
-            ``content`` and optional ``extensions``.
+            When ``filter=True``, the returned dict contains Chat protocol
+            fields and optional business ``extensions``.
         """
         logger.trace()
 
@@ -378,39 +338,17 @@ class AIContextAdapter:
                 f"got {type(message).__name__}."
             )
 
-        metadata: dict[str, Any] = copy.deepcopy(message.metadata or {})
-        extensions: dict[str, Any] = copy.deepcopy(message.extensions or {})
-        content = str(message.content or "")
-
-        if isinstance(message, ApixAiMessage):
-            role = "assistant"
-        else:
-            role = "tool"
-
+        result = message.to_dict()
         if filter:
-            result = {
-                "role": role,
-                "content": content,
-            }
-            if extensions:
-                result["extensions"] = extensions
+            result = message.to_chat()
+            if message.extensions:
+                result["extensions"] = copy.deepcopy(message.extensions)
             return result
-
-        result = {
-            "message_uid": message.message_uid,
-            "generation_id": generation_id,
-            "role": role,
-            "name": message.name,
-            "content": content,
-            "node_id": convert_generation_id_to_message_node_id(
-                generation_id,
-                role,
-            ),
-            "parent_id": parent_id,
-            "metadata": metadata,
-            "extensions": extensions,
-        }
-
+        result.update(
+            generation_id=generation_id,
+            node_id=convert_generation_id_to_message_node_id(generation_id, message.role),
+            parent_id=parent_id,
+        )
         return result
 
     @staticmethod
@@ -460,14 +398,8 @@ class AIContextAdapter:
                 # Only check ApixAiMessage with tool_calls
                 if isinstance(msg, ApixAiMessage):
                     if any(
-                        call.get("tool_name") == "write_todos"
+                        call.get("function", {}).get("name") == "write_todos"
                         for call in msg.tool_calls
-                    ):
-                        last_todo_idx = i
-                elif isinstance(msg, ApixAiMessageChunk):
-                    if any(
-                        delta.tool_name_delta == "write_todos"
-                        for delta in msg.tool_call_deltas
                     ):
                         last_todo_idx = i
 
@@ -627,7 +559,7 @@ class AIContextAdapter:
                     parts = [
                         part
                         for part in (
-                            input_msg.reasoning,
+                            input_msg.reasoning_content,
                             input_msg.content,
                         )
                         if isinstance(part, str) and part
@@ -640,21 +572,7 @@ class AIContextAdapter:
                 if content:
                     messages.append(ApixAiMessage(content=content, name=name))
 
-            elif isinstance(input_msg, ApixAiMessageChunk):
-                content = "\n\n".join(
-                    part
-                    for part in (
-                        input_msg.reasoning_delta,
-                        input_msg.content_delta,
-                    )
-                    if part
-                )
-                name = input_msg.name
-                index = input_msg.message_uid
-                if content:
-                    messages.append(ApixAiMessage(content=content, name=name))
-
-            elif isinstance(input_msg, ApixSystemMessage):
+            elif isinstance(input_msg, (ApixSystemMessage, ApixDeveloperMessage)):
                 system_msgs.append(copy.copy(input_msg))
 
         logger.info(f"The latest message id is {index}")

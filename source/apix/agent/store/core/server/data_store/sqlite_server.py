@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional, TypeVar
 from apix.agent.store.core.server.data_store.data_server_base import DataServerBase
 from apix.agent.store.core.server.data_store.utils import data_store_handler
 from apix.common.lifespan.auto_init import auto_init
+from apix.agent.store.core.server.data_store.message_fields import decode_message_row, encode_content, encode_optional
 from apix.common.utils.logger import logger
 from apix.config.base_config import SQLITE_DATABASE
 
@@ -317,8 +318,9 @@ class SqliteService(DataServerBase):
                 INSERT INTO messages (
                     message_uid, msg_cursor, user_uid, conversation_id,
                     conversation_uid, generation_id, node_id, parent_id,
-                    role, name, content, metadata, extensions
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    role, name, content, tool_calls, tool_call_id, refusal,
+                    reasoning_content, audio, annotations, function_call, metadata, extensions
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message["message_uid"],
@@ -331,7 +333,14 @@ class SqliteService(DataServerBase):
                     message.get("parent_id", ""),
                     role,
                     message.get("name"),
-                    message["content"],
+                    encode_content(message.get("content")),
+                    encode_optional(message.get("tool_calls")),
+                    message.get("tool_call_id"),
+                    message.get("refusal"),
+                    message.get("reasoning_content"),
+                    encode_optional(message.get("audio")),
+                    encode_optional(message.get("annotations")),
+                    encode_optional(message.get("function_call")),
                     metadata,
                     extensions,
                 ),
@@ -401,7 +410,8 @@ class SqliteService(DataServerBase):
         limit = int(payload.get("limit", 65535))
         rows = await self._fetch_all(
             """
-            SELECT message_uid, msg_cursor, role, name, content, metadata,
+            SELECT message_uid, msg_cursor, role, name, content, tool_calls,
+                   tool_call_id, refusal, reasoning_content, audio, annotations, function_call, metadata,
                    extensions, timestamp, generation_id, node_id, parent_id,
                    is_deleted
             FROM messages
@@ -416,6 +426,7 @@ class SqliteService(DataServerBase):
                 limit,
             ),
         )
+        rows = [decode_message_row(row, content_json=True) for row in rows]
         next_cursor = rows[-1]["msg_cursor"] + 1 if rows else after_cursor
         return {
             "success": True,
@@ -444,7 +455,7 @@ class SqliteService(DataServerBase):
             """,
             (payload["user_uid"], f"%{keyword}%"),
         )
-        return {"success": True, "messages": rows}
+        return {"success": True, "messages": [decode_message_row(row, content_json=True) for row in rows]}
 
     # --------------------------------------------------
     # Skills
